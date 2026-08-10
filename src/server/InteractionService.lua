@@ -280,6 +280,39 @@ local function setSurfaceGuiEnabled(root, labelName, enabled)
 	end
 end
 
+local function setFridgeContentVisible(root, visible)
+	for _, instance in ipairs(getInstanceAndDescendants(root)) do
+		if instance:IsA("BasePart") then
+			local openTransparency = instance:GetAttribute("OpenTransparency")
+			local openCanCollide = instance:GetAttribute("OpenCanCollide")
+
+			if visible then
+				instance.Transparency = if openTransparency ~= nil then openTransparency else 0
+				instance.CanCollide = if openCanCollide ~= nil then openCanCollide else instance.CanCollide
+			else
+				instance.Transparency = 1
+				instance.CanCollide = false
+			end
+		elseif instance:IsA("PointLight") or instance:IsA("SpotLight") or instance:IsA("SurfaceLight") then
+			local openEnabled = instance:GetAttribute("OpenEnabled")
+			instance.Enabled = visible and (openEnabled == nil or openEnabled == true)
+		elseif instance:IsA("SurfaceGui") then
+			local openEnabled = instance:GetAttribute("OpenEnabled")
+			instance.Enabled = visible and (openEnabled == nil or openEnabled == true)
+		end
+	end
+end
+
+local function getFridgeDoorOpenCFrame(door)
+	local baseCFrame = door:GetAttribute("BaseCFrame") or door.CFrame
+	local hingeOffset = -door.Size.X / 2
+
+	return baseCFrame
+		* CFrame.new(hingeOffset, 0, 0)
+		* CFrame.Angles(0, math.rad(-92), 0)
+		* CFrame.new(-hingeOffset, 0, 0)
+end
+
 function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService)
 	local self = setmetatable({}, InteractionService)
 	self.eventManager = eventManager
@@ -1699,10 +1732,16 @@ function InteractionService:_wireSnackButton(button)
 end
 
 function InteractionService:_setFridgeOpenDetails(fridge, opened)
+	local iceCube = fridge:FindFirstChild("ColdIdeaIceCube", true)
+	local pizzaModel = fridge:FindFirstChild("FridgePizza", true)
+	local colaModel = fridge:FindFirstChild("FridgeBloxyCola", true)
 	local pizza = fridge:FindFirstChild("PizzaSlice", true)
 	local cola = fridge:FindFirstChild("BloxyColaCan", true)
 	local secretButton = fridge:FindFirstChild("SecretFridgeButton", true)
 
+	setFridgeContentVisible(iceCube, opened)
+	setFridgeContentVisible(pizzaModel, opened)
+	setFridgeContentVisible(colaModel, opened)
 	setPromptEnabled(pizza, opened)
 	setPromptEnabled(cola, opened)
 
@@ -1716,8 +1755,8 @@ function InteractionService:_setFridgeOpenDetails(fridge, opened)
 end
 
 function InteractionService:_wireSnackFridge(fridge)
-	local prompt = getPrompt(fridge)
 	local door = fridge:FindFirstChild("FridgeDoor", true)
+	local prompt = door and getPrompt(door) or getPrompt(fridge)
 	local iceCube = fridge:FindFirstChild("ColdIdeaIceCube", true)
 
 	self.fridgeState[fridge] = self.fridgeState[fridge] or {
@@ -1739,9 +1778,10 @@ function InteractionService:_wireSnackFridge(fridge)
 		if state.Opened then
 			self.systemMessageRemote:FireClient(player, "The fridge contains one cold idea.")
 			tweenPart(door, 0.35, {
-				CFrame = (door:GetAttribute("BaseCFrame") or door.CFrame) + Vector3.new(-2.7, 0, 0.9),
+				CFrame = getFridgeDoorOpenCFrame(door),
 				Color = Color3.fromRGB(172, 242, 255),
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			prompt.ActionText = "Close"
 			self:_setFridgeOpenDetails(fridge, true)
 
 			if iceCube and iceCube:IsA("BasePart") then
@@ -1768,6 +1808,7 @@ function InteractionService:_wireSnackFridge(fridge)
 			state.IceSpinToken = nil
 			self.resetService.RestoreInstance(fridge)
 			self:_setFridgeOpenDetails(fridge, false)
+			prompt.ActionText = "Open"
 		end
 
 		task.wait(0.4)

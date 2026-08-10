@@ -723,6 +723,30 @@ local function makeSnackButton(objectsFolder)
 	return model
 end
 
+local function hideFridgeContentAtBaseline(root)
+	local instances = root:GetDescendants()
+	table.insert(instances, root)
+
+	for _, instance in ipairs(instances) do
+		if instance:IsA("BasePart") then
+			instance:SetAttribute("OpenTransparency", instance.Transparency)
+			instance:SetAttribute("OpenCanCollide", instance.CanCollide)
+			instance.Transparency = 1
+			instance.CanCollide = false
+			instance:SetAttribute("BaseTransparency", 1)
+			instance:SetAttribute("BaseCanCollide", false)
+		elseif instance:IsA("PointLight") or instance:IsA("SpotLight") or instance:IsA("SurfaceLight") then
+			instance:SetAttribute("OpenEnabled", instance.Enabled)
+			instance.Enabled = false
+			instance:SetAttribute("BaseEnabled", false)
+		elseif instance:IsA("SurfaceGui") then
+			instance:SetAttribute("OpenEnabled", instance.Enabled)
+			instance.Enabled = false
+			instance:SetAttribute("BaseEnabled", false)
+		end
+	end
+end
+
 local function makeSnackFridge(objectsFolder)
 	local origin = SNACK_LAB_ORIGIN
 	local fridge = makeModel(objectsFolder, "Fridge")
@@ -741,6 +765,7 @@ local function makeSnackFridge(objectsFolder)
 	iceLight.Range = 8
 	iceLight.Parent = iceCube
 	mark(iceLight)
+	hideFridgeContentAtBaseline(iceCube)
 
 	local pizza = makeModel(fridge, "FridgePizza")
 	local pizzaSlice = createPart(pizza, "PizzaSlice", Vector3.new(2.3, 0.25, 1.45), cframeAt(origin, -14.3, 6.78, -7.75) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(246, 184, 85), Enum.Material.SmoothPlastic, "WedgePart")
@@ -761,6 +786,7 @@ local function makeSnackFridge(objectsFolder)
 	pizzaPrompt:SetAttribute("BaseEnabled", false)
 	tag(pizzaSlice, Constants.Tags.FridgePizza)
 	pizza.PrimaryPart = pizzaSlice
+	hideFridgeContentAtBaseline(pizza)
 
 	local cola = makeModel(fridge, "FridgeBloxyCola")
 	local can = createPart(cola, "BloxyColaCan", Vector3.new(0.82, 1.55, 0.82), cframeAt(origin, -11.6, 4.85, -7.6), Color3.fromRGB(218, 40, 47), Enum.Material.Metal)
@@ -772,6 +798,7 @@ local function makeSnackFridge(objectsFolder)
 	colaPrompt:SetAttribute("BaseEnabled", false)
 	tag(can, Constants.Tags.FridgeBloxyCola)
 	cola.PrimaryPart = can
+	hideFridgeContentAtBaseline(cola)
 
 	local door = createPart(fridge, "FridgeDoor", Vector3.new(5.5, 8, 0.32), cframeAt(origin, -13, 4.9, -6.83), Color3.fromRGB(237, 246, 247), Enum.Material.Metal)
 	createSurfaceText(door, "FridgeDoorText", "DO NOT OPEN", Enum.NormalId.Front, Color3.fromRGB(26, 35, 39), Color3.fromRGB(237, 246, 247))
