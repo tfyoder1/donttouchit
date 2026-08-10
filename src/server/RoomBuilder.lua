@@ -564,7 +564,7 @@ local function makeSnackResetRoomButton(parent)
 	local width = Constants.Room.Width
 	local origin = SNACK_LAB_ORIGIN
 	local wallX = -width / 2 + 0.58
-	local panelZ = 13.6
+	local panelZ = 3.7
 
 	local plate = createPart(
 		resetModel,
@@ -586,7 +586,8 @@ local function makeSnackResetRoomButton(parent)
 	button.Shape = Enum.PartType.Cylinder
 
 	createSurfaceText(plate, "SnackResetButtonText", "RESET\nSNACKS", Enum.NormalId.Right, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
-	createPrompt(button, "Reset", "Snack Lab Reset", 0.2)
+	local prompt = createPrompt(button, "Reset", "Snack Lab Reset", 0.2)
+	prompt.MaxActivationDistance = 12
 	tag(button, Constants.Tags.ResetRoomButton)
 
 	resetModel.PrimaryPart = plate
@@ -888,7 +889,8 @@ local function makeSnackFridge(objectsFolder)
 
 	local door = createPart(fridge, "FridgeDoor", Vector3.new(5.5, 8, 0.32), cframeAt(origin, -13, 4.9, -6.83), Color3.fromRGB(237, 246, 247), Enum.Material.Metal)
 	createSurfaceText(door, "FridgeDoorText", "DO NOT OPEN", Enum.NormalId.Front, Color3.fromRGB(26, 35, 39), Color3.fromRGB(237, 246, 247))
-	createPrompt(door, "Open", "Fridge", 0)
+	local doorPrompt = createPrompt(door, "Open", "Fridge", 0)
+	doorPrompt.MaxActivationDistance = 13
 
 	local secretButton = createPart(fridge, "SecretFridgeButton", Vector3.new(2.55, 1.2, 0.24), cframeAt(origin, -15.7, 4.85, -6.18), Color3.fromRGB(255, 72, 86), Enum.Material.Neon)
 	secretButton.Transparency = 1
@@ -905,6 +907,7 @@ local function makeSnackFridge(objectsFolder)
 	secretPrompt.Enabled = false
 	secretPrompt:SetAttribute("BaseEnabled", false)
 	tag(secretButton, Constants.Tags.SecretFridgeButton)
+	tag(door, Constants.Tags.SnackFridge)
 	tag(fridge, Constants.Tags.SnackFridge)
 
 	fridge.PrimaryPart = body
@@ -949,7 +952,7 @@ local function makeSnackMixer(objectsFolder)
 	local mixer = makeModel(objectsFolder, "Mixer")
 	local mixerX = 17.8
 	local mixerZ = 11.3
-	local mixerFrame = CFrame.new(origin + Vector3.new(mixerX, 0, mixerZ)) * CFrame.Angles(0, math.rad(180), 0)
+	local mixerFrame = CFrame.new(origin + Vector3.new(mixerX, 0, mixerZ))
 
 	local function mixerCFrame(x, y, z)
 		return mixerFrame * CFrame.new(x, y, z)

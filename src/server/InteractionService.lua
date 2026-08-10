@@ -86,6 +86,8 @@ local SNACK_BUTTON_ACTIVITIES = {
 }
 
 local SNACK_FLIGHT_DURATION = 60
+local SNACK_FLIGHT_INITIAL_BOOST = 16
+local SNACK_FLIGHT_CEILING_Y = Constants.Rooms.SnackLab.Zone.Max.Y - 5.2
 local SNACK_SLOW_MOTION_DURATION = 12
 local SNACK_SUPER_WIND_GUSTS = 5
 
@@ -310,7 +312,7 @@ local function getFridgeDoorOpenCFrame(door)
 
 	return baseCFrame
 		* CFrame.new(hingeOffset, 0, 0)
-		* CFrame.Angles(0, math.rad(-92), 0)
+		* CFrame.Angles(0, math.rad(-112), 0)
 		* CFrame.new(-hingeOffset, 0, 0)
 end
 
@@ -789,6 +791,7 @@ function InteractionService:_wireResetRoomButton(button)
 		for _, state in pairs(self.snackFanState) do
 			state.SpinToken = nil
 		end
+		self:_stopSnackFlightForRoom(player)
 		self.eventManager:ResetRoom(player)
 		self:_afterRoomReset()
 		for _, currentPlayer in ipairs(Players:GetPlayers()) do
@@ -1612,12 +1615,13 @@ function InteractionService:_triggerSnackFlight(triggeringPlayer)
 	for _, player in ipairs(targets) do
 		local rootPart = getRootPart(player)
 		if rootPart then
-			rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, 34, 0)
+			rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, SNACK_FLIGHT_INITIAL_BOOST, 0)
 		end
 
 		self.snackEffectRemote:FireClient(player, {
 			Action = "Flight",
 			Duration = SNACK_FLIGHT_DURATION,
+			CeilingY = SNACK_FLIGHT_CEILING_Y,
 		})
 	end
 
@@ -1943,9 +1947,16 @@ function InteractionService:_setFridgeOpenDetails(fridge, opened)
 	end
 end
 
-function InteractionService:_wireSnackFridge(fridge)
-	local door = fridge:FindFirstChild("FridgeDoor", true)
-	local prompt = door and getPrompt(door) or getPrompt(fridge)
+function InteractionService:_wireSnackFridge(fridgeTarget)
+	local fridge = fridgeTarget
+	if fridgeTarget:IsA("BasePart") then
+		fridge = fridgeTarget:FindFirstAncestor("Fridge") or fridgeTarget.Parent or fridgeTarget
+	end
+
+	local door = if fridgeTarget:IsA("BasePart") and fridgeTarget.Name == "FridgeDoor"
+		then fridgeTarget
+		else fridge:FindFirstChild("FridgeDoor", true)
+	local prompt = door and getPrompt(door) or getPrompt(fridgeTarget)
 	local iceCube = fridge:FindFirstChild("ColdIdeaIceCube", true)
 
 	self.fridgeState[fridge] = self.fridgeState[fridge] or {
@@ -1966,6 +1977,7 @@ function InteractionService:_wireSnackFridge(fridge)
 
 		if state.Opened then
 			self.systemMessageRemote:FireClient(player, "The fridge contains one cold idea.")
+			door.CanCollide = false
 			tweenPart(door, 0.35, {
 				CFrame = getFridgeDoorOpenCFrame(door),
 				Color = Color3.fromRGB(172, 242, 255),
@@ -1997,6 +2009,7 @@ function InteractionService:_wireSnackFridge(fridge)
 			state.IceSpinToken = nil
 			self.resetService.RestoreInstance(fridge)
 			self:_setFridgeOpenDetails(fridge, false)
+			door.CanCollide = door:GetAttribute("BaseCanCollide") ~= false
 			prompt.ActionText = "Open"
 		end
 
@@ -2450,20 +2463,9 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 		local fruitTemplates = {}
 		for _, child in ipairs(fruitBowl:GetChildren()) do
 			if child:IsA("Model") and child:GetAttribute("IsFruitModel") then
-				table.insert(fruitTemplates, child)
-			end
-		end
-
-		local hiddenParts = {}
-		for _, template in ipairs(fruitTemplates) do
-			for _, descendant in ipairs(template:GetDescendants()) do
-				if descendant:IsA("BasePart") then
-					table.insert(hiddenParts, {
-						Part = descendant,
-						Transparency = descendant.Transparency,
-					})
-					descendant.Transparency = 1
-				end
+				local template = child:Clone()
+				template.Parent = nil
+				table.insert(fruitTemplates, template)
 			end
 		end
 
@@ -2483,6 +2485,8 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 
 		local random = Random.new()
 		local originCFrame = bowl and bowl:IsA("BasePart") and bowl.CFrame or fruitBowl:GetPivot()
+		local snackRoom = Constants.GetRoom("SnackLab")
+		local zone = snackRoom and snackRoom.Zone
 
 		for wave = 1, 6 do
 			for _, template in ipairs(fruitTemplates) do
@@ -2516,14 +2520,27 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 				end
 
 				if primary then
-					local angle = random:NextNumber(0, math.pi * 2)
-					local horizontal = Vector3.new(math.cos(angle), 0, math.sin(angle))
-					primary.AssemblyLinearVelocity = horizontal * random:NextNumber(50, 82)
-						+ Vector3.new(0, random:NextNumber(28, 52), 0)
+					local horizontal = nil
+					if zone then
+						local target = Vector3.new(
+							random:NextNumber(zone.Min.X + 4, zone.Max.X - 4),
+							primary.Position.Y,
+							random:NextNumber(zone.Min.Z + 4, zone.Max.Z - 4)
+						)
+						horizontal = Vector3.new(target.X - primary.Position.X, 0, target.Z - primary.Position.Z)
+					end
+
+					if not horizontal or horizontal.Magnitude < 1 then
+						local angle = random:NextNumber(0, math.pi * 2)
+						horizontal = Vector3.new(math.cos(angle), 0, math.sin(angle))
+					end
+
+					primary.AssemblyLinearVelocity = horizontal.Unit * random:NextNumber(76, 118)
+						+ Vector3.new(0, random:NextNumber(32, 54), 0)
 					primary.AssemblyAngularVelocity = Vector3.new(
-						random:NextNumber(-14, 14),
-						random:NextNumber(-14, 14),
-						random:NextNumber(-14, 14)
+						random:NextNumber(-22, 22),
+						random:NextNumber(-22, 22),
+						random:NextNumber(-22, 22)
 					)
 				end
 			end
@@ -2531,13 +2548,9 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 			task.wait(0.08)
 		end
 
-		task.delay(2.4, function()
-			for _, record in ipairs(hiddenParts) do
-				if record.Part.Parent then
-					record.Part.Transparency = record.Transparency
-				end
-			end
-		end)
+		for _, template in ipairs(fruitTemplates) do
+			template:Destroy()
+		end
 
 		task.wait(0.7)
 		state.Reacting = false

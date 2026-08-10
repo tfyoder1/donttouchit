@@ -10,6 +10,12 @@ local snackEffectRemote = remotes:WaitForChild(Constants.Remotes.SnackEffect)
 
 local activeFlight = nil
 
+local SNACK_FLIGHT_HORIZONTAL_SPEED = 38
+local SNACK_FLIGHT_IDLE_VERTICAL = 3
+local SNACK_FLIGHT_UP_VERTICAL = 16
+local SNACK_FLIGHT_DOWN_VERTICAL = -22
+local SNACK_FLIGHT_DEFAULT_CEILING_Y = Constants.Rooms.SnackLab.Zone.Max.Y - 5.2
+
 local function getCharacterParts()
 	local character = player.Character
 	if not character then
@@ -43,7 +49,7 @@ local function stopFlight()
 	activeFlight = nil
 end
 
-local function startFlight(duration)
+local function startFlight(duration, ceilingY)
 	stopFlight()
 
 	local rootPart, humanoid = getCharacterParts()
@@ -60,7 +66,7 @@ local function startFlight(duration)
 	linearVelocity.Attachment0 = attachment
 	linearVelocity.MaxForce = 85000
 	linearVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
-	linearVelocity.VectorVelocity = Vector3.new(0, 12, 0)
+	linearVelocity.VectorVelocity = Vector3.new(0, SNACK_FLIGHT_IDLE_VERTICAL, 0)
 	linearVelocity.Parent = rootPart
 
 	local token = {}
@@ -70,6 +76,7 @@ local function startFlight(duration)
 		LinearVelocity = linearVelocity,
 		Humanoid = humanoid,
 		AutoRotate = humanoid.AutoRotate,
+		CeilingY = ceilingY or SNACK_FLIGHT_DEFAULT_CEILING_Y,
 		Connection = nil,
 	}
 
@@ -87,18 +94,25 @@ local function startFlight(duration)
 			return
 		end
 
-		local vertical = 7
+		local vertical = SNACK_FLIGHT_IDLE_VERTICAL
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-			vertical = 30
+			vertical = SNACK_FLIGHT_UP_VERTICAL
 		elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
 			or UserInputService:IsKeyDown(Enum.KeyCode.C)
 		then
-			vertical = -24
+			vertical = SNACK_FLIGHT_DOWN_VERTICAL
 		end
 
-		linearVelocity.VectorVelocity = humanoid.MoveDirection * 42 + Vector3.new(0, vertical, 0)
+		local ceiling = activeFlight.CeilingY or SNACK_FLIGHT_DEFAULT_CEILING_Y
+		if rootPart.Position.Y >= ceiling and vertical > -6 then
+			vertical = -6
+		elseif rootPart.Position.Y >= ceiling - 1.2 and vertical > SNACK_FLIGHT_IDLE_VERTICAL then
+			vertical = SNACK_FLIGHT_IDLE_VERTICAL
+		end
+
+		linearVelocity.VectorVelocity = humanoid.MoveDirection * SNACK_FLIGHT_HORIZONTAL_SPEED + Vector3.new(0, vertical, 0)
 	end)
 
 	task.delay(duration or 60, function()
@@ -114,7 +128,7 @@ snackEffectRemote.OnClientEvent:Connect(function(payload)
 	end
 
 	if payload.Action == "Flight" then
-		startFlight(payload.Duration or 60)
+		startFlight(payload.Duration or 60, payload.CeilingY)
 	elseif payload.Action == "StopFlight" then
 		stopFlight()
 	end
