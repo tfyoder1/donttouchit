@@ -1628,6 +1628,7 @@ end
 
 function InteractionService:_wireFruitBowl(fruitBowl)
 	local prompt = getPrompt(fruitBowl)
+	local bowl = fruitBowl:FindFirstChild("Bowl", true)
 
 	self.fruitBowlState[fruitBowl] = self.fruitBowlState[fruitBowl] or {
 		Reacting = false,
@@ -1641,35 +1642,97 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.LivingFruit.Id)
-		self.systemMessageRemote:FireClient(player, "The fruit bowl has become self-aware.")
+		self.systemMessageRemote:FireClient(player, "The fruit bowl has become aggressively generous.")
 
-		local fruit = {}
-		for _, descendant in ipairs(fruitBowl:GetDescendants()) do
-			if descendant:IsA("BasePart") and descendant:GetAttribute("IsFruit") then
-				table.insert(fruit, descendant)
+		local fruitTemplates = {}
+		for _, child in ipairs(fruitBowl:GetChildren()) do
+			if child:IsA("Model") and child:GetAttribute("IsFruitModel") then
+				table.insert(fruitTemplates, child)
 			end
 		end
 
-		for index, piece in ipairs(fruit) do
-			task.spawn(function()
-				local baseCFrame = piece:GetAttribute("BaseCFrame") or piece.CFrame
-				local jumpTween = tweenPart(piece, 0.22, {
-					CFrame = baseCFrame + Vector3.new(0, 1.2 + index * 0.15, 0),
-				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-				jumpTween.Completed:Wait()
+		local hiddenParts = {}
+		for _, template in ipairs(fruitTemplates) do
+			for _, descendant in ipairs(template:GetDescendants()) do
+				if descendant:IsA("BasePart") then
+					table.insert(hiddenParts, {
+						Part = descendant,
+						Transparency = descendant.Transparency,
+					})
+					descendant.Transparency = 1
+				end
+			end
+		end
 
-				local spinTween = tweenPart(piece, 0.28, {
-					CFrame = baseCFrame * CFrame.Angles(math.rad(0), math.rad(180 + index * 25), math.rad(0)),
-				}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
-				spinTween.Completed:Wait()
-
-				if piece.Parent then
-					self.resetService.RestoreInstance(piece)
+		if bowl and bowl:IsA("BasePart") then
+			playSound(bowl, "rbxasset://sounds/snap.wav", 0.6, 1.25)
+			local baseCFrame = bowl:GetAttribute("BaseCFrame") or bowl.CFrame
+			tweenPart(bowl, 0.18, {
+				CFrame = baseCFrame * CFrame.Angles(math.rad(24), 0, math.rad(-30)) + Vector3.new(0, 0.25, 0),
+				Color = Color3.fromRGB(255, 196, 73),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			task.delay(1.2, function()
+				if bowl.Parent then
+					self.resetService.RestoreInstance(bowl)
 				end
 			end)
 		end
 
-		task.wait(0.9)
+		local random = Random.new()
+		local originCFrame = bowl and bowl:IsA("BasePart") and bowl.CFrame or fruitBowl:GetPivot()
+
+		for wave = 1, 4 do
+			for _, template in ipairs(fruitTemplates) do
+				local clone = template:Clone()
+				clone.Name = template.Name .. "Spilled"
+				clone.Parent = workspace
+				CollectionService:AddTag(clone, Constants.Tags.TemporaryObject)
+
+				local primary = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
+				if primary then
+					clone.PrimaryPart = primary
+				end
+
+				clone:PivotTo(
+					originCFrame
+						* CFrame.new(random:NextNumber(-0.8, 0.8), random:NextNumber(0.4, 1.1), random:NextNumber(-0.8, 0.8))
+						* CFrame.Angles(random:NextNumber(-math.pi, math.pi), random:NextNumber(-math.pi, math.pi), random:NextNumber(-math.pi, math.pi))
+				)
+
+				for _, descendant in ipairs(clone:GetDescendants()) do
+					if descendant:IsA("BasePart") then
+						descendant.Anchored = false
+						descendant.CanCollide = true
+						descendant.Massless = false
+						CollectionService:AddTag(descendant, Constants.Tags.TemporaryObject)
+					end
+				end
+
+				if primary then
+					local angle = random:NextNumber(0, math.pi * 2)
+					local horizontal = Vector3.new(math.cos(angle), 0, math.sin(angle))
+					primary.AssemblyLinearVelocity = horizontal * random:NextNumber(38, 68)
+						+ Vector3.new(0, random:NextNumber(22, 44), 0)
+					primary.AssemblyAngularVelocity = Vector3.new(
+						random:NextNumber(-14, 14),
+						random:NextNumber(-14, 14),
+						random:NextNumber(-14, 14)
+					)
+				end
+			end
+
+			task.wait(0.08)
+		end
+
+		task.delay(2.4, function()
+			for _, record in ipairs(hiddenParts) do
+				if record.Part.Parent then
+					record.Part.Transparency = record.Transparency
+				end
+			end
+		end)
+
+		task.wait(0.7)
 		state.Reacting = false
 	end)
 end

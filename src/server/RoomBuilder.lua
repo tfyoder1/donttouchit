@@ -769,17 +769,18 @@ end
 local function makeSnackMixer(objectsFolder)
 	local origin = SNACK_LAB_ORIGIN
 	local mixer = makeModel(objectsFolder, "Mixer")
-	local wallOffset = 5
+	local mixerX = 17.8
+	local mixerZ = 11.3
 
-	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), cframeAt(origin, 12 + wallOffset, 1.15, 7), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
-	createPart(mixer, "MixerStand", Vector3.new(0.75, 3.4, 0.75), cframeAt(origin, 10.1 + wallOffset, 2.75, 7), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
-	local head = createPart(mixer, "MixerHead", Vector3.new(3.9, 1.3, 2.1), cframeAt(origin, 11.75 + wallOffset, 4.35, 7), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
-	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 1.75, 3.6), cframeAt(origin, 12.25 + wallOffset, 2.25, 7), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
+	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), cframeAt(origin, mixerX, 1.15, mixerZ), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
+	createPart(mixer, "MixerStand", Vector3.new(0.75, 3.4, 0.75), cframeAt(origin, mixerX - 1.9, 2.75, mixerZ), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
+	local head = createPart(mixer, "MixerHead", Vector3.new(3.9, 1.3, 2.1), cframeAt(origin, mixerX - 0.25, 4.35, mixerZ), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
+	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 1.75, 3.6), cframeAt(origin, mixerX + 0.25, 2.25, mixerZ), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
 	bowl.Shape = Enum.PartType.Ball
 	bowl.Transparency = 0.25
 	bowl:SetAttribute("BaseTransparency", bowl.Transparency)
-	createPart(mixer, "BeaterLeft", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8 + wallOffset, 3.15, 6.55), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
-	createPart(mixer, "BeaterRight", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8 + wallOffset, 3.15, 7.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	createPart(mixer, "BeaterLeft", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, mixerX - 0.2, 3.15, mixerZ - 0.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	createPart(mixer, "BeaterRight", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, mixerX - 0.2, 3.15, mixerZ + 0.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
 	createPrompt(head, "Mix", "Mixer", 0)
 	tag(mixer, Constants.Tags.SnackMixer)
 
@@ -798,24 +799,28 @@ local function makeSnackRack(objectsFolder)
 		Color3.fromRGB(219, 112, 255),
 	}
 	local names = { "CRONCH", "ZAP CHIPS", "MYSTERY", "PUFFS", "NOPE" }
-	local rackX = 10
-	local rackZ = -1.25
+	local rackX = Constants.Room.Width / 2 - 0.78
+	local rackZ = -1.5
+	local rackRotation = CFrame.Angles(0, math.rad(90), 0)
+	local function rackCFrame(x, y, z)
+		return CFrame.new(origin + Vector3.new(rackX, 0, rackZ)) * rackRotation * CFrame.new(x, y, z)
+	end
 
-	local back = createPart(rack, "RackBack", Vector3.new(9.5, 6.6, 0.35), cframeAt(origin, rackX, 4.0, rackZ), Color3.fromRGB(68, 76, 90), Enum.Material.Metal)
-	createPart(rack, "RackLeft", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, rackX - 4.9, 4.0, rackZ - 0.85), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
-	createPart(rack, "RackRight", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, rackX + 4.9, 4.0, rackZ - 0.85), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
+	local back = createPart(rack, "RackBack", Vector3.new(9.5, 6.6, 0.35), rackCFrame(0, 4.0, 0), Color3.fromRGB(68, 76, 90), Enum.Material.Metal)
+	createPart(rack, "RackLeft", Vector3.new(0.35, 6.8, 2.2), rackCFrame(-4.9, 4.0, -0.85), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
+	createPart(rack, "RackRight", Vector3.new(0.35, 6.8, 2.2), rackCFrame(4.9, 4.0, -0.85), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
 
 	for shelfIndex = 1, 3 do
 		local y = 1.65 + shelfIndex * 1.85
-		createPart(rack, "SnackShelf", Vector3.new(10, 0.28, 2.3), cframeAt(origin, rackX, y, rackZ - 0.85), Color3.fromRGB(94, 103, 116), Enum.Material.Metal)
+		createPart(rack, "SnackShelf", Vector3.new(10, 0.28, 2.3), rackCFrame(0, y, -0.85), Color3.fromRGB(94, 103, 116), Enum.Material.Metal)
 
 		for packIndex = 1, 5 do
-			local x = rackX - 3.6 + (packIndex - 1) * 1.8
+			local x = -3.6 + (packIndex - 1) * 1.8
 			local pack = createPart(
 				rack,
 				"SnackPack",
 				Vector3.new(1.1, 1.45, 0.28),
-				cframeAt(origin, x, y + 0.88, rackZ - 2.02),
+				rackCFrame(x, y + 0.88, -2.02),
 				colors[((shelfIndex + packIndex - 2) % #colors) + 1],
 				Enum.Material.SmoothPlastic
 			)
@@ -838,25 +843,99 @@ local function makeFruitBowl(objectsFolder)
 	local bowl = createPart(fruitBowl, "Bowl", Vector3.new(4.7, 1.25, 4.7), cframeAt(origin, 1.5, 2.2, 7.5), Color3.fromRGB(255, 226, 122), Enum.Material.SmoothPlastic)
 	bowl.Shape = Enum.PartType.Ball
 
-	local fruitData = {
-		{ Name = "Apple", Offset = Vector3.new(-0.9, 1.0, -0.35), Color = Color3.fromRGB(233, 52, 60), Size = 0.95 },
-		{ Name = "Lemon", Offset = Vector3.new(0.2, 1.12, 0.2), Color = Color3.fromRGB(247, 224, 55), Size = 0.8 },
-		{ Name = "Lime", Offset = Vector3.new(1.0, 0.95, -0.1), Color = Color3.fromRGB(74, 197, 91), Size = 0.82 },
-		{ Name = "Orange", Offset = Vector3.new(-0.05, 1.2, -0.9), Color = Color3.fromRGB(255, 142, 47), Size = 0.88 },
-	}
+	local function finishFruit(model, primary, kind)
+		model:SetAttribute("IsFruitModel", true)
+		model:SetAttribute("FruitKind", kind)
+		model.PrimaryPart = primary
 
-	for _, data in ipairs(fruitData) do
-		local fruit = createPart(
-			fruitBowl,
-			data.Name,
-			Vector3.new(data.Size, data.Size, data.Size),
-			cframeAt(origin, 1.5 + data.Offset.X, 2.2 + data.Offset.Y, 7.5 + data.Offset.Z),
-			data.Color,
+		for _, descendant in ipairs(model:GetDescendants()) do
+			if descendant:IsA("BasePart") then
+				descendant:SetAttribute("FruitKind", kind)
+				if descendant == primary then
+					descendant:SetAttribute("IsFruit", true)
+				end
+			end
+		end
+
+		for _, descendant in ipairs(model:GetDescendants()) do
+			if descendant:IsA("BasePart") and descendant ~= primary then
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = primary
+				weld.Part1 = descendant
+				weld.Parent = descendant
+			end
+		end
+	end
+
+	local function makeLeaf(parent, cframe)
+		return createPart(parent, "Leaf", Vector3.new(0.5, 0.14, 0.3), cframe, Color3.fromRGB(66, 166, 72), Enum.Material.SmoothPlastic, "WedgePart")
+	end
+
+	local function makeRoundFruit(name, kind, pivot, color, size, stemColor)
+		local model = makeModel(fruitBowl, name)
+		local body = createPart(model, kind .. "Body", size, pivot, color, Enum.Material.SmoothPlastic)
+		body.Shape = Enum.PartType.Ball
+
+		local stem = createPart(model, "Stem", Vector3.new(0.16, 0.46, 0.16), pivot * CFrame.new(0, size.Y / 2 + 0.18, 0) * CFrame.Angles(math.rad(12), 0, math.rad(18)), stemColor or Color3.fromRGB(95, 58, 35), Enum.Material.Wood)
+		stem.Shape = Enum.PartType.Cylinder
+		makeLeaf(model, pivot * CFrame.new(0.32, size.Y / 2 + 0.32, 0.02) * CFrame.Angles(0, math.rad(-25), math.rad(16)))
+
+		finishFruit(model, body, kind)
+	end
+
+	makeRoundFruit("Apple", "Apple", cframeAt(origin, 0.55, 3.28, 7.05), Color3.fromRGB(216, 38, 52), Vector3.new(1.05, 1.0, 1.05))
+	makeRoundFruit("Orange", "Orange", cframeAt(origin, 1.5, 3.35, 6.75), Color3.fromRGB(255, 134, 35), Vector3.new(1.0, 1.0, 1.0), Color3.fromRGB(68, 126, 55))
+	makeRoundFruit("Lime", "Lime", cframeAt(origin, 2.45, 3.18, 7.15), Color3.fromRGB(70, 184, 76), Vector3.new(0.82, 0.78, 0.82), Color3.fromRGB(58, 116, 45))
+
+	local lemon = makeModel(fruitBowl, "Lemon")
+	local lemonPivot = cframeAt(origin, 2.3, 3.28, 8.05) * CFrame.Angles(0, 0, math.rad(-10))
+	local lemonBody = createPart(lemon, "LemonBody", Vector3.new(1.25, 0.78, 0.78), lemonPivot, Color3.fromRGB(247, 226, 56), Enum.Material.SmoothPlastic)
+	lemonBody.Shape = Enum.PartType.Ball
+	local lemonTipA = createPart(lemon, "LemonTipA", Vector3.new(0.22, 0.28, 0.28), lemonPivot * CFrame.new(-0.65, 0, 0), Color3.fromRGB(239, 211, 49), Enum.Material.SmoothPlastic)
+	lemonTipA.Shape = Enum.PartType.Ball
+	local lemonTipB = createPart(lemon, "LemonTipB", Vector3.new(0.22, 0.28, 0.28), lemonPivot * CFrame.new(0.65, 0, 0), Color3.fromRGB(239, 211, 49), Enum.Material.SmoothPlastic)
+	lemonTipB.Shape = Enum.PartType.Ball
+	finishFruit(lemon, lemonBody, "Lemon")
+
+	local banana = makeModel(fruitBowl, "Banana")
+	local bananaPivot = cframeAt(origin, 0.75, 3.55, 8.15) * CFrame.Angles(0, math.rad(20), math.rad(-8))
+	local bananaPrimary = nil
+	for index = 1, 5 do
+		local curve = index - 3
+		local segment = createPart(
+			banana,
+			"BananaSegment",
+			Vector3.new(0.34, 0.34, 0.85),
+			bananaPivot * CFrame.new(curve * 0.28, math.abs(curve) * 0.07, 0) * CFrame.Angles(0, math.rad(curve * 8), math.rad(curve * 8)),
+			Color3.fromRGB(250, 219, 61),
 			Enum.Material.SmoothPlastic
 		)
-		fruit.Shape = Enum.PartType.Ball
-		fruit:SetAttribute("IsFruit", true)
+		segment.Shape = Enum.PartType.Cylinder
+		bananaPrimary = bananaPrimary or segment
 	end
+	local bananaTip = createPart(banana, "BananaStem", Vector3.new(0.28, 0.28, 0.34), bananaPivot * CFrame.new(-0.7, 0.16, 0), Color3.fromRGB(111, 72, 35), Enum.Material.Wood)
+	bananaTip.Shape = Enum.PartType.Ball
+	finishFruit(banana, bananaPrimary, "Banana")
+
+	local grapes = makeModel(fruitBowl, "Grapes")
+	local grapePivot = cframeAt(origin, 1.45, 3.45, 8.4)
+	local grapePrimary = nil
+	local grapeOffsets = {
+		Vector3.new(0, 0.2, 0),
+		Vector3.new(-0.28, -0.08, -0.05),
+		Vector3.new(0.28, -0.08, 0.05),
+		Vector3.new(-0.14, -0.36, 0.1),
+		Vector3.new(0.18, -0.38, -0.08),
+		Vector3.new(0.02, -0.66, 0.02),
+	}
+	for _, offset in ipairs(grapeOffsets) do
+		local grape = createPart(grapes, "Grape", Vector3.new(0.38, 0.38, 0.38), grapePivot * CFrame.new(offset), Color3.fromRGB(125, 65, 184), Enum.Material.SmoothPlastic)
+		grape.Shape = Enum.PartType.Ball
+		grapePrimary = grapePrimary or grape
+	end
+	local grapeStem = createPart(grapes, "GrapeStem", Vector3.new(0.12, 0.55, 0.12), grapePivot * CFrame.new(0, 0.55, 0) * CFrame.Angles(math.rad(16), 0, math.rad(-18)), Color3.fromRGB(77, 113, 49), Enum.Material.Wood)
+	grapeStem.Shape = Enum.PartType.Cylinder
+	finishFruit(grapes, grapePrimary, "Grapes")
 
 	createPrompt(bowl, "Inspect", "Fruit Bowl", 0)
 	tag(fruitBowl, Constants.Tags.FruitBowl)
