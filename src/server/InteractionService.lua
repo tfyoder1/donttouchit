@@ -11,6 +11,20 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local InteractionService = {}
 InteractionService.__index = InteractionService
 
+local COUCH_GET_UP_LABELS = {
+	"Try to Get Up",
+	"Ask Nicely",
+	"Wiggle Free",
+	"Negotiate Release",
+	"Accept Cushion Fate",
+}
+
+local COUCH_REFUSAL_MESSAGES = {
+	"The couch pretends not to hear you.",
+	"The cushions tighten their argument.",
+	"The couch is still considering your request.",
+}
+
 local function getPrompt(root)
 	if root:IsA("ProximityPrompt") then
 		return root
@@ -92,6 +106,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.roomProgressService = roomProgressService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.connectedPrompts = {}
+	self.couchState = {}
 	self.couchRiding = {}
 	self.lampState = {}
 	self.squishyState = {}
@@ -316,28 +331,143 @@ end
 
 function InteractionService:_wireCouch(couch)
 	local prompt = getPrompt(couch)
-	local seat = couch:FindFirstChild("CouchSeat", true)
+	local sitTarget = couch:FindFirstChild("CouchSitTarget", true)
+
+	self.couchState[couch] = self.couchState[couch] or {
+		GetUpAttempts = 0,
+		LabelIndex = 0,
+		OccupantUserId = nil,
+		RideToken = nil,
+	}
+
+	local state = self.couchState[couch]
+
+	if sitTarget and sitTarget:IsA("Seat") and not state.OccupantConnection then
+		state.OccupantConnection = sitTarget:GetPropertyChangedSignal("Occupant"):Connect(function()
+			if sitTarget.Occupant ~= nil or self.couchRiding[couch] then
+				return
+			end
+
+			self:_clearCouchPrompt(prompt, state)
+		end)
+	end
 
 	self:_connectPrompt(prompt, function(player)
 		local humanoid = getHumanoid(player)
-		if not humanoid or not seat or self.couchRiding[couch] then
+		if not humanoid or not sitTarget or not sitTarget:IsA("Seat") or self.couchRiding[couch] then
 			return
 		end
 
-		seat:Sit(humanoid)
-		self.systemMessageRemote:FireClient(player, "The couch seems comfortable. Too comfortable.")
+		if sitTarget.Occupant == humanoid or state.OccupantUserId == player.UserId then
+			self:_tryLeaveCouch(sitTarget, humanoid, player, prompt, state)
+			return
+		end
 
-		task.delay(3, function()
-			if seat.Parent and seat.Occupant == humanoid and not self.couchRiding[couch] then
-				self:_rideCouch(couch, seat, player, prompt)
-			end
-		end)
+		if sitTarget.Occupant then
+			self.systemMessageRemote:FireClient(player, "The couch is currently busy being someone else's problem.")
+			return
+		end
+
+		self:_sitOnCouch(couch, sitTarget, humanoid, player, prompt, state)
 	end)
 end
 
-function InteractionService:_rideCouch(couch, seat, player, prompt)
+function InteractionService:_sitOnCouch(couch, sitTarget, humanoid, player, prompt, state)
+	state.GetUpAttempts = 0
+	state.LabelIndex = 0
+	state.OccupantUserId = player.UserId
+	self:_setCouchPromptSitting(prompt, state)
+
+	local rootPart = getRootPart(player)
+	if rootPart then
+		rootPart.AssemblyLinearVelocity = Vector3.zero
+		rootPart.AssemblyAngularVelocity = Vector3.zero
+		rootPart.CFrame = sitTarget.CFrame + Vector3.new(0, 1.8, 0)
+	end
+
+	sitTarget.CanTouch = true
+	sitTarget:Sit(humanoid)
+
+	task.delay(0.2, function()
+		if sitTarget.Parent then
+			sitTarget.CanTouch = false
+		end
+	end)
+
+	task.delay(0.1, function()
+		if not sitTarget.Parent or sitTarget.Occupant == humanoid then
+			return
+		end
+
+		sitTarget:Sit(humanoid)
+	end)
+
+	self.systemMessageRemote:FireClient(player, "The couch seems comfortable. Too comfortable.")
+
+	local rideToken = {}
+	state.RideToken = rideToken
+
+	task.delay(3, function()
+		if state.RideToken ~= rideToken then
+			return
+		end
+
+		if sitTarget.Parent and sitTarget.Occupant == humanoid and not self.couchRiding[couch] then
+			self:_rideCouch(couch, sitTarget, player, prompt, state)
+		end
+	end)
+end
+
+function InteractionService:_tryLeaveCouch(sitTarget, humanoid, player, prompt, state)
+	state.GetUpAttempts += 1
+	self:_setCouchPromptSitting(prompt, state)
+
+	if state.GetUpAttempts >= 3 then
+		state.RideToken = nil
+		state.OccupantUserId = nil
+		humanoid.Sit = false
+		self:_clearCouchPrompt(prompt, state)
+		self.systemMessageRemote:FireClient(player, "The couch releases you, but makes it weird.")
+		return
+	end
+
+	local message = COUCH_REFUSAL_MESSAGES[((state.GetUpAttempts - 1) % #COUCH_REFUSAL_MESSAGES) + 1]
+	self.systemMessageRemote:FireClient(player, message)
+end
+
+function InteractionService:_setCouchPromptSitting(prompt, state)
+	if not prompt then
+		return
+	end
+
+	state.LabelIndex = (state.LabelIndex or 0) + 1
+	prompt.ActionText = COUCH_GET_UP_LABELS[((state.LabelIndex - 1) % #COUCH_GET_UP_LABELS) + 1]
+	prompt.ObjectText = "Suspicious Couch"
+	prompt.Enabled = true
+end
+
+function InteractionService:_clearCouchPrompt(prompt, state)
+	if state then
+		state.GetUpAttempts = 0
+		state.LabelIndex = 0
+		state.OccupantUserId = nil
+		state.RideToken = nil
+	end
+
+	if not prompt then
+		return
+	end
+
+	prompt.ActionText = prompt:GetAttribute("BaseActionText") or "Sit"
+	prompt.ObjectText = prompt:GetAttribute("BaseObjectText") or "Suspicious Couch"
+	prompt.Enabled = prompt:GetAttribute("BaseEnabled") ~= false
+end
+
+function InteractionService:_rideCouch(couch, seat, player, prompt, state)
 	self.couchRiding[couch] = true
 	if prompt then
+		prompt.ActionText = "Hold On"
+		prompt.ObjectText = "Regret Couch"
 		prompt.Enabled = false
 	end
 
@@ -362,9 +492,13 @@ function InteractionService:_rideCouch(couch, seat, player, prompt)
 	end
 
 	self.resetService.RestoreInstance(couch)
+	if seat and seat.Parent then
+		seat.CanTouch = false
+	end
 	if prompt then
 		prompt.Enabled = true
 	end
+	self:_clearCouchPrompt(prompt, state)
 	self.couchRiding[couch] = nil
 end
 

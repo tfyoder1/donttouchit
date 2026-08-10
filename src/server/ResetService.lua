@@ -45,6 +45,8 @@ function ResetService.MarkBaseline(instance)
 		instance:SetAttribute("BaseRange", instance.Range)
 	elseif instance:IsA("ProximityPrompt") then
 		instance:SetAttribute("BaseEnabled", instance.Enabled)
+		instance:SetAttribute("BaseActionText", instance.ActionText)
+		instance:SetAttribute("BaseObjectText", instance.ObjectText)
 	elseif instance:IsA("TextLabel") then
 		instance:SetAttribute("BaseText", instance.Text)
 		instance:SetAttribute("BaseTextColor3", instance.TextColor3)
@@ -117,6 +119,16 @@ local function restorePrompt(prompt)
 	local baseEnabled = prompt:GetAttribute("BaseEnabled")
 	if baseEnabled ~= nil then
 		prompt.Enabled = baseEnabled
+	end
+
+	local baseActionText = prompt:GetAttribute("BaseActionText")
+	if baseActionText then
+		prompt.ActionText = baseActionText
+	end
+
+	local baseObjectText = prompt:GetAttribute("BaseObjectText")
+	if baseObjectText then
+		prompt.ObjectText = baseObjectText
 	end
 end
 

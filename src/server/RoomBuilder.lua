@@ -242,7 +242,12 @@ local function makeCouch(objectsFolder)
 	couch:SetAttribute("RideDirection", Vector3.new(1, 0, 0))
 
 	local baseColor = Color3.fromRGB(74, 139, 158)
-	local seat = createPart(couch, "CouchSeat", Vector3.new(8, 1, 3.2), CFrame.new(-14, 1.1, 3), baseColor, Enum.Material.Fabric, "Seat")
+	local seat = createPart(couch, "CouchSeat", Vector3.new(8, 1, 3.2), CFrame.new(-14, 1.1, 3), baseColor, Enum.Material.Fabric)
+	local sitTarget = createPart(couch, "CouchSitTarget", Vector3.new(2.8, 0.5, 2.2), CFrame.new(-14, 1.8, 3), baseColor, Enum.Material.SmoothPlastic, "Seat")
+	sitTarget.Transparency = 1
+	sitTarget.CanCollide = false
+	sitTarget.CanTouch = false
+	mark(sitTarget)
 	local back = createPart(couch, "CouchBack", Vector3.new(8.4, 3.4, 0.8), CFrame.new(-14, 2.4, 4.8), Color3.fromRGB(62, 121, 139), Enum.Material.Fabric)
 	local leftArm = createPart(couch, "LeftArm", Vector3.new(0.8, 2.2, 3.6), CFrame.new(-18.4, 1.8, 3.2), Color3.fromRGB(62, 121, 139), Enum.Material.Fabric)
 	local rightArm = createPart(couch, "RightArm", Vector3.new(0.8, 2.2, 3.6), CFrame.new(-9.6, 1.8, 3.2), Color3.fromRGB(62, 121, 139), Enum.Material.Fabric)
@@ -251,7 +256,7 @@ local function makeCouch(objectsFolder)
 	createPrompt(seat, "Sit", "Suspicious Couch", 0)
 	tag(couch, Constants.Tags.Couch)
 
-	return couch, { seat, back, leftArm, rightArm }
+	return couch, { seat, sitTarget, back, leftArm, rightArm }
 end
 
 local function makeLamp(objectsFolder)
