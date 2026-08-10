@@ -10,11 +10,12 @@ EventManager.__index = EventManager
 
 local OBJECT_RAIN_BUTTON_INTERVAL = 8
 
-function EventManager.new(discoveryService, resetService, roomReferences)
+function EventManager.new(discoveryService, resetService, roomReferences, roomProgressService)
 	local self = setmetatable({}, EventManager)
 	self.discoveryService = discoveryService
 	self.resetService = resetService
 	self.roomReferences = roomReferences
+	self.roomProgressService = roomProgressService
 	self.random = Random.new()
 	self.active = false
 	self.buttonPressCount = 0
@@ -88,6 +89,11 @@ function EventManager:_buildContext(triggeringPlayer, eventDefinition)
 		end,
 		BroadcastMessage = function(text)
 			self:_broadcastMessage(text)
+		end,
+		RecordInteraction = function(player)
+			if self.roomProgressService then
+				self.roomProgressService:RecordInteraction(player)
+			end
 		end,
 	}
 end

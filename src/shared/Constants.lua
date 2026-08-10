@@ -35,6 +35,7 @@ Constants.Tags = {
 	HallDoor = "DontTouchIt_HallDoor",
 	ReferenceBook = "DontTouchIt_ReferenceBook",
 	ResetRoomButton = "DontTouchIt_ResetRoomButton",
+	NoTouchClock = "DontTouchIt_NoTouchClock",
 	UnderfloorReturn = "DontTouchIt_UnderfloorReturn",
 	SnackButton = "DontTouchIt_SnackButton",
 	SnackFridge = "DontTouchIt_SnackFridge",
@@ -44,6 +45,7 @@ Constants.Tags = {
 	SnackRack = "DontTouchIt_SnackRack",
 	FruitBowl = "DontTouchIt_FruitBowl",
 	FloorSection = "DontTouchIt_FloorSection",
+	ObjectRainObject = "DontTouchIt_ObjectRainObject",
 	TemporaryObject = "DontTouchIt_TemporaryObject",
 }
 
@@ -74,6 +76,11 @@ Constants.Sparkle = {
 
 Constants.Confetti = {
 	DurationSeconds = 90,
+}
+
+Constants.RoomPlay = {
+	HintIntervalSeconds = 300,
+	HintsPerInterval = 1,
 }
 
 Constants.FloorPressMessages = {
@@ -188,6 +195,11 @@ Constants.Discoveries = {
 		Id = "snack_lab_no_touch",
 		Name = "Left the Snack Lab Alone",
 		Hint = "Stand in the Snack Lab for two minutes without interacting with anything.",
+	},
+	RainBasement = {
+		Id = "rain_basement",
+		Name = "Moved the Rain Downstairs",
+		Hint = "This secret is not listed in the room log.",
 	},
 }
 

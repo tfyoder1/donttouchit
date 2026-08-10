@@ -34,6 +34,44 @@ local SWITCH_ON_COLORS = {
 	Color3.fromRGB(255, 144, 177),
 }
 
+local ROOM_MOODS = {
+	{
+		Label = "laundromat birthday",
+		Color = Color3.fromRGB(151, 221, 232),
+		Material = Enum.Material.Concrete,
+	},
+	{
+		Label = "fresh cardboard",
+		Color = Color3.fromRGB(219, 187, 122),
+		Material = Enum.Material.WoodPlanks,
+	},
+	{
+		Label = "polite dungeon",
+		Color = Color3.fromRGB(150, 167, 177),
+		Material = Enum.Material.Brick,
+	},
+	{
+		Label = "arcade carpet energy",
+		Color = Color3.fromRGB(85, 204, 154),
+		Material = Enum.Material.Foil,
+	},
+	{
+		Label = "unlicensed dentist",
+		Color = Color3.fromRGB(236, 226, 202),
+		Material = Enum.Material.Marble,
+	},
+}
+
+local TV_ROOM_MOOD_SURFACES = {
+	BackWall = true,
+	Ceiling = true,
+	FrontWallHeader = true,
+	FrontWallLeft = true,
+	FrontWallRight = true,
+	LeftWall = true,
+	RightWall = true,
+}
+
 local TV_SOUND_IDS = {
 	Static = "rbxasset://sounds/electronicpingshort.wav",
 	TestTone = "rbxasset://sounds/electronicpingshort.wav",
@@ -148,6 +186,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.exitUnlocked = false
 	self.underfloorReturnState = {}
 	self.snackButtonState = {}
+	self.roomMoodStateByRoomId = {}
 	self.fridgeState = {}
 	self.toasterState = {}
 	self.sinkState = {}
@@ -278,11 +317,67 @@ function InteractionService:_wireMainButton(button)
 	self:_connectPrompt(prompt, function(player)
 		local accepted = self.eventManager:TriggerRandom(player)
 		if accepted and button:IsA("BasePart") then
+			self:_cycleRoomMood("TVRoom")
 			task.spawn(function()
 				self:_pressButtonVisual(button)
 			end)
 		end
 	end)
+end
+
+function InteractionService:_getRoomMoodSurfaces(roomId)
+	local surfaces = {}
+	local roomReferences = self.eventManager and self.eventManager.roomReferences
+
+	if roomId == "TVRoom" then
+		local roomRoot = roomReferences and roomReferences.Room or workspace:FindFirstChild("Room")
+		if not roomRoot then
+			return surfaces
+		end
+
+		for _, child in ipairs(roomRoot:GetChildren()) do
+			if child:IsA("BasePart") and TV_ROOM_MOOD_SURFACES[child.Name] then
+				table.insert(surfaces, child)
+			end
+		end
+	elseif roomId == "SnackLab" then
+		local snackLab = roomReferences and roomReferences.SnackLab and roomReferences.SnackLab.Model
+		snackLab = snackLab or workspace:FindFirstChild("Room") and workspace.Room:FindFirstChild("SnackLabRoom")
+		if not snackLab then
+			return surfaces
+		end
+
+		for _, descendant in ipairs(snackLab:GetDescendants()) do
+			if descendant:IsA("BasePart")
+				and (descendant.Name:find("Wall", 1, true) or descendant.Name:find("Ceiling", 1, true))
+			then
+				table.insert(surfaces, descendant)
+			end
+		end
+	end
+
+	return surfaces
+end
+
+function InteractionService:_cycleRoomMood(roomId)
+	local surfaces = self:_getRoomMoodSurfaces(roomId)
+	if #surfaces == 0 then
+		return
+	end
+
+	local nextIndex = ((self.roomMoodStateByRoomId[roomId] or 0) % #ROOM_MOODS) + 1
+	self.roomMoodStateByRoomId[roomId] = nextIndex
+
+	local mood = ROOM_MOODS[nextIndex]
+	for _, part in ipairs(surfaces) do
+		part.Material = mood.Material
+		tweenPart(part, 0.35, {
+			Color = mood.Color,
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+
+	local room = Constants.GetRoom(roomId)
+	self.systemMessageRemote:FireAllClients(("%s switched to %s walls."):format(room and room.Name or "The room", mood.Label))
 end
 
 function InteractionService:_pressButtonVisual(button)
@@ -1231,6 +1326,7 @@ function InteractionService:_wireSnackButton(button)
 
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.PressedSnackButton.Id)
+		self:_cycleRoomMood("SnackLab")
 		self.systemMessageRemote:FireClient(player, "The Snack Lab accepts your terrible application.")
 
 		local originalColor = button.Color

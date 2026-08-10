@@ -19,7 +19,7 @@ discoveryService:Initialize()
 local roomProgressService = RoomProgressService.new(discoveryService)
 roomProgressService:Initialize()
 
-local eventManager = EventManager.new(discoveryService, ResetService, roomReferences)
+local eventManager = EventManager.new(discoveryService, ResetService, roomReferences, roomProgressService)
 local interactionService = InteractionService.new(eventManager, discoveryService, ResetService, roomProgressService)
 interactionService:Initialize()
 

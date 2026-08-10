@@ -43,12 +43,12 @@ titleSizeConstraint.Parent = title
 
 local counter = Instance.new("TextLabel")
 counter.Name = "DiscoveryCounter"
-counter.AnchorPoint = Vector2.new(1, 0)
+counter.AnchorPoint = Vector2.new(0, 0)
 counter.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 counter.BackgroundTransparency = 0.18
 counter.BorderSizePixel = 0
 counter.Font = Enum.Font.GothamBold
-counter.Position = UDim2.new(1, -18, 0, 96)
+counter.Position = UDim2.new(0, 18, 0, 96)
 counter.Size = UDim2.fromOffset(280, 38)
 counter.Text = "Finding room..."
 counter.TextColor3 = Color3.fromRGB(236, 246, 255)
@@ -61,12 +61,12 @@ counterCorner.Parent = counter
 
 local noTouchPanel = Instance.new("Frame")
 noTouchPanel.Name = "NoTouchProgress"
-noTouchPanel.AnchorPoint = Vector2.new(1, 0)
+noTouchPanel.AnchorPoint = Vector2.new(0, 0)
 noTouchPanel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 noTouchPanel.BackgroundTransparency = 0.18
 noTouchPanel.BorderSizePixel = 0
-noTouchPanel.Position = UDim2.new(1, -18, 0, 140)
-noTouchPanel.Size = UDim2.fromOffset(280, 48)
+noTouchPanel.Position = UDim2.new(0, 18, 0, 140)
+noTouchPanel.Size = UDim2.fromOffset(280, 56)
 noTouchPanel.Visible = false
 noTouchPanel.Parent = gui
 
@@ -79,7 +79,7 @@ noTouchLabel.Name = "NoTouchLabel"
 noTouchLabel.BackgroundTransparency = 1
 noTouchLabel.Font = Enum.Font.GothamBold
 noTouchLabel.Position = UDim2.fromOffset(10, 4)
-noTouchLabel.Size = UDim2.new(1, -20, 0, 20)
+noTouchLabel.Size = UDim2.new(1, -20, 0, 28)
 noTouchLabel.Text = "No interaction: 0.0 / 2.0 min"
 noTouchLabel.TextColor3 = Color3.fromRGB(236, 246, 255)
 noTouchLabel.TextScaled = true
@@ -90,7 +90,7 @@ local noTouchTrack = Instance.new("Frame")
 noTouchTrack.Name = "NoTouchTrack"
 noTouchTrack.BackgroundColor3 = Color3.fromRGB(42, 47, 56)
 noTouchTrack.BorderSizePixel = 0
-noTouchTrack.Position = UDim2.fromOffset(10, 29)
+noTouchTrack.Position = UDim2.fromOffset(10, 38)
 noTouchTrack.Size = UDim2.new(1, -20, 0, 10)
 noTouchTrack.Parent = noTouchPanel
 
@@ -441,7 +441,7 @@ local function showDiscoveryToast(discoveryName)
 		Position = UDim2.fromScale(0.5, 0.16),
 	})
 
-	task.delay(2.4, function()
+	task.delay(3, function()
 		if toastSequence ~= currentSequence then
 			return
 		end
@@ -516,10 +516,11 @@ local function updateRoomStatus(payload)
 		)
 		local elapsed = math.max(0, payload.NoTouchElapsed or 0)
 		local target = math.max(1, payload.NoTouchTarget or Constants.NoTouch.AccomplishmentSeconds)
+		local totalPlay = math.max(0, payload.TotalPlaySeconds or 0)
 		local ratio = math.clamp(elapsed / target, 0, 1)
 		noTouchPanel.Visible = true
 		noTouchFill.Size = UDim2.fromScale(ratio, 1)
-		noTouchLabel.Text = ("No interaction: %.1f / %.1f min"):format(elapsed / 60, target / 60)
+		noTouchLabel.Text = ("Still: %.1f / %.1f min  Room: %.1f min"):format(elapsed / 60, target / 60, totalPlay / 60)
 	else
 		counter.Text = ""
 		noTouchPanel.Visible = false

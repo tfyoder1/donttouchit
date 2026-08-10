@@ -117,7 +117,10 @@ function RoomProgressService:_getState(player)
 			CurrentRoomId = nil,
 			TimerStartedAt = now,
 			PlayStartedAt = now,
-			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
+			LastRoomTickAt = nil,
+			RoomPlaySecondsByRoomId = {},
+			RoomPlayRewardsByRoomId = {},
+			SparkleStateByRoomId = {},
 			StartOptionsSent = false,
 			StartChoiceHandled = false,
 			TwoMinuteAwarded = {},
@@ -253,6 +256,7 @@ function RoomProgressService:_tickPlayer(player, now)
 	if not roomId then
 		state.CurrentRoomId = nil
 		state.TimerStartedAt = now
+		state.LastRoomTickAt = nil
 		self:_sendRoomStatus(player, now)
 		return
 	end
@@ -260,6 +264,14 @@ function RoomProgressService:_tickPlayer(player, now)
 	if state.CurrentRoomId ~= roomId then
 		state.CurrentRoomId = roomId
 		state.TimerStartedAt = now
+		state.LastRoomTickAt = now
+		state.SparkleStateByRoomId[roomId] = {
+			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
+		}
+	else
+		local delta = math.max(0, now - (state.LastRoomTickAt or now))
+		state.RoomPlaySecondsByRoomId[roomId] = (state.RoomPlaySecondsByRoomId[roomId] or 0) + delta
+		state.LastRoomTickAt = now
 	end
 
 	local room = Constants.GetRoom(roomId)
@@ -269,7 +281,10 @@ function RoomProgressService:_tickPlayer(player, now)
 	end
 
 	local elapsed = now - state.TimerStartedAt
+	local totalPlay = state.RoomPlaySecondsByRoomId[roomId] or 0
+	self:_tickRoomPlayRewards(player, roomId, totalPlay, state)
 	self:_sendRoomStatus(player, now)
+	self:_updateNoTouchWorldClocks(roomId, elapsed, totalPlay)
 
 	if room.NoTouchDiscoveryId
 		and elapsed >= Constants.NoTouch.AccomplishmentSeconds
@@ -319,6 +334,7 @@ function RoomProgressService:_sendRoomStatus(player, now)
 				Total = snapshot.Total,
 				NoTouchElapsed = elapsed,
 				NoTouchTarget = Constants.NoTouch.AccomplishmentSeconds,
+				TotalPlaySeconds = state.RoomPlaySecondsByRoomId[areaId] or 0,
 			})
 			return
 		end
@@ -329,12 +345,61 @@ function RoomProgressService:_sendRoomStatus(player, now)
 	})
 end
 
-function RoomProgressService:_tickSparkle(player, roomId, now, state)
-	if now < state.NextSparkleAt then
+function RoomProgressService:_tickRoomPlayRewards(player, roomId, totalPlay, state)
+	local earnedCount = math.floor(totalPlay / Constants.RoomPlay.HintIntervalSeconds)
+	local awardedCount = state.RoomPlayRewardsByRoomId[roomId] or 0
+
+	if earnedCount <= awardedCount then
 		return
 	end
 
-	state.NextSparkleAt = now + Constants.Sparkle.IntervalSeconds
+	local rewardCount = earnedCount - awardedCount
+	local hintTotal = rewardCount * Constants.RoomPlay.HintsPerInterval
+	state.RoomPlayRewardsByRoomId[roomId] = earnedCount
+	self.discoveryService:GrantHints(player, hintTotal)
+
+	local room = Constants.GetRoom(roomId)
+	self.systemMessageRemote:FireClient(
+		player,
+		("Room time bonus: %d free hint%s for staying in %s."):format(
+			hintTotal,
+			hintTotal == 1 and "" or "s",
+			room and room.Name or "the room"
+		)
+	)
+end
+
+function RoomProgressService:_updateNoTouchWorldClocks(roomId, elapsed, totalPlay)
+	local text = ("Still %.1f / %.1fm\nRoom %.1fm"):format(
+		elapsed / 60,
+		Constants.NoTouch.AccomplishmentSeconds / 60,
+		totalPlay / 60
+	)
+
+	for _, clock in ipairs(CollectionService:GetTagged(Constants.Tags.NoTouchClock)) do
+		if clock:GetAttribute("RoomId") == roomId then
+			local label = clock:FindFirstChild("ClockText", true)
+			if label and label:IsA("TextLabel") then
+				label.Text = text
+			end
+		end
+	end
+end
+
+function RoomProgressService:_tickSparkle(player, roomId, now, state)
+	local sparkleState = state.SparkleStateByRoomId[roomId]
+	if not sparkleState then
+		sparkleState = {
+			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
+		}
+		state.SparkleStateByRoomId[roomId] = sparkleState
+	end
+
+	if now < sparkleState.NextSparkleAt then
+		return
+	end
+
+	sparkleState.NextSparkleAt = now + Constants.Sparkle.IntervalSeconds
 
 	local _, targetTag = self.discoveryService:GetNextPendingHighlight(player, roomId)
 	if not targetTag then

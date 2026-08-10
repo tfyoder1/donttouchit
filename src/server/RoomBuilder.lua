@@ -90,6 +90,15 @@ local function createSurfaceText(parent, name, text, face, textColor, background
 	return label
 end
 
+local function createNoTouchClock(parent, name, roomId, size, cframe, face)
+	local clock = createPart(parent, name, size, cframe, Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
+	clock:SetAttribute("RoomId", roomId)
+	local label = createSurfaceText(clock, "ClockText", "Still 0.0 / 2.0m\nRoom 0.0m", face, Color3.fromRGB(255, 242, 181), Color3.fromRGB(24, 28, 34))
+	label.Font = Enum.Font.GothamBold
+	tag(clock, Constants.Tags.NoTouchClock)
+	return clock
+end
+
 local function clearGeneratedFolder(name)
 	local existing = workspace:FindFirstChild(name)
 	if existing and existing:GetAttribute(ROOM_ATTRIBUTE) then
@@ -223,6 +232,26 @@ local function makeResetRoomButton(roomFolder)
 
 	resetModel.PrimaryPart = plate
 	return resetModel
+end
+
+local function makeTVRoomClocks(roomFolder)
+	createNoTouchClock(
+		roomFolder,
+		"TVRoomWallClock",
+		"TVRoom",
+		Vector3.new(0.28, 2.3, 5.6),
+		CFrame.new(Constants.Room.Width / 2 - 0.57, 8.2, 6.4),
+		Enum.NormalId.Left
+	)
+
+	createNoTouchClock(
+		roomFolder,
+		"TVRoomPedestalClock",
+		"TVRoom",
+		Vector3.new(4.2, 1.05, 0.22),
+		CFrame.new(0, 2.75, 2.9),
+		Enum.NormalId.Front
+	)
 end
 
 local function makeSpawn(roomFolder)
@@ -654,6 +683,14 @@ local function makeSnackButton(objectsFolder)
 	local model = makeModel(objectsFolder, "SnackLabButton")
 
 	local base = createPart(model, "SnackButtonBase", Vector3.new(4.6, 2.6, 4.6), cframeAt(origin, 0, 1.8, 0), Color3.fromRGB(59, 67, 76), Enum.Material.Metal)
+	createNoTouchClock(
+		model,
+		"SnackButtonClock",
+		"SnackLab",
+		Vector3.new(4.1, 1.05, 0.22),
+		cframeAt(origin, 0, 2.05, 2.42),
+		Enum.NormalId.Front
+	)
 
 	local button = createPart(model, "SnackBlueButton", Vector3.new(3.1, 0.65, 3.1), cframeAt(origin, 0, 3.4, 0), Color3.fromRGB(45, 151, 255), Enum.Material.SmoothPlastic)
 	button.Shape = Enum.PartType.Ball
@@ -862,10 +899,19 @@ function RoomBuilder.Build()
 	local _, recoveryFloor = makeFloor(roomFolder)
 	local exitDoor = makeShell(roomFolder)
 	local resetRoomButton = makeResetRoomButton(roomFolder)
+	makeTVRoomClocks(roomFolder)
 	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
+	createNoTouchClock(
+		snackLab.Model,
+		"SnackLabWallClock",
+		"SnackLab",
+		Vector3.new(0.28, 2.3, 5.6),
+		cframeAt(SNACK_LAB_ORIGIN, Constants.Room.Width / 2 - 0.57, 8.2, -2.5),
+		Enum.NormalId.Left
+	)
 
 	local pedestal = makePedestal(objectsFolder)
 	local lightSwitch = makeLightSwitch(objectsFolder)
