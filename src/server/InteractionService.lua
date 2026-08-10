@@ -347,6 +347,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.slowMotionTokensByHumanoid = {}
 	self.fruitBowlState = {}
 	self.islandExitBounceAtByUserId = {}
+	self.islandExitWarningsByUserId = {}
 	self.islandExitTouchConnections = {}
 	self.islandShovelState = {}
 	self.islandTreasureState = {}
@@ -2541,7 +2542,7 @@ function InteractionService:_getIslandExitRequiredCount()
 		return 1
 	end
 
-	return math.ceil(#room.DiscoveryOrder * 0.5)
+	return #room.DiscoveryOrder
 end
 
 function InteractionService:_spawnIslandShark(exitGate, player)
@@ -2587,12 +2588,12 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 	end
 
 	if rootPart then
-		rootPart.AssemblyLinearVelocity = Vector3.new(0, 38, 54)
+		rootPart.AssemblyLinearVelocity = Vector3.new(0, 42, 74)
 		task.delay(0.28, function()
 			if rootPart.Parent then
 				local destination = Constants.GetRoomSpawnCFrame("Island")
 				rootPart.CFrame = destination
-				rootPart.AssemblyLinearVelocity = Vector3.new(0, 26, 30)
+				rootPart.AssemblyLinearVelocity = Vector3.new(0, 28, 34)
 			end
 		end)
 	end
@@ -2618,15 +2619,34 @@ function InteractionService:_wireIslandExit(exitGate)
 			end
 
 			self.islandExitBounceAtByUserId[player.UserId] = now
-			self.discoveryService:Unlock(player, Constants.Discoveries.SharkBounce.Id)
-			self:_spawnIslandShark(exitGate, player)
-			self.systemMessageRemote:FireClient(
-				player,
-				("The exit shark requires %d island discoveries before checkout. You have %d."):format(requiredCount, currentCount)
-			)
+			local warningCount = (self.islandExitWarningsByUserId[player.UserId] or 0) + 1
+			self.islandExitWarningsByUserId[player.UserId] = warningCount
+
+			if warningCount < 3 then
+				local remainingWarnings = 3 - warningCount
+				self.systemMessageRemote:FireClient(
+					player,
+					("Warning %d/3: something large is objecting to early checkout. Find %d island discoveries first. You have %d."):format(
+						warningCount,
+						requiredCount,
+						currentCount
+					)
+				)
+				if remainingWarnings == 1 then
+					playSound(exitGate, "rbxasset://sounds/electronicpingshort.wav", 0.55, 0.45)
+				else
+					playSound(exitGate, "rbxasset://sounds/button.wav", 0.45, 0.6)
+				end
+			else
+				self.islandExitWarningsByUserId[player.UserId] = 0
+				self.discoveryService:Unlock(player, Constants.Discoveries.SharkBounce.Id)
+				self:_spawnIslandShark(exitGate, player)
+				self.systemMessageRemote:FireClient(player, "Third warning: the exit shark has filed a physical complaint.")
+			end
 			return
 		end
 
+		self.islandExitWarningsByUserId[player.UserId] = nil
 		local destinationCFrame = exitGate:GetAttribute("DestinationCFrame") or Constants.Hallway.SpawnCFrame
 		teleportPlayer(player, destinationCFrame)
 		self.systemMessageRemote:FireClient(player, "The island lets you return to the hallway.")
@@ -2664,6 +2684,12 @@ function InteractionService:_setIslandTreasureLayerVisible(treasure, layerName, 
 		if instance:IsA("BasePart") and instance:GetAttribute("TreasureLayer") == layerName then
 			instance.Transparency = visible and 0 or 1
 			instance.CanCollide = visible and layerName == "Chest"
+		elseif instance:IsA("SurfaceGui")
+			and instance.Parent
+			and instance.Parent:IsA("BasePart")
+			and instance.Parent:GetAttribute("TreasureLayer") == layerName
+		then
+			instance.Enabled = visible
 		end
 	end
 end
@@ -2747,9 +2773,10 @@ function InteractionService:_wireIslandTreasure(treasurePart)
 		if lid and lid:IsA("BasePart") then
 			local baseCFrame = lid:GetAttribute("BaseCFrame") or lid.CFrame
 			tweenPart(lid, 0.3, {
-				CFrame = baseCFrame * CFrame.new(0, 0.45, 0.7) * CFrame.Angles(math.rad(-18), 0, 0),
+				CFrame = baseCFrame * CFrame.new(0, 1.25, 1.35) * CFrame.Angles(math.rad(-72), 0, 0),
 				Color = Color3.fromRGB(158, 92, 47),
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			lid.CanCollide = false
 		end
 
 		self:_setIslandTreasureLayerVisible(treasure, "Cola", true)

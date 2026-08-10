@@ -1162,6 +1162,9 @@ local function setHiddenBaseline(root)
 		elseif descendant:IsA("ProximityPrompt") then
 			descendant.Enabled = false
 			descendant:SetAttribute("BaseEnabled", false)
+		elseif descendant:IsA("SurfaceGui") then
+			descendant.Enabled = false
+			descendant:SetAttribute("BaseEnabled", false)
 		end
 	end
 end
@@ -1171,20 +1174,10 @@ local function makePalmTree(parent, name, x, z, leanDegrees)
 	local trunkHeight = 7.2
 	local trunkDiameter = 0.8
 	local baseCFrame = cframeAt(ISLAND_ORIGIN, x, 1.02, z) * CFrame.Angles(0, 0, math.rad(leanDegrees or 0))
-	local trunkCFrame = baseCFrame * CFrame.new(0, trunkHeight / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
-	local trunk = createPart(tree, "PalmTrunk", Vector3.new(trunkHeight, trunkDiameter, trunkDiameter), trunkCFrame, Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
-	trunk.Shape = Enum.PartType.Cylinder
+	local trunk = createPart(tree, "PalmTrunk", Vector3.new(trunkDiameter, trunkHeight, trunkDiameter), baseCFrame * CFrame.new(0, trunkHeight / 2, 0), Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
 
 	for index = 1, 5 do
-		local ring = createPart(
-			tree,
-			"PalmTrunkBand",
-			Vector3.new(0.12, trunkDiameter + 0.08, trunkDiameter + 0.08),
-			baseCFrame * CFrame.new(0, 0.9 + index * 1.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-			Color3.fromRGB(91, 58, 34),
-			Enum.Material.Wood
-		)
-		ring.Shape = Enum.PartType.Cylinder
+		createPart(tree, "PalmTrunkBand", Vector3.new(trunkDiameter + 0.14, 0.14, trunkDiameter + 0.14), baseCFrame * CFrame.new(0, 0.9 + index * 1.05, 0), Color3.fromRGB(91, 58, 34), Enum.Material.Wood)
 	end
 
 	local crownCFrame = baseCFrame * CFrame.new(0, trunkHeight + 0.15, 0)
@@ -1331,6 +1324,9 @@ local function makeIslandObjects(objectsFolder)
 	local colaTop = createPart(treasure, "IslandBloxyColaTop", Vector3.new(0.7, 0.08, 0.7), cframeAt(origin, 5.5, 3.11, 8.25), Color3.fromRGB(238, 238, 232), Enum.Material.Metal)
 	colaTop.Shape = Enum.PartType.Cylinder
 	colaTop:SetAttribute("TreasureLayer", "Cola")
+	local colaLabel = createPart(treasure, "IslandBloxyColaLabel", Vector3.new(0.92, 0.68, 0.08), cframeAt(origin, 5.5, 2.3, 7.79), Color3.fromRGB(245, 245, 242), Enum.Material.SmoothPlastic)
+	colaLabel:SetAttribute("TreasureLayer", "Cola")
+	createSurfaceText(colaLabel, "IslandBloxyColaText", "BLOXY\nCOLA", Enum.NormalId.Front, Color3.fromRGB(220, 38, 47), Color3.fromRGB(245, 245, 242))
 	local colaPrompt = createPrompt(colaCan, "Sip", "Bloxy Cola", 0)
 	colaPrompt.Enabled = false
 	colaPrompt:SetAttribute("BaseEnabled", false)

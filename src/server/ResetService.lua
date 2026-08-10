@@ -47,6 +47,8 @@ function ResetService.MarkBaseline(instance)
 		instance:SetAttribute("BaseEnabled", instance.Enabled)
 		instance:SetAttribute("BaseActionText", instance.ActionText)
 		instance:SetAttribute("BaseObjectText", instance.ObjectText)
+	elseif instance:IsA("SurfaceGui") then
+		instance:SetAttribute("BaseEnabled", instance.Enabled)
 	elseif instance:IsA("TextLabel") then
 		instance:SetAttribute("BaseText", instance.Text)
 		instance:SetAttribute("BaseTextColor3", instance.TextColor3)
@@ -149,6 +151,13 @@ local function restoreTextLabel(textLabel)
 	end
 end
 
+local function restoreSurfaceGui(surfaceGui)
+	local baseEnabled = surfaceGui:GetAttribute("BaseEnabled")
+	if baseEnabled ~= nil then
+		surfaceGui.Enabled = baseEnabled
+	end
+end
+
 function ResetService.RestoreInstance(root)
 	if not root then
 		return
@@ -164,6 +173,8 @@ function ResetService.RestoreInstance(root)
 			restoreLight(instance)
 		elseif instance:IsA("ProximityPrompt") then
 			restorePrompt(instance)
+		elseif instance:IsA("SurfaceGui") then
+			restoreSurfaceGui(instance)
 		elseif instance:IsA("TextLabel") then
 			restoreTextLabel(instance)
 		end
