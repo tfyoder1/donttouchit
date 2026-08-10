@@ -555,14 +555,19 @@ local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
 local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
+local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
+local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
 
-local function makeHallDoor(parent, name, size, cframe, face, label, destinationCFrame, lockedMessage)
+local function makeHallDoor(parent, name, size, cframe, face, label, destinationCFrame, lockedMessage, roomId)
 	local door = createPart(parent, name, size, cframe, Color3.fromRGB(79, 92, 116), Enum.Material.Wood)
 	createSurfaceText(door, "DoorText", label, face, Color3.fromRGB(232, 245, 255), Color3.fromRGB(38, 48, 64))
 
 	local prompt = createPrompt(door, lockedMessage and "Knock" or "Enter", label, 0)
 	if destinationCFrame then
 		door:SetAttribute("DestinationCFrame", destinationCFrame)
+	end
+	if roomId then
+		door:SetAttribute("RoomId", roomId)
 	end
 	if lockedMessage then
 		door:SetAttribute("LockedMessage", lockedMessage)
@@ -594,13 +599,22 @@ local function makeHallway(roomFolder)
 	createPart(hallway, "HallwayLeftWall", Vector3.new(1, 10, 56), CFrame.new(-6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
 	createPart(hallway, "HallwayRightWall", Vector3.new(1, 10, 56), CFrame.new(6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
 	createPart(hallway, "HallwayCeiling", Vector3.new(13, 1, 56), CFrame.new(0, 10, 45), Color3.fromRGB(116, 119, 128), Enum.Material.Concrete)
-	createPart(hallway, "HallwayEndWall", Vector3.new(13, 10, 1), CFrame.new(0, 5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	createPart(hallway, "IslandApproachFloor", Vector3.new(9, 1, 48), CFrame.new(0, 0, 97), Color3.fromRGB(65, 84, 104), Enum.Material.Concrete)
+	createPart(hallway, "IslandApproachLeftWall", Vector3.new(1, 9, 48), CFrame.new(-4.5, 4.5, 97), Color3.fromRGB(76, 103, 130), Enum.Material.SmoothPlastic)
+	createPart(hallway, "IslandApproachRightWall", Vector3.new(1, 9, 48), CFrame.new(4.5, 4.5, 97), Color3.fromRGB(76, 103, 130), Enum.Material.SmoothPlastic)
+	createPart(hallway, "IslandApproachCeiling", Vector3.new(9, 1, 48), CFrame.new(0, 9.5, 97), Color3.fromRGB(41, 65, 91), Enum.Material.Concrete)
+	createPart(hallway, "IslandApproachArchTop", Vector3.new(13, 2, 1), CFrame.new(0, 9, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	createPart(hallway, "IslandApproachArchLeft", Vector3.new(2, 9, 1), CFrame.new(-5.5, 4.5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	createPart(hallway, "IslandApproachArchRight", Vector3.new(2, 9, 1), CFrame.new(5.5, 4.5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
 
 	local label = createPart(hallway, "HallwaySign", Vector3.new(9.5, 2.2, 0.3), CFrame.new(0, 7.1, 22), Color3.fromRGB(250, 238, 111), Enum.Material.SmoothPlastic)
 	createSurfaceText(label, "HallwaySignText", "ROOMS", Enum.NormalId.Back, Color3.fromRGB(22, 22, 26), Color3.fromRGB(250, 238, 111))
+	local oceanSign = createPart(hallway, "IslandApproachSign", Vector3.new(7.2, 1.9, 0.3), CFrame.new(0, 6.4, 88), Color3.fromRGB(112, 222, 255), Enum.Material.SmoothPlastic)
+	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nTO A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
 	makeReferenceBook(hallway, "TVRoomReferenceBook", CFrame.new(-3.5, 0, 30), "TVRoom", "TV ROOM")
 	makeReferenceBook(hallway, "SnackLabReferenceBook", CFrame.new(3.5, 0, 38), "SnackLab", "SNACK LAB")
+	makeReferenceBook(hallway, "IslandReferenceBook", CFrame.new(-2.8, 0, 107), "Island", "ISLAND")
 
 	local snackDoor = makeHallDoor(
 		hallway,
@@ -609,7 +623,9 @@ local function makeHallway(roomFolder)
 		CFrame.new(5.95, 4.75, 45),
 		Enum.NormalId.Left,
 		"SNACK LAB",
-		SNACK_LAB_SPAWN_CFRAME
+		SNACK_LAB_SPAWN_CFRAME,
+		nil,
+		"SnackLab"
 	)
 
 	makeHallDoor(
@@ -623,15 +639,16 @@ local function makeHallway(roomFolder)
 		"Something behind this door is still rehearsing."
 	)
 
-	makeHallDoor(
+	local islandDoor = makeHallDoor(
 		hallway,
-		"DeepHallDoor",
+		"IslandDoor",
 		Vector3.new(7, 8.5, 0.45),
-		CFrame.new(0, 4.75, 72.4),
+		CFrame.new(0, 4.75, 121),
 		Enum.NormalId.Back,
-		"MORE SOON",
+		"ISLAND",
+		ISLAND_SPAWN_CFRAME,
 		nil,
-		"The hallway refuses to be bigger yet."
+		"Island"
 	)
 
 	local returnPad = createPart(hallway, "HallwayLanding", Vector3.new(8, 0.25, 8), CFrame.new(HALLWAY_SPAWN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(96, 194, 134), Enum.Material.Neon)
@@ -641,6 +658,7 @@ local function makeHallway(roomFolder)
 	return {
 		Model = hallway,
 		SnackDoor = snackDoor,
+		IslandDoor = islandDoor,
 	}
 end
 
@@ -724,9 +742,56 @@ local function makeSnackFridge(objectsFolder)
 	iceLight.Parent = iceCube
 	mark(iceLight)
 
+	local pizza = makeModel(fridge, "FridgePizza")
+	local pizzaSlice = createPart(pizza, "PizzaSlice", Vector3.new(2.3, 0.25, 1.45), cframeAt(origin, -14.3, 6.78, -7.75) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(246, 184, 85), Enum.Material.SmoothPlastic, "WedgePart")
+	createPart(pizza, "PizzaCrust", Vector3.new(0.28, 0.32, 1.5), cframeAt(origin, -15.05, 6.79, -7.75), Color3.fromRGB(177, 103, 47), Enum.Material.SmoothPlastic)
+	for index = 1, 4 do
+		local topping = createPart(
+			pizza,
+			"Pepperoni",
+			Vector3.new(0.28, 0.08, 0.28),
+			cframeAt(origin, -14.35 + (index % 2) * 0.6, 6.96, -8.08 + math.floor((index - 1) / 2) * 0.55),
+			Color3.fromRGB(190, 42, 45),
+			Enum.Material.SmoothPlastic
+		)
+		topping.Shape = Enum.PartType.Cylinder
+	end
+	local pizzaPrompt = createPrompt(pizzaSlice, "Inspect", "Cold Pizza", 0)
+	pizzaPrompt.Enabled = false
+	pizzaPrompt:SetAttribute("BaseEnabled", false)
+	tag(pizzaSlice, Constants.Tags.FridgePizza)
+	pizza.PrimaryPart = pizzaSlice
+
+	local cola = makeModel(fridge, "FridgeBloxyCola")
+	local can = createPart(cola, "BloxyColaCan", Vector3.new(0.82, 1.55, 0.82), cframeAt(origin, -11.6, 4.85, -7.6), Color3.fromRGB(218, 40, 47), Enum.Material.Metal)
+	can.Shape = Enum.PartType.Cylinder
+	local canLabel = createPart(cola, "BloxyColaLabel", Vector3.new(0.9, 0.68, 0.08), cframeAt(origin, -11.6, 4.85, -7.16), Color3.fromRGB(245, 245, 242), Enum.Material.SmoothPlastic)
+	createSurfaceText(canLabel, "BloxyColaText", "BLOXY\nCOLA", Enum.NormalId.Front, Color3.fromRGB(218, 40, 47), Color3.fromRGB(245, 245, 242))
+	local colaPrompt = createPrompt(can, "Sip", "Bloxy Cola", 0)
+	colaPrompt.Enabled = false
+	colaPrompt:SetAttribute("BaseEnabled", false)
+	tag(can, Constants.Tags.FridgeBloxyCola)
+	cola.PrimaryPart = can
+
 	local door = createPart(fridge, "FridgeDoor", Vector3.new(5.5, 8, 0.32), cframeAt(origin, -13, 4.9, -6.83), Color3.fromRGB(237, 246, 247), Enum.Material.Metal)
 	createSurfaceText(door, "FridgeDoorText", "DO NOT OPEN", Enum.NormalId.Front, Color3.fromRGB(26, 35, 39), Color3.fromRGB(237, 246, 247))
 	createPrompt(door, "Open", "Fridge", 0)
+
+	local secretButton = createPart(fridge, "SecretFridgeButton", Vector3.new(2.55, 1.2, 0.24), cframeAt(origin, -15.7, 4.85, -6.18), Color3.fromRGB(255, 72, 86), Enum.Material.Neon)
+	secretButton.Transparency = 1
+	secretButton.CanCollide = false
+	secretButton:SetAttribute("BaseTransparency", 1)
+	secretButton:SetAttribute("BaseCanCollide", false)
+	local secretLabel = createSurfaceText(secretButton, "SecretFridgeButtonText", "SECRET\nFRIDGE\nBUTTON", Enum.NormalId.Front, Color3.fromRGB(255, 246, 220), Color3.fromRGB(115, 18, 31))
+	secretLabel.Text = ""
+	secretLabel:SetAttribute("BaseText", "")
+	if secretLabel.Parent and secretLabel.Parent:IsA("SurfaceGui") then
+		secretLabel.Parent.Enabled = false
+	end
+	local secretPrompt = createPrompt(secretButton, "Press", "Secret Fridge Button", 0)
+	secretPrompt.Enabled = false
+	secretPrompt:SetAttribute("BaseEnabled", false)
+	tag(secretButton, Constants.Tags.SecretFridgeButton)
 	tag(fridge, Constants.Tags.SnackFridge)
 
 	fridge.PrimaryPart = body
@@ -947,6 +1012,185 @@ local function makeFruitBowl(objectsFolder)
 	return fruitBowl
 end
 
+local function setHiddenBaseline(root)
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Transparency = 1
+			descendant.CanCollide = false
+			descendant:SetAttribute("BaseTransparency", 1)
+			descendant:SetAttribute("BaseCanCollide", false)
+		elseif descendant:IsA("ProximityPrompt") then
+			descendant.Enabled = false
+			descendant:SetAttribute("BaseEnabled", false)
+		end
+	end
+end
+
+local function makePalmTree(parent, name, x, z, leanDegrees)
+	local tree = makeModel(parent, name)
+	local baseCFrame = cframeAt(ISLAND_ORIGIN, x, 1.05, z) * CFrame.Angles(0, 0, math.rad(leanDegrees or 0))
+	local trunk = createPart(tree, "PalmTrunk", Vector3.new(0.8, 7.2, 0.8), baseCFrame * CFrame.new(0, 3.6, 0), Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
+	trunk.Shape = Enum.PartType.Cylinder
+
+	local crownCFrame = cframeAt(ISLAND_ORIGIN, x + math.sin(math.rad(leanDegrees or 0)) * 1.4, 8.2, z)
+	for index = 1, 6 do
+		local angle = (index - 1) * math.pi / 3
+		local leaf = createPart(
+			tree,
+			"PalmLeaf",
+			Vector3.new(5.8, 0.32, 1.25),
+			crownCFrame * CFrame.Angles(0, angle, math.rad(-14)),
+			Color3.fromRGB(61, 156, 77),
+			Enum.Material.Grass,
+			"WedgePart"
+		)
+		leaf:SetAttribute("LeafIndex", index)
+	end
+
+	tree.PrimaryPart = trunk
+	return tree
+end
+
+local function makeIslandRoom(roomFolder)
+	local room = makeModel(roomFolder, "IslandRoom")
+	local origin = ISLAND_ORIGIN
+
+	local ocean = createPart(room, "OceanPlane", Vector3.new(150, 0.28, 112), cframeAt(origin, 0, -0.18, 31), Color3.fromRGB(43, 152, 215), Enum.Material.Glass)
+	ocean.Transparency = 0.18
+	ocean:SetAttribute("BaseTransparency", ocean.Transparency)
+
+	local sand = createPart(room, "IslandSand", Vector3.new(34, 1.05, 26), cframeAt(origin, 0, 0.45, 4), Color3.fromRGB(229, 202, 123), Enum.Material.Sand)
+	createPart(room, "IslandSandNorth", Vector3.new(22, 0.85, 12), cframeAt(origin, -5, 0.62, 14), Color3.fromRGB(235, 211, 140), Enum.Material.Sand)
+	createPart(room, "IslandSandSouth", Vector3.new(18, 0.85, 10), cframeAt(origin, 7, 0.62, -6), Color3.fromRGB(224, 194, 112), Enum.Material.Sand)
+	sand:SetAttribute("RoomId", "Island")
+
+	for index = 1, 5 do
+		local rock = createPart(
+			room,
+			"IslandRock",
+			Vector3.new(1.2 + index * 0.15, 0.7 + index * 0.05, 1.4),
+			cframeAt(origin, -13 + index * 5.2, 1.12, 14 - (index % 2) * 20) * CFrame.Angles(0, math.rad(index * 24), math.rad(index * 9)),
+			Color3.fromRGB(104, 112, 116),
+			Enum.Material.Slate
+		)
+		rock.Shape = Enum.PartType.Ball
+	end
+
+	makePalmTree(room, "BentPalm", -10, 8, -9)
+	makePalmTree(room, "SmallPalm", 10, 1, 6)
+
+	for _, data in ipairs({
+		{ Name = "NorthHorizon", Size = Vector3.new(150, 28, 0.4), CFrame = cframeAt(origin, 0, 13, 87), Color = Color3.fromRGB(133, 215, 255) },
+		{ Name = "SouthHorizon", Size = Vector3.new(150, 28, 0.4), CFrame = cframeAt(origin, 0, 13, -28), Color = Color3.fromRGB(118, 197, 238) },
+		{ Name = "WestHorizon", Size = Vector3.new(0.4, 28, 112), CFrame = cframeAt(origin, -75, 13, 31), Color = Color3.fromRGB(109, 192, 238) },
+		{ Name = "EastHorizon", Size = Vector3.new(0.4, 28, 112), CFrame = cframeAt(origin, 75, 13, 31), Color = Color3.fromRGB(109, 192, 238) },
+	}) do
+		local horizon = createPart(room, data.Name, data.Size, data.CFrame, data.Color, Enum.Material.SmoothPlastic)
+		horizon.Transparency = 0.22
+		horizon.CanCollide = false
+		horizon:SetAttribute("BaseTransparency", horizon.Transparency)
+		horizon:SetAttribute("BaseCanCollide", false)
+	end
+
+	local sun = createPart(room, "IslandSun", Vector3.new(7, 7, 0.35), cframeAt(origin, -30, 17, 63.5), Color3.fromRGB(255, 222, 88), Enum.Material.Neon)
+	sun.Shape = Enum.PartType.Ball
+	sun.CanCollide = false
+	sun:SetAttribute("BaseCanCollide", false)
+
+	for index = 1, 8 do
+		createPart(
+			room,
+			"DockPlank",
+			Vector3.new(6.2, 0.38, 1.15),
+			cframeAt(origin, 0, 0.9, -21 + index * 1.55),
+			Color3.fromRGB(118, 75, 45),
+			Enum.Material.WoodPlanks
+		)
+	end
+	createPart(room, "DockLeftRail", Vector3.new(0.28, 2.1, 15), cframeAt(origin, -3.3, 2.15, -14.8), Color3.fromRGB(98, 61, 37), Enum.Material.Wood)
+	createPart(room, "DockRightRail", Vector3.new(0.28, 2.1, 15), cframeAt(origin, 3.3, 2.15, -14.8), Color3.fromRGB(98, 61, 37), Enum.Material.Wood)
+
+	local exitGate = createPart(room, "IslandExitGate", Vector3.new(8.2, 6.4, 0.62), cframeAt(origin, 0, 3.2, -23.4), Color3.fromRGB(67, 93, 112), Enum.Material.Metal)
+	exitGate:SetAttribute("DestinationCFrame", HALLWAY_SPAWN_CFRAME)
+	exitGate:SetAttribute("RoomId", "Island")
+	createSurfaceText(exitGate, "IslandExitText", "HALLWAY", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(35, 55, 70))
+	createPrompt(exitGate, "Leave", "Hallway", 0)
+	tag(exitGate, Constants.Tags.IslandExit)
+
+	for _, data in ipairs({
+		{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, -31, 8, 5) },
+		{ Name = "IslandBoundaryRight", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, 31, 8, 5) },
+		{ Name = "IslandBoundaryBack", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, 34) },
+		{ Name = "IslandBoundaryFront", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, -25) },
+	}) do
+		local boundary = createPart(room, data.Name, data.Size, data.CFrame, Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
+		boundary.Transparency = 1
+		boundary:SetAttribute("BaseTransparency", 1)
+	end
+
+	createNoTouchClock(
+		room,
+		"IslandClock",
+		"Island",
+		Vector3.new(5.4, 2.1, 0.28),
+		cframeAt(origin, 13.5, 5.2, 8) * CFrame.Angles(0, math.rad(-36), 0),
+		Enum.NormalId.Front
+	)
+	createSpawnLocation(room, "IslandSpawn", "Island", ISLAND_SPAWN_CFRAME, Color3.fromRGB(255, 205, 91), false)
+
+	room.PrimaryPart = sand
+	return {
+		Model = room,
+		ExitGate = exitGate,
+	}
+end
+
+local function makeIslandObjects(objectsFolder)
+	local origin = ISLAND_ORIGIN
+	local objects = makeModel(objectsFolder, "IslandObjects")
+
+	local shovel = makeModel(objects, "IslandShovel")
+	local handle = createPart(shovel, "ShovelHandle", Vector3.new(0.28, 4.6, 0.28), cframeAt(origin, -8, 2.4, 1.5) * CFrame.Angles(0, 0, math.rad(-32)), Color3.fromRGB(113, 71, 39), Enum.Material.Wood)
+	handle.Shape = Enum.PartType.Cylinder
+	createPart(shovel, "ShovelGrip", Vector3.new(1.5, 0.22, 0.22), cframeAt(origin, -9.25, 4.3, 1.5) * CFrame.Angles(0, 0, math.rad(-32)), Color3.fromRGB(84, 51, 30), Enum.Material.Wood)
+	createPart(shovel, "ShovelBlade", Vector3.new(1.2, 1.5, 0.24), cframeAt(origin, -6.55, 0.95, 1.5) * CFrame.Angles(0, 0, math.rad(-32)), Color3.fromRGB(191, 197, 201), Enum.Material.Metal, "WedgePart")
+	createPrompt(handle, "Dig", "Shovel", 0)
+	tag(handle, Constants.Tags.IslandShovel)
+	shovel.PrimaryPart = handle
+
+	local treasure = makeModel(objects, "IslandTreasureBox")
+	local base = createPart(treasure, "TreasureChestBase", Vector3.new(4.4, 1.55, 2.55), cframeAt(origin, 5.5, 1.18, 8.4), Color3.fromRGB(111, 63, 33), Enum.Material.Wood)
+	base:SetAttribute("TreasureLayer", "Chest")
+	local lid = createPart(treasure, "TreasureChestLid", Vector3.new(4.6, 0.9, 2.7), cframeAt(origin, 5.5, 2.42, 8.4), Color3.fromRGB(132, 76, 41), Enum.Material.Wood)
+	lid:SetAttribute("TreasureLayer", "Chest")
+	createPart(treasure, "TreasureBandFront", Vector3.new(4.7, 0.24, 0.2), cframeAt(origin, 5.5, 2.35, 7.02), Color3.fromRGB(255, 202, 75), Enum.Material.Metal):SetAttribute("TreasureLayer", "Chest")
+	createPart(treasure, "TreasureLock", Vector3.new(0.55, 0.55, 0.18), cframeAt(origin, 5.5, 1.85, 7.03), Color3.fromRGB(255, 214, 96), Enum.Material.Metal):SetAttribute("TreasureLayer", "Chest")
+	local treasurePrompt = createPrompt(base, "Open", "Treasure Box", 0)
+	treasurePrompt.Enabled = false
+	treasurePrompt:SetAttribute("BaseEnabled", false)
+	tag(base, Constants.Tags.IslandTreasure)
+
+	local colaCan = createPart(treasure, "IslandBloxyColaCan", Vector3.new(0.82, 1.55, 0.82), cframeAt(origin, 5.5, 2.3, 8.25), Color3.fromRGB(220, 38, 47), Enum.Material.Metal)
+	colaCan.Shape = Enum.PartType.Cylinder
+	colaCan:SetAttribute("TreasureLayer", "Cola")
+	local colaTop = createPart(treasure, "IslandBloxyColaTop", Vector3.new(0.7, 0.08, 0.7), cframeAt(origin, 5.5, 3.11, 8.25), Color3.fromRGB(238, 238, 232), Enum.Material.Metal)
+	colaTop.Shape = Enum.PartType.Cylinder
+	colaTop:SetAttribute("TreasureLayer", "Cola")
+	local colaPrompt = createPrompt(colaCan, "Sip", "Bloxy Cola", 0)
+	colaPrompt.Enabled = false
+	colaPrompt:SetAttribute("BaseEnabled", false)
+	tag(colaCan, Constants.Tags.IslandBloxyCola)
+	treasure.PrimaryPart = base
+	setHiddenBaseline(treasure)
+
+	objects.PrimaryPart = handle
+	return {
+		Model = objects,
+		Shovel = shovel,
+		Treasure = treasure,
+	}
+end
+
 local function connectSafetyFloor(safetyFloor)
 	local debounceByCharacter = {}
 
@@ -988,6 +1232,7 @@ function RoomBuilder.Build()
 	makeSpawn(roomFolder)
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
+	local islandRoom = makeIslandRoom(roomFolder)
 	createNoTouchClock(
 		snackLab.Model,
 		"SnackLabWallClock",
@@ -1011,6 +1256,7 @@ function RoomBuilder.Build()
 	local mixer = makeSnackMixer(objectsFolder)
 	local snackRack = makeSnackRack(objectsFolder)
 	local fruitBowl = makeFruitBowl(objectsFolder)
+	local islandObjects = makeIslandObjects(objectsFolder)
 
 	connectSafetyFloor(safetyFloor)
 	ResetService.CaptureRoots(roomFolder, objectsFolder)
@@ -1023,6 +1269,7 @@ function RoomBuilder.Build()
 		ExitDoor = exitDoor,
 		ResetRoomButton = resetRoomButton,
 		Hallway = hallway,
+		Island = islandRoom,
 		Pedestal = pedestal,
 		LightSwitch = lightSwitch,
 		Couch = couch,
@@ -1037,6 +1284,7 @@ function RoomBuilder.Build()
 		Mixer = mixer,
 		SnackRack = snackRack,
 		FruitBowl = fruitBowl,
+		IslandObjects = islandObjects,
 	}
 end
 

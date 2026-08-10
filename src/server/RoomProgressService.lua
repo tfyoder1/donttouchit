@@ -268,6 +268,10 @@ function RoomProgressService:_tickPlayer(player, now)
 		state.SparkleStateByRoomId[roomId] = {
 			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
 		}
+
+		if roomId == "Island" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
+		end
 	else
 		local delta = math.max(0, now - (state.LastRoomTickAt or now))
 		state.RoomPlaySecondsByRoomId[roomId] = (state.RoomPlaySecondsByRoomId[roomId] or 0) + delta

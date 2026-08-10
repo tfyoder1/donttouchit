@@ -248,6 +248,38 @@ local function playSound(parent, soundId, volume, playbackSpeed)
 	Debris:AddItem(sound, 3)
 end
 
+local function getInstanceAndDescendants(root)
+	if not root then
+		return {}
+	end
+
+	local instances = root:GetDescendants()
+	table.insert(instances, root)
+	return instances
+end
+
+local function setPromptEnabled(root, enabled)
+	for _, instance in ipairs(getInstanceAndDescendants(root)) do
+		if instance:IsA("ProximityPrompt") then
+			instance.Enabled = enabled
+		end
+	end
+end
+
+local function setTextLabelText(root, labelName, text)
+	local label = root and root:FindFirstChild(labelName, true)
+	if label and label:IsA("TextLabel") then
+		label.Text = text
+	end
+end
+
+local function setSurfaceGuiEnabled(root, labelName, enabled)
+	local label = root and root:FindFirstChild(labelName, true)
+	if label and label.Parent and label.Parent:IsA("SurfaceGui") then
+		label.Parent.Enabled = enabled
+	end
+end
+
 function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService)
 	local self = setmetatable({}, InteractionService)
 	self.eventManager = eventManager
@@ -271,6 +303,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.snackButtonState = {}
 	self.roomMoodStateByRoomId = {}
 	self.fridgeState = {}
+	self.secretFridgeButtonState = {}
 	self.toasterState = {}
 	self.sinkState = {}
 	self.mixerState = {}
@@ -278,6 +311,11 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.snackPackStateByUserId = {}
 	self.slowMotionTokensByHumanoid = {}
 	self.fruitBowlState = {}
+	self.islandExitBounceAtByUserId = {}
+	self.islandExitTouchConnections = {}
+	self.islandShovelState = {}
+	self.islandTreasureState = {}
+	self.islandColaState = {}
 	return self
 end
 
@@ -348,6 +386,18 @@ function InteractionService:Initialize()
 		self:_wireSnackFridge(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.FridgePizza, function(instance)
+		self:_wireFridgePizza(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.FridgeBloxyCola, function(instance)
+		self:_wireFridgeBloxyCola(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SecretFridgeButton, function(instance)
+		self:_wireSecretFridgeButton(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SnackToaster, function(instance)
 		self:_wireSnackToaster(instance)
 	end)
@@ -370,6 +420,22 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.FruitBowl, function(instance)
 		self:_wireFruitBowl(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandExit, function(instance)
+		self:_wireIslandExit(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandShovel, function(instance)
+		self:_wireIslandShovel(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandTreasure, function(instance)
+		self:_wireIslandTreasure(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandBloxyCola, function(instance)
+		self:_wireIslandBloxyCola(instance)
 	end)
 
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -673,10 +739,35 @@ function InteractionService:_wireResetRoomButton(button)
 
 		self:_clearAllTelevisions()
 		self.eventManager:ResetRoom(player)
+		self:_afterRoomReset()
 		for _, currentPlayer in ipairs(Players:GetPlayers()) do
 			self:_checkExitUnlock(currentPlayer)
 		end
 	end)
+end
+
+function InteractionService:_afterRoomReset()
+	for fridge, state in pairs(self.fridgeState) do
+		if fridge and fridge.Parent then
+			state.Opened = false
+			state.IceSpinToken = nil
+			state.Reacting = false
+			self:_setFridgeOpenDetails(fridge, false)
+		end
+	end
+
+	for _, state in pairs(self.islandTreasureState) do
+		state.Opened = false
+		state.Reacting = false
+	end
+
+	for _, state in pairs(self.islandShovelState) do
+		state.Reacting = false
+	end
+
+	for _, state in pairs(self.islandColaState) do
+		state.Reacting = false
+	end
 end
 
 function InteractionService:_wireAppliance(appliance)
@@ -1390,6 +1481,12 @@ function InteractionService:_wireHallDoor(door)
 			return
 		end
 
+		local roomId = door:GetAttribute("RoomId")
+		if roomId and not self.discoveryService:IsRoomUnlocked(player, roomId) then
+			self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
+			return
+		end
+
 		local destinationCFrame = door:GetAttribute("DestinationCFrame")
 		if typeof(destinationCFrame) ~= "CFrame" then
 			self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
@@ -1398,6 +1495,24 @@ function InteractionService:_wireHallDoor(door)
 
 		teleportPlayer(player, destinationCFrame)
 	end)
+end
+
+function InteractionService:_getRoomDoorRequirementText(player, roomId)
+	local requiredRoomId, requiredCount = Constants.GetRoomUnlockRequirement(roomId)
+	local targetRoom = Constants.GetRoom(roomId)
+	local requiredRoom = requiredRoomId and Constants.GetRoom(requiredRoomId)
+
+	if not targetRoom or not requiredRoom or not requiredCount then
+		return "That room is not ready yet."
+	end
+
+	local currentCount = self.discoveryService:GetRoomDiscoveryCount(player, requiredRoomId)
+	return ("The %s door wants %d %s discoveries first. You have %d."):format(
+		targetRoom.Name,
+		requiredCount,
+		requiredRoom.Name,
+		currentCount
+	)
 end
 
 function InteractionService:_getPlayersInRoom(roomId)
@@ -1583,10 +1698,26 @@ function InteractionService:_wireSnackButton(button)
 	end)
 end
 
+function InteractionService:_setFridgeOpenDetails(fridge, opened)
+	local pizza = fridge:FindFirstChild("PizzaSlice", true)
+	local cola = fridge:FindFirstChild("BloxyColaCan", true)
+	local secretButton = fridge:FindFirstChild("SecretFridgeButton", true)
+
+	setPromptEnabled(pizza, opened)
+	setPromptEnabled(cola, opened)
+
+	if secretButton and secretButton:IsA("BasePart") then
+		secretButton.Transparency = opened and 0 or 1
+		secretButton.CanCollide = opened
+		setPromptEnabled(secretButton, opened)
+		setTextLabelText(secretButton, "SecretFridgeButtonText", opened and "SECRET\nFRIDGE\nBUTTON" or "")
+		setSurfaceGuiEnabled(secretButton, "SecretFridgeButtonText", opened)
+	end
+end
+
 function InteractionService:_wireSnackFridge(fridge)
 	local prompt = getPrompt(fridge)
 	local door = fridge:FindFirstChild("FridgeDoor", true)
-	local textLabel = fridge:FindFirstChild("FridgeDoorText", true)
 	local iceCube = fridge:FindFirstChild("ColdIdeaIceCube", true)
 
 	self.fridgeState[fridge] = self.fridgeState[fridge] or {
@@ -1607,15 +1738,11 @@ function InteractionService:_wireSnackFridge(fridge)
 
 		if state.Opened then
 			self.systemMessageRemote:FireClient(player, "The fridge contains one cold idea.")
-			if textLabel and textLabel:IsA("TextLabel") then
-				textLabel.Text = "TOO LATE"
-				textLabel.TextColor3 = Color3.fromRGB(25, 34, 39)
-				textLabel.BackgroundColor3 = Color3.fromRGB(172, 242, 255)
-			end
 			tweenPart(door, 0.35, {
 				CFrame = (door:GetAttribute("BaseCFrame") or door.CFrame) + Vector3.new(-2.7, 0, 0.9),
 				Color = Color3.fromRGB(172, 242, 255),
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			self:_setFridgeOpenDetails(fridge, true)
 
 			if iceCube and iceCube:IsA("BasePart") then
 				local token = {}
@@ -1640,9 +1767,75 @@ function InteractionService:_wireSnackFridge(fridge)
 		else
 			state.IceSpinToken = nil
 			self.resetService.RestoreInstance(fridge)
+			self:_setFridgeOpenDetails(fridge, false)
 		end
 
 		task.wait(0.4)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_playBloxyColaSound(parent)
+	playSound(parent, "rbxasset://sounds/button.wav", 0.55, 1.25)
+	task.delay(0.12, function()
+		playSound(parent, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.9)
+	end)
+	task.delay(0.3, function()
+		playSound(parent, "rbxasset://sounds/snap.wav", 0.35, 1.45)
+	end)
+end
+
+function InteractionService:_wireFridgePizza(pizza)
+	local prompt = getPrompt(pizza)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.FridgePizza.Id)
+		playSound(pizza, "rbxasset://sounds/snap.wav", 0.45, 0.62)
+		self.systemMessageRemote:FireClient(player, "The cold pizza has been waiting with professional patience.")
+	end)
+end
+
+function InteractionService:_wireFridgeBloxyCola(cola)
+	local prompt = getPrompt(cola)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.FridgeBloxyCola.Id)
+		self:_playBloxyColaSound(cola)
+		self.systemMessageRemote:FireClient(player, "The fridge Bloxy Cola opens with suspicious confidence.")
+	end)
+end
+
+function InteractionService:_wireSecretFridgeButton(button)
+	local prompt = getPrompt(button)
+
+	self.secretFridgeButtonState[button] = self.secretFridgeButtonState[button] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.secretFridgeButtonState[button]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecretFridgeButton.Id)
+		playSound(button, "rbxasset://sounds/button.wav", 0.55, 0.75)
+		playSound(button, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.6)
+
+		if button:IsA("BasePart") then
+			local baseColor = button:GetAttribute("BaseColor") or button.Color
+			local pulseTween = tweenPart(button, 0.12, {
+				Color = Color3.fromRGB(255, 241, 137),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			pulseTween.Completed:Wait()
+			tweenPart(button, 0.18, {
+				Color = baseColor,
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+
+		self.systemMessageRemote:FireClient(player, "The back of the fridge door says TOO LATE, but now it has committed to being a button.")
+		task.wait(0.25)
 		state.Reacting = false
 	end)
 end
@@ -1715,14 +1908,46 @@ end
 function InteractionService:_wireSnackSink(sink)
 	local prompt = getPrompt(sink)
 	local faucet = sink:FindFirstChild("FaucetSpout", true) or sink:FindFirstChild("FaucetPost", true)
+	local launchPart = sink:FindFirstChild("SinkWaterRest", true) or sink:FindFirstChild("SinkBasinDark", true)
 
 	self.sinkState[sink] = self.sinkState[sink] or {
 		CountByUserId = {},
 		Reacting = false,
+		GeyserActiveUntil = 0,
+		LaunchDebounceByCharacter = {},
 	}
 
+	local state = self.sinkState[sink]
+	if launchPart and launchPart:IsA("BasePart") and not state.TouchConnection then
+		state.TouchConnection = launchPart.Touched:Connect(function(hit)
+			if os.clock() > (state.GeyserActiveUntil or 0) then
+				return
+			end
+
+			local character = hit:FindFirstAncestorOfClass("Model")
+			if not character or state.LaunchDebounceByCharacter[character] then
+				return
+			end
+
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local rootPart = character:FindFirstChild("HumanoidRootPart")
+			local player = Players:GetPlayerFromCharacter(character)
+			if not humanoid or humanoid.Health <= 0 or not rootPart or not player then
+				return
+			end
+
+			state.LaunchDebounceByCharacter[character] = true
+			rootPart.AssemblyLinearVelocity = Vector3.new(0, 92, 0) + rootPart.CFrame.LookVector * 16
+			playSound(launchPart, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.35)
+			self.systemMessageRemote:FireClient(player, "The sink launches you because geyser mode has no workplace safety plan.")
+
+			task.delay(1.2, function()
+				state.LaunchDebounceByCharacter[character] = nil
+			end)
+		end)
+	end
+
 	self:_connectPrompt(prompt, function(player)
-		local state = self.sinkState[sink]
 		if not state or state.Reacting then
 			return
 		end
@@ -1736,6 +1961,7 @@ function InteractionService:_wireSnackSink(sink)
 
 		state.CountByUserId[player.UserId] = 0
 		state.Reacting = true
+		state.GeyserActiveUntil = os.clock() + 6.5
 		self.discoveryService:Unlock(player, Constants.Discoveries.AngrySink.Id)
 		self.systemMessageRemote:FireClient(player, "The sink has entered geyser mode.")
 
@@ -1751,7 +1977,7 @@ function InteractionService:_wireSnackSink(sink)
 			water.CFrame = (faucet and faucet.CFrame or sink:GetPivot()) + Vector3.new(0, 1.2 + index * 0.5, 0)
 			water.Parent = workspace
 			CollectionService:AddTag(water, Constants.Tags.TemporaryObject)
-			Debris:AddItem(water, 1.2)
+			Debris:AddItem(water, 6.5)
 			task.wait(0.12)
 		end
 
@@ -2047,6 +2273,269 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 		end)
 
 		task.wait(0.7)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_getIslandExitRequiredCount()
+	local room = Constants.GetRoom("Island")
+	if not room or not room.DiscoveryOrder then
+		return 1
+	end
+
+	return math.ceil(#room.DiscoveryOrder * 0.5)
+end
+
+function InteractionService:_spawnIslandShark(exitGate, player)
+	local rootPart = getRootPart(player)
+	local origin = exitGate:IsA("BasePart") and exitGate.Position or Constants.GetRoomSpawnCFrame("Island").Position
+	local sharkModel = Instance.new("Model")
+	sharkModel.Name = "IslandExitShark"
+	sharkModel.Parent = workspace
+	CollectionService:AddTag(sharkModel, Constants.Tags.TemporaryObject)
+
+	local function makeSharkPart(name, className, size, cframe, color)
+		local part = Instance.new(className or "Part")
+		part.Name = name
+		part.Anchored = true
+		part.CanCollide = false
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.Size = size
+		part.CFrame = cframe
+		part.Color = color
+		part.Material = Enum.Material.SmoothPlastic
+		part.Parent = sharkModel
+		return part
+	end
+
+	local baseCFrame = CFrame.new(origin + Vector3.new(0, -2.2, 4.2), origin)
+	local body = makeSharkPart("SharkBody", "Part", Vector3.new(6.2, 1.5, 2.2), baseCFrame, Color3.fromRGB(89, 103, 116))
+	body.Shape = Enum.PartType.Ball
+	makeSharkPart("SharkFin", "WedgePart", Vector3.new(1.8, 2.2, 1.4), baseCFrame * CFrame.new(0, 1.15, 0), Color3.fromRGB(55, 67, 78))
+	makeSharkPart("SharkSnout", "WedgePart", Vector3.new(1.6, 1.1, 1.9), baseCFrame * CFrame.new(0, 0, -2.75), Color3.fromRGB(104, 121, 134))
+	local eye = makeSharkPart("SharkEye", "Part", Vector3.new(0.34, 0.34, 0.34), baseCFrame * CFrame.new(-0.86, 0.32, -2.0), Color3.fromRGB(255, 255, 245))
+	eye.Shape = Enum.PartType.Ball
+
+	playSound(exitGate, "rbxasset://sounds/snap.wav", 0.8, 0.72)
+	playSound(exitGate, "rbxasset://sounds/electronicpingshort.wav", 0.55, 0.45)
+
+	for _, part in ipairs(sharkModel:GetChildren()) do
+		if part:IsA("BasePart") then
+			tweenPart(part, 0.18, {
+				CFrame = part.CFrame + Vector3.new(0, 2.7, 0),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+	end
+
+	if rootPart then
+		rootPart.AssemblyLinearVelocity = Vector3.new(0, 38, 54)
+		task.delay(0.28, function()
+			if rootPart.Parent then
+				local destination = Constants.GetRoomSpawnCFrame("Island")
+				rootPart.CFrame = destination
+				rootPart.AssemblyLinearVelocity = Vector3.new(0, 26, 30)
+			end
+		end)
+	end
+
+	Debris:AddItem(sharkModel, 3.2)
+end
+
+function InteractionService:_wireIslandExit(exitGate)
+	local prompt = getPrompt(exitGate)
+
+	local function attemptLeave(player)
+		if not player or not player.Parent then
+			return
+		end
+
+		local requiredCount = self:_getIslandExitRequiredCount()
+		local currentCount = self.discoveryService:GetRoomDiscoveryCount(player, "Island")
+
+		if currentCount < requiredCount then
+			local now = os.clock()
+			if now - (self.islandExitBounceAtByUserId[player.UserId] or 0) < 0.8 then
+				return
+			end
+
+			self.islandExitBounceAtByUserId[player.UserId] = now
+			self.discoveryService:Unlock(player, Constants.Discoveries.SharkBounce.Id)
+			self:_spawnIslandShark(exitGate, player)
+			self.systemMessageRemote:FireClient(
+				player,
+				("The exit shark requires %d island discoveries before checkout. You have %d."):format(requiredCount, currentCount)
+			)
+			return
+		end
+
+		local destinationCFrame = exitGate:GetAttribute("DestinationCFrame") or Constants.Hallway.SpawnCFrame
+		teleportPlayer(player, destinationCFrame)
+		self.systemMessageRemote:FireClient(player, "The island lets you return to the hallway.")
+	end
+
+	self:_connectPrompt(prompt, attemptLeave)
+
+	if exitGate:IsA("BasePart") and not self.islandExitTouchConnections[exitGate] then
+		self.islandExitTouchConnections[exitGate] = exitGate.Touched:Connect(function(hit)
+			local character = hit:FindFirstAncestorOfClass("Model")
+			local player = character and Players:GetPlayerFromCharacter(character)
+			if player then
+				attemptLeave(player)
+			end
+		end)
+	end
+end
+
+function InteractionService:_getIslandTreasureModel()
+	for _, treasurePart in ipairs(CollectionService:GetTagged(Constants.Tags.IslandTreasure)) do
+		if treasurePart and treasurePart.Parent then
+			return treasurePart:FindFirstAncestor("IslandTreasureBox") or treasurePart.Parent
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_setIslandTreasureLayerVisible(treasure, layerName, visible)
+	if not treasure then
+		return
+	end
+
+	for _, instance in ipairs(getInstanceAndDescendants(treasure)) do
+		if instance:IsA("BasePart") and instance:GetAttribute("TreasureLayer") == layerName then
+			instance.Transparency = visible and 0 or 1
+			instance.CanCollide = visible and layerName == "Chest"
+		end
+	end
+end
+
+function InteractionService:_revealIslandTreasure()
+	local treasure = self:_getIslandTreasureModel()
+	if not treasure then
+		return nil
+	end
+
+	self:_setIslandTreasureLayerVisible(treasure, "Chest", true)
+	local base = treasure:FindFirstChild("TreasureChestBase", true)
+	if base then
+		setPromptEnabled(base, true)
+	end
+
+	return treasure
+end
+
+function InteractionService:_wireIslandShovel(shovel)
+	local prompt = getPrompt(shovel)
+
+	self.islandShovelState[shovel] = self.islandShovelState[shovel] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandShovelState[shovel]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.DugTreasure.Id)
+		playSound(shovel, "rbxasset://sounds/snap.wav", 0.45, 0.58)
+
+		if shovel:IsA("BasePart") then
+			local baseCFrame = shovel:GetAttribute("BaseCFrame") or shovel.CFrame
+			local digTween = tweenPart(shovel, 0.16, {
+				CFrame = baseCFrame * CFrame.Angles(math.rad(0), 0, math.rad(-20)),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			digTween.Completed:Wait()
+			tweenPart(shovel, 0.18, {
+				CFrame = baseCFrame,
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+
+		local treasure = self:_revealIslandTreasure()
+		if treasure then
+			self.systemMessageRemote:FireClient(player, "The shovel found a treasure box in the sand.")
+		else
+			self.systemMessageRemote:FireClient(player, "The shovel found a treasure box, but the box forgot to exist.")
+		end
+
+		task.wait(0.2)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireIslandTreasure(treasurePart)
+	local prompt = getPrompt(treasurePart)
+
+	self.islandTreasureState[treasurePart] = self.islandTreasureState[treasurePart] or {
+		Reacting = false,
+		Opened = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandTreasureState[treasurePart]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		state.Opened = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.OpenedTreasure.Id)
+		playSound(treasurePart, "rbxasset://sounds/button.wav", 0.5, 0.72)
+
+		local treasure = treasurePart:FindFirstAncestor("IslandTreasureBox") or treasurePart.Parent
+		local lid = treasure and treasure:FindFirstChild("TreasureChestLid", true)
+		if lid and lid:IsA("BasePart") then
+			local baseCFrame = lid:GetAttribute("BaseCFrame") or lid.CFrame
+			tweenPart(lid, 0.3, {
+				CFrame = baseCFrame * CFrame.new(0, 0.45, 0.7) * CFrame.Angles(math.rad(-18), 0, 0),
+				Color = Color3.fromRGB(158, 92, 47),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+
+		self:_setIslandTreasureLayerVisible(treasure, "Cola", true)
+		local colaCan = treasure and treasure:FindFirstChild("IslandBloxyColaCan", true)
+		if colaCan then
+			setPromptEnabled(colaCan, true)
+		end
+
+		self.systemMessageRemote:FireClient(player, "The treasure box contains a Bloxy Cola. Classic.")
+		task.wait(0.25)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireIslandBloxyCola(cola)
+	local prompt = getPrompt(cola)
+
+	self.islandColaState[cola] = self.islandColaState[cola] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandColaState[cola]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.IslandBloxyCola.Id)
+		self:_playBloxyColaSound(cola)
+
+		if cola:IsA("BasePart") then
+			local baseCFrame = cola:GetAttribute("BaseCFrame") or cola.CFrame
+			local popTween = tweenPart(cola, 0.16, {
+				CFrame = baseCFrame + Vector3.new(0, 0.7, 0),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			popTween.Completed:Wait()
+			tweenPart(cola, 0.2, {
+				CFrame = baseCFrame,
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+
+		self.systemMessageRemote:FireClient(player, "The island Bloxy Cola makes the correct soda noise.")
+		task.wait(0.25)
 		state.Reacting = false
 	end)
 end

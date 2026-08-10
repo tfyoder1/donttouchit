@@ -46,6 +46,13 @@ Constants.Tags = {
 	SnackRack = "DontTouchIt_SnackRack",
 	SnackPack = "DontTouchIt_SnackPack",
 	FruitBowl = "DontTouchIt_FruitBowl",
+	FridgePizza = "DontTouchIt_FridgePizza",
+	FridgeBloxyCola = "DontTouchIt_FridgeBloxyCola",
+	SecretFridgeButton = "DontTouchIt_SecretFridgeButton",
+	IslandExit = "DontTouchIt_IslandExit",
+	IslandShovel = "DontTouchIt_IslandShovel",
+	IslandTreasure = "DontTouchIt_IslandTreasure",
+	IslandBloxyCola = "DontTouchIt_IslandBloxyCola",
 	FloorSection = "DontTouchIt_FloorSection",
 	ObjectRainObject = "DontTouchIt_ObjectRainObject",
 	TemporaryObject = "DontTouchIt_TemporaryObject",
@@ -59,7 +66,7 @@ Constants.Hallway = {
 	UnlockDiscoveryFraction = 0.5,
 	Zone = {
 		Min = Vector3.new(-7.75, -3, Constants.Room.Depth / 2 - 0.5),
-		Max = Vector3.new(7.75, 13, 74),
+		Max = Vector3.new(7.75, 13, 124),
 	},
 	SpawnCFrame = CFrame.new(0, 3, 27),
 }
@@ -168,6 +175,21 @@ Constants.Discoveries = {
 		Name = "Opened the Fridge",
 		Hint = "Open the fridge and look for the cool idea.",
 	},
+	FridgePizza = {
+		Id = "fridge_pizza",
+		Name = "Found Fridge Pizza",
+		Hint = "Open the fridge and inspect the pizza inside.",
+	},
+	FridgeBloxyCola = {
+		Id = "fridge_bloxy_cola",
+		Name = "Found Fridge Bloxy Cola",
+		Hint = "Open the fridge and try the cola inside.",
+	},
+	SecretFridgeButton = {
+		Id = "secret_fridge_button",
+		Name = "Pressed the Secret Fridge Button",
+		Hint = "Open the fridge and check the inside of the door.",
+	},
 	SuspiciousToast = {
 		Id = "suspicious_toast",
 		Name = "Made Suspicious Toast",
@@ -213,6 +235,36 @@ Constants.Discoveries = {
 		Name = "Moved the Rain Downstairs",
 		Hint = "This secret is not listed in the room log.",
 	},
+	ReachedIsland = {
+		Id = "reached_island",
+		Name = "Reached the Island",
+		Hint = "Take the long hallway from the main hall.",
+	},
+	SharkBounce = {
+		Id = "shark_bounce",
+		Name = "Met the Door Shark",
+		Hint = "Try to leave the island before finding enough island discoveries.",
+	},
+	DugTreasure = {
+		Id = "dug_treasure",
+		Name = "Dug Up Treasure",
+		Hint = "Use the shovel on the island.",
+	},
+	OpenedTreasure = {
+		Id = "opened_treasure",
+		Name = "Opened the Treasure Box",
+		Hint = "After digging, open the treasure box.",
+	},
+	IslandBloxyCola = {
+		Id = "island_bloxy_cola",
+		Name = "Found Island Bloxy Cola",
+		Hint = "Open the treasure box and try the cola.",
+	},
+	IslandNoTouch = {
+		Id = "island_no_touch",
+		Name = "Left the Island Alone",
+		Hint = "Stand on the island for two minutes without interacting with anything.",
+	},
 }
 
 Constants.RoomDiscoveryOrder = {
@@ -234,6 +286,9 @@ Constants.RoomDiscoveryOrder = {
 	SnackLab = {
 		Constants.Discoveries.PressedSnackButton.Id,
 		Constants.Discoveries.OpenedFridge.Id,
+		Constants.Discoveries.FridgePizza.Id,
+		Constants.Discoveries.FridgeBloxyCola.Id,
+		Constants.Discoveries.SecretFridgeButton.Id,
 		Constants.Discoveries.SuspiciousToast.Id,
 		Constants.Discoveries.AngrySink.Id,
 		Constants.Discoveries.MixedCloud.Id,
@@ -242,6 +297,14 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.AllSnackSounds.Id,
 		Constants.Discoveries.LivingFruit.Id,
 		Constants.Discoveries.SnackLabNoTouch.Id,
+	},
+	Island = {
+		Constants.Discoveries.ReachedIsland.Id,
+		Constants.Discoveries.SharkBounce.Id,
+		Constants.Discoveries.DugTreasure.Id,
+		Constants.Discoveries.OpenedTreasure.Id,
+		Constants.Discoveries.IslandBloxyCola.Id,
+		Constants.Discoveries.IslandNoTouch.Id,
 	},
 }
 
@@ -259,6 +322,7 @@ Constants.RoomCompletionOrder = {
 Constants.RoomOrder = {
 	"TVRoom",
 	"SnackLab",
+	"Island",
 }
 
 Constants.Rooms = {
@@ -284,11 +348,26 @@ Constants.Rooms = {
 			Max = Vector3.new(48 + Constants.Room.Width / 2, Constants.Room.Height + 2, 44 + Constants.Room.Depth / 2),
 		},
 	},
+	Island = {
+		Id = "Island",
+		Name = "Island",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.Island,
+		NoTouchDiscoveryId = Constants.Discoveries.IslandNoTouch.Id,
+		SpawnCFrame = CFrame.new(0, 3, 132),
+		Zone = {
+			Min = Vector3.new(-55, -3, 126),
+			Max = Vector3.new(55, 28, 192),
+		},
+	},
 }
 
 Constants.RoomUnlockRules = {
 	SnackLab = {
 		RequiredRoomId = "TVRoom",
+		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
+	},
+	Island = {
+		RequiredRoomId = "SnackLab",
 		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
 	},
 }
@@ -308,6 +387,9 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.AngeredTelevision.Id] = Constants.Tags.Television,
 	[Constants.Discoveries.PressedSnackButton.Id] = Constants.Tags.SnackButton,
 	[Constants.Discoveries.OpenedFridge.Id] = Constants.Tags.SnackFridge,
+	[Constants.Discoveries.FridgePizza.Id] = Constants.Tags.FridgePizza,
+	[Constants.Discoveries.FridgeBloxyCola.Id] = Constants.Tags.FridgeBloxyCola,
+	[Constants.Discoveries.SecretFridgeButton.Id] = Constants.Tags.SecretFridgeButton,
 	[Constants.Discoveries.SuspiciousToast.Id] = Constants.Tags.SnackToaster,
 	[Constants.Discoveries.AngrySink.Id] = Constants.Tags.SnackSink,
 	[Constants.Discoveries.MixedCloud.Id] = Constants.Tags.SnackMixer,
@@ -315,6 +397,11 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.HeardSnackSound.Id] = Constants.Tags.SnackPack,
 	[Constants.Discoveries.AllSnackSounds.Id] = Constants.Tags.SnackPack,
 	[Constants.Discoveries.LivingFruit.Id] = Constants.Tags.FruitBowl,
+	[Constants.Discoveries.ReachedIsland.Id] = Constants.Tags.IslandExit,
+	[Constants.Discoveries.SharkBounce.Id] = Constants.Tags.IslandExit,
+	[Constants.Discoveries.DugTreasure.Id] = Constants.Tags.IslandShovel,
+	[Constants.Discoveries.OpenedTreasure.Id] = Constants.Tags.IslandTreasure,
+	[Constants.Discoveries.IslandBloxyCola.Id] = Constants.Tags.IslandBloxyCola,
 }
 
 Constants.NoTouch = {
