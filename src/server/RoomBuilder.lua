@@ -39,6 +39,7 @@ local function createPrompt(parent, actionText, objectText, holdDuration)
 	prompt.ObjectText = objectText
 	prompt.HoldDuration = holdDuration or 0
 	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
 	prompt.MaxActivationDistance = 10
 	prompt.Parent = parent
 	mark(prompt)

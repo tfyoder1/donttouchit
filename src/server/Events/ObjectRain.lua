@@ -48,6 +48,7 @@ local function createMovePrompt(blob, context, random)
 	prompt.ObjectText = "Rain Object"
 	prompt.HoldDuration = 0.08
 	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
 	prompt.MaxActivationDistance = 9
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
