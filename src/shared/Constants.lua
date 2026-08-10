@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.4.0"
+Constants.BuildVersion = "0.4.1"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -29,6 +29,7 @@ Constants.Remotes = {
 Constants.Tags = {
 	MainButton = "DontTouchIt_MainButton",
 	LightSwitch = "DontTouchIt_LightSwitch",
+	TVLightSwitch = "DontTouchIt_TVLightSwitch",
 	Couch = "DontTouchIt_Couch",
 	FloorLamp = "DontTouchIt_FloorLamp",
 	Squishy = "DontTouchIt_Squishy",
@@ -425,7 +426,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.PressedButton.Id] = Constants.Tags.MainButton,
 	[Constants.Discoveries.LowGravity.Id] = Constants.Tags.FloorSection,
 	[Constants.Discoveries.TinyPlayers.Id] = Constants.Tags.MainButton,
-	[Constants.Discoveries.GiantPlayer.Id] = Constants.Tags.LightSwitch,
+	[Constants.Discoveries.GiantPlayer.Id] = Constants.Tags.TVLightSwitch,
 	[Constants.Discoveries.ObjectRain.Id] = Constants.Tags.MainButton,
 	[Constants.Discoveries.DelayedSurprise.Id] = Constants.Tags.MainButton,
 	[Constants.Discoveries.EscapedUnderfloor.Id] = Constants.Tags.UnderfloorReturn,

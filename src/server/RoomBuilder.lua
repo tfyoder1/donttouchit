@@ -342,10 +342,17 @@ local function makePedestal(objectsFolder)
 	return pedestal
 end
 
-local function makeLightSwitch(objectsFolder)
-	local switch = makeModel(objectsFolder, "TVRoomLightSwitch")
-	local wallZ = Constants.Room.Depth / 2 - 0.58
-	local baseCFrame = CFrame.new(-6.15, 4.55, wallZ)
+local function makeLightSwitch(parent, name, baseCFrame, options)
+	options = options or {}
+
+	local switch = makeModel(parent, name or "LightSwitch")
+	baseCFrame = baseCFrame or CFrame.new(-6.15, 4.55, Constants.Room.Depth / 2 - 0.58)
+	if options.RoomId then
+		switch:SetAttribute("RoomId", options.RoomId)
+	end
+	if options.UnlocksGiantDiscovery then
+		switch:SetAttribute("UnlocksGiantDiscovery", true)
+	end
 
 	local plate = createPart(
 		switch,
@@ -370,9 +377,12 @@ local function makeLightSwitch(objectsFolder)
 	lever:SetAttribute("SwitchOffCFrame", leverOffCFrame)
 
 	plate:SetAttribute("IsOn", true)
-	createSurfaceText(plate, "SwitchText", "LIGHT", Enum.NormalId.Front, Color3.fromRGB(34, 34, 32), Color3.fromRGB(238, 238, 226))
-	createPrompt(plate, "Flip", "Light Switch", 0)
+	createSurfaceText(plate, "SwitchText", options.Label or "LIGHT", Enum.NormalId.Front, Color3.fromRGB(34, 34, 32), Color3.fromRGB(238, 238, 226))
+	createPrompt(plate, "Flip", options.PromptObjectText or "Light Switch", 0)
 	tag(switch, Constants.Tags.LightSwitch)
+	if options.HighlightTag then
+		tag(switch, options.HighlightTag)
+	end
 
 	switch.PrimaryPart = plate
 	return switch, { plate, lever }
@@ -699,6 +709,38 @@ local function makeHallway(roomFolder)
 	makeReferenceBook(hallway, "TVRoomReferenceBook", CFrame.new(-3.5, 0, 30), "TVRoom", "TV ROOM")
 	makeReferenceBook(hallway, "SnackLabReferenceBook", CFrame.new(3.5, 0, 38), "SnackLab", "SNACK LAB")
 	makeReferenceBook(hallway, "IslandReferenceBook", CFrame.new(-2.8, 0, 107), "Island", "ISLAND")
+	makeLightSwitch(
+		hallway,
+		"TVHallLightSwitch",
+		CFrame.new(-5.88, 4.55, 25.2) * CFrame.Angles(0, math.rad(-90), 0),
+		{
+			PromptObjectText = "Hall Light Switch",
+		}
+	)
+	makeLightSwitch(
+		hallway,
+		"SnackHallLightSwitch",
+		CFrame.new(5.88, 4.55, 39.4) * CFrame.Angles(0, math.rad(90), 0),
+		{
+			PromptObjectText = "Snack Door Light Switch",
+		}
+	)
+	makeLightSwitch(
+		hallway,
+		"ConstructionHallLightSwitch",
+		CFrame.new(-5.88, 4.55, 39.4) * CFrame.Angles(0, math.rad(-90), 0),
+		{
+			PromptObjectText = "Mystery Door Light Switch",
+		}
+	)
+	makeLightSwitch(
+		hallway,
+		"IslandHallLightSwitch",
+		CFrame.new(4.0, 4.55, 120.38),
+		{
+			PromptObjectText = "Island Door Light Switch",
+		}
+	)
 
 	local snackDoor = makeHallDoor(
 		hallway,
@@ -778,12 +820,22 @@ local function makeSnackLabShell(roomFolder)
 	createSurfaceText(roomSign, "SnackLabSignText", "SNACK LAB", Enum.NormalId.Front, Color3.fromRGB(28, 27, 24), Color3.fromRGB(255, 232, 115))
 
 	local resetRoomButton = makeSnackResetRoomButton(room)
+	local lightSwitch = makeLightSwitch(
+		room,
+		"SnackLabLightSwitch",
+		cframeAt(origin, -width / 2 + 0.58, 4.55, 4.6) * CFrame.Angles(0, math.rad(-90), 0),
+		{
+			RoomId = "SnackLab",
+			PromptObjectText = "Snack Lab Light Switch",
+		}
+	)
 	createSpawnLocation(room, "SnackLabSpawn", "SnackLab", Constants.GetRoomSpawnCFrame("SnackLab"), Color3.fromRGB(91, 188, 124), false)
 
 	return {
 		Model = room,
 		ExitDoor = exitDoor,
 		ResetRoomButton = resetRoomButton,
+		LightSwitch = lightSwitch,
 	}
 end
 
@@ -1514,7 +1566,16 @@ function RoomBuilder.Build()
 	)
 
 	local pedestal = makePedestal(objectsFolder)
-	local lightSwitch = makeLightSwitch(objectsFolder)
+	local lightSwitch = makeLightSwitch(
+		objectsFolder,
+		"TVRoomLightSwitch",
+		CFrame.new(-6.15, 4.55, Constants.Room.Depth / 2 - 0.58),
+		{
+			RoomId = "TVRoom",
+			HighlightTag = Constants.Tags.TVLightSwitch,
+			UnlocksGiantDiscovery = true,
+		}
+	)
 	local couch = makeCouch(objectsFolder)
 	local lamp = makeLamp(objectsFolder)
 	makeTableAndAppliance(objectsFolder)

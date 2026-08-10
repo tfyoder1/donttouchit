@@ -329,7 +329,13 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.couchState = {}
 	self.couchRiding = {}
 	self.lampState = {}
-	self.lightSwitchState = {}
+	self.lightSwitchState = {
+		IsOn = true,
+		OnCycle = 0,
+		Reacting = false,
+		GiantAwardedByUserId = {},
+		Switches = {},
+	}
 	self.floorPressStateByUserId = {}
 	self.squishyState = {}
 	self.tvState = {}
@@ -684,22 +690,17 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 	local plate = lightSwitch:FindFirstChild("SwitchPlate", true)
 	local lever = lightSwitch:FindFirstChild("SwitchLever", true)
 
-	self.lightSwitchState[lightSwitch] = self.lightSwitchState[lightSwitch] or {
-		IsOn = true,
-		OnCycle = 0,
-		Reacting = false,
-		GiantAwardedByUserId = {},
-	}
+	local state = self.lightSwitchState
+	state.Switches[lightSwitch] = true
+	self:_syncLightSwitches(state.IsOn)
 
 	self:_connectPrompt(prompt, function(player)
-		local state = self.lightSwitchState[lightSwitch]
 		if not state or state.Reacting then
 			return
 		end
 
 		state.Reacting = true
 		state.IsOn = not state.IsOn
-		self:_animateLightSwitch(lever, state.IsOn)
 
 		if state.IsOn then
 			state.OnCycle += 1
@@ -708,15 +709,15 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 			Lighting.ClockTime = 16
 			Lighting.Ambient = color
 			Lighting.OutdoorAmbient = color:Lerp(Color3.fromRGB(255, 255, 255), 0.22)
-
-			if plate and plate:IsA("BasePart") then
-				plate.Color = color:Lerp(Color3.fromRGB(255, 255, 255), 0.7)
-			end
+			self:_syncLightSwitches(true)
 
 			playSound(plate or lever or lightSwitch, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.1)
 			self.systemMessageRemote:FireClient(player, "The room lights came back in a different mood.")
 
-			if not state.GiantAwardedByUserId[player.UserId] and state.OnCycle >= 3 then
+			if lightSwitch:GetAttribute("UnlocksGiantDiscovery")
+				and not state.GiantAwardedByUserId[player.UserId]
+				and state.OnCycle >= 3
+			then
 				state.GiantAwardedByUserId[player.UserId] = true
 				self:_lightSwitchGiant(player)
 			end
@@ -725,10 +726,7 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 			Lighting.ClockTime = 0
 			Lighting.Ambient = Color3.fromRGB(10, 12, 18)
 			Lighting.OutdoorAmbient = Color3.fromRGB(5, 6, 10)
-
-			if plate and plate:IsA("BasePart") then
-				plate.Color = Color3.fromRGB(205, 205, 195)
-			end
+			self:_syncLightSwitches(false)
 
 			playSound(plate or lever or lightSwitch, "rbxasset://sounds/button.wav", 0.45, 0.82)
 			self.systemMessageRemote:FireClient(player, "The room goes suspiciously dark.")
@@ -737,6 +735,31 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 		task.wait(0.15)
 		state.Reacting = false
 	end)
+end
+
+function InteractionService:_syncLightSwitches(isOn)
+	local state = self.lightSwitchState
+	local colorIndex = math.max(1, state.OnCycle)
+	local onColor = SWITCH_ON_COLORS[((colorIndex - 1) % #SWITCH_ON_COLORS) + 1]
+	local plateColor = if isOn
+		then onColor:Lerp(Color3.fromRGB(255, 255, 255), 0.7)
+		else Color3.fromRGB(205, 205, 195)
+
+	for lightSwitch in pairs(state.Switches) do
+		if not lightSwitch.Parent then
+			state.Switches[lightSwitch] = nil
+			continue
+		end
+
+		local plate = lightSwitch:FindFirstChild("SwitchPlate", true)
+		local lever = lightSwitch:FindFirstChild("SwitchLever", true)
+		if plate and plate:IsA("BasePart") then
+			plate:SetAttribute("IsOn", isOn)
+			plate.Color = plateColor
+		end
+
+		self:_animateLightSwitch(lever, isOn)
+	end
 end
 
 function InteractionService:_animateLightSwitch(lever, isOn)
