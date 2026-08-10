@@ -35,6 +35,8 @@ Constants.Tags = {
 	ExitDoor = "DontTouchIt_ExitDoor",
 	HallDoor = "DontTouchIt_HallDoor",
 	ReferenceBook = "DontTouchIt_ReferenceBook",
+	SecretRoomDoor = "DontTouchIt_SecretRoomDoor",
+	SecretRoomExit = "DontTouchIt_SecretRoomExit",
 	ResetRoomButton = "DontTouchIt_ResetRoomButton",
 	NoTouchClock = "DontTouchIt_NoTouchClock",
 	UnderfloorReturn = "DontTouchIt_UnderfloorReturn",
@@ -329,6 +331,21 @@ Constants.SecretDiscoveries = {
 		RoomId = "TVRoom",
 		PrizeHints = 5,
 		PrizeMessage = "Secret prize: +5 hints for relocating the rain.",
+		PrizeSecretKeyRoomId = "TVRoom",
+		PrizeSecretKeyMessage = "Secret prize: TV Secret Key added to your inventory.",
+	},
+}
+
+Constants.SecretDoors = {
+	TVRoom = {
+		Id = "tv_room_secret_door",
+		RoomId = "TVRoom",
+		Name = "TV Room Secret Door",
+		KeyId = "tv_secret_key",
+		KeyName = "TV Secret Key",
+		RevealHintCost = 5,
+		RevealRobux = 5,
+		RevealProductId = 0,
 	},
 }
 

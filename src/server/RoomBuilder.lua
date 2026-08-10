@@ -553,6 +553,9 @@ end
 
 local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
+local TV_SECRET_ROOM_ORIGIN = Vector3.new(-14, 0, -38)
+local TV_SECRET_ROOM_ENTRY_CFRAME = CFrame.new(-14, 3, -31.5)
+local TV_SECRET_ROOM_RETURN_CFRAME = CFrame.new(-14, 3, -10.5)
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
 local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
@@ -1178,6 +1181,69 @@ local function setHiddenBaseline(root)
 	end
 end
 
+local function rememberSecretDoorVisibleState(root)
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant:SetAttribute("SecretVisibleTransparency", descendant.Transparency)
+			descendant:SetAttribute("SecretVisibleCanCollide", descendant.CanCollide)
+		elseif descendant:IsA("ProximityPrompt") then
+			descendant:SetAttribute("SecretVisibleEnabled", descendant.Enabled)
+		elseif descendant:IsA("SurfaceGui") then
+			descendant:SetAttribute("SecretVisibleEnabled", descendant.Enabled)
+		end
+	end
+end
+
+local function makeTVSecretRoom(roomFolder)
+	local secretDoor = makeModel(roomFolder, "TVSecretDoor")
+	secretDoor:SetAttribute("RoomId", "TVRoom")
+	secretDoor:SetAttribute("DestinationCFrame", TV_SECRET_ROOM_ENTRY_CFRAME)
+
+	local doorFrame = CFrame.new(-14, 5.2, -16.42)
+	local backPlate = createPart(secretDoor, "SecretDoorFrame", Vector3.new(6.6, 8.4, 0.22), doorFrame, Color3.fromRGB(43, 45, 53), Enum.Material.Metal)
+	local panel = createPart(secretDoor, "SecretDoorPanel", Vector3.new(5.55, 7.45, 0.28), doorFrame * CFrame.new(0, 0, 0.12), Color3.fromRGB(76, 55, 132), Enum.Material.Wood)
+	panel:SetAttribute("RoomId", "TVRoom")
+	panel:SetAttribute("DestinationCFrame", TV_SECRET_ROOM_ENTRY_CFRAME)
+	panel:SetAttribute("SecretClosedCFrame", panel.CFrame)
+	local handle = createPart(secretDoor, "SecretDoorHandle", Vector3.new(0.42, 0.42, 0.42), doorFrame * CFrame.new(2.1, -0.15, 0.34), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
+	handle.Shape = Enum.PartType.Ball
+	createSurfaceText(panel, "SecretDoorText", "NO DOOR\nHERE", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(76, 55, 132))
+	local prompt = createPrompt(panel, "Open", "Secret Door", 0)
+	prompt.MaxActivationDistance = 11
+	tag(panel, Constants.Tags.SecretRoomDoor)
+	secretDoor.PrimaryPart = panel
+	rememberSecretDoorVisibleState(secretDoor)
+	setHiddenBaseline(secretDoor)
+
+	local room = makeModel(roomFolder, "TVSecretRoom")
+	local origin = TV_SECRET_ROOM_ORIGIN
+	createPart(room, "SecretRoomFloor", Vector3.new(18, 1, 16), cframeAt(origin, 0, 0, 0), Color3.fromRGB(74, 69, 91), Enum.Material.Concrete)
+	createPart(room, "SecretRoomBackWall", Vector3.new(18, 12, 1), cframeAt(origin, 0, 6, -8), Color3.fromRGB(42, 44, 55), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomFrontWall", Vector3.new(18, 12, 1), cframeAt(origin, 0, 6, 8), Color3.fromRGB(42, 44, 55), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomLeftWall", Vector3.new(1, 12, 16), cframeAt(origin, -9, 6, 0), Color3.fromRGB(50, 48, 63), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomRightWall", Vector3.new(1, 12, 16), cframeAt(origin, 9, 6, 0), Color3.fromRGB(50, 48, 63), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomCeiling", Vector3.new(18, 1, 16), cframeAt(origin, 0, 12, 0), Color3.fromRGB(34, 36, 48), Enum.Material.Concrete)
+
+	local sign = createPart(room, "SecretRoomSign", Vector3.new(12.5, 2.3, 0.28), cframeAt(origin, 0, 7.8, -7.35), Color3.fromRGB(255, 226, 102), Enum.Material.SmoothPlastic)
+	createSurfaceText(sign, "SecretRoomSignText", "THIS ROOM WAS\nNOT ON THE TOUR", Enum.NormalId.Front, Color3.fromRGB(36, 27, 42), Color3.fromRGB(255, 226, 102))
+
+	local keyhole = createPart(room, "SecretRoomKeyhole", Vector3.new(2.1, 2.1, 0.2), cframeAt(origin, 0, 4.5, -7.24), Color3.fromRGB(161, 112, 255), Enum.Material.Neon)
+	keyhole.Shape = Enum.PartType.Ball
+
+	local exitDoor = createPart(room, "SecretRoomExitDoor", Vector3.new(5.2, 7.1, 0.35), cframeAt(origin, 0, 4.25, 7.45), Color3.fromRGB(63, 84, 105), Enum.Material.Wood)
+	exitDoor:SetAttribute("DestinationCFrame", TV_SECRET_ROOM_RETURN_CFRAME)
+	createSurfaceText(exitDoor, "SecretRoomExitText", "BACK TO\nTV ROOM", Enum.NormalId.Back, Color3.fromRGB(228, 247, 255), Color3.fromRGB(43, 57, 72))
+	createPrompt(exitDoor, "Exit", "TV Room", 0)
+	tag(exitDoor, Constants.Tags.SecretRoomExit)
+
+	room.PrimaryPart = keyhole
+	return {
+		Door = secretDoor,
+		Room = room,
+		ExitDoor = exitDoor,
+	}
+end
+
 local function makePalmTree(parent, name, x, z, leanDegrees)
 	local tree = makeModel(parent, name)
 	local trunkHeight = 7.2
@@ -1437,6 +1503,7 @@ function RoomBuilder.Build()
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
 	local islandRoom = makeIslandRoom(roomFolder)
+	local tvSecretRoom = makeTVSecretRoom(roomFolder)
 	createNoTouchClock(
 		snackLab.Model,
 		"SnackLabWallClock",
@@ -1474,6 +1541,7 @@ function RoomBuilder.Build()
 		ExitDoor = exitDoor,
 		ResetRoomButton = resetRoomButton,
 		Hallway = hallway,
+		TVSecretRoom = tvSecretRoom,
 		Island = islandRoom,
 		Pedestal = pedestal,
 		LightSwitch = lightSwitch,

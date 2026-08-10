@@ -27,10 +27,25 @@ local function buildDiscoveryList(foundById)
 	return discoveries
 end
 
+local function buildSecretRoomList(foundByRoomId)
+	local rooms = {}
+
+	for roomId, unlocked in pairs(foundByRoomId or {}) do
+		if unlocked and Constants.SecretDoors and Constants.SecretDoors[roomId] then
+			table.insert(rooms, roomId)
+		end
+	end
+
+	table.sort(rooms)
+	return rooms
+end
+
 function DiscoveryService.new()
 	local self = setmetatable({}, DiscoveryService)
 	self.discoveryByUserId = {}
 	self.hintsByUserId = {}
+	self.secretKeysByUserId = {}
+	self.secretDoorRevealsByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
 	self.hasSavedDataByUserId = {}
 	self.loadedByUserId = {}
@@ -41,6 +56,8 @@ function DiscoveryService.new()
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self._unlockedEvent = Instance.new("BindableEvent")
 	self.DiscoveryUnlocked = self._unlockedEvent.Event
+	self._secretDoorChangedEvent = Instance.new("BindableEvent")
+	self.SecretDoorChanged = self._secretDoorChangedEvent.Event
 
 	local ok, dataStore = pcall(function()
 		return DataStoreService:GetDataStore(Constants.DataStore.Name)
@@ -57,13 +74,24 @@ end
 function DiscoveryService:Initialize()
 	Players.PlayerAdded:Connect(function(player)
 		self:_loadPlayer(player)
+		self:_syncSecretKeyTools(player)
 		self:_sendSnapshot(player)
+
+		player.CharacterAdded:Connect(function()
+			task.delay(0.25, function()
+				if player.Parent then
+					self:_syncSecretKeyTools(player)
+				end
+			end)
+		end)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
 		self:_savePlayer(player)
 		self.discoveryByUserId[player.UserId] = nil
 		self.hintsByUserId[player.UserId] = nil
+		self.secretKeysByUserId[player.UserId] = nil
+		self.secretDoorRevealsByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
 		self.hasSavedDataByUserId[player.UserId] = nil
 		self.loadedByUserId[player.UserId] = nil
@@ -73,6 +101,7 @@ function DiscoveryService:Initialize()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_loadPlayer(player)
+		self:_syncSecretKeyTools(player)
 		self:_sendSnapshot(player)
 	end
 
@@ -99,6 +128,14 @@ function DiscoveryService:_ensurePlayer(player)
 
 	if not self.hintsByUserId[player.UserId] then
 		self.hintsByUserId[player.UserId] = 0
+	end
+
+	if not self.secretKeysByUserId[player.UserId] then
+		self.secretKeysByUserId[player.UserId] = {}
+	end
+
+	if not self.secretDoorRevealsByUserId[player.UserId] then
+		self.secretDoorRevealsByUserId[player.UserId] = {}
 	end
 
 	if not self.lastUnlockedRoomByUserId[player.UserId] then
@@ -129,6 +166,8 @@ end
 function DiscoveryService:_loadPlayer(player)
 	self.discoveryByUserId[player.UserId] = {}
 	self.hintsByUserId[player.UserId] = 0
+	self.secretKeysByUserId[player.UserId] = {}
+	self.secretDoorRevealsByUserId[player.UserId] = {}
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	self.hasSavedDataByUserId[player.UserId] = false
 	self.loadedByUserId[player.UserId] = false
@@ -168,6 +207,24 @@ function DiscoveryService:_loadPlayer(player)
 		self.hintsByUserId[player.UserId] = math.max(0, math.floor(data.Hints))
 	end
 
+	if typeof(data.Inventory) == "table" then
+		if typeof(data.Inventory.SecretKeys) == "table" then
+			for _, roomId in ipairs(data.Inventory.SecretKeys) do
+				if Constants.SecretDoors and Constants.SecretDoors[roomId] then
+					self.secretKeysByUserId[player.UserId][roomId] = true
+				end
+			end
+		end
+
+		if typeof(data.Inventory.SecretDoorReveals) == "table" then
+			for _, roomId in ipairs(data.Inventory.SecretDoorReveals) do
+				if Constants.SecretDoors and Constants.SecretDoors[roomId] then
+					self.secretDoorRevealsByUserId[player.UserId][roomId] = true
+				end
+			end
+		end
+	end
+
 	if typeof(data.LastUnlockedRoomId) == "string" and Constants.GetRoom(data.LastUnlockedRoomId) then
 		self.lastUnlockedRoomByUserId[player.UserId] = data.LastUnlockedRoomId
 	end
@@ -187,6 +244,10 @@ function DiscoveryService:_buildSaveData(player)
 		Version = 1,
 		Discoveries = buildDiscoveryList(self.discoveryByUserId[player.UserId]),
 		Hints = self.hintsByUserId[player.UserId] or 0,
+		Inventory = {
+			SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
+			SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
+		},
 		LastUnlockedRoomId = self:GetLastUnlockedRoomId(player),
 	}
 end
@@ -364,6 +425,153 @@ function DiscoveryService:GetLastUnlockedRoomId(player)
 	return self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID
 end
 
+function DiscoveryService:IsRoomComplete(player, roomId)
+	local room = Constants.GetRoom(roomId)
+	if not room then
+		return false
+	end
+
+	return self:HasAll(player, room.DiscoveryOrder)
+end
+
+function DiscoveryService:HasSecretKey(player, roomId)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	return self.secretKeysByUserId[player.UserId][roomId] == true
+end
+
+function DiscoveryService:_syncSecretKeyTools(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	self:_ensurePlayer(player)
+	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 2)
+	if not backpack then
+		return
+	end
+
+	for roomId, config in pairs(Constants.SecretDoors or {}) do
+		if self.secretKeysByUserId[player.UserId][roomId] == true then
+			local keyName = config.KeyName or "Secret Key"
+			local character = player.Character
+			local existing = backpack:FindFirstChild(keyName) or (character and character:FindFirstChild(keyName))
+			if not existing then
+				local keyTool = Instance.new("Tool")
+				keyTool.Name = keyName
+				keyTool.ToolTip = "Opens one secret door."
+				keyTool.RequiresHandle = false
+				keyTool.CanBeDropped = false
+				keyTool:SetAttribute("SecretKeyRoomId", roomId)
+				keyTool.Parent = backpack
+			end
+		end
+	end
+end
+
+function DiscoveryService:GrantSecretKey(player, roomId, messageText)
+	if not player or not player.Parent or not Constants.SecretDoors or not Constants.SecretDoors[roomId] then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	if self.secretKeysByUserId[player.UserId][roomId] then
+		return false
+	end
+
+	self.secretKeysByUserId[player.UserId][roomId] = true
+	self:_syncSecretKeyTools(player)
+	if messageText then
+		self.systemMessageRemote:FireClient(player, messageText)
+	end
+
+	self:_sendSnapshot(player)
+	self._secretDoorChangedEvent:Fire(player, roomId)
+	self:_queueSave(player)
+	return true
+end
+
+function DiscoveryService:HasSecretDoorReveal(player, roomId)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	return self.secretDoorRevealsByUserId[player.UserId][roomId] == true
+end
+
+function DiscoveryService:CanSeeSecretDoor(player, roomId)
+	return self:IsRoomComplete(player, roomId) or self:HasSecretDoorReveal(player, roomId)
+end
+
+function DiscoveryService:RevealSecretDoor(player, roomId, messageText)
+	if not player or not player.Parent or not Constants.SecretDoors or not Constants.SecretDoors[roomId] then
+		return false, "That secret door is not configured yet."
+	end
+
+	self:_ensurePlayer(player)
+	if self.secretDoorRevealsByUserId[player.UserId][roomId] then
+		return false, "That secret door is already visible."
+	end
+
+	self.secretDoorRevealsByUserId[player.UserId][roomId] = true
+	if messageText then
+		self.systemMessageRemote:FireClient(player, messageText)
+	end
+
+	self:_sendSnapshot(player)
+	self._secretDoorChangedEvent:Fire(player, roomId)
+	self:_queueSave(player)
+	return true, "Secret door revealed."
+end
+
+function DiscoveryService:SpendHints(player, count)
+	if not player or not player.Parent then
+		return false, "No player."
+	end
+
+	local cost = math.max(0, math.floor(count or 0))
+	self:_ensurePlayer(player)
+	if self.hintsByUserId[player.UserId] < cost then
+		return false, ("Needs %d hints."):format(cost)
+	end
+
+	self.hintsByUserId[player.UserId] -= cost
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+	return true, nil
+end
+
+function DiscoveryService:GetSecretDoorSnapshot(player, roomId)
+	local config = Constants.SecretDoors and Constants.SecretDoors[roomId]
+	if not config then
+		return nil
+	end
+
+	local roomComplete = self:IsRoomComplete(player, roomId)
+	local purchasedReveal = self:HasSecretDoorReveal(player, roomId)
+	local visible = roomComplete or purchasedReveal
+	local hasKey = self:HasSecretKey(player, roomId)
+
+	return {
+		Id = config.Id,
+		RoomId = roomId,
+		Name = config.Name,
+		KeyName = config.KeyName,
+		Visible = visible,
+		HasKey = hasKey,
+		CanOpen = visible and hasKey,
+		RoomComplete = roomComplete,
+		PurchasedReveal = purchasedReveal,
+		RevealHintCost = config.RevealHintCost or 0,
+		RevealRobux = config.RevealRobux or 0,
+		RevealProductId = config.RevealProductId or 0,
+	}
+end
+
 function DiscoveryService:GetNextPendingHighlight(player, roomId)
 	if not player or not player.Parent then
 		return nil
@@ -397,6 +605,8 @@ function DiscoveryService:_sendSnapshot(player)
 		Total = Constants.TotalDiscoveries,
 		Rooms = self:_buildRoomSummaries(player),
 		Hints = self:GetHintCount(player),
+		SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
+		SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		HasSavedData = self.hasSavedDataByUserId[player.UserId] == true,
 		LastUnlockedRoomId = lastUnlockedRoomId,
 		LastUnlockedRoomName = lastUnlockedRoom and lastUnlockedRoom.Name or "TV Room",
@@ -433,6 +643,10 @@ function DiscoveryService:Unlock(player, discoveryId)
 				secretConfig.PrizeMessage or ("Secret prize: +%d hints."):format(prizeHints)
 			)
 		end
+
+		if secretConfig.PrizeSecretKeyRoomId then
+			self:GrantSecretKey(player, secretConfig.PrizeSecretKeyRoomId, secretConfig.PrizeSecretKeyMessage)
+		end
 	end
 
 	local lastUnlockedRoomId = self:GetLastUnlockedRoomId(player)
@@ -446,6 +660,8 @@ function DiscoveryService:Unlock(player, discoveryId)
 		Total = Constants.TotalDiscoveries,
 		Rooms = self:_buildRoomSummaries(player),
 		Hints = self:GetHintCount(player),
+		SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
+		SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		HasSavedData = true,
 		LastUnlockedRoomId = lastUnlockedRoomId,
 		LastUnlockedRoomName = lastUnlockedRoom and lastUnlockedRoom.Name or "TV Room",
@@ -537,6 +753,7 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 		Total = #room.DiscoveryOrder,
 		SecretCount = secretCount,
 		Hints = self:GetHintCount(player),
+		SecretDoor = self:GetSecretDoorSnapshot(player, room.Id),
 		Discoveries = discoveries,
 		Rooms = self:_buildRoomSummaries(player),
 	}

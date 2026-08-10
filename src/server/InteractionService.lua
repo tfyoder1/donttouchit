@@ -354,6 +354,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandShovelState = {}
 	self.islandTreasureState = {}
 	self.islandColaState = {}
+	self.secretDoorState = {}
 	return self
 end
 
@@ -361,8 +362,23 @@ function InteractionService:Initialize()
 	if self.discoveryService.DiscoveryUnlocked then
 		self.discoveryService.DiscoveryUnlocked:Connect(function(player)
 			self:_checkExitUnlock(player)
+			self:_refreshSecretDoorsForPlayer(player)
 		end)
 	end
+
+	if self.discoveryService.SecretDoorChanged then
+		self.discoveryService.SecretDoorChanged:Connect(function(player)
+			self:_refreshSecretDoorsForPlayer(player)
+		end)
+	end
+
+	Players.PlayerAdded:Connect(function(player)
+		task.delay(1.5, function()
+			if player.Parent then
+				self:_refreshSecretDoorsForPlayer(player)
+			end
+		end)
+	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
 		self:_wireMainButton(instance)
@@ -406,6 +422,14 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.ReferenceBook, function(instance)
 		self:_wireReferenceBook(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SecretRoomDoor, function(instance)
+		self:_wireSecretRoomDoor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SecretRoomExit, function(instance)
+		self:_wireSecretRoomExit(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.ResetRoomButton, function(instance)
@@ -490,6 +514,7 @@ function InteractionService:Initialize()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
+		self:_refreshSecretDoorsForPlayer(player)
 	end
 end
 
@@ -768,6 +793,151 @@ function InteractionService:_wireReferenceBook(bookPart)
 	end)
 end
 
+function InteractionService:_getSecretDoorRoot(door)
+	if not door then
+		return nil
+	end
+
+	if door:IsA("BasePart") then
+		return door:FindFirstAncestor("TVSecretDoor") or door
+	end
+
+	return door
+end
+
+function InteractionService:_setSecretDoorVisible(door, visible)
+	local root = self:_getSecretDoorRoot(door)
+	if not root then
+		return
+	end
+
+	for _, instance in ipairs(getInstanceAndDescendants(root)) do
+		if instance:IsA("BasePart") then
+			if visible then
+				local visibleTransparency = instance:GetAttribute("SecretVisibleTransparency")
+				local visibleCanCollide = instance:GetAttribute("SecretVisibleCanCollide")
+				instance.Transparency = if visibleTransparency ~= nil then visibleTransparency else 0
+				instance.CanCollide = if visibleCanCollide ~= nil then visibleCanCollide else true
+			else
+				instance.Transparency = 1
+				instance.CanCollide = false
+			end
+		elseif instance:IsA("ProximityPrompt") then
+			local visibleEnabled = instance:GetAttribute("SecretVisibleEnabled")
+			instance.Enabled = visible and (visibleEnabled == nil or visibleEnabled == true)
+		elseif instance:IsA("SurfaceGui") then
+			local visibleEnabled = instance:GetAttribute("SecretVisibleEnabled")
+			instance.Enabled = visible and (visibleEnabled == nil or visibleEnabled == true)
+		end
+	end
+end
+
+function InteractionService:_shouldRevealSecretDoorForAnyone(roomId)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if self.discoveryService:CanSeeSecretDoor(player, roomId) then
+			return true
+		end
+	end
+
+	return false
+end
+
+function InteractionService:_refreshSecretDoorsForPlayer(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.SecretRoomDoor)) do
+		local roomId = door:GetAttribute("RoomId") or "TVRoom"
+		self:_setSecretDoorVisible(door, self:_shouldRevealSecretDoorForAnyone(roomId))
+	end
+end
+
+local function getSecretDoorOpenCFrame(doorPanel)
+	local closedCFrame = doorPanel:GetAttribute("SecretClosedCFrame") or doorPanel:GetAttribute("BaseCFrame") or doorPanel.CFrame
+	local hingeOffset = -doorPanel.Size.X / 2
+
+	return closedCFrame
+		* CFrame.new(hingeOffset, 0, 0)
+		* CFrame.Angles(0, math.rad(-96), 0)
+		* CFrame.new(-hingeOffset, 0, 0)
+end
+
+function InteractionService:_wireSecretRoomDoor(door)
+	local prompt = getPrompt(door)
+	local roomId = door:GetAttribute("RoomId") or "TVRoom"
+
+	self.secretDoorState[door] = self.secretDoorState[door] or {
+		Reacting = false,
+	}
+	self:_setSecretDoorVisible(door, self:_shouldRevealSecretDoorForAnyone(roomId))
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.secretDoorState[door]
+		if not state or state.Reacting then
+			return
+		end
+
+		if not self.discoveryService:CanSeeSecretDoor(player, roomId) then
+			self.systemMessageRemote:FireClient(player, "That wall is still committed to being a wall. Finish the room or reveal the secret door in the log.")
+			return
+		end
+
+		if not self.discoveryService:HasSecretKey(player, roomId) then
+			self.systemMessageRemote:FireClient(player, "The secret door wants the TV Secret Key. A secret discovery is probably hoarding it.")
+			return
+		end
+
+		local destinationCFrame = door:GetAttribute("DestinationCFrame")
+		if typeof(destinationCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "The secret door forgot where the secret is.")
+			return
+		end
+
+		state.Reacting = true
+		playSound(door, "rbxasset://sounds/button.wav", 0.45, 0.58)
+		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.38, 1.65)
+
+		if door:IsA("BasePart") then
+			local openTween = tweenPart(door, 0.34, {
+				CFrame = getSecretDoorOpenCFrame(door),
+				Color = Color3.fromRGB(122, 255, 177),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			openTween.Completed:Wait()
+		else
+			task.wait(0.25)
+		end
+
+		teleportPlayer(player, destinationCFrame)
+		self.systemMessageRemote:FireClient(player, "The secret door opens. Very suspiciously.")
+
+		task.delay(1.2, function()
+			if door.Parent and door:IsA("BasePart") then
+				tweenPart(door, 0.24, {
+					CFrame = door:GetAttribute("SecretClosedCFrame") or door:GetAttribute("BaseCFrame") or door.CFrame,
+					Color = door:GetAttribute("BaseColor") or Color3.fromRGB(76, 55, 132),
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			end
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireSecretRoomExit(exitDoor)
+	local prompt = getPrompt(exitDoor)
+
+	self:_connectPrompt(prompt, function(player)
+		local destinationCFrame = exitDoor:GetAttribute("DestinationCFrame")
+		if typeof(destinationCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "The secret exit is having stage fright.")
+			return
+		end
+
+		teleportPlayer(player, destinationCFrame)
+		self.systemMessageRemote:FireClient(player, "Back to the TV room. Act natural.")
+	end)
+end
+
 function InteractionService:_wireResetRoomButton(button)
 	local prompt = getPrompt(button)
 
@@ -796,6 +966,7 @@ function InteractionService:_wireResetRoomButton(button)
 		self:_afterRoomReset()
 		for _, currentPlayer in ipairs(Players:GetPlayers()) do
 			self:_checkExitUnlock(currentPlayer)
+			self:_refreshSecretDoorsForPlayer(currentPlayer)
 		end
 	end)
 end

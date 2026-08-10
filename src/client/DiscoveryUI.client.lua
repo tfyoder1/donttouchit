@@ -227,8 +227,8 @@ bookList.BackgroundTransparency = 0.16
 bookList.BorderSizePixel = 0
 bookList.CanvasSize = UDim2.fromOffset(0, 0)
 bookList.ScrollBarThickness = 6
-bookList.Position = UDim2.fromOffset(18, 228)
-bookList.Size = UDim2.new(1, -36, 1, -246)
+bookList.Position = UDim2.fromOffset(18, 274)
+bookList.Size = UDim2.new(1, -36, 1, -292)
 bookList.Parent = bookPanel
 
 local listCorner = Instance.new("UICorner")
@@ -253,7 +253,7 @@ hintTray.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 hintTray.BackgroundTransparency = 0.08
 hintTray.BorderSizePixel = 0
 hintTray.Position = UDim2.fromOffset(18, 84)
-hintTray.Size = UDim2.new(1, -36, 0, 132)
+hintTray.Size = UDim2.new(1, -36, 0, 178)
 hintTray.Parent = bookPanel
 
 local hintTrayCorner = Instance.new("UICorner")
@@ -351,6 +351,24 @@ revealHintButton.Parent = hintTray
 local revealCorner = Instance.new("UICorner")
 revealCorner.CornerRadius = UDim.new(0, 6)
 revealCorner.Parent = revealHintButton
+
+local secretDoorButton = Instance.new("TextButton")
+secretDoorButton.Name = "SecretDoorReveal"
+secretDoorButton.BackgroundColor3 = Color3.fromRGB(150, 112, 255)
+secretDoorButton.BorderSizePixel = 0
+secretDoorButton.Font = Enum.Font.GothamBlack
+secretDoorButton.Position = UDim2.new(0, 10, 0, 128)
+secretDoorButton.Size = UDim2.new(1, -20, 0, 38)
+secretDoorButton.Text = "Secret Door"
+secretDoorButton.TextColor3 = Color3.fromRGB(242, 236, 255)
+secretDoorButton.TextScaled = true
+secretDoorButton.TextWrapped = true
+secretDoorButton.Visible = false
+secretDoorButton.Parent = hintTray
+
+local secretDoorCorner = Instance.new("UICorner")
+secretDoorCorner.CornerRadius = UDim.new(0, 6)
+secretDoorCorner.Parent = secretDoorButton
 
 local startOverlay = Instance.new("Frame")
 startOverlay.Name = "StartChoiceOverlay"
@@ -733,9 +751,38 @@ local function renderReferenceBook(payload)
 	end
 	bookTitle.Text = (payload.RoomName or "Room") .. " Log"
 	bookCount.Text = ("%d / %d found"):format(payload.Count or 0, payload.Total or 0)
-	hintCount.Text = ("Hints: %d"):format(payload.Hints or 0)
+	local secretDoor = payload.SecretDoor
+	local keyText = ""
+	if secretDoor then
+		keyText = secretDoor.HasKey and (" | Key: %s"):format(secretDoor.KeyName or "yes") or " | Key: no"
+	end
+	hintCount.Text = ("Hints: %d%s"):format(payload.Hints or 0, keyText)
 	hintText.Text = payload.HintText or payload.StatusText or "Pick: free hint, paid hint, or full reveal."
 	hintText.Visible = true
+	secretDoorButton.Visible = secretDoor ~= nil
+	if secretDoor then
+		if secretDoor.CanOpen then
+			secretDoorButton.Text = "Secret Door Ready"
+			secretDoorButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
+			secretDoorButton.TextColor3 = Color3.fromRGB(14, 40, 24)
+		elseif secretDoor.Visible and secretDoor.HasKey == false then
+			secretDoorButton.Text = ("Secret Door Visible - Find %s"):format(secretDoor.KeyName or "Key")
+			secretDoorButton.BackgroundColor3 = Color3.fromRGB(255, 198, 82)
+			secretDoorButton.TextColor3 = Color3.fromRGB(57, 38, 4)
+		elseif secretDoor.RoomComplete then
+			secretDoorButton.Text = "Secret Door Visible"
+			secretDoorButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
+			secretDoorButton.TextColor3 = Color3.fromRGB(14, 40, 24)
+		elseif (secretDoor.RevealProductId or 0) > 0 then
+			secretDoorButton.Text = ("Reveal Secret Door - %d R$"):format(secretDoor.RevealRobux or 0)
+			secretDoorButton.BackgroundColor3 = Color3.fromRGB(150, 112, 255)
+			secretDoorButton.TextColor3 = Color3.fromRGB(242, 236, 255)
+		else
+			secretDoorButton.Text = ("Reveal Secret Door - %d hints"):format(secretDoor.RevealHintCost or 0)
+			secretDoorButton.BackgroundColor3 = Color3.fromRGB(150, 112, 255)
+			secretDoorButton.TextColor3 = Color3.fromRGB(242, 236, 255)
+		end
+	end
 
 	clearBookList()
 
@@ -810,6 +857,15 @@ revealHintButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
 			Action = "FullReveal",
+			RoomId = activeBookRoomId,
+		})
+	end
+end)
+
+secretDoorButton.MouseButton1Click:Connect(function()
+	if activeBookRoomId then
+		hintPackRemote:FireServer({
+			Action = "RevealSecretDoor",
 			RoomId = activeBookRoomId,
 		})
 	end

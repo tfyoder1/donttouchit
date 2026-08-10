@@ -450,6 +450,8 @@ function RoomProgressService:_handleHintRequest(player, payload)
 		self:_requestPaidHint(player, roomId)
 	elseif action == "FullReveal" then
 		self:_requestFullReveal(player, roomId)
+	elseif action == "RevealSecretDoor" then
+		self:_requestSecretDoorReveal(player, roomId)
 	end
 end
 
@@ -525,14 +527,59 @@ function RoomProgressService:_requestHintPack(player, roomId)
 	self.systemMessageRemote:FireClient(player, "Prototype hint pack added: 10 hints. Currently free; no Robux charged.")
 end
 
+function RoomProgressService:_requestSecretDoorReveal(player, roomId)
+	local config = Constants.SecretDoors and Constants.SecretDoors[roomId]
+	if not config then
+		self:_showHintResult(player, roomId, nil, "This room does not have a secret door yet.")
+		return
+	end
+
+	if self.discoveryService:CanSeeSecretDoor(player, roomId) then
+		self:_showHintResult(player, roomId, nil, "The secret door is already visible. The key is still earned by a secret discovery.")
+		return
+	end
+
+	local productId = config.RevealProductId
+	if productId and productId > 0 then
+		self:_promptHintProduct(player, roomId, productId, "SecretDoorReveal")
+		return
+	end
+
+	local cost = math.max(0, config.RevealHintCost or 0)
+	local ok, errorText = self.discoveryService:SpendHints(player, cost)
+	if not ok then
+		self:_showHintResult(
+			player,
+			roomId,
+			nil,
+			("Secret door rush reveal needs %d hints, or you can complete the room normally for free."):format(cost)
+		)
+		return
+	end
+
+	self.discoveryService:RevealSecretDoor(player, roomId, "Secret door revealed early. The key is still hiding in a secret discovery.")
+	self:ShowReferenceBook(player, roomId, {
+		StatusText = ("Secret door revealed early for %d hints. Find the secret key to open it."):format(cost),
+	})
+end
+
 function RoomProgressService:_installReceiptHandler()
 	local hintPackProductId = Constants.NoTouch.HintPackProductId
 	local paidHintProductId = Constants.NoTouch.PaidHintProductId
 	local fullRevealProductId = Constants.NoTouch.FullRevealProductId
+	local secretDoorProductById = {}
+
+	for roomId, config in pairs(Constants.SecretDoors or {}) do
+		local productId = config.RevealProductId
+		if productId and productId > 0 then
+			secretDoorProductById[productId] = roomId
+		end
+	end
 
 	if (not hintPackProductId or hintPackProductId <= 0)
 		and (not paidHintProductId or paidHintProductId <= 0)
 		and (not fullRevealProductId or fullRevealProductId <= 0)
+		and next(secretDoorProductById) == nil
 	then
 		return
 	end
@@ -574,6 +621,20 @@ function RoomProgressService:_installReceiptHandler()
 			end
 
 			self:_showHintResult(player, pending.RoomId, hintText, errorText)
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		end
+
+		local secretDoorRoomId = secretDoorProductById[receiptInfo.ProductId]
+		if secretDoorRoomId then
+			local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+			if not player then
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+
+			self.discoveryService:RevealSecretDoor(player, secretDoorRoomId, "Secret door revealed early. The key is still hiding in a secret discovery.")
+			self:ShowReferenceBook(player, secretDoorRoomId, {
+				StatusText = "Secret door revealed early. Find the secret key to open it.",
+			})
 			return Enum.ProductPurchaseDecision.PurchaseGranted
 		end
 
