@@ -85,8 +85,9 @@ local SNACK_BUTTON_ACTIVITIES = {
 	"rack_rattle",
 }
 
-local SNACK_FLIGHT_DURATION = 14
+local SNACK_FLIGHT_DURATION = 60
 local SNACK_SLOW_MOTION_DURATION = 12
+local SNACK_SUPER_WIND_GUSTS = 5
 
 local SNACK_SOUND_PROFILES = {
 	CRONCH = {
@@ -334,6 +335,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.exitUnlocked = false
 	self.underfloorReturnState = {}
 	self.snackButtonState = {}
+	self.snackFanState = {}
 	self.roomMoodStateByRoomId = {}
 	self.fridgeState = {}
 	self.secretFridgeButtonState = {}
@@ -413,6 +415,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.SnackButton, function(instance)
 		self:_wireSnackButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SnackCeilingFan, function(instance)
+		self:_wireSnackCeilingFan(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.SnackFridge, function(instance)
@@ -771,6 +777,9 @@ function InteractionService:_wireResetRoomButton(button)
 		end
 
 		self:_clearAllTelevisions()
+		for _, state in pairs(self.snackFanState) do
+			state.SpinToken = nil
+		end
 		self.eventManager:ResetRoom(player)
 		self:_afterRoomReset()
 		for _, currentPlayer in ipairs(Players:GetPlayers()) do
@@ -786,6 +795,14 @@ function InteractionService:_afterRoomReset()
 			state.IceSpinToken = nil
 			state.Reacting = false
 			self:_setFridgeOpenDetails(fridge, false)
+		end
+	end
+
+	for fan, state in pairs(self.snackFanState) do
+		if fan and fan.Parent then
+			state.Level = 0
+			state.SpinToken = nil
+			state.Reacting = false
 		end
 	end
 
@@ -1694,6 +1711,169 @@ function InteractionService:_triggerSnackButtonActivity(player, button, state)
 	end
 end
 
+function InteractionService:_stopSnackFlightForRoom(triggeringPlayer)
+	local targets = self:_getPlayersInRoom("SnackLab")
+	if #targets == 0 and triggeringPlayer then
+		targets = { triggeringPlayer }
+	end
+
+	for _, player in ipairs(targets) do
+		self.snackEffectRemote:FireClient(player, {
+			Action = "StopFlight",
+		})
+	end
+end
+
+function InteractionService:_startSnackFanSpin(fan, state)
+	local hub = fan:FindFirstChild("FanHub", true)
+	if not hub or not hub:IsA("BasePart") then
+		return
+	end
+
+	local bladeRecords = {}
+	local centerCFrame = hub:GetAttribute("BaseCFrame") or hub.CFrame
+	for _, descendant in ipairs(fan:GetDescendants()) do
+		if descendant:IsA("BasePart") and descendant.Name == "FanBlade" then
+			table.insert(bladeRecords, {
+				Part = descendant,
+				Offset = centerCFrame:ToObjectSpace(descendant:GetAttribute("BaseCFrame") or descendant.CFrame),
+			})
+		end
+	end
+
+	if #bladeRecords == 0 then
+		return
+	end
+
+	local token = {}
+	state.SpinToken = token
+
+	task.spawn(function()
+		local angle = 0
+		while fan.Parent and state.SpinToken == token do
+			local speed = state.Level >= 2 and 52 or 16
+			angle += math.rad(speed)
+
+			for _, record in ipairs(bladeRecords) do
+				if record.Part.Parent then
+					record.Part.CFrame = centerCFrame * CFrame.Angles(0, angle, 0) * record.Offset
+				end
+			end
+
+			task.wait(state.Level >= 2 and 0.03 or 0.08)
+		end
+	end)
+end
+
+function InteractionService:_getSnackWindDirection(position)
+	local snackRoom = Constants.GetRoom("SnackLab")
+	local zone = snackRoom and snackRoom.Zone
+	local center = zone and (zone.Min + zone.Max) * 0.5 or Vector3.new(48, 0, 44)
+	local direction = Vector3.new(position.X - center.X, 0, position.Z - center.Z)
+
+	if direction.Magnitude < 1 then
+		return Vector3.new(1, 0, 0)
+	end
+
+	return direction.Unit
+end
+
+function InteractionService:_pushSnackPlayersToWalls(level)
+	for _, player in ipairs(self:_getPlayersInRoom("SnackLab")) do
+		local rootPart = getRootPart(player)
+		if rootPart then
+			local direction = self:_getSnackWindDirection(rootPart.Position)
+			rootPart.AssemblyLinearVelocity = direction * (level >= 3 and 128 or 96) + Vector3.new(0, 12, 0)
+			rootPart.AssemblyAngularVelocity += Vector3.new(0, 3, 0)
+		end
+	end
+end
+
+function InteractionService:_pushLooseFruitToWalls(level)
+	local pushedParts = {}
+
+	for _, looseFruit in ipairs(CollectionService:GetTagged(Constants.Tags.LooseFruit)) do
+		local part = nil
+		if looseFruit:IsA("BasePart") then
+			part = looseFruit
+		elseif looseFruit:IsA("Model") then
+			part = looseFruit.PrimaryPart or looseFruit:FindFirstChildWhichIsA("BasePart", true)
+		end
+
+		if part and part.Parent and not pushedParts[part] then
+			pushedParts[part] = true
+			part.Anchored = false
+			part.CanCollide = true
+			local direction = self:_getSnackWindDirection(part.Position)
+			part.AssemblyLinearVelocity = direction * (level >= 3 and 120 or 86) + Vector3.new(0, 18, 0)
+			part.AssemblyAngularVelocity = Vector3.new(12 + level * 4, -18, 9)
+		end
+	end
+end
+
+function InteractionService:_triggerSnackSuperWind(button, level)
+	playSound(button, "rbxasset://sounds/electronicpingshort.wav", 0.62, level >= 3 and 1.8 or 1.35)
+	self.systemMessageRemote:FireAllClients("The Gravity Apology Fan has escalated to snack weather.")
+
+	for gust = 1, SNACK_SUPER_WIND_GUSTS do
+		task.delay((gust - 1) * 0.36, function()
+			self:_pushSnackPlayersToWalls(level)
+			self:_pushLooseFruitToWalls(level)
+		end)
+	end
+end
+
+function InteractionService:_wireSnackCeilingFan(button)
+	local prompt = getPrompt(button)
+	local fan = button:FindFirstAncestor("SnackCeilingFan") or button
+
+	self.snackFanState[fan] = self.snackFanState[fan] or {
+		Level = 0,
+		Reacting = false,
+		SpinToken = nil,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.snackFanState[fan]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		state.Level = math.min((state.Level or 0) + 1, 3)
+		self:_stopSnackFlightForRoom(player)
+		self:_startSnackFanSpin(fan, state)
+
+		if button:IsA("BasePart") then
+			local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
+			tweenPart(button, 0.08, {
+				CFrame = baseCFrame + Vector3.new(0, -0.16, 0),
+				Color = Color3.fromRGB(255, 236, 104),
+			})
+			task.delay(0.12, function()
+				if button.Parent then
+					tweenPart(button, 0.16, {
+						CFrame = baseCFrame,
+						Color = button:GetAttribute("BaseColor") or Color3.fromRGB(93, 217, 255),
+					}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				end
+			end)
+		end
+
+		if state.Level == 1 then
+			prompt.ActionText = "Gust"
+			playSound(button, "rbxasset://sounds/button.wav", 0.5, 0.95)
+			self.systemMessageRemote:FireClient(player, "Flight canceled. The ceiling fan is now quietly making decisions.")
+		else
+			prompt.ActionText = "More Wind"
+			self:_triggerSnackSuperWind(button, state.Level)
+		end
+
+		task.wait(0.25)
+		state.Reacting = false
+	end)
+end
+
 function InteractionService:_wireSnackButton(button)
 	local prompt = getPrompt(button)
 
@@ -2262,26 +2442,30 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 		local random = Random.new()
 		local originCFrame = bowl and bowl:IsA("BasePart") and bowl.CFrame or fruitBowl:GetPivot()
 
-		for wave = 1, 4 do
+		for wave = 1, 6 do
 			for _, template in ipairs(fruitTemplates) do
 				local clone = template:Clone()
 				clone.Name = template.Name .. "Spilled"
-				clone.Parent = workspace
+				clone.Parent = workspace:FindFirstChild("InteractiveObjects") or workspace
 				CollectionService:AddTag(clone, Constants.Tags.TemporaryObject)
+				CollectionService:AddTag(clone, Constants.Tags.LooseFruit)
 
 				local primary = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
 				if primary then
 					clone.PrimaryPart = primary
+					CollectionService:AddTag(primary, Constants.Tags.LooseFruit)
 				end
 
 				clone:PivotTo(
 					originCFrame
-						* CFrame.new(random:NextNumber(-0.8, 0.8), random:NextNumber(0.4, 1.1), random:NextNumber(-0.8, 0.8))
+						* CFrame.new(random:NextNumber(-1.4, 1.4), random:NextNumber(0.7, 1.8), random:NextNumber(-1.4, 1.4))
 						* CFrame.Angles(random:NextNumber(-math.pi, math.pi), random:NextNumber(-math.pi, math.pi), random:NextNumber(-math.pi, math.pi))
 				)
 
 				for _, descendant in ipairs(clone:GetDescendants()) do
 					if descendant:IsA("BasePart") then
+						local baseTransparency = descendant:GetAttribute("BaseTransparency")
+						descendant.Transparency = if baseTransparency ~= nil then baseTransparency else 0
 						descendant.Anchored = false
 						descendant.CanCollide = true
 						descendant.Massless = false
@@ -2292,8 +2476,8 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 				if primary then
 					local angle = random:NextNumber(0, math.pi * 2)
 					local horizontal = Vector3.new(math.cos(angle), 0, math.sin(angle))
-					primary.AssemblyLinearVelocity = horizontal * random:NextNumber(38, 68)
-						+ Vector3.new(0, random:NextNumber(22, 44), 0)
+					primary.AssemblyLinearVelocity = horizontal * random:NextNumber(50, 82)
+						+ Vector3.new(0, random:NextNumber(28, 52), 0)
 					primary.AssemblyAngularVelocity = Vector3.new(
 						random:NextNumber(-14, 14),
 						random:NextNumber(-14, 14),

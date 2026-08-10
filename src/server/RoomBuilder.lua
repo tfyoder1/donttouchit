@@ -558,6 +558,84 @@ local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
 local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
 
+local function makeSnackResetRoomButton(parent)
+	local resetModel = makeModel(parent, "SnackResetRoomButton")
+	local width = Constants.Room.Width
+	local origin = SNACK_LAB_ORIGIN
+	local wallX = -width / 2 + 0.58
+	local panelZ = 13.6
+
+	local plate = createPart(
+		resetModel,
+		"SnackResetButtonPlate",
+		Vector3.new(0.24, 2.1, 3.4),
+		cframeAt(origin, wallX, 4.45, panelZ),
+		Color3.fromRGB(42, 47, 56),
+		Enum.Material.Metal
+	)
+
+	local button = createPart(
+		resetModel,
+		"SnackResetButton",
+		Vector3.new(1.45, 0.38, 1.45),
+		cframeAt(origin, wallX + 0.28, 4.45, panelZ) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(255, 221, 84),
+		Enum.Material.Neon
+	)
+	button.Shape = Enum.PartType.Cylinder
+
+	createSurfaceText(plate, "SnackResetButtonText", "RESET\nSNACKS", Enum.NormalId.Right, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
+	createPrompt(button, "Reset", "Snack Lab Reset", 0.2)
+	tag(button, Constants.Tags.ResetRoomButton)
+
+	resetModel.PrimaryPart = plate
+	return resetModel
+end
+
+local function makeSnackCeilingFan(objectsFolder)
+	local fan = makeModel(objectsFolder, "SnackCeilingFan")
+	local origin = SNACK_LAB_ORIGIN
+	local center = cframeAt(origin, 0, Constants.Room.Height - 1.25, 3.2)
+
+	createPart(fan, "FanStem", Vector3.new(0.32, 1.2, 0.32), center * CFrame.new(0, 0.75, 0), Color3.fromRGB(74, 84, 94), Enum.Material.Metal)
+
+	local hub = createPart(fan, "FanHub", Vector3.new(1.3, 0.55, 1.3), center, Color3.fromRGB(80, 95, 108), Enum.Material.Metal)
+	hub.Shape = Enum.PartType.Ball
+
+	for index = 1, 4 do
+		local angle = math.rad((index - 1) * 90)
+		local blade = createPart(
+			fan,
+			"FanBlade",
+			Vector3.new(4.2, 0.18, 0.72),
+			center * CFrame.Angles(0, angle, 0) * CFrame.new(2.65, 0, 0),
+			Color3.fromRGB(210, 232, 238),
+			Enum.Material.SmoothPlastic
+		)
+		blade:SetAttribute("BladeIndex", index)
+	end
+
+	local button = createPart(
+		fan,
+		"FanPullButton",
+		Vector3.new(1.1, 0.34, 1.1),
+		center * CFrame.new(0, -0.58, 0) * CFrame.Angles(math.rad(90), 0, 0),
+		Color3.fromRGB(93, 217, 255),
+		Enum.Material.Neon
+	)
+	button.Shape = Enum.PartType.Cylinder
+
+	local label = createPart(fan, "FanLabel", Vector3.new(5.6, 0.16, 1.55), center * CFrame.new(0, -0.95, 2.7), Color3.fromRGB(38, 45, 55), Enum.Material.Metal)
+	createSurfaceText(label, "FanLabelText", "GRAVITY\nAPOLOGY FAN", Enum.NormalId.Bottom, Color3.fromRGB(185, 246, 255), Color3.fromRGB(38, 45, 55))
+
+	local prompt = createPrompt(button, "Pull", "Gravity Apology Fan", 0)
+	prompt.MaxActivationDistance = 22
+	tag(button, Constants.Tags.SnackCeilingFan)
+
+	fan.PrimaryPart = hub
+	return fan
+end
+
 local function makeHallDoor(parent, name, size, cframe, face, label, destinationCFrame, lockedMessage, roomId)
 	local door = createPart(parent, name, size, cframe, Color3.fromRGB(79, 92, 116), Enum.Material.Wood)
 	createSurfaceText(door, "DoorText", label, face, Color3.fromRGB(232, 245, 255), Color3.fromRGB(38, 48, 64))
@@ -689,11 +767,13 @@ local function makeSnackLabShell(roomFolder)
 	local roomSign = createPart(room, "SnackLabSign", Vector3.new(14, 2.6, 0.35), cframeAt(origin, 0, 7.2, -depth / 2 + 0.54), Color3.fromRGB(255, 232, 115), Enum.Material.SmoothPlastic)
 	createSurfaceText(roomSign, "SnackLabSignText", "SNACK LAB", Enum.NormalId.Front, Color3.fromRGB(28, 27, 24), Color3.fromRGB(255, 232, 115))
 
+	local resetRoomButton = makeSnackResetRoomButton(room)
 	createSpawnLocation(room, "SnackLabSpawn", "SnackLab", Constants.GetRoomSpawnCFrame("SnackLab"), Color3.fromRGB(91, 188, 124), false)
 
 	return {
 		Model = room,
 		ExitDoor = exitDoor,
+		ResetRoomButton = resetRoomButton,
 	}
 end
 
@@ -1277,6 +1357,7 @@ function RoomBuilder.Build()
 	local squishy = makeSquishy(objectsFolder)
 	local television = makeTelevision(objectsFolder)
 	local snackButton = makeSnackButton(objectsFolder)
+	local snackCeilingFan = makeSnackCeilingFan(objectsFolder)
 	local fridge = makeSnackFridge(objectsFolder)
 	local toaster = makeSnackToaster(objectsFolder)
 	local sink = makeSnackSink(objectsFolder)
@@ -1305,6 +1386,7 @@ function RoomBuilder.Build()
 		Television = television,
 		SnackLab = snackLab,
 		SnackButton = snackButton,
+		SnackCeilingFan = snackCeilingFan,
 		Fridge = fridge,
 		Toaster = toaster,
 		Sink = sink,

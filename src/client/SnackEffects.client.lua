@@ -101,7 +101,7 @@ local function startFlight(duration)
 		linearVelocity.VectorVelocity = humanoid.MoveDirection * 42 + Vector3.new(0, vertical, 0)
 	end)
 
-	task.delay(duration or 12, function()
+	task.delay(duration or 60, function()
 		if activeFlight and activeFlight.Token == token then
 			stopFlight()
 		end
@@ -114,7 +114,9 @@ snackEffectRemote.OnClientEvent:Connect(function(payload)
 	end
 
 	if payload.Action == "Flight" then
-		startFlight(payload.Duration or 12)
+		startFlight(payload.Duration or 60)
+	elseif payload.Action == "StopFlight" then
+		stopFlight()
 	end
 end)
 
