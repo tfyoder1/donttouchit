@@ -310,6 +310,20 @@ Constants.RoomDiscoveryOrder = {
 	},
 }
 
+Constants.SecretDiscoveries = {
+	[Constants.Discoveries.RainBasement.Id] = {
+		RoomId = "TVRoom",
+		PrizeHints = 5,
+		PrizeMessage = "Secret prize: +5 hints for relocating the rain.",
+	},
+}
+
+Constants.SecretDiscoveryOrderByRoom = {
+	TVRoom = {
+		Constants.Discoveries.RainBasement.Id,
+	},
+}
+
 Constants.RoomCompletionOrder = {
 	TVRoom = {
 		Constants.Discoveries.PressedButton.Id,

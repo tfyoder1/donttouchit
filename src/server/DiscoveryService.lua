@@ -423,6 +423,18 @@ function DiscoveryService:Unlock(player, discoveryId)
 	self.discoveryByUserId[player.UserId][discoveryId] = true
 	self:_refreshLastUnlockedRoom(player, false)
 
+	local secretConfig = Constants.SecretDiscoveries and Constants.SecretDiscoveries[discoveryId]
+	if secretConfig then
+		local prizeHints = math.max(0, secretConfig.PrizeHints or 0)
+		if prizeHints > 0 then
+			self.hintsByUserId[player.UserId] += prizeHints
+			self.systemMessageRemote:FireClient(
+				player,
+				secretConfig.PrizeMessage or ("Secret prize: +%d hints."):format(prizeHints)
+			)
+		end
+	end
+
 	local lastUnlockedRoomId = self:GetLastUnlockedRoomId(player)
 	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
 
@@ -503,12 +515,27 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 		end
 	end
 
+	local secretCount = 0
+	for _, discoveryId in ipairs(Constants.SecretDiscoveryOrderByRoom[room.Id] or {}) do
+		local discovery = Constants.GetDiscovery(discoveryId)
+		if discovery and foundById[discoveryId] == true then
+			secretCount += 1
+			table.insert(discoveries, {
+				Id = discovery.Id,
+				Name = discovery.Name,
+				Secret = true,
+				Unlocked = true,
+			})
+		end
+	end
+
 	return {
 		Type = "RoomSnapshot",
 		RoomId = room.Id,
 		RoomName = room.Name,
 		Count = self:_countForPlayer(player, room.DiscoveryOrder),
 		Total = #room.DiscoveryOrder,
+		SecretCount = secretCount,
 		Hints = self:GetHintCount(player),
 		Discoveries = discoveries,
 		Rooms = self:_buildRoomSummaries(player),

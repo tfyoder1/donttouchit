@@ -740,16 +740,23 @@ local function renderReferenceBook(payload)
 	clearBookList()
 
 	for index, entry in ipairs(payload.Discoveries or {}) do
+		local isSecret = entry.Secret == true
 		local row = Instance.new("TextLabel")
 		row.Name = "DiscoveryRow"
-		row.BackgroundColor3 = entry.Unlocked and Color3.fromRGB(44, 70, 52) or Color3.fromRGB(40, 43, 50)
+		row.BackgroundColor3 = if isSecret
+			then Color3.fromRGB(88, 66, 24)
+			else entry.Unlocked and Color3.fromRGB(44, 70, 52) or Color3.fromRGB(40, 43, 50)
 		row.BackgroundTransparency = 0.08
 		row.BorderSizePixel = 0
 		row.Font = Enum.Font.GothamBold
 		row.LayoutOrder = index
 		row.Size = UDim2.new(1, 0, 0, 38)
-		row.Text = (entry.Unlocked and "[x] " or "[?] ") .. (entry.Name or "???")
-		row.TextColor3 = entry.Unlocked and Color3.fromRGB(205, 255, 218) or Color3.fromRGB(225, 230, 238)
+		row.Text = if isSecret
+			then "[secret] " .. (entry.Name or "???")
+			else (entry.Unlocked and "[x] " or "[?] ") .. (entry.Name or "???")
+		row.TextColor3 = if isSecret
+			then Color3.fromRGB(255, 232, 143)
+			else entry.Unlocked and Color3.fromRGB(205, 255, 218) or Color3.fromRGB(225, 230, 238)
 		row.TextScaled = true
 		row.TextXAlignment = Enum.TextXAlignment.Left
 		row.Parent = bookList
