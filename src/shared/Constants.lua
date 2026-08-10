@@ -52,6 +52,8 @@ Constants.Tags = {
 	FridgeBloxyCola = "DontTouchIt_FridgeBloxyCola",
 	SecretFridgeButton = "DontTouchIt_SecretFridgeButton",
 	IslandExit = "DontTouchIt_IslandExit",
+	IslandSharkSign = "DontTouchIt_IslandSharkSign",
+	IslandJellyfishSign = "DontTouchIt_IslandJellyfishSign",
 	IslandShovel = "DontTouchIt_IslandShovel",
 	IslandTreasure = "DontTouchIt_IslandTreasure",
 	IslandBloxyCola = "DontTouchIt_IslandBloxyCola",
@@ -247,6 +249,16 @@ Constants.Discoveries = {
 		Name = "Met the Door Shark",
 		Hint = "Try to leave the island before finding enough island discoveries.",
 	},
+	ReadSharkWarning = {
+		Id = "read_shark_warning",
+		Name = "Read the Shark Warning",
+		Hint = "Read the shark warning near the island shore.",
+	},
+	ReadJellyfishWarning = {
+		Id = "read_jellyfish_warning",
+		Name = "Read the Jellyfish Warning",
+		Hint = "Read the jellyfish warning near the island shore.",
+	},
 	DugTreasure = {
 		Id = "dug_treasure",
 		Name = "Dug Up Treasure",
@@ -303,6 +315,8 @@ Constants.RoomDiscoveryOrder = {
 	Island = {
 		Constants.Discoveries.ReachedIsland.Id,
 		Constants.Discoveries.SharkBounce.Id,
+		Constants.Discoveries.ReadSharkWarning.Id,
+		Constants.Discoveries.ReadJellyfishWarning.Id,
 		Constants.Discoveries.DugTreasure.Id,
 		Constants.Discoveries.OpenedTreasure.Id,
 		Constants.Discoveries.IslandBloxyCola.Id,
@@ -415,6 +429,8 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.LivingFruit.Id] = Constants.Tags.FruitBowl,
 	[Constants.Discoveries.ReachedIsland.Id] = Constants.Tags.IslandExit,
 	[Constants.Discoveries.SharkBounce.Id] = Constants.Tags.IslandExit,
+	[Constants.Discoveries.ReadSharkWarning.Id] = Constants.Tags.IslandSharkSign,
+	[Constants.Discoveries.ReadJellyfishWarning.Id] = Constants.Tags.IslandJellyfishSign,
 	[Constants.Discoveries.DugTreasure.Id] = Constants.Tags.IslandShovel,
 	[Constants.Discoveries.OpenedTreasure.Id] = Constants.Tags.IslandTreasure,
 	[Constants.Discoveries.IslandBloxyCola.Id] = Constants.Tags.IslandBloxyCola,

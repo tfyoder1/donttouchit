@@ -466,6 +466,14 @@ function InteractionService:Initialize()
 		self:_wireIslandExit(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.IslandSharkSign, function(instance)
+		self:_wireIslandWarningSign(instance, Constants.Discoveries.ReadSharkWarning.Id, "The shark sign feels less like advice and more like a countdown.")
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandJellyfishSign, function(instance)
+		self:_wireIslandWarningSign(instance, Constants.Discoveries.ReadJellyfishWarning.Id, "The jellyfish sign politely recommends owning fewer nerve endings.")
+	end)
+
 	self:_connectTagged(Constants.Tags.IslandShovel, function(instance)
 		self:_wireIslandShovel(instance)
 	end)
@@ -2533,6 +2541,16 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 
 		task.wait(0.7)
 		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireIslandWarningSign(sign, discoveryId, message)
+	local prompt = getPrompt(sign)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, discoveryId)
+		playSound(sign, "rbxasset://sounds/button.wav", 0.35, 0.82)
+		self.systemMessageRemote:FireClient(player, message)
 	end)
 end
 

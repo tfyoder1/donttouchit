@@ -557,6 +557,7 @@ local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
 local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
 local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
+local ISLAND_RETURN_CFRAME = CFrame.new(0, 3, 113)
 
 local function makeSnackResetRoomButton(parent)
 	local resetModel = makeModel(parent, "SnackResetRoomButton")
@@ -689,6 +690,7 @@ local function makeHallway(roomFolder)
 	createSurfaceText(label, "HallwaySignText", "ROOMS", Enum.NormalId.Back, Color3.fromRGB(22, 22, 26), Color3.fromRGB(250, 238, 111))
 	local oceanSign = createPart(hallway, "IslandApproachSign", Vector3.new(7.2, 1.9, 0.3), CFrame.new(0, 6.4, 88), Color3.fromRGB(112, 222, 255), Enum.Material.SmoothPlastic)
 	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nTO A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
+	createSurfaceText(oceanSign, "IslandApproachReturnText", "THIS WAY\nTO PARADISE", Enum.NormalId.Front, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
 	makeReferenceBook(hallway, "TVRoomReferenceBook", CFrame.new(-3.5, 0, 30), "TVRoom", "TV ROOM")
 	makeReferenceBook(hallway, "SnackLabReferenceBook", CFrame.new(3.5, 0, 38), "SnackLab", "SNACK LAB")
@@ -732,6 +734,10 @@ local function makeHallway(roomFolder)
 	local returnPad = createPart(hallway, "HallwayLanding", Vector3.new(8, 0.25, 8), CFrame.new(HALLWAY_SPAWN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(96, 194, 134), Enum.Material.Neon)
 	returnPad.Transparency = 0.35
 	returnPad:SetAttribute("BaseTransparency", returnPad.Transparency)
+
+	local islandReturnPad = createPart(hallway, "IslandReturnLanding", Vector3.new(7.8, 0.25, 7.8), CFrame.new(ISLAND_RETURN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(112, 222, 255), Enum.Material.Neon)
+	islandReturnPad.Transparency = 0.35
+	islandReturnPad:SetAttribute("BaseTransparency", islandReturnPad.Transparency)
 
 	return {
 		Model = hallway,
@@ -1199,6 +1205,47 @@ local function makePalmTree(parent, name, x, z, leanDegrees)
 	return tree
 end
 
+local function makeIslandWarningSign(parent, name, text, x, z, targetX, targetZ, tagName)
+	local signModel = makeModel(parent, name .. "Model")
+	local signPosition = ISLAND_ORIGIN + Vector3.new(x, 3.05, z)
+	local targetPosition = ISLAND_ORIGIN + Vector3.new(targetX, 2.9, targetZ)
+	local signCFrame = CFrame.new(signPosition, targetPosition)
+
+	local post = createPart(
+		signModel,
+		name .. "Post",
+		Vector3.new(0.34, 2.7, 0.34),
+		signCFrame * CFrame.new(0, -1.45, 0.1),
+		Color3.fromRGB(103, 66, 38),
+		Enum.Material.Wood
+	)
+	local board = createPart(
+		signModel,
+		name,
+		Vector3.new(5.2, 2.05, 0.28),
+		signCFrame,
+		Color3.fromRGB(255, 238, 139),
+		Enum.Material.WoodPlanks
+	)
+	local trim = createPart(
+		signModel,
+		name .. "Trim",
+		Vector3.new(5.55, 2.35, 0.12),
+		signCFrame * CFrame.new(0, 0, 0.08),
+		Color3.fromRGB(132, 84, 45),
+		Enum.Material.Wood
+	)
+	trim.CanCollide = false
+	trim:SetAttribute("BaseCanCollide", false)
+
+	createSurfaceText(board, name .. "Text", text, Enum.NormalId.Front, Color3.fromRGB(42, 37, 24), Color3.fromRGB(255, 238, 139))
+	createPrompt(board, "Read", text:gsub("\n", " "), 0)
+	tag(board, tagName)
+
+	signModel.PrimaryPart = post
+	return signModel
+end
+
 local function makeIslandRoom(roomFolder)
 	local room = makeModel(roomFolder, "IslandRoom")
 	local origin = ISLAND_ORIGIN
@@ -1259,11 +1306,14 @@ local function makeIslandRoom(roomFolder)
 	createPart(room, "DockRightRail", Vector3.new(0.28, 2.1, 15), cframeAt(origin, 3.3, 2.15, -14.8), Color3.fromRGB(98, 61, 37), Enum.Material.Wood)
 
 	local exitGate = createPart(room, "IslandExitGate", Vector3.new(8.2, 6.4, 0.62), cframeAt(origin, 0, 3.2, -23.4), Color3.fromRGB(67, 93, 112), Enum.Material.Metal)
-	exitGate:SetAttribute("DestinationCFrame", HALLWAY_SPAWN_CFRAME)
+	exitGate:SetAttribute("DestinationCFrame", ISLAND_RETURN_CFRAME)
 	exitGate:SetAttribute("RoomId", "Island")
 	createSurfaceText(exitGate, "IslandExitText", "HALLWAY", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(35, 55, 70))
 	createPrompt(exitGate, "Leave", "Hallway", 0)
 	tag(exitGate, Constants.Tags.IslandExit)
+
+	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS", -10.5, -7.5, -1, 2, Constants.Tags.IslandSharkSign)
+	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", 12.5, 12.5, 1, 5, Constants.Tags.IslandJellyfishSign)
 
 	for _, data in ipairs({
 		{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, -31, 8, 5) },
@@ -1280,8 +1330,8 @@ local function makeIslandRoom(roomFolder)
 		room,
 		"IslandClock",
 		"Island",
-		Vector3.new(5.4, 2.1, 0.28),
-		cframeAt(origin, 13.5, 5.2, 8) * CFrame.Angles(0, math.rad(-36), 0),
+		Vector3.new(6.2, 2.1, 0.28),
+		CFrame.new(origin + Vector3.new(0, 8.05, -22.85), origin + Vector3.new(0, 5, 4)),
 		Enum.NormalId.Front
 	)
 	createSpawnLocation(room, "IslandSpawn", "Island", ISLAND_SPAWN_CFRAME, Color3.fromRGB(255, 205, 91), false)
