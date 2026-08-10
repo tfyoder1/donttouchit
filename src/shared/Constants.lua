@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.4.2"
+Constants.BuildVersion = "0.4.3"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -474,6 +474,7 @@ Constants.NoTouch = {
 	RevealClueCost = 3,
 	RevealRobux = 3,
 	RevealProductId = 0,
+	SecretKeyClueCost = 3,
 }
 
 Constants.DiscoveryOrder = {}

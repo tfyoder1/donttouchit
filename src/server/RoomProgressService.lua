@@ -456,6 +456,8 @@ function RoomProgressService:_handleHintRequest(player, payload)
 		self:_requestDiscoveryReveal(player, roomId)
 	elseif action == "RevealSecretDoor" then
 		self:_requestSecretDoorReveal(player, roomId)
+	elseif action == "BuySecretKey" then
+		self:_requestSecretKey(player, roomId)
 	end
 end
 
@@ -580,6 +582,36 @@ function RoomProgressService:_requestSecretDoorReveal(player, roomId)
 	self.discoveryService:RevealSecretDoor(player, roomId, "Library outline revealed early. Finish the room to activate it.")
 	self:ShowReferenceBook(player, roomId, {
 		StatusText = ("Library outline revealed for %d hints. Finish the room, then bring the Library Key."):format(cost),
+	})
+end
+
+function RoomProgressService:_requestSecretKey(player, roomId)
+	local config = Constants.SecretDoors and Constants.SecretDoors[roomId]
+	if not config then
+		self:_showHintResult(player, roomId, nil, "This room does not have a Library key yet.")
+		return
+	end
+
+	if self.discoveryService:HasSecretKey(player, roomId) then
+		self:_showHintResult(player, roomId, nil, "You already have the Library Key.")
+		return
+	end
+
+	if not self.discoveryService:IsRoomComplete(player, roomId) then
+		self:_showHintResult(player, roomId, nil, "Finish the room before rushing the Library Key.")
+		return
+	end
+
+	local cost = math.max(0, Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3)
+	local ok = self.discoveryService:SpendClues(player, cost)
+	if not ok then
+		self:_showHintResult(player, roomId, nil, ("Library Key rush needs %d clues."):format(cost))
+		return
+	end
+
+	self.discoveryService:GrantSecretKey(player, roomId, "Library Key purchased for one reveal's worth of clues.")
+	self:ShowReferenceBook(player, roomId, {
+		StatusText = ("Library Key purchased for %d clues."):format(cost),
 	})
 end
 

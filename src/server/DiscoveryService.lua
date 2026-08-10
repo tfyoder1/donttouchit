@@ -633,6 +633,7 @@ function DiscoveryService:GetSecretDoorSnapshot(player, roomId)
 		RevealHintCost = config.RevealHintCost or 0,
 		RevealRobux = config.RevealRobux or 0,
 		RevealProductId = config.RevealProductId or 0,
+		KeyClueCost = Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3,
 	}
 end
 

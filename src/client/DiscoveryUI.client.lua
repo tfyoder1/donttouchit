@@ -494,6 +494,7 @@ local activeMessageTween = nil
 local toastSequence = 0
 local messageSequence = 0
 local activeBookRoomId = nil
+local activeSecretDoorAction = "RevealSecretDoor"
 local currentStatusType = nil
 local currentStatusRoomId = nil
 local pendingStartOptions = nil
@@ -803,12 +804,14 @@ local function renderReferenceBook(payload)
 	end
 	secretDoorButton.Visible = secretDoor ~= nil
 	if secretDoor then
+		activeSecretDoorAction = "RevealSecretDoor"
 		if secretDoor.CanOpen then
 			secretDoorButton.Text = "Library\nReady"
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
 			secretDoorButton.TextColor3 = Color3.fromRGB(14, 40, 24)
 		elseif secretDoor.RoomComplete and secretDoor.HasKey == false then
-			secretDoorButton.Text = "Library\nNeeds Key"
+			activeSecretDoorAction = "BuySecretKey"
+			secretDoorButton.Text = ("Key\n%d clues"):format(secretDoor.KeyClueCost or Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3)
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(255, 198, 82)
 			secretDoorButton.TextColor3 = Color3.fromRGB(57, 38, 4)
 		elseif secretDoor.Visible then
@@ -925,7 +928,7 @@ end)
 secretDoorButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
-			Action = "RevealSecretDoor",
+			Action = activeSecretDoorAction,
 			RoomId = activeBookRoomId,
 		})
 	end
