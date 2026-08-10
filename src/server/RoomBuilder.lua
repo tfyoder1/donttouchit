@@ -943,16 +943,49 @@ local function makeSnackMixer(objectsFolder)
 	local mixer = makeModel(objectsFolder, "Mixer")
 	local mixerX = 17.8
 	local mixerZ = 11.3
+	local mixerFrame = CFrame.new(origin + Vector3.new(mixerX, 0, mixerZ)) * CFrame.Angles(0, math.rad(180), 0)
 
-	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), cframeAt(origin, mixerX, 1.15, mixerZ), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
-	createPart(mixer, "MixerStand", Vector3.new(0.75, 3.4, 0.75), cframeAt(origin, mixerX - 1.9, 2.75, mixerZ), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
-	local head = createPart(mixer, "MixerHead", Vector3.new(3.9, 1.3, 2.1), cframeAt(origin, mixerX - 0.25, 4.35, mixerZ), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
-	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 1.75, 3.6), cframeAt(origin, mixerX + 0.25, 2.25, mixerZ), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
+	local function mixerCFrame(x, y, z)
+		return mixerFrame * CFrame.new(x, y, z)
+	end
+
+	local function markBlade(part, side)
+		part:SetAttribute("MixerBladeSide", side)
+		return part
+	end
+
+	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), mixerCFrame(0, 1.15, 0), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
+	createPart(mixer, "MixerStand", Vector3.new(0.8, 3.45, 0.8), mixerCFrame(-1.85, 2.8, 0), Color3.fromRGB(224, 230, 235), Enum.Material.Metal)
+	createPart(mixer, "MixerNeck", Vector3.new(2.45, 0.82, 1.15), mixerCFrame(-1.08, 4.45, 0), Color3.fromRGB(217, 226, 232), Enum.Material.Metal)
+	local head = createPart(mixer, "MixerHead", Vector3.new(3.8, 1.35, 2.35), mixerCFrame(0.2, 4.45, 0), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
+	createPart(mixer, "MixerHeadBand", Vector3.new(3.95, 0.2, 2.5), mixerCFrame(0.2, 4.8, 0), Color3.fromRGB(255, 222, 98), Enum.Material.Neon)
+	createPart(mixer, "MixerSpeedKnob", Vector3.new(0.55, 0.55, 0.22), mixerCFrame(0.2, 4.52, -1.32), Color3.fromRGB(54, 61, 71), Enum.Material.Metal)
+
+	local bowl = createPart(mixer, "MixerBowl", Vector3.new(4, 1.9, 4), mixerCFrame(0.55, 2.35, 0), Color3.fromRGB(142, 225, 241), Enum.Material.Glass)
 	bowl.Shape = Enum.PartType.Ball
-	bowl.Transparency = 0.25
+	bowl.Transparency = 0.46
 	bowl:SetAttribute("BaseTransparency", bowl.Transparency)
-	createPart(mixer, "BeaterLeft", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, mixerX - 0.2, 3.15, mixerZ - 0.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
-	createPart(mixer, "BeaterRight", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, mixerX - 0.2, 3.15, mixerZ + 0.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	local bowlRim = createPart(mixer, "MixerBowlRim", Vector3.new(4.25, 0.18, 4.25), mixerCFrame(0.55, 3.12, 0), Color3.fromRGB(198, 246, 255), Enum.Material.Glass)
+	bowlRim.Shape = Enum.PartType.Cylinder
+	bowlRim.Transparency = 0.34
+	bowlRim:SetAttribute("BaseTransparency", bowlRim.Transparency)
+	local bowlHighlight = createPart(mixer, "MixerBowlHighlight", Vector3.new(0.12, 1.1, 1.8), mixerCFrame(-0.42, 2.55, -1.35) * CFrame.Angles(0, math.rad(18), math.rad(-8)), Color3.fromRGB(236, 255, 255), Enum.Material.Glass)
+	bowlHighlight.Transparency = 0.32
+	bowlHighlight:SetAttribute("BaseTransparency", bowlHighlight.Transparency)
+	local batter = createPart(mixer, "MixerBatter", Vector3.new(3.15, 0.48, 3.15), mixerCFrame(0.55, 2.05, 0), Color3.fromRGB(255, 238, 158), Enum.Material.SmoothPlastic)
+	batter.Shape = Enum.PartType.Ball
+
+	local function makeBeater(side, zOffset)
+		local root = markBlade(createPart(mixer, "Beater" .. side, Vector3.new(0.2, 1.3, 0.2), mixerCFrame(0.42, 3.22, zOffset), Color3.fromRGB(224, 232, 235), Enum.Material.Metal), side)
+		local loopOuter = markBlade(createPart(mixer, "Beater" .. side .. "OuterLoop", Vector3.new(0.12, 1, 0.12), mixerCFrame(0.08, 2.56, zOffset) * CFrame.Angles(0, 0, math.rad(-18)), Color3.fromRGB(236, 242, 244), Enum.Material.Metal), side)
+		local loopInner = markBlade(createPart(mixer, "Beater" .. side .. "InnerLoop", Vector3.new(0.12, 1, 0.12), mixerCFrame(0.76, 2.56, zOffset) * CFrame.Angles(0, 0, math.rad(18)), Color3.fromRGB(236, 242, 244), Enum.Material.Metal), side)
+		markBlade(createPart(mixer, "Beater" .. side .. "BottomWire", Vector3.new(0.9, 0.12, 0.12), mixerCFrame(0.42, 2.08, zOffset), Color3.fromRGB(236, 242, 244), Enum.Material.Metal), side)
+		markBlade(createPart(mixer, "Beater" .. side .. "CrossBlade", Vector3.new(0.95, 0.1, 0.22), mixerCFrame(0.42, 2.38, zOffset) * CFrame.Angles(0, math.rad(90), math.rad(12)), Color3.fromRGB(236, 242, 244), Enum.Material.Metal), side)
+		return root, loopOuter, loopInner
+	end
+
+	makeBeater("Left", -0.48)
+	makeBeater("Right", 0.48)
 	createPrompt(head, "Mix", "Mixer", 0)
 	tag(mixer, Constants.Tags.SnackMixer)
 

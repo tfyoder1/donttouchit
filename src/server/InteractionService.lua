@@ -2213,6 +2213,44 @@ function InteractionService:_wireSnackMixer(mixer)
 	local beaterLeft = mixer:FindFirstChild("BeaterLeft", true)
 	local beaterRight = mixer:FindFirstChild("BeaterRight", true)
 
+	local function collectBladeRecords(rootPart, side)
+		if not rootPart or not rootPart:IsA("BasePart") then
+			return {}
+		end
+
+		local rootBaseCFrame = rootPart:GetAttribute("BaseCFrame") or rootPart.CFrame
+		local records = {}
+
+		for _, descendant in ipairs(mixer:GetDescendants()) do
+			if descendant:IsA("BasePart") and descendant:GetAttribute("MixerBladeSide") == side then
+				table.insert(records, {
+					Part = descendant,
+					Offset = rootBaseCFrame:ToObjectSpace(descendant:GetAttribute("BaseCFrame") or descendant.CFrame),
+				})
+			end
+		end
+
+		return records
+	end
+
+	local leftBladeRecords = collectBladeRecords(beaterLeft, "Left")
+	local rightBladeRecords = collectBladeRecords(beaterRight, "Right")
+
+	local function rotateBladeRecords(rootPart, records, angle)
+		if not rootPart or not rootPart:IsA("BasePart") then
+			return
+		end
+
+		local rootBaseCFrame = rootPart:GetAttribute("BaseCFrame") or rootPart.CFrame
+		local rotationCFrame = rootBaseCFrame * CFrame.Angles(0, angle, 0)
+
+		for _, record in ipairs(records) do
+			if record.Part.Parent then
+				record.Part.CFrame = rotationCFrame * record.Offset
+			end
+		end
+	end
+
 	self.mixerState[mixer] = self.mixerState[mixer] or {
 		Reacting = false,
 	}
@@ -2232,13 +2270,8 @@ function InteractionService:_wireSnackMixer(mixer)
 		bowl.Color = Color3.fromRGB(190, 255, 235)
 
 		for index = 1, 7 do
-			if beaterLeft and beaterLeft:IsA("BasePart") then
-				beaterLeft.CFrame = (beaterLeft:GetAttribute("BaseCFrame") or beaterLeft.CFrame) * CFrame.Angles(0, math.rad(index * 65), 0)
-			end
-
-			if beaterRight and beaterRight:IsA("BasePart") then
-				beaterRight.CFrame = (beaterRight:GetAttribute("BaseCFrame") or beaterRight.CFrame) * CFrame.Angles(0, math.rad(-index * 65), 0)
-			end
+			rotateBladeRecords(beaterLeft, leftBladeRecords, math.rad(index * 65))
+			rotateBladeRecords(beaterRight, rightBladeRecords, math.rad(-index * 65))
 
 			local cloud = Instance.new("Part")
 			cloud.Name = "MixerCloud"
