@@ -825,7 +825,11 @@ local function makeSnackRack(objectsFolder)
 				Enum.Material.SmoothPlastic
 			)
 			pack:SetAttribute("IsSnackPack", true)
-			createSurfaceText(pack, "SnackPackText", names[((shelfIndex + packIndex - 2) % #names) + 1], Enum.NormalId.Front, Color3.fromRGB(255, 255, 255), pack.Color)
+			pack:SetAttribute("SnackId", ("snack_%d_%d"):format(shelfIndex, packIndex))
+			pack:SetAttribute("SnackName", names[((shelfIndex + packIndex - 2) % #names) + 1])
+			createSurfaceText(pack, "SnackPackText", pack:GetAttribute("SnackName"), Enum.NormalId.Front, Color3.fromRGB(255, 255, 255), pack.Color)
+			createPrompt(pack, "Listen", pack:GetAttribute("SnackName"), 0)
+			tag(pack, Constants.Tags.SnackPack)
 		end
 	end
 

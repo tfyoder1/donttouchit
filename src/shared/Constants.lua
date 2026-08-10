@@ -21,6 +21,7 @@ Constants.Remotes = {
 	SystemMessage = "SystemMessage",
 	RoomStatus = "RoomStatus",
 	SparkleHint = "SparkleHint",
+	SnackEffect = "SnackEffect",
 }
 
 Constants.Tags = {
@@ -43,6 +44,7 @@ Constants.Tags = {
 	SnackSink = "DontTouchIt_SnackSink",
 	SnackMixer = "DontTouchIt_SnackMixer",
 	SnackRack = "DontTouchIt_SnackRack",
+	SnackPack = "DontTouchIt_SnackPack",
 	FruitBowl = "DontTouchIt_FruitBowl",
 	FloorSection = "DontTouchIt_FloorSection",
 	ObjectRainObject = "DontTouchIt_ObjectRainObject",
@@ -186,6 +188,16 @@ Constants.Discoveries = {
 		Name = "Checked the Snack Rack",
 		Hint = "Inspect the colorful snack shelf in the Snack Lab.",
 	},
+	HeardSnackSound = {
+		Id = "heard_snack_sound",
+		Name = "Heard a Snack Sound",
+		Hint = "The snack packs are not just decorative. Try one directly.",
+	},
+	AllSnackSounds = {
+		Id = "all_snack_sounds",
+		Name = "Sampled Every Snack",
+		Hint = "Every snack pack on the rack has something to say.",
+	},
 	LivingFruit = {
 		Id = "living_fruit",
 		Name = "Woke the Fruit Bowl",
@@ -226,6 +238,8 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.AngrySink.Id,
 		Constants.Discoveries.MixedCloud.Id,
 		Constants.Discoveries.SnackRack.Id,
+		Constants.Discoveries.HeardSnackSound.Id,
+		Constants.Discoveries.AllSnackSounds.Id,
 		Constants.Discoveries.LivingFruit.Id,
 		Constants.Discoveries.SnackLabNoTouch.Id,
 	},
@@ -298,6 +312,8 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.AngrySink.Id] = Constants.Tags.SnackSink,
 	[Constants.Discoveries.MixedCloud.Id] = Constants.Tags.SnackMixer,
 	[Constants.Discoveries.SnackRack.Id] = Constants.Tags.SnackRack,
+	[Constants.Discoveries.HeardSnackSound.Id] = Constants.Tags.SnackPack,
+	[Constants.Discoveries.AllSnackSounds.Id] = Constants.Tags.SnackPack,
 	[Constants.Discoveries.LivingFruit.Id] = Constants.Tags.FruitBowl,
 }
 

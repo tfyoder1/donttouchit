@@ -78,6 +78,63 @@ local TV_SOUND_IDS = {
 	Warning = "rbxasset://sounds/snap.wav",
 }
 
+local SNACK_BUTTON_ACTIVITIES = {
+	"flight",
+	"slow_motion",
+	"mood",
+	"rack_rattle",
+}
+
+local SNACK_FLIGHT_DURATION = 14
+local SNACK_SLOW_MOTION_DURATION = 12
+
+local SNACK_SOUND_PROFILES = {
+	CRONCH = {
+		Message = "CRONCH performs a literal structural crunch.",
+		Color = Color3.fromRGB(255, 230, 118),
+		Sounds = {
+			{ Id = "rbxasset://sounds/snap.wav", Delay = 0, Volume = 0.8, Speed = 0.65 },
+			{ Id = "rbxasset://sounds/snap.wav", Delay = 0.12, Volume = 0.8, Speed = 0.82 },
+			{ Id = "rbxasset://sounds/button.wav", Delay = 0.22, Volume = 0.45, Speed = 0.5 },
+		},
+	},
+	["ZAP CHIPS"] = {
+		Message = "ZAP CHIPS emit snack electricity.",
+		Color = Color3.fromRGB(111, 224, 255),
+		Sounds = {
+			{ Id = "rbxasset://sounds/electronicpingshort.wav", Delay = 0, Volume = 0.75, Speed = 1.7 },
+			{ Id = "rbxasset://sounds/electronicpingshort.wav", Delay = 0.11, Volume = 0.65, Speed = 2.25 },
+			{ Id = "rbxasset://sounds/snap.wav", Delay = 0.2, Volume = 0.55, Speed = 1.4 },
+		},
+	},
+	MYSTERY = {
+		Message = "MYSTERY makes a sound with no paperwork.",
+		Color = Color3.fromRGB(196, 122, 255),
+		Sounds = {
+			{ Id = "rbxasset://sounds/electronicpingshort.wav", Delay = 0, Volume = 0.55, Speed = 0.35 },
+			{ Id = "rbxasset://sounds/button.wav", Delay = 0.18, Volume = 0.45, Speed = 0.48 },
+			{ Id = "rbxasset://sounds/electronicpingshort.wav", Delay = 0.34, Volume = 0.45, Speed = 0.72 },
+		},
+	},
+	PUFFS = {
+		Message = "PUFFS puff with tiny confidence.",
+		Color = Color3.fromRGB(245, 248, 255),
+		Sounds = {
+			{ Id = "rbxasset://sounds/button.wav", Delay = 0, Volume = 0.32, Speed = 1.55 },
+			{ Id = "rbxasset://sounds/button.wav", Delay = 0.1, Volume = 0.28, Speed = 1.85 },
+			{ Id = "rbxasset://sounds/button.wav", Delay = 0.2, Volume = 0.24, Speed = 2.15 },
+		},
+	},
+	NOPE = {
+		Message = "NOPE refuses in audio form.",
+		Color = Color3.fromRGB(255, 112, 122),
+		Sounds = {
+			{ Id = "rbxasset://sounds/snap.wav", Delay = 0, Volume = 0.65, Speed = 0.48 },
+			{ Id = "rbxasset://sounds/snap.wav", Delay = 0.28, Volume = 0.65, Speed = 0.42 },
+		},
+	},
+}
+
 local function getPrompt(root)
 	if root:IsA("ProximityPrompt") then
 		return root
@@ -117,6 +174,30 @@ local function teleportPlayer(player, destinationCFrame)
 	rootPart.AssemblyLinearVelocity = Vector3.zero
 	rootPart.AssemblyAngularVelocity = Vector3.zero
 	rootPart.CFrame = destinationCFrame
+end
+
+local function positionInZone(position, zone)
+	if not zone or not zone.Min or not zone.Max then
+		return false
+	end
+
+	return position.X >= zone.Min.X
+		and position.X <= zone.Max.X
+		and position.Y >= zone.Min.Y
+		and position.Y <= zone.Max.Y
+		and position.Z >= zone.Min.Z
+		and position.Z <= zone.Max.Z
+end
+
+local function countDictionary(dictionary)
+	local count = 0
+	for _, value in pairs(dictionary) do
+		if value then
+			count += 1
+		end
+	end
+
+	return count
 end
 
 local function tweenPart(part, duration, properties, easingStyle, easingDirection)
@@ -174,7 +255,9 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.resetService = resetService
 	self.roomProgressService = roomProgressService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
+	self.snackEffectRemote = RemoteService.GetRemote(Constants.Remotes.SnackEffect)
 	self.connectedPrompts = {}
+	self.snackButtonRandom = Random.new()
 	self.couchState = {}
 	self.couchRiding = {}
 	self.lampState = {}
@@ -192,6 +275,8 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.sinkState = {}
 	self.mixerState = {}
 	self.snackRackState = {}
+	self.snackPackStateByUserId = {}
+	self.slowMotionTokensByHumanoid = {}
 	self.fruitBowlState = {}
 	return self
 end
@@ -277,6 +362,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.SnackRack, function(instance)
 		self:_wireSnackRack(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SnackPack, function(instance)
+		self:_wireSnackPack(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.FruitBowl, function(instance)
@@ -1311,11 +1400,158 @@ function InteractionService:_wireHallDoor(door)
 	end)
 end
 
+function InteractionService:_getPlayersInRoom(roomId)
+	local playersInRoom = {}
+	local room = Constants.GetRoom(roomId)
+	if not room then
+		return playersInRoom
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		local rootPart = getRootPart(player)
+		if rootPart and positionInZone(rootPart.Position, room.Zone) then
+			table.insert(playersInRoom, player)
+		end
+	end
+
+	return playersInRoom
+end
+
+function InteractionService:_nextSnackButtonActivity(state)
+	if not state.ActivityBag or #state.ActivityBag == 0 then
+		state.ActivityBag = table.clone(SNACK_BUTTON_ACTIVITIES)
+		for index = #state.ActivityBag, 2, -1 do
+			local swapIndex = self.snackButtonRandom:NextInteger(1, index)
+			state.ActivityBag[index], state.ActivityBag[swapIndex] = state.ActivityBag[swapIndex], state.ActivityBag[index]
+		end
+	end
+
+	return table.remove(state.ActivityBag)
+end
+
+function InteractionService:_triggerSnackFlight(triggeringPlayer)
+	local targets = self:_getPlayersInRoom("SnackLab")
+	if #targets == 0 and triggeringPlayer then
+		targets = { triggeringPlayer }
+	end
+
+	for _, player in ipairs(targets) do
+		local rootPart = getRootPart(player)
+		if rootPart then
+			rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, 34, 0)
+		end
+
+		self.snackEffectRemote:FireClient(player, {
+			Action = "Flight",
+			Duration = SNACK_FLIGHT_DURATION,
+		})
+	end
+
+	self.systemMessageRemote:FireAllClients("Snack Lab flight mode is live. Space goes up, Shift or Ctrl comes down.")
+end
+
+function InteractionService:_applySlowMotion(player, duration)
+	local humanoid = getHumanoid(player)
+	if not humanoid then
+		return
+	end
+
+	if humanoid:GetAttribute("SnackBaseWalkSpeed") == nil then
+		humanoid:SetAttribute("SnackBaseWalkSpeed", humanoid.WalkSpeed)
+		humanoid:SetAttribute("SnackBaseJumpPower", humanoid.JumpPower)
+		humanoid:SetAttribute("SnackBaseJumpHeight", humanoid.JumpHeight)
+	end
+
+	local token = {}
+	self.slowMotionTokensByHumanoid[humanoid] = token
+	humanoid.WalkSpeed = math.max(5, (humanoid:GetAttribute("SnackBaseWalkSpeed") or 16) * 0.38)
+
+	if humanoid.UseJumpPower then
+		humanoid.JumpPower = math.max(18, (humanoid:GetAttribute("SnackBaseJumpPower") or 50) * 0.45)
+	else
+		humanoid.JumpHeight = math.max(2.2, (humanoid:GetAttribute("SnackBaseJumpHeight") or 7.2) * 0.45)
+	end
+
+	task.delay(duration, function()
+		if self.slowMotionTokensByHumanoid[humanoid] ~= token or not humanoid.Parent then
+			return
+		end
+
+		humanoid.WalkSpeed = humanoid:GetAttribute("SnackBaseWalkSpeed") or 16
+		if humanoid.UseJumpPower then
+			humanoid.JumpPower = humanoid:GetAttribute("SnackBaseJumpPower") or 50
+		else
+			humanoid.JumpHeight = humanoid:GetAttribute("SnackBaseJumpHeight") or 7.2
+		end
+		self.slowMotionTokensByHumanoid[humanoid] = nil
+	end)
+end
+
+function InteractionService:_triggerSnackSlowMotion(triggeringPlayer)
+	local targets = self:_getPlayersInRoom("SnackLab")
+	if #targets == 0 and triggeringPlayer then
+		targets = { triggeringPlayer }
+	end
+
+	for _, player in ipairs(targets) do
+		self:_applySlowMotion(player, SNACK_SLOW_MOTION_DURATION)
+	end
+
+	self.systemMessageRemote:FireAllClients("Snack Lab slow motion is on. The room is chewing carefully.")
+end
+
+function InteractionService:_triggerSnackRackRattle()
+	local packs = CollectionService:GetTagged(Constants.Tags.SnackPack)
+	for index, pack in ipairs(packs) do
+		if pack:IsA("BasePart") then
+			local baseCFrame = pack:GetAttribute("BaseCFrame") or pack.CFrame
+			task.delay((index % 5) * 0.035, function()
+				if not pack.Parent then
+					return
+				end
+
+				playSound(pack, "rbxasset://sounds/button.wav", 0.22, 1.4 + (index % 4) * 0.18)
+				local shakeTween = tweenPart(pack, 0.08, {
+					CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad((index % 2 == 0 and 1 or -1) * 8)),
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				shakeTween.Completed:Wait()
+
+				if pack.Parent then
+					tweenPart(pack, 0.12, {
+						CFrame = baseCFrame,
+					}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				end
+			end)
+		end
+	end
+
+	self.systemMessageRemote:FireAllClients("The snack shelf tries to applaud with packaging.")
+end
+
+function InteractionService:_triggerSnackButtonActivity(player, button, state)
+	local activity = self:_nextSnackButtonActivity(state)
+
+	if activity == "flight" then
+		self:_triggerSnackFlight(player)
+	elseif activity == "slow_motion" then
+		self:_triggerSnackSlowMotion(player)
+	elseif activity == "rack_rattle" then
+		self:_triggerSnackRackRattle()
+	else
+		self:_cycleRoomMood("SnackLab")
+	end
+
+	if button and button:IsA("BasePart") then
+		playSound(button, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.1)
+	end
+end
+
 function InteractionService:_wireSnackButton(button)
 	local prompt = getPrompt(button)
 
 	self.snackButtonState[button] = self.snackButtonState[button] or {
 		Reacting = false,
+		ActivityBag = {},
 	}
 
 	self:_connectPrompt(prompt, function(player)
@@ -1326,8 +1562,7 @@ function InteractionService:_wireSnackButton(button)
 
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.PressedSnackButton.Id)
-		self:_cycleRoomMood("SnackLab")
-		self.systemMessageRemote:FireClient(player, "The Snack Lab accepts your terrible application.")
+		self:_triggerSnackButtonActivity(player, button, state)
 
 		local originalColor = button.Color
 		local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
@@ -1623,6 +1858,85 @@ function InteractionService:_wireSnackRack(rack)
 
 		task.wait(0.6)
 		state.Reacting = false
+	end)
+end
+
+function InteractionService:_getSnackPackCount()
+	local count = 0
+	for _, pack in ipairs(CollectionService:GetTagged(Constants.Tags.SnackPack)) do
+		if pack:IsA("BasePart") then
+			count += 1
+		end
+	end
+
+	return count
+end
+
+function InteractionService:_playSnackPackSound(pack, snackName)
+	local profile = SNACK_SOUND_PROFILES[snackName] or SNACK_SOUND_PROFILES.MYSTERY
+	local baseColor = pack:GetAttribute("BaseColor") or pack.Color
+
+	for _, soundData in ipairs(profile.Sounds) do
+		task.delay(soundData.Delay or 0, function()
+			if pack.Parent then
+				playSound(pack, soundData.Id, soundData.Volume, soundData.Speed)
+			end
+		end)
+	end
+
+	local baseCFrame = pack:GetAttribute("BaseCFrame") or pack.CFrame
+	local flashTween = tweenPart(pack, 0.1, {
+		CFrame = baseCFrame + pack.CFrame.LookVector * 0.28,
+		Color = profile.Color or Color3.fromRGB(255, 255, 255),
+	}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	flashTween.Completed:Wait()
+
+	if pack.Parent then
+		tweenPart(pack, 0.18, {
+			CFrame = baseCFrame,
+			Color = baseColor,
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+
+	return profile.Message
+end
+
+function InteractionService:_wireSnackPack(pack)
+	local prompt = getPrompt(pack)
+
+	self:_connectPrompt(prompt, function(player)
+		if not pack:IsA("BasePart") then
+			return
+		end
+
+		local snackName = pack:GetAttribute("SnackName") or pack.Name
+		local snackId = pack:GetAttribute("SnackId") or pack.Name
+		local message = self:_playSnackPackSound(pack, snackName)
+
+		local state = self.snackPackStateByUserId[player.UserId]
+		if not state then
+			state = {
+				ClickedBySnackId = {},
+			}
+			self.snackPackStateByUserId[player.UserId] = state
+		end
+
+		local wasNew = state.ClickedBySnackId[snackId] ~= true
+		state.ClickedBySnackId[snackId] = true
+
+		if wasNew then
+			self.discoveryService:Unlock(player, Constants.Discoveries.HeardSnackSound.Id)
+
+			local clickedCount = countDictionary(state.ClickedBySnackId)
+			local totalCount = self:_getSnackPackCount()
+			if totalCount > 0 and clickedCount >= totalCount then
+				self.discoveryService:Unlock(player, Constants.Discoveries.AllSnackSounds.Id)
+				self.systemMessageRemote:FireClient(player, "Every snack has now made its case.")
+				return
+			end
+		end
+
+		self.systemMessageRemote:FireClient(player, message)
 	end)
 end
 
