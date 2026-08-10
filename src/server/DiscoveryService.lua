@@ -515,7 +515,7 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 	}
 end
 
-function DiscoveryService:UseHint(player, roomId)
+function DiscoveryService:_getNextDiscovery(player, roomId)
 	if not player or not player.Parent then
 		return nil, "No player."
 	end
@@ -528,28 +528,102 @@ function DiscoveryService:UseHint(player, roomId)
 	end
 
 	local foundById = self.discoveryByUserId[player.UserId]
-	local nextDiscovery = nil
 
 	for _, discoveryId in ipairs(room.DiscoveryOrder) do
 		if not foundById[discoveryId] then
-			nextDiscovery = Constants.GetDiscovery(discoveryId)
-			break
+			return Constants.GetDiscovery(discoveryId), nil
 		end
 	end
 
+	return nil, "Everything in this room is already found."
+end
+
+function DiscoveryService:GetFreeHint(player, roomId)
+	local nextDiscovery, errorText = self:_getNextDiscovery(player, roomId)
 	if not nextDiscovery then
-		return nil, "Everything in this room is already found."
+		return nil, errorText
 	end
+
+	local targetTag = Constants.DiscoveryHighlightTargets[nextDiscovery.Id]
+	local targetText = "one object in this room"
+
+	if targetTag == Constants.Tags.MainButton or targetTag == Constants.Tags.SnackButton then
+		targetText = "the center button"
+	elseif targetTag == Constants.Tags.FloorSection then
+		targetText = "the floor"
+	elseif targetTag == Constants.Tags.ReferenceBook then
+		targetText = "the room log"
+	elseif targetTag then
+		targetText = "one suspicious object"
+	end
+
+	return ("Free clue: %s still has something left to give."):format(targetText), nil
+end
+
+function DiscoveryService:GetPaidHintText(player, roomId)
+	local nextDiscovery, errorText = self:_getNextDiscovery(player, roomId)
+	if not nextDiscovery then
+		return nil, errorText
+	end
+
+	return nextDiscovery.Hint or "Try one of the untouched objects in this room.", nil
+end
+
+function DiscoveryService:GetFullRevealText(player, roomId)
+	local nextDiscovery, errorText = self:_getNextDiscovery(player, roomId)
+	if not nextDiscovery then
+		return nil, errorText
+	end
+
+	local hint = nextDiscovery.Hint or "Try one of the untouched objects in this room."
+	return ("Full reveal: %s. %s"):format(nextDiscovery.Name, hint), nil
+end
+
+function DiscoveryService:UseHint(player, roomId)
+	if not player or not player.Parent then
+		return nil, "No player."
+	end
+
+	self:_ensurePlayer(player)
 
 	if self.hintsByUserId[player.UserId] <= 0 then
 		return nil, "No hints left."
+	end
+
+	local hintText, errorText = self:GetPaidHintText(player, roomId)
+	if not hintText then
+		return nil, errorText
 	end
 
 	self.hintsByUserId[player.UserId] -= 1
 	self:_sendSnapshot(player)
 	self:_queueSave(player)
 
-	return nextDiscovery.Hint or "Try one of the untouched objects in this room.", nil
+	return hintText, nil
+end
+
+function DiscoveryService:UseFullReveal(player, roomId, cost)
+	if not player or not player.Parent then
+		return nil, "No player."
+	end
+
+	self:_ensurePlayer(player)
+
+	local revealCost = math.max(0, cost or Constants.NoTouch.FullRevealHintCost or 3)
+	if self.hintsByUserId[player.UserId] < revealCost then
+		return nil, ("Full reveal needs %d hints."):format(revealCost)
+	end
+
+	local revealText, errorText = self:GetFullRevealText(player, roomId)
+	if not revealText then
+		return nil, errorText
+	end
+
+	self.hintsByUserId[player.UserId] -= revealCost
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+
+	return revealText, nil
 end
 
 return DiscoveryService

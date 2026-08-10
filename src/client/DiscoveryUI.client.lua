@@ -163,15 +163,15 @@ bookPanel.AnchorPoint = Vector2.new(0.5, 0.5)
 bookPanel.BackgroundColor3 = Color3.fromRGB(28, 30, 36)
 bookPanel.BackgroundTransparency = 0.04
 bookPanel.BorderSizePixel = 0
-bookPanel.Position = UDim2.fromScale(0.5, 0.52)
-bookPanel.Size = UDim2.fromOffset(440, 500)
+bookPanel.Position = UDim2.fromScale(0.56, 0.54)
+bookPanel.Size = UDim2.new(0.86, 0, 0.82, 0)
 bookPanel.Visible = false
 bookPanel.Active = true
 bookPanel.Parent = gui
 
 local bookPanelConstraint = Instance.new("UISizeConstraint")
-bookPanelConstraint.MaxSize = Vector2.new(440, 500)
-bookPanelConstraint.MinSize = Vector2.new(300, 360)
+bookPanelConstraint.MaxSize = Vector2.new(680, 620)
+bookPanelConstraint.MinSize = Vector2.new(320, 420)
 bookPanelConstraint.Parent = bookPanel
 
 local bookCorner = Instance.new("UICorner")
@@ -183,7 +183,7 @@ bookTitle.Name = "BookTitle"
 bookTitle.BackgroundTransparency = 1
 bookTitle.Font = Enum.Font.GothamBlack
 bookTitle.Position = UDim2.fromOffset(18, 14)
-bookTitle.Size = UDim2.new(1, -66, 0, 34)
+bookTitle.Size = UDim2.new(1, -92, 0, 32)
 bookTitle.Text = "Room Log"
 bookTitle.TextColor3 = Color3.fromRGB(255, 242, 181)
 bookTitle.TextScaled = true
@@ -197,7 +197,7 @@ closeBookButton.BackgroundColor3 = Color3.fromRGB(62, 66, 78)
 closeBookButton.BorderSizePixel = 0
 closeBookButton.Font = Enum.Font.GothamBlack
 closeBookButton.Position = UDim2.new(1, -12, 0, 12)
-closeBookButton.Size = UDim2.fromOffset(36, 32)
+closeBookButton.Size = UDim2.fromOffset(52, 46)
 closeBookButton.Text = "X"
 closeBookButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBookButton.TextScaled = true
@@ -212,7 +212,7 @@ local bookCount = Instance.new("TextLabel")
 bookCount.Name = "BookCount"
 bookCount.BackgroundTransparency = 1
 bookCount.Font = Enum.Font.GothamBold
-bookCount.Position = UDim2.fromOffset(18, 54)
+bookCount.Position = UDim2.fromOffset(18, 50)
 bookCount.Size = UDim2.new(1, -36, 0, 26)
 bookCount.Text = "0 / 0 found"
 bookCount.TextColor3 = Color3.fromRGB(220, 235, 245)
@@ -227,8 +227,8 @@ bookList.BackgroundTransparency = 0.16
 bookList.BorderSizePixel = 0
 bookList.CanvasSize = UDim2.fromOffset(0, 0)
 bookList.ScrollBarThickness = 6
-bookList.Position = UDim2.fromOffset(18, 90)
-bookList.Size = UDim2.new(1, -36, 1, -222)
+bookList.Position = UDim2.fromOffset(18, 228)
+bookList.Size = UDim2.new(1, -36, 1, -246)
 bookList.Parent = bookPanel
 
 local listCorner = Instance.new("UICorner")
@@ -247,17 +247,37 @@ listPadding.PaddingRight = UDim.new(0, 8)
 listPadding.PaddingTop = UDim.new(0, 8)
 listPadding.Parent = bookList
 
+local hintTray = Instance.new("Frame")
+hintTray.Name = "HintTray"
+hintTray.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+hintTray.BackgroundTransparency = 0.08
+hintTray.BorderSizePixel = 0
+hintTray.Position = UDim2.fromOffset(18, 84)
+hintTray.Size = UDim2.new(1, -36, 0, 132)
+hintTray.Parent = bookPanel
+
+local hintTrayCorner = Instance.new("UICorner")
+hintTrayCorner.CornerRadius = UDim.new(0, 6)
+hintTrayCorner.Parent = hintTray
+
+local hintTrayPadding = Instance.new("UIPadding")
+hintTrayPadding.PaddingBottom = UDim.new(0, 8)
+hintTrayPadding.PaddingLeft = UDim.new(0, 10)
+hintTrayPadding.PaddingRight = UDim.new(0, 10)
+hintTrayPadding.PaddingTop = UDim.new(0, 8)
+hintTrayPadding.Parent = hintTray
+
 local hintCount = Instance.new("TextLabel")
 hintCount.Name = "HintCount"
 hintCount.BackgroundTransparency = 1
 hintCount.Font = Enum.Font.GothamBold
-hintCount.Position = UDim2.new(0, 18, 1, -122)
-hintCount.Size = UDim2.new(1, -36, 0, 24)
+hintCount.Position = UDim2.fromOffset(10, 6)
+hintCount.Size = UDim2.new(1, -20, 0, 22)
 hintCount.Text = "Hints: 0"
 hintCount.TextColor3 = Color3.fromRGB(220, 235, 245)
 hintCount.TextScaled = true
 hintCount.TextXAlignment = Enum.TextXAlignment.Left
-hintCount.Parent = bookPanel
+hintCount.Parent = hintTray
 
 local hintText = Instance.new("TextLabel")
 hintText.Name = "HintText"
@@ -265,52 +285,72 @@ hintText.BackgroundColor3 = Color3.fromRGB(255, 242, 181)
 hintText.BackgroundTransparency = 0.1
 hintText.BorderSizePixel = 0
 hintText.Font = Enum.Font.GothamSemibold
-hintText.Position = UDim2.new(0, 18, 1, -94)
-hintText.Size = UDim2.new(1, -36, 0, 40)
+hintText.Position = UDim2.fromOffset(10, 32)
+hintText.Size = UDim2.new(1, -20, 0, 34)
 hintText.Text = ""
 hintText.TextColor3 = Color3.fromRGB(28, 30, 36)
 hintText.TextScaled = true
 hintText.TextWrapped = true
-hintText.Parent = bookPanel
+hintText.Parent = hintTray
 
 local hintCorner = Instance.new("UICorner")
 hintCorner.CornerRadius = UDim.new(0, 6)
 hintCorner.Parent = hintText
 
 local buyHintButton = Instance.new("TextButton")
-buyHintButton.Name = "BuyHintPack"
+buyHintButton.Name = "FreeHint"
 buyHintButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
 buyHintButton.BorderSizePixel = 0
 buyHintButton.Font = Enum.Font.GothamBlack
-buyHintButton.Position = UDim2.new(0, 18, 1, -48)
-buyHintButton.Size = UDim2.new(0.5, -24, 0, 36)
-buyHintButton.Text = if Constants.NoTouch.HintPackProductId > 0
-	then ("%d Hints - %d R$"):format(Constants.NoTouch.HintPackSize, Constants.NoTouch.HintPackRobux)
-	else ("%d Hints\nCurrently Free"):format(Constants.NoTouch.HintPackSize)
+buyHintButton.Position = UDim2.new(0, 10, 0, 76)
+buyHintButton.Size = UDim2.new(1 / 3, -14, 0, 46)
+buyHintButton.Text = "Free\nHint"
 buyHintButton.TextColor3 = Color3.fromRGB(18, 45, 26)
 buyHintButton.TextScaled = true
 buyHintButton.TextWrapped = true
-buyHintButton.Parent = bookPanel
+buyHintButton.Parent = hintTray
 
 local buyCorner = Instance.new("UICorner")
 buyCorner.CornerRadius = UDim.new(0, 6)
 buyCorner.Parent = buyHintButton
 
 local useHintButton = Instance.new("TextButton")
-useHintButton.Name = "UseHint"
+useHintButton.Name = "PaidHint"
 useHintButton.BackgroundColor3 = Color3.fromRGB(84, 154, 255)
 useHintButton.BorderSizePixel = 0
 useHintButton.Font = Enum.Font.GothamBlack
-useHintButton.Position = UDim2.new(0.5, 6, 1, -48)
-useHintButton.Size = UDim2.new(0.5, -24, 0, 36)
-useHintButton.Text = "Use Hint"
+useHintButton.Position = UDim2.new(1 / 3, 2, 0, 76)
+useHintButton.Size = UDim2.new(1 / 3, -14, 0, 46)
+useHintButton.Text = if Constants.NoTouch.PaidHintProductId > 0
+	then ("Paid\n%d R$"):format(Constants.NoTouch.PaidHintRobux)
+	else "Paid\n1 hint"
 useHintButton.TextColor3 = Color3.fromRGB(16, 28, 48)
 useHintButton.TextScaled = true
-useHintButton.Parent = bookPanel
+useHintButton.TextWrapped = true
+useHintButton.Parent = hintTray
 
 local useCorner = Instance.new("UICorner")
 useCorner.CornerRadius = UDim.new(0, 6)
 useCorner.Parent = useHintButton
+
+local revealHintButton = Instance.new("TextButton")
+revealHintButton.Name = "FullReveal"
+revealHintButton.BackgroundColor3 = Color3.fromRGB(255, 198, 82)
+revealHintButton.BorderSizePixel = 0
+revealHintButton.Font = Enum.Font.GothamBlack
+revealHintButton.Position = UDim2.new(2 / 3, -6, 0, 76)
+revealHintButton.Size = UDim2.new(1 / 3, -14, 0, 46)
+revealHintButton.Text = if Constants.NoTouch.FullRevealProductId > 0
+	then ("Reveal\n%d R$"):format(Constants.NoTouch.FullRevealRobux)
+	else ("Reveal\n%d hints"):format(Constants.NoTouch.FullRevealHintCost)
+revealHintButton.TextColor3 = Color3.fromRGB(57, 38, 4)
+revealHintButton.TextScaled = true
+revealHintButton.TextWrapped = true
+revealHintButton.Parent = hintTray
+
+local revealCorner = Instance.new("UICorner")
+revealCorner.CornerRadius = UDim.new(0, 6)
+revealCorner.Parent = revealHintButton
 
 local startOverlay = Instance.new("Frame")
 startOverlay.Name = "StartChoiceOverlay"
@@ -694,8 +734,8 @@ local function renderReferenceBook(payload)
 	bookTitle.Text = (payload.RoomName or "Room") .. " Log"
 	bookCount.Text = ("%d / %d found"):format(payload.Count or 0, payload.Total or 0)
 	hintCount.Text = ("Hints: %d"):format(payload.Hints or 0)
-	hintText.Text = payload.HintText or payload.StatusText or ""
-	hintText.Visible = hintText.Text ~= ""
+	hintText.Text = payload.HintText or payload.StatusText or "Pick: free hint, paid hint, or full reveal."
+	hintText.Visible = true
 
 	clearBookList()
 
@@ -707,7 +747,7 @@ local function renderReferenceBook(payload)
 		row.BorderSizePixel = 0
 		row.Font = Enum.Font.GothamBold
 		row.LayoutOrder = index
-		row.Size = UDim2.new(1, 0, 0, 30)
+		row.Size = UDim2.new(1, 0, 0, 38)
 		row.Text = (entry.Unlocked and "[x] " or "[?] ") .. (entry.Name or "???")
 		row.TextColor3 = entry.Unlocked and Color3.fromRGB(205, 255, 218) or Color3.fromRGB(225, 230, 238)
 		row.TextScaled = true
@@ -744,7 +784,7 @@ end)
 buyHintButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
-			Action = "BuyPack",
+			Action = "FreeHint",
 			RoomId = activeBookRoomId,
 		})
 	end
@@ -753,7 +793,16 @@ end)
 useHintButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
-			Action = "UseHint",
+			Action = "PaidHint",
+			RoomId = activeBookRoomId,
+		})
+	end
+end)
+
+revealHintButton.MouseButton1Click:Connect(function()
+	if activeBookRoomId then
+		hintPackRemote:FireServer({
+			Action = "FullReveal",
 			RoomId = activeBookRoomId,
 		})
 	end

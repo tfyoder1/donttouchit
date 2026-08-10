@@ -411,6 +411,11 @@ Constants.NoTouch = {
 	HintPackSize = 10,
 	HintPackRobux = 1,
 	HintPackProductId = 0,
+	PaidHintRobux = 1,
+	PaidHintProductId = 0,
+	FullRevealRobux = 3,
+	FullRevealHintCost = 3,
+	FullRevealProductId = 0,
 }
 
 Constants.DiscoveryOrder = {}

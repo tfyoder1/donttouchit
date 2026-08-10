@@ -58,6 +58,7 @@ function RoomProgressService.new(discoveryService)
 	self.roomStatusRemote = RemoteService.GetRemote(Constants.Remotes.RoomStatus)
 	self.sparkleRemote = RemoteService.GetRemote(Constants.Remotes.SparkleHint)
 	self.stateByUserId = {}
+	self.pendingHintPurchaseByUserId = {}
 	return self
 end
 
@@ -84,6 +85,7 @@ function RoomProgressService:Initialize()
 
 	Players.PlayerRemoving:Connect(function(player)
 		self.stateByUserId[player.UserId] = nil
+		self.pendingHintPurchaseByUserId[player.UserId] = nil
 	end)
 
 	self.sessionStartRemote.OnServerEvent:Connect(function(player, payload)
@@ -441,16 +443,65 @@ function RoomProgressService:_handleHintRequest(player, payload)
 
 	if action == "BuyPack" then
 		self:_requestHintPack(player, roomId)
-	elseif action == "UseHint" then
-		local hintText, errorText = self.discoveryService:UseHint(player, roomId)
-		local messageText = hintText or errorText or "No hint available."
-
-		self:ShowReferenceBook(player, roomId, {
-			HintText = hintText,
-			StatusText = errorText,
-		})
-		self.systemMessageRemote:FireClient(player, messageText)
+	elseif action == "FreeHint" then
+		local hintText, errorText = self.discoveryService:GetFreeHint(player, roomId)
+		self:_showHintResult(player, roomId, hintText, errorText)
+	elseif action == "PaidHint" or action == "UseHint" then
+		self:_requestPaidHint(player, roomId)
+	elseif action == "FullReveal" then
+		self:_requestFullReveal(player, roomId)
 	end
+end
+
+function RoomProgressService:_showHintResult(player, roomId, hintText, errorText)
+	local messageText = hintText or errorText or "No hint available."
+
+	self:ShowReferenceBook(player, roomId, {
+		HintText = hintText,
+		StatusText = errorText,
+	})
+	self.systemMessageRemote:FireClient(player, messageText)
+end
+
+function RoomProgressService:_promptHintProduct(player, roomId, productId, action)
+	self.pendingHintPurchaseByUserId[player.UserId] = {
+		Action = action,
+		RoomId = roomId,
+		ProductId = productId,
+	}
+
+	local ok = pcall(function()
+		MarketplaceService:PromptProductPurchase(player, productId)
+	end)
+
+	if not ok then
+		self.pendingHintPurchaseByUserId[player.UserId] = nil
+		self.systemMessageRemote:FireClient(player, "That hint purchase is not ready in this test build.")
+	end
+end
+
+function RoomProgressService:_requestPaidHint(player, roomId)
+	local productId = Constants.NoTouch.PaidHintProductId
+
+	if productId and productId > 0 then
+		self:_promptHintProduct(player, roomId, productId, "PaidHint")
+		return
+	end
+
+	local hintText, errorText = self.discoveryService:UseHint(player, roomId)
+	self:_showHintResult(player, roomId, hintText, errorText)
+end
+
+function RoomProgressService:_requestFullReveal(player, roomId)
+	local productId = Constants.NoTouch.FullRevealProductId
+
+	if productId and productId > 0 then
+		self:_promptHintProduct(player, roomId, productId, "FullReveal")
+		return
+	end
+
+	local revealText, errorText = self.discoveryService:UseFullReveal(player, roomId, Constants.NoTouch.FullRevealHintCost)
+	self:_showHintResult(player, roomId, revealText, errorText)
 end
 
 function RoomProgressService:_requestHintPack(player, roomId)
@@ -475,15 +526,21 @@ function RoomProgressService:_requestHintPack(player, roomId)
 end
 
 function RoomProgressService:_installReceiptHandler()
-	local productId = Constants.NoTouch.HintPackProductId
-	if not productId or productId <= 0 then
+	local hintPackProductId = Constants.NoTouch.HintPackProductId
+	local paidHintProductId = Constants.NoTouch.PaidHintProductId
+	local fullRevealProductId = Constants.NoTouch.FullRevealProductId
+
+	if (not hintPackProductId or hintPackProductId <= 0)
+		and (not paidHintProductId or paidHintProductId <= 0)
+		and (not fullRevealProductId or fullRevealProductId <= 0)
+	then
 		return
 	end
 
 	local previousProcessReceipt = MarketplaceService.ProcessReceipt
 
 	MarketplaceService.ProcessReceipt = function(receiptInfo)
-		if receiptInfo.ProductId == productId then
+		if receiptInfo.ProductId == hintPackProductId then
 			local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
 			if not player then
 				return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -491,6 +548,32 @@ function RoomProgressService:_installReceiptHandler()
 
 			self.discoveryService:GrantHints(player, Constants.NoTouch.HintPackSize)
 			self.systemMessageRemote:FireClient(player, "Hint pack added: 10 hints.")
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		end
+
+		if receiptInfo.ProductId == paidHintProductId or receiptInfo.ProductId == fullRevealProductId then
+			local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+			if not player then
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+
+			local pending = self.pendingHintPurchaseByUserId[player.UserId]
+			self.pendingHintPurchaseByUserId[player.UserId] = nil
+
+			if not pending or pending.ProductId ~= receiptInfo.ProductId then
+				self.systemMessageRemote:FireClient(player, "Hint purchase completed, but the room log lost its place.")
+				return Enum.ProductPurchaseDecision.PurchaseGranted
+			end
+
+			local hintText = nil
+			local errorText = nil
+			if pending.Action == "FullReveal" then
+				hintText, errorText = self.discoveryService:GetFullRevealText(player, pending.RoomId)
+			else
+				hintText, errorText = self.discoveryService:GetPaidHintText(player, pending.RoomId)
+			end
+
+			self:_showHintResult(player, pending.RoomId, hintText, errorText)
 			return Enum.ProductPurchaseDecision.PurchaseGranted
 		end
 
