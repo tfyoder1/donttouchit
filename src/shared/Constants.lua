@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.4.3"
+Constants.BuildVersion = "0.5.0"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -65,6 +65,25 @@ Constants.Tags = {
 	FloorSection = "DontTouchIt_FloorSection",
 	ObjectRainObject = "DontTouchIt_ObjectRainObject",
 	TemporaryObject = "DontTouchIt_TemporaryObject",
+	LibraryBook = "DontTouchIt_LibraryBook",
+	LibraryShelf = "DontTouchIt_LibraryShelf",
+	LibraryLamp = "DontTouchIt_LibraryLamp",
+	LibraryGlobe = "DontTouchIt_LibraryGlobe",
+	LibraryCatalog = "DontTouchIt_LibraryCatalog",
+	LibraryLadder = "DontTouchIt_LibraryLadder",
+	LibraryLoftDoor = "DontTouchIt_LibraryLoftDoor",
+	LibraryTopShelfKey = "DontTouchIt_LibraryTopShelfKey",
+	LibraryBookcaseDoor = "DontTouchIt_LibraryBookcaseDoor",
+	BowlingLaneButton = "DontTouchIt_BowlingLaneButton",
+	BowlingPin = "DontTouchIt_BowlingPin",
+	BowlingCosmicSwitch = "DontTouchIt_BowlingCosmicSwitch",
+	BowlingDiscoBall = "DontTouchIt_BowlingDiscoBall",
+	BowlingMaintenanceDoor = "DontTouchIt_BowlingMaintenanceDoor",
+	BowlingResetLever = "DontTouchIt_BowlingResetLever",
+	BowlingShoeRack = "DontTouchIt_BowlingShoeRack",
+	BowlingScoreboard = "DontTouchIt_BowlingScoreboard",
+	BowlingGutter = "DontTouchIt_BowlingGutter",
+	BowlingBallReturn = "DontTouchIt_BowlingBallReturn",
 }
 
 Constants.Hallway = {
@@ -284,6 +303,126 @@ Constants.Discoveries = {
 		Name = "Left the Island Alone",
 		Hint = "Stand on the island for two minutes without interacting with anything.",
 	},
+	LibraryEntered = {
+		Id = "library_entered",
+		Name = "Entered the Library",
+		Hint = "Open the Library from the TV Room with the Library Key.",
+	},
+	LibraryForbiddenBook = {
+		Id = "library_forbidden_book",
+		Name = "Read the Book That Sighed",
+		Hint = "One book on the Library table does not want to be opened.",
+	},
+	LibraryShushedShelf = {
+		Id = "library_shushed_shelf",
+		Name = "Got Shushed by a Shelf",
+		Hint = "A tall Library shelf reacts if inspected directly.",
+	},
+	LibraryLamp = {
+		Id = "library_lamp",
+		Name = "Turned On the Reading Lamp",
+		Hint = "The desk lamp in the Library is waiting for a reader.",
+	},
+	LibraryGlobe = {
+		Id = "library_globe",
+		Name = "Spun the Wrong Globe",
+		Hint = "The Library globe is not entirely committed to geography.",
+	},
+	LibraryCatalog = {
+		Id = "library_catalog",
+		Name = "Opened the Card Catalog",
+		Hint = "Check the tiny drawers near the Library shelves.",
+	},
+	LibraryLadder = {
+		Id = "library_ladder",
+		Name = "Found the Rolling Ladder",
+		Hint = "The tall shelves have a ladder on a track.",
+	},
+	LibraryLoft = {
+		Id = "library_loft",
+		Name = "Reached the Loft Door",
+		Hint = "The loft door is visible above the Library, but the ladder makes it reachable.",
+	},
+	LibraryBowlingKey = {
+		Id = "library_bowling_key",
+		Name = "Found the Bowling Key",
+		Hint = "Use the Library ladder and check the top shelves along the outside wall.",
+	},
+	LibraryBookcaseDoor = {
+		Id = "library_bookcase_door",
+		Name = "Opened the Bookcase Door",
+		Hint = "A bookcase in the Library swings open after you find the Bowling Key.",
+	},
+	LibraryNoTouch = {
+		Id = "library_no_touch",
+		Name = "Left the Library Alone",
+		Hint = "Stand in the Library for two minutes without interacting with anything.",
+	},
+	BowlingEntered = {
+		Id = "bowling_entered",
+		Name = "Entered the Bowling Alley",
+		Hint = "Open the secret bookcase in the Library.",
+	},
+	BowlingFirstBall = {
+		Id = "bowling_first_ball",
+		Name = "Rolled the First Ball",
+		Hint = "Use one of the lane buttons near the ball returns.",
+	},
+	BowlingPinsHit = {
+		Id = "bowling_pins_hit",
+		Name = "Hit the Pins",
+		Hint = "A bowling ball must reach the pins at the far end.",
+	},
+	BowlingStrike = {
+		Id = "bowling_strike",
+		Name = "Almost Bowled a Strike",
+		Hint = "Knock down enough pins with one roll.",
+	},
+	BowlingGutter = {
+		Id = "bowling_gutter",
+		Name = "Inspected the Gutter",
+		Hint = "The lane gutters are suspiciously proud of their job.",
+	},
+	BowlingCosmic = {
+		Id = "bowling_cosmic",
+		Name = "Started Cosmic Bowling",
+		Hint = "Use the light switch near the Bowling Alley entrance.",
+	},
+	BowlingDiscoBall = {
+		Id = "bowling_disco_ball",
+		Name = "Questioned the Disco Ball",
+		Hint = "Cosmic bowling has a disco ball near the ceiling.",
+	},
+	BowlingMaintenance = {
+		Id = "bowling_maintenance",
+		Name = "Found the Maintenance Room",
+		Hint = "Look behind the pin machinery at the far end of the lanes.",
+	},
+	BowlingResetLever = {
+		Id = "bowling_reset_lever",
+		Name = "Pulled the Pinsetter Lever",
+		Hint = "The maintenance room has a reset lever.",
+	},
+	BowlingShoes = {
+		Id = "bowling_shoes",
+		Name = "Ignored the Shoe Policy",
+		Hint = "Inspect the shoe rack near the Bowling Alley entrance.",
+	},
+	BowlingScoreboard = {
+		Id = "bowling_scoreboard",
+		Name = "Read the Scoreboard",
+		Hint = "The scoreboard is more judgmental than mathematical.",
+	},
+	BowlingBallReturn = {
+		Id = "bowling_ball_return",
+		Name = "Pressed the Ball Return",
+		Hint = "The ball return has its own button near the lanes.",
+	},
+	BowlingNoTouch = {
+		Id = "bowling_no_touch",
+		Name = "Left the Bowling Alley Alone",
+		Hint = "Stand in the Bowling Alley for two minutes without interacting with anything.",
+	},
 }
 
 Constants.RoomDiscoveryOrder = {
@@ -326,6 +465,34 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.OpenedTreasure.Id,
 		Constants.Discoveries.IslandBloxyCola.Id,
 		Constants.Discoveries.IslandNoTouch.Id,
+	},
+	Library = {
+		Constants.Discoveries.LibraryEntered.Id,
+		Constants.Discoveries.LibraryForbiddenBook.Id,
+		Constants.Discoveries.LibraryShushedShelf.Id,
+		Constants.Discoveries.LibraryLamp.Id,
+		Constants.Discoveries.LibraryGlobe.Id,
+		Constants.Discoveries.LibraryCatalog.Id,
+		Constants.Discoveries.LibraryLadder.Id,
+		Constants.Discoveries.LibraryLoft.Id,
+		Constants.Discoveries.LibraryBowlingKey.Id,
+		Constants.Discoveries.LibraryBookcaseDoor.Id,
+		Constants.Discoveries.LibraryNoTouch.Id,
+	},
+	BowlingAlley = {
+		Constants.Discoveries.BowlingEntered.Id,
+		Constants.Discoveries.BowlingFirstBall.Id,
+		Constants.Discoveries.BowlingPinsHit.Id,
+		Constants.Discoveries.BowlingStrike.Id,
+		Constants.Discoveries.BowlingGutter.Id,
+		Constants.Discoveries.BowlingCosmic.Id,
+		Constants.Discoveries.BowlingDiscoBall.Id,
+		Constants.Discoveries.BowlingMaintenance.Id,
+		Constants.Discoveries.BowlingResetLever.Id,
+		Constants.Discoveries.BowlingShoes.Id,
+		Constants.Discoveries.BowlingScoreboard.Id,
+		Constants.Discoveries.BowlingBallReturn.Id,
+		Constants.Discoveries.BowlingNoTouch.Id,
 	},
 }
 
@@ -375,6 +542,19 @@ Constants.RoomOrder = {
 	"Island",
 }
 
+Constants.DiscoveryRoomOrder = {
+	"TVRoom",
+	"SnackLab",
+	"Island",
+	"Library",
+	"BowlingAlley",
+}
+
+Constants.RoomResumeDiscoveries = {
+	Library = Constants.Discoveries.LibraryEntered.Id,
+	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
+}
+
 Constants.Rooms = {
 	TVRoom = {
 		Id = "TVRoom",
@@ -407,6 +587,28 @@ Constants.Rooms = {
 		Zone = {
 			Min = Vector3.new(-55, -3, 126),
 			Max = Vector3.new(55, 28, 192),
+		},
+	},
+	Library = {
+		Id = "Library",
+		Name = "Library",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.Library,
+		NoTouchDiscoveryId = Constants.Discoveries.LibraryNoTouch.Id,
+		SpawnCFrame = CFrame.new(-14, 3, -36),
+		Zone = {
+			Min = Vector3.new(-25, -3, -48),
+			Max = Vector3.new(-3, 18, -28),
+		},
+	},
+	BowlingAlley = {
+		Id = "BowlingAlley",
+		Name = "Bowling Alley",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.BowlingAlley,
+		NoTouchDiscoveryId = Constants.Discoveries.BowlingNoTouch.Id,
+		SpawnCFrame = CFrame.new(-14, 3, -56),
+		Zone = {
+			Min = Vector3.new(-36, -3, -150),
+			Max = Vector3.new(8, 21, -48),
 		},
 	},
 }
@@ -454,6 +656,28 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.DugTreasure.Id] = Constants.Tags.IslandShovel,
 	[Constants.Discoveries.OpenedTreasure.Id] = Constants.Tags.IslandTreasure,
 	[Constants.Discoveries.IslandBloxyCola.Id] = Constants.Tags.IslandBloxyCola,
+	[Constants.Discoveries.LibraryEntered.Id] = Constants.Tags.SecretRoomDoor,
+	[Constants.Discoveries.LibraryForbiddenBook.Id] = Constants.Tags.LibraryBook,
+	[Constants.Discoveries.LibraryShushedShelf.Id] = Constants.Tags.LibraryShelf,
+	[Constants.Discoveries.LibraryLamp.Id] = Constants.Tags.LibraryLamp,
+	[Constants.Discoveries.LibraryGlobe.Id] = Constants.Tags.LibraryGlobe,
+	[Constants.Discoveries.LibraryCatalog.Id] = Constants.Tags.LibraryCatalog,
+	[Constants.Discoveries.LibraryLadder.Id] = Constants.Tags.LibraryLadder,
+	[Constants.Discoveries.LibraryLoft.Id] = Constants.Tags.LibraryLoftDoor,
+	[Constants.Discoveries.LibraryBowlingKey.Id] = Constants.Tags.LibraryTopShelfKey,
+	[Constants.Discoveries.LibraryBookcaseDoor.Id] = Constants.Tags.LibraryBookcaseDoor,
+	[Constants.Discoveries.BowlingEntered.Id] = Constants.Tags.LibraryBookcaseDoor,
+	[Constants.Discoveries.BowlingFirstBall.Id] = Constants.Tags.BowlingLaneButton,
+	[Constants.Discoveries.BowlingPinsHit.Id] = Constants.Tags.BowlingPin,
+	[Constants.Discoveries.BowlingStrike.Id] = Constants.Tags.BowlingPin,
+	[Constants.Discoveries.BowlingGutter.Id] = Constants.Tags.BowlingGutter,
+	[Constants.Discoveries.BowlingCosmic.Id] = Constants.Tags.BowlingCosmicSwitch,
+	[Constants.Discoveries.BowlingDiscoBall.Id] = Constants.Tags.BowlingDiscoBall,
+	[Constants.Discoveries.BowlingMaintenance.Id] = Constants.Tags.BowlingMaintenanceDoor,
+	[Constants.Discoveries.BowlingResetLever.Id] = Constants.Tags.BowlingResetLever,
+	[Constants.Discoveries.BowlingShoes.Id] = Constants.Tags.BowlingShoeRack,
+	[Constants.Discoveries.BowlingScoreboard.Id] = Constants.Tags.BowlingScoreboard,
+	[Constants.Discoveries.BowlingBallReturn.Id] = Constants.Tags.BowlingBallReturn,
 }
 
 Constants.NoTouch = {
@@ -479,7 +703,7 @@ Constants.NoTouch = {
 
 Constants.DiscoveryOrder = {}
 
-for _, roomId in ipairs(Constants.RoomOrder) do
+for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 	for _, discoveryId in ipairs(Constants.RoomDiscoveryOrder[roomId]) do
 		table.insert(Constants.DiscoveryOrder, discoveryId)
 	end

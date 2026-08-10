@@ -381,6 +381,15 @@ function DiscoveryService:GetDiscoveryCount(player, discoveryOrder)
 	return self:_countForPlayer(player, discoveryOrder)
 end
 
+function DiscoveryService:HasDiscovery(player, discoveryId)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	return self.discoveryByUserId[player.UserId][discoveryId] == true
+end
+
 function DiscoveryService:GetRoomDiscoveryCount(player, roomId)
 	local room = Constants.GetRoom(roomId)
 	if not room then
@@ -393,7 +402,7 @@ end
 function DiscoveryService:_buildRoomSummaries(player)
 	local summaries = {}
 
-	for _, roomId in ipairs(Constants.RoomOrder) do
+	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 		local room = Constants.GetRoom(roomId)
 		if room then
 			table.insert(summaries, {
@@ -423,6 +432,11 @@ end
 function DiscoveryService:IsRoomUnlocked(player, roomId)
 	if roomId == DEFAULT_ROOM_ID then
 		return true
+	end
+
+	local resumeDiscoveryId = Constants.RoomResumeDiscoveries and Constants.RoomResumeDiscoveries[roomId]
+	if resumeDiscoveryId then
+		return self:HasDiscovery(player, resumeDiscoveryId)
 	end
 
 	local requiredRoomId, requiredCount = Constants.GetRoomUnlockRequirement(roomId)
@@ -465,7 +479,7 @@ function DiscoveryService:_refreshLastUnlockedRoom(player, shouldSave)
 	self:_ensurePlayer(player)
 
 	local lastUnlockedRoomId = DEFAULT_ROOM_ID
-	for _, roomId in ipairs(Constants.RoomOrder) do
+	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 		if self:IsRoomUnlocked(player, roomId) then
 			lastUnlockedRoomId = roomId
 		end

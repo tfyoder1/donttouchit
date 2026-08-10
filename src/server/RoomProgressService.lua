@@ -140,7 +140,7 @@ function RoomProgressService:GetRoomForPlayer(player)
 		return nil
 	end
 
-	for _, roomId in ipairs(Constants.RoomOrder) do
+	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 		local room = Constants.GetRoom(roomId)
 		if room and positionInZone(rootPart.Position, room.Zone) then
 			return roomId

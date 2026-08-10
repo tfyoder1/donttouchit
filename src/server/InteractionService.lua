@@ -91,6 +91,14 @@ local SNACK_FLIGHT_CEILING_Y = Constants.Rooms.SnackLab.Zone.Max.Y - 5.2
 local SNACK_SLOW_MOTION_DURATION = 12
 local SNACK_SUPER_WIND_GUSTS = 5
 
+local BOWLING_COSMIC_COLORS = {
+	Color3.fromRGB(119, 255, 203),
+	Color3.fromRGB(255, 88, 128),
+	Color3.fromRGB(150, 112, 255),
+	Color3.fromRGB(255, 232, 92),
+	Color3.fromRGB(93, 217, 255),
+}
+
 local SNACK_SOUND_PROFILES = {
 	CRONCH = {
 		Message = "CRONCH performs a literal structural crunch.",
@@ -316,6 +324,16 @@ local function getFridgeDoorOpenCFrame(door)
 		* CFrame.new(-hingeOffset, 0, 0)
 end
 
+local function getMaterialByName(materialName)
+	for _, material in ipairs(Enum.Material:GetEnumItems()) do
+		if material.Name == materialName then
+			return material
+		end
+	end
+
+	return nil
+end
+
 function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService)
 	local self = setmetatable({}, InteractionService)
 	self.eventManager = eventManager
@@ -361,6 +379,14 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandTreasureState = {}
 	self.islandColaState = {}
 	self.secretDoorState = {}
+	self.libraryLampState = {}
+	self.libraryGlobeState = {}
+	self.libraryLadderState = {}
+	self.libraryLoftDoorState = {}
+	self.libraryBookcaseState = {}
+	self.bowlingLaneState = {}
+	self.bowlingCosmicActive = false
+	self.bowlingCosmicToken = nil
 	return self
 end
 
@@ -518,6 +544,78 @@ function InteractionService:Initialize()
 		self:_wireIslandBloxyCola(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.LibraryBook, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryForbiddenBook.Id, "The forbidden book sighs and immediately regrets being readable.")
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryShelf, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryShushedShelf.Id, "The shelf shushes you before you even make noise.")
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryLamp, function(instance)
+		self:_wireLibraryLamp(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryGlobe, function(instance)
+		self:_wireLibraryGlobe(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryCatalog, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryCatalog.Id, "The card catalog files you under Possibly Problem.")
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryLadder, function(instance)
+		self:_wireLibraryLadder(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryLoftDoor, function(instance)
+		self:_wireLibraryLoftDoor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryTopShelfKey, function(instance)
+		self:_wireLibraryBowlingKey(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryBookcaseDoor, function(instance)
+		self:_wireLibraryBookcaseDoor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingLaneButton, function(instance)
+		self:_wireBowlingLaneButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingCosmicSwitch, function(instance)
+		self:_wireBowlingCosmicSwitch(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingDiscoBall, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingDiscoBall.Id, "The disco ball refuses to explain the score.")
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingMaintenanceDoor, function(instance)
+		self:_wireBowlingMaintenanceDoor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingResetLever, function(instance)
+		self:_wireBowlingResetLever(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingShoeRack, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingShoes.Id, "The shoe rack confirms the shoes are optional but judgment is not.")
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingScoreboard, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingScoreboard.Id, "The scoreboard is keeping score emotionally.")
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingGutter, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingGutter.Id, "The gutter says it is not failure, it is alternative bowling.")
+	end)
+
+	self:_connectTagged(Constants.Tags.BowlingBallReturn, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingBallReturn.Id, "The ball return hums like it knows where the missing balls went.")
+	end)
+
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
 		self:_refreshSecretDoorsForPlayer(player)
@@ -544,6 +642,18 @@ function InteractionService:_connectPrompt(prompt, callback)
 		end
 
 		callback(player)
+	end)
+end
+
+function InteractionService:_wireDiscoveryPrompt(instance, discoveryId, message)
+	local prompt = getPrompt(instance)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, discoveryId)
+		playSound(instance, "rbxasset://sounds/button.wav", 0.35, 0.9)
+		if message then
+			self.systemMessageRemote:FireClient(player, message)
+		end
 	end)
 end
 
@@ -962,6 +1072,7 @@ function InteractionService:_wireSecretRoomDoor(door)
 		end
 
 		teleportPlayer(player, destinationCFrame)
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryEntered.Id)
 		self.systemMessageRemote:FireClient(player, "The Library opens. Very suspiciously.")
 
 		task.delay(1.2, function()
@@ -987,7 +1098,513 @@ function InteractionService:_wireSecretRoomExit(exitDoor)
 		end
 
 		teleportPlayer(player, destinationCFrame)
-		self.systemMessageRemote:FireClient(player, "Back to the TV room. Act natural.")
+		local destinationName = exitDoor:GetAttribute("DestinationName") or "the TV Room"
+		self.systemMessageRemote:FireClient(player, ("Back to %s. Act natural."):format(destinationName))
+	end)
+end
+
+function InteractionService:_wireLibraryLamp(lamp)
+	local prompt = getPrompt(lamp)
+	local light = lamp:FindFirstChild("LibraryLampLight", true)
+
+	self.libraryLampState[lamp] = self.libraryLampState[lamp] or {
+		On = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.libraryLampState[lamp]
+		state.On = not state.On
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLamp.Id)
+
+		if light and light:IsA("PointLight") then
+			light.Brightness = state.On and 4.2 or 0
+		end
+
+		if lamp:IsA("BasePart") then
+			lamp.Material = state.On and Enum.Material.Neon or Enum.Material.Metal
+			tweenPart(lamp, 0.16, {
+				Color = state.On and Color3.fromRGB(255, 239, 157) or (lamp:GetAttribute("BaseColor") or Color3.fromRGB(255, 214, 102)),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+
+		playSound(lamp, "rbxasset://sounds/electronicpingshort.wav", 0.35, state.On and 1.4 or 0.75)
+		self.systemMessageRemote:FireClient(player, state.On and "The reading lamp found dramatic purpose." or "The reading lamp returns to quiet judgment.")
+	end)
+end
+
+function InteractionService:_wireLibraryGlobe(globe)
+	local prompt = getPrompt(globe)
+
+	self.libraryGlobeState[globe] = self.libraryGlobeState[globe] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.libraryGlobeState[globe]
+		if not state or state.Reacting or not globe:IsA("BasePart") then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryGlobe.Id)
+		self.systemMessageRemote:FireClient(player, "The globe spins and briefly recommends a different continent.")
+		playSound(globe, "rbxasset://sounds/button.wav", 0.34, 1.25)
+
+		local baseCFrame = globe:GetAttribute("BaseCFrame") or globe.CFrame
+		for step = 1, 14 do
+			if not globe.Parent then
+				break
+			end
+
+			globe.CFrame = baseCFrame * CFrame.Angles(0, math.rad(step * 42), 0)
+			task.wait(0.035)
+		end
+
+		if globe.Parent then
+			tweenPart(globe, 0.18, {
+				CFrame = baseCFrame,
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireLibraryLadder(ladder)
+	local prompt = getPrompt(ladder)
+
+	self.libraryLadderState[ladder] = self.libraryLadderState[ladder] or {
+		Moved = false,
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.libraryLadderState[ladder]
+		if not state or state.Reacting or not ladder:IsA("BasePart") then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLadder.Id)
+		playSound(ladder, "rbxasset://sounds/button.wav", 0.42, 0.68)
+
+		local baseCFrame = ladder:GetAttribute("BaseCFrame") or ladder.CFrame
+		state.Moved = not state.Moved
+		local targetCFrame = state.Moved and (baseCFrame + Vector3.new(2.6, 0, -1.1)) or baseCFrame
+		tweenPart(ladder, 0.35, {
+			CFrame = targetCFrame,
+			Color = state.Moved and Color3.fromRGB(219, 154, 82) or (ladder:GetAttribute("BaseColor") or ladder.Color),
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		self.systemMessageRemote:FireClient(player, "The rolling library ladder glides toward the suspicious top shelf.")
+		task.wait(0.25)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireLibraryLoftDoor(door)
+	local prompt = getPrompt(door)
+
+	self.libraryLoftDoorState[door] = self.libraryLoftDoorState[door] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.libraryLoftDoorState[door]
+		if not state or state.Reacting then
+			return
+		end
+
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id) then
+			self.systemMessageRemote:FireClient(player, "The loft door is visible, but the Library expects ladder etiquette first.")
+			playSound(door, "rbxasset://sounds/snap.wav", 0.35, 0.6)
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLoft.Id)
+		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.42, 1.35)
+		self.systemMessageRemote:FireClient(player, "The loft door opens onto a very selective reading nook.")
+
+		local destination = CFrame.new(-18.7, 10.6, -43.4)
+		teleportPlayer(player, destination)
+		task.wait(0.25)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireLibraryBowlingKey(key)
+	local prompt = getPrompt(key)
+
+	self:_connectPrompt(prompt, function(player)
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id) then
+			self.systemMessageRemote:FireClient(player, "The Bowling Key is too high. The rolling ladder is the Library-approved shortcut.")
+			playSound(key, "rbxasset://sounds/snap.wav", 0.35, 0.5)
+			return
+		end
+
+		local unlocked = self.discoveryService:Unlock(player, Constants.Discoveries.LibraryBowlingKey.Id)
+		if unlocked then
+			self.systemMessageRemote:FireClient(player, "Bowling Key found. The bookcase suddenly looks guilty.")
+		else
+			self.systemMessageRemote:FireClient(player, "You already found the Bowling Key.")
+		end
+
+		playSound(key, "rbxasset://sounds/electronicpingshort.wav", 0.5, 1.85)
+		for _, partName in ipairs({ "BowlingKeyTopShelf", "BowlingKeyHead" }) do
+			local part = key.Parent and key.Parent:FindFirstChild(partName, true)
+			if part and part:IsA("BasePart") then
+				part.Transparency = 0.55
+				part.CanCollide = false
+			end
+		end
+	end)
+end
+
+function InteractionService:_wireLibraryBookcaseDoor(door)
+	local prompt = getPrompt(door)
+
+	self.libraryBookcaseState[door] = self.libraryBookcaseState[door] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.libraryBookcaseState[door]
+		if not state or state.Reacting then
+			return
+		end
+
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryBowlingKey.Id) then
+			self.systemMessageRemote:FireClient(player, "The bookcase does not swing for strangers. It wants the Bowling Key.")
+			playSound(door, "rbxasset://sounds/snap.wav", 0.38, 0.52)
+			return
+		end
+
+		local destinationCFrame = door:GetAttribute("DestinationCFrame")
+		if typeof(destinationCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "The bookcase found a secret, then misplaced the coordinates.")
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryBookcaseDoor.Id)
+		playSound(door, "rbxasset://sounds/button.wav", 0.48, 0.58)
+		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.35, 1.55)
+
+		if door:IsA("BasePart") then
+			door.CanCollide = false
+			local openTween = tweenPart(door, 0.42, {
+				CFrame = getSecretDoorOpenCFrame(door),
+				Color = Color3.fromRGB(119, 255, 203),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			openTween.Completed:Wait()
+		else
+			task.wait(0.25)
+		end
+
+		teleportPlayer(player, destinationCFrame)
+		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingEntered.Id)
+		self.systemMessageRemote:FireClient(player, "The bookcase opens into a bowling alley. That is not standard library architecture.")
+
+		task.delay(1.2, function()
+			if door.Parent and door:IsA("BasePart") then
+				tweenPart(door, 0.26, {
+					CFrame = door:GetAttribute("SecretClosedCFrame") or door:GetAttribute("BaseCFrame") or door.CFrame,
+					Color = door:GetAttribute("BaseColor") or Color3.fromRGB(76, 48, 34),
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				door.CanCollide = true
+			end
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
+	local ball = Instance.new("Part")
+	ball.Name = "BowlingBall"
+	ball.Shape = Enum.PartType.Ball
+	ball.Size = Vector3.new(2.15, 2.15, 2.15)
+	ball.Color = BOWLING_COSMIC_COLORS[((laneIndex - 1) % #BOWLING_COSMIC_COLORS) + 1]
+	ball.Material = self.bowlingCosmicActive and Enum.Material.Neon or Enum.Material.SmoothPlastic
+	ball.CanCollide = true
+	ball.Anchored = false
+	ball.CustomPhysicalProperties = PhysicalProperties.new(4.5, 0.35, 0.35)
+	ball.CFrame = CFrame.new(laneX, 2.05, -55.8)
+	ball.Parent = workspace:FindFirstChild("InteractiveObjects") or workspace
+	CollectionService:AddTag(ball, Constants.Tags.TemporaryObject)
+
+	local hitPins = {}
+	ball.Touched:Connect(function(hit)
+		if not hit or hit == ball or not CollectionService:HasTag(hit, Constants.Tags.BowlingPin) then
+			return
+		end
+
+		if hit:GetAttribute("LaneIndex") ~= laneIndex then
+			return
+		end
+
+		if not hitPins[hit] then
+			hitPins[hit] = true
+			self.discoveryService:Unlock(player, Constants.Discoveries.BowlingPinsHit.Id)
+			hit.AssemblyLinearVelocity += Vector3.new((math.random() - 0.5) * 24, 18, -22)
+			hit.AssemblyAngularVelocity = Vector3.new(9, 4, 13)
+		end
+	end)
+
+	ball.AssemblyLinearVelocity = Vector3.new(0, 0, -118)
+	ball.AssemblyAngularVelocity = Vector3.new(-28, 0, 0)
+	Debris:AddItem(ball, 14)
+
+	return ball
+end
+
+function InteractionService:_countKnockedBowlingPins(laneIndex)
+	local knocked = 0
+
+	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
+		if pin:IsA("BasePart") and pin:GetAttribute("LaneIndex") == laneIndex then
+			local baseCFrame = pin:GetAttribute("BaseCFrame")
+			local moved = baseCFrame and (pin.Position - baseCFrame.Position).Magnitude > 0.75
+			local tipped = baseCFrame and math.abs(pin.CFrame.UpVector:Dot(baseCFrame.UpVector)) < 0.72
+			if moved or tipped then
+				knocked += 1
+			end
+		end
+	end
+
+	return knocked
+end
+
+function InteractionService:_wireBowlingLaneButton(button)
+	local prompt = getPrompt(button)
+	local laneIndex = button:GetAttribute("LaneIndex") or 1
+	local laneX = button:GetAttribute("LaneX") or button.Position.X
+
+	self.bowlingLaneState[button] = self.bowlingLaneState[button] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.bowlingLaneState[button]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingFirstBall.Id)
+		playSound(button, "rbxasset://sounds/button.wav", 0.55, 0.75)
+
+		if button:IsA("BasePart") then
+			local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
+			local downTween = tweenPart(button, 0.1, {
+				CFrame = baseCFrame + Vector3.new(0, -0.18, 0),
+				Color = Color3.fromRGB(255, 232, 92),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			downTween.Completed:Wait()
+			tweenPart(button, 0.18, {
+				CFrame = baseCFrame,
+				Color = button:GetAttribute("BaseColor") or button.Color,
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+
+		self:_spawnBowlingBall(button, laneIndex, laneX, player)
+		self.systemMessageRemote:FireClient(player, ("Lane %d accepts your bowling-related decision."):format(laneIndex))
+
+		task.delay(2.8, function()
+			local knocked = self:_countKnockedBowlingPins(laneIndex)
+			if knocked >= 8 then
+				self.discoveryService:Unlock(player, Constants.Discoveries.BowlingStrike.Id)
+				self.systemMessageRemote:FireClient(player, ("Lane %d calls that close enough to a strike: %d pins."):format(laneIndex, knocked))
+			elseif knocked > 0 then
+				self.systemMessageRemote:FireClient(player, ("Lane %d reports %d pins down. The rest are being stubborn."):format(laneIndex, knocked))
+			end
+		end)
+
+		task.delay(1.25, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_setBowlingCosmic(active, source)
+	self.bowlingCosmicActive = active
+	local token = {}
+	self.bowlingCosmicToken = token
+
+	if active then
+		Lighting.Brightness = 1.1
+		Lighting.ClockTime = 0
+		Lighting.Ambient = Color3.fromRGB(44, 18, 80)
+		Lighting.OutdoorAmbient = Color3.fromRGB(15, 8, 38)
+	else
+		self.resetService.RestoreLighting()
+	end
+
+	for _, instance in ipairs(workspace:GetDescendants()) do
+		if instance:IsA("BasePart") and instance:GetAttribute("CosmicSurface") then
+			if active then
+				instance.Material = Enum.Material.Neon
+				instance.Color = BOWLING_COSMIC_COLORS[((math.floor(math.abs(instance.Position.X)) % #BOWLING_COSMIC_COLORS) + 1)]
+			else
+				local baseColor = instance:GetAttribute("BaseColor")
+				local baseMaterial = getMaterialByName(instance:GetAttribute("BaseMaterial"))
+				if baseColor then
+					instance.Color = baseColor
+				end
+				if baseMaterial then
+					instance.Material = baseMaterial
+				end
+			end
+		end
+	end
+
+	for _, disco in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingDiscoBall)) do
+		if disco:IsA("BasePart") then
+			if active then
+				disco.Material = Enum.Material.Neon
+				disco.Color = Color3.fromRGB(192, 222, 255)
+			else
+				local baseColor = disco:GetAttribute("BaseColor")
+				local baseMaterial = getMaterialByName(disco:GetAttribute("BaseMaterial"))
+				if baseColor then
+					disco.Color = baseColor
+				end
+				if baseMaterial then
+					disco.Material = baseMaterial
+				end
+			end
+		end
+
+		local light = disco:FindFirstChild("DiscoLight", true)
+		if light and light:IsA("PointLight") then
+			light.Brightness = active and 5.6 or 0
+			light.Color = BOWLING_COSMIC_COLORS[1]
+		end
+	end
+
+	if not active then
+		return
+	end
+
+	task.spawn(function()
+		local step = 0
+		while self.bowlingCosmicActive and self.bowlingCosmicToken == token do
+			step += 1
+			local color = BOWLING_COSMIC_COLORS[((step - 1) % #BOWLING_COSMIC_COLORS) + 1]
+
+			for _, instance in ipairs(workspace:GetDescendants()) do
+				if instance:IsA("BasePart") and instance:GetAttribute("CosmicSurface") then
+					instance.Color = BOWLING_COSMIC_COLORS[((step + math.floor(math.abs(instance.Position.X))) % #BOWLING_COSMIC_COLORS) + 1]
+				end
+			end
+
+			for _, disco in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingDiscoBall)) do
+				if disco:IsA("BasePart") then
+					disco.CFrame = (disco:GetAttribute("BaseCFrame") or disco.CFrame) * CFrame.Angles(0, math.rad(step * 22), 0)
+				end
+
+				local light = disco:FindFirstChild("DiscoLight", true)
+				if light and light:IsA("PointLight") then
+					light.Color = color
+				end
+			end
+
+			task.wait(0.28)
+		end
+	end)
+
+	if source then
+		playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.5, 1.9)
+	end
+end
+
+function InteractionService:_wireBowlingCosmicSwitch(switch)
+	local prompt = getPrompt(switch)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingCosmic.Id)
+		self:_setBowlingCosmic(not self.bowlingCosmicActive, switch)
+		if prompt then
+			prompt.ActionText = self.bowlingCosmicActive and "Normalize" or "Cosmic"
+		end
+
+		self.systemMessageRemote:FireClient(
+			player,
+			self.bowlingCosmicActive and "Cosmic Bowling is on. The floor is taking lighting personally." or "Cosmic Bowling is off. The alley returns to regular questionable bowling."
+		)
+	end)
+end
+
+function InteractionService:_wireBowlingMaintenanceDoor(door)
+	local prompt = getPrompt(door)
+
+	self:_connectPrompt(prompt, function(player)
+		local rootPart = getRootPart(player)
+		local destinationCFrame = door:GetAttribute("DestinationCFrame")
+
+		if rootPart and door:IsA("BasePart") and rootPart.Position.Z < door.Position.Z then
+			destinationCFrame = CFrame.new(door.Position + Vector3.new(0, -1.25, 5.6))
+		else
+			self.discoveryService:Unlock(player, Constants.Discoveries.BowlingMaintenance.Id)
+		end
+
+		if typeof(destinationCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "The maintenance door has misplaced its maintenance.")
+			return
+		end
+
+		playSound(door, "rbxasset://sounds/button.wav", 0.42, 0.65)
+		teleportPlayer(player, destinationCFrame)
+		self.systemMessageRemote:FireClient(player, "The pin machinery allows a supervised maintenance detour.")
+	end)
+end
+
+function InteractionService:_resetBowlingPins()
+	for _, temporaryObject in ipairs(CollectionService:GetTagged(Constants.Tags.TemporaryObject)) do
+		if temporaryObject and temporaryObject.Parent and temporaryObject.Name == "BowlingBall" then
+			temporaryObject:Destroy()
+		end
+	end
+
+	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
+		if pin:IsA("BasePart") and pin.Parent then
+			local baseCFrame = pin:GetAttribute("BaseCFrame")
+			if baseCFrame then
+				pin.AssemblyLinearVelocity = Vector3.zero
+				pin.AssemblyAngularVelocity = Vector3.zero
+				pin.Anchored = true
+				pin.CFrame = baseCFrame
+				task.delay(0.08, function()
+					if pin.Parent then
+						pin.Anchored = false
+					end
+				end)
+			end
+		end
+	end
+end
+
+function InteractionService:_wireBowlingResetLever(lever)
+	local prompt = getPrompt(lever)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingResetLever.Id)
+		self:_resetBowlingPins()
+		playSound(lever, "rbxasset://sounds/button.wav", 0.5, 0.58)
+
+		if lever:IsA("BasePart") then
+			local baseCFrame = lever:GetAttribute("BaseCFrame") or lever.CFrame
+			local pullTween = tweenPart(lever, 0.14, {
+				CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad(-38)),
+				Color = Color3.fromRGB(255, 236, 104),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			pullTween.Completed:Wait()
+			tweenPart(lever, 0.18, {
+				CFrame = baseCFrame,
+				Color = lever:GetAttribute("BaseColor") or lever.Color,
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+
+		self.systemMessageRemote:FireClient(player, "The pinsetter resets the pins and quietly refuses overtime.")
 	end)
 end
 
@@ -1025,6 +1642,34 @@ function InteractionService:_wireResetRoomButton(button)
 end
 
 function InteractionService:_afterRoomReset()
+	self.bowlingCosmicActive = false
+	self.bowlingCosmicToken = {}
+
+	for _, state in pairs(self.libraryLampState) do
+		state.On = false
+	end
+
+	for _, state in pairs(self.libraryGlobeState) do
+		state.Reacting = false
+	end
+
+	for _, state in pairs(self.libraryLadderState) do
+		state.Moved = false
+		state.Reacting = false
+	end
+
+	for _, state in pairs(self.libraryLoftDoorState) do
+		state.Reacting = false
+	end
+
+	for _, state in pairs(self.libraryBookcaseState) do
+		state.Reacting = false
+	end
+
+	for _, state in pairs(self.bowlingLaneState) do
+		state.Reacting = false
+	end
+
 	for fridge, state in pairs(self.fridgeState) do
 		if fridge and fridge.Parent then
 			state.Opened = false
