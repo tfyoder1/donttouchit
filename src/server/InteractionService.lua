@@ -429,6 +429,14 @@ function InteractionService:_animateLightSwitch(lever, isOn)
 end
 
 function InteractionService:_lightSwitchGiant(player)
+	local rootPart = getRootPart(player)
+	task.spawn(function()
+		for index = 1, 3 do
+			playSound(rootPart, "rbxasset://sounds/electronicpingshort.wav", 0.75, 0.65 + index * 0.32)
+			task.wait(0.13)
+		end
+	end)
+
 	local snapshot = PlayerScale.Apply(player, 2.25)
 	self.discoveryService:Unlock(player, Constants.Discoveries.GiantPlayer.Id)
 	self.systemMessageRemote:FireClient(player, "The light switch made you inconveniently tall.")

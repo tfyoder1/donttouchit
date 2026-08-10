@@ -196,12 +196,13 @@ end
 local function makeResetRoomButton(roomFolder)
 	local resetModel = makeModel(roomFolder, "ResetRoomButton")
 	local wallZ = Constants.Room.Depth / 2 - 0.6
+	local panelX = -12.4
 
 	local plate = createPart(
 		resetModel,
 		"ResetButtonPlate",
 		Vector3.new(3.4, 2.1, 0.24),
-		CFrame.new(-8.4, 4.5, wallZ),
+		CFrame.new(panelX, 4.5, wallZ),
 		Color3.fromRGB(42, 47, 56),
 		Enum.Material.Metal
 	)
@@ -210,7 +211,7 @@ local function makeResetRoomButton(roomFolder)
 		resetModel,
 		"ResetButton",
 		Vector3.new(1.45, 0.38, 1.45),
-		CFrame.new(-8.4, 4.5, wallZ - 0.24) * CFrame.Angles(math.rad(90), 0, 0),
+		CFrame.new(panelX, 4.5, wallZ - 0.24) * CFrame.Angles(math.rad(90), 0, 0),
 		Color3.fromRGB(255, 221, 84),
 		Enum.Material.Neon
 	)
@@ -730,16 +731,17 @@ end
 local function makeSnackMixer(objectsFolder)
 	local origin = SNACK_LAB_ORIGIN
 	local mixer = makeModel(objectsFolder, "Mixer")
+	local wallOffset = 5
 
-	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), cframeAt(origin, 12, 1.15, 7), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
-	createPart(mixer, "MixerStand", Vector3.new(0.75, 3.4, 0.75), cframeAt(origin, 10.1, 2.75, 7), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
-	local head = createPart(mixer, "MixerHead", Vector3.new(3.9, 1.3, 2.1), cframeAt(origin, 11.75, 4.35, 7), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
-	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 1.75, 3.6), cframeAt(origin, 12.25, 2.25, 7), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
+	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), cframeAt(origin, 12 + wallOffset, 1.15, 7), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
+	createPart(mixer, "MixerStand", Vector3.new(0.75, 3.4, 0.75), cframeAt(origin, 10.1 + wallOffset, 2.75, 7), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
+	local head = createPart(mixer, "MixerHead", Vector3.new(3.9, 1.3, 2.1), cframeAt(origin, 11.75 + wallOffset, 4.35, 7), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
+	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 1.75, 3.6), cframeAt(origin, 12.25 + wallOffset, 2.25, 7), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
 	bowl.Shape = Enum.PartType.Ball
 	bowl.Transparency = 0.25
 	bowl:SetAttribute("BaseTransparency", bowl.Transparency)
-	createPart(mixer, "BeaterLeft", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8, 3.15, 6.55), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
-	createPart(mixer, "BeaterRight", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8, 3.15, 7.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	createPart(mixer, "BeaterLeft", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8 + wallOffset, 3.15, 6.55), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	createPart(mixer, "BeaterRight", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8 + wallOffset, 3.15, 7.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
 	createPrompt(head, "Mix", "Mixer", 0)
 	tag(mixer, Constants.Tags.SnackMixer)
 
@@ -758,27 +760,29 @@ local function makeSnackRack(objectsFolder)
 		Color3.fromRGB(219, 112, 255),
 	}
 	local names = { "CRONCH", "ZAP CHIPS", "MYSTERY", "PUFFS", "NOPE" }
+	local rackX = 10
+	local rackZ = -1.25
 
-	local back = createPart(rack, "RackBack", Vector3.new(9.5, 6.6, 0.35), cframeAt(origin, -12, 4.0, 6.8), Color3.fromRGB(68, 76, 90), Enum.Material.Metal)
-	createPart(rack, "RackLeft", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, -16.9, 4.0, 7.65), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
-	createPart(rack, "RackRight", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, -7.1, 4.0, 7.65), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
+	local back = createPart(rack, "RackBack", Vector3.new(9.5, 6.6, 0.35), cframeAt(origin, rackX, 4.0, rackZ), Color3.fromRGB(68, 76, 90), Enum.Material.Metal)
+	createPart(rack, "RackLeft", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, rackX - 4.9, 4.0, rackZ - 0.85), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
+	createPart(rack, "RackRight", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, rackX + 4.9, 4.0, rackZ - 0.85), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
 
 	for shelfIndex = 1, 3 do
 		local y = 1.65 + shelfIndex * 1.85
-		createPart(rack, "SnackShelf", Vector3.new(10, 0.28, 2.3), cframeAt(origin, -12, y, 7.7), Color3.fromRGB(94, 103, 116), Enum.Material.Metal)
+		createPart(rack, "SnackShelf", Vector3.new(10, 0.28, 2.3), cframeAt(origin, rackX, y, rackZ - 0.85), Color3.fromRGB(94, 103, 116), Enum.Material.Metal)
 
 		for packIndex = 1, 5 do
-			local x = -15.6 + (packIndex - 1) * 1.8
+			local x = rackX - 3.6 + (packIndex - 1) * 1.8
 			local pack = createPart(
 				rack,
 				"SnackPack",
 				Vector3.new(1.1, 1.45, 0.28),
-				cframeAt(origin, x, y + 0.88, 6.45),
+				cframeAt(origin, x, y + 0.88, rackZ - 2.02),
 				colors[((shelfIndex + packIndex - 2) % #colors) + 1],
 				Enum.Material.SmoothPlastic
 			)
 			pack:SetAttribute("IsSnackPack", true)
-			createSurfaceText(pack, "SnackPackText", names[((shelfIndex + packIndex - 2) % #names) + 1], Enum.NormalId.Back, Color3.fromRGB(255, 255, 255), pack.Color)
+			createSurfaceText(pack, "SnackPackText", names[((shelfIndex + packIndex - 2) % #names) + 1], Enum.NormalId.Front, Color3.fromRGB(255, 255, 255), pack.Color)
 		end
 	end
 
