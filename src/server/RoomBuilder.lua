@@ -1168,11 +1168,26 @@ end
 
 local function makePalmTree(parent, name, x, z, leanDegrees)
 	local tree = makeModel(parent, name)
-	local baseCFrame = cframeAt(ISLAND_ORIGIN, x, 1.05, z) * CFrame.Angles(0, 0, math.rad(leanDegrees or 0))
-	local trunk = createPart(tree, "PalmTrunk", Vector3.new(0.8, 7.2, 0.8), baseCFrame * CFrame.new(0, 3.6, 0), Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
+	local trunkHeight = 7.2
+	local trunkDiameter = 0.8
+	local baseCFrame = cframeAt(ISLAND_ORIGIN, x, 1.02, z) * CFrame.Angles(0, 0, math.rad(leanDegrees or 0))
+	local trunkCFrame = baseCFrame * CFrame.new(0, trunkHeight / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
+	local trunk = createPart(tree, "PalmTrunk", Vector3.new(trunkHeight, trunkDiameter, trunkDiameter), trunkCFrame, Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
 	trunk.Shape = Enum.PartType.Cylinder
 
-	local crownCFrame = cframeAt(ISLAND_ORIGIN, x + math.sin(math.rad(leanDegrees or 0)) * 1.4, 8.2, z)
+	for index = 1, 5 do
+		local ring = createPart(
+			tree,
+			"PalmTrunkBand",
+			Vector3.new(0.12, trunkDiameter + 0.08, trunkDiameter + 0.08),
+			baseCFrame * CFrame.new(0, 0.9 + index * 1.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(91, 58, 34),
+			Enum.Material.Wood
+		)
+		ring.Shape = Enum.PartType.Cylinder
+	end
+
+	local crownCFrame = baseCFrame * CFrame.new(0, trunkHeight + 0.15, 0)
 	for index = 1, 6 do
 		local angle = (index - 1) * math.pi / 3
 		local leaf = createPart(
