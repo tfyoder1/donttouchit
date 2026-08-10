@@ -8,6 +8,8 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local EventManager = {}
 EventManager.__index = EventManager
 
+local OBJECT_RAIN_BUTTON_INTERVAL = 8
+
 function EventManager.new(discoveryService, resetService, roomReferences)
 	local self = setmetatable({}, EventManager)
 	self.discoveryService = discoveryService
@@ -15,6 +17,7 @@ function EventManager.new(discoveryService, resetService, roomReferences)
 	self.roomReferences = roomReferences
 	self.random = Random.new()
 	self.active = false
+	self.buttonPressCount = 0
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	return self
 end
@@ -36,20 +39,40 @@ end
 function EventManager:_chooseEvent()
 	local totalWeight = 0
 	for _, eventDefinition in ipairs(EventRegistry) do
-		totalWeight += eventDefinition.Weight or 1
+		local weight = eventDefinition.Weight or 1
+		if weight > 0 then
+			totalWeight += weight
+		end
+	end
+
+	if totalWeight <= 0 then
+		return nil
 	end
 
 	local roll = self.random:NextNumber(0, totalWeight)
 	local runningWeight = 0
 
 	for _, eventDefinition in ipairs(EventRegistry) do
-		runningWeight += eventDefinition.Weight or 1
-		if roll <= runningWeight then
+		local weight = eventDefinition.Weight or 1
+		if weight > 0 then
+			runningWeight += weight
+			if roll <= runningWeight then
+				return eventDefinition
+			end
+		end
+	end
+
+	return nil
+end
+
+function EventManager:_getEventById(eventId)
+	for _, eventDefinition in ipairs(EventRegistry) do
+		if eventDefinition.Id == eventId then
 			return eventDefinition
 		end
 	end
 
-	return EventRegistry[#EventRegistry]
+	return nil
 end
 
 function EventManager:_buildContext(triggeringPlayer, eventDefinition)
@@ -69,17 +92,23 @@ function EventManager:_buildContext(triggeringPlayer, eventDefinition)
 	}
 end
 
-function EventManager:TriggerRandom(triggeringPlayer)
+function EventManager:_startEvent(triggeringPlayer, eventDefinition, unlockButtonDiscovery)
 	if self.active then
-		self:_sendMessage(triggeringPlayer, "The button is busy making a questionable decision.")
+		self:_sendMessage(triggeringPlayer, "The room is busy making a questionable decision.")
+		return false
+	end
+
+	if not eventDefinition then
+		self:_sendMessage(triggeringPlayer, "Nothing happened. Even the room seems surprised.")
 		return false
 	end
 
 	self.active = true
-	self.discoveryService:Unlock(triggeringPlayer, Constants.Discoveries.PressedButton.Id)
+	if unlockButtonDiscovery then
+		self.discoveryService:Unlock(triggeringPlayer, Constants.Discoveries.PressedButton.Id)
+	end
 
 	task.spawn(function()
-		local eventDefinition = self:_chooseEvent()
 		local context = self:_buildContext(triggeringPlayer, eventDefinition)
 
 		self:_broadcastMessage(eventDefinition.StartMessage or "Something is happening.")
@@ -101,5 +130,26 @@ function EventManager:TriggerRandom(triggeringPlayer)
 	return true
 end
 
-return EventManager
+function EventManager:TriggerRandom(triggeringPlayer)
+	if self.active then
+		self:_sendMessage(triggeringPlayer, "The room is busy making a questionable decision.")
+		return false
+	end
 
+	self.buttonPressCount += 1
+
+	local eventDefinition = nil
+	if self.buttonPressCount % OBJECT_RAIN_BUTTON_INTERVAL == 0 then
+		eventDefinition = self:_getEventById("object_rain")
+	end
+
+	eventDefinition = eventDefinition or self:_chooseEvent()
+	return self:_startEvent(triggeringPlayer, eventDefinition, true)
+end
+
+function EventManager:TriggerById(triggeringPlayer, eventId)
+	local eventDefinition = self:_getEventById(eventId)
+	return self:_startEvent(triggeringPlayer, eventDefinition, false)
+end
+
+return EventManager

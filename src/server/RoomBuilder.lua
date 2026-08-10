@@ -120,6 +120,8 @@ local function makeFloor(roomFolder)
 				Enum.Material.Concrete
 			)
 
+			local prompt = createPrompt(floor, "Press", "The Floor", 0)
+			prompt.MaxActivationDistance = 7
 			tag(floor, Constants.Tags.FloorSection)
 		end
 	end
@@ -141,7 +143,7 @@ end
 local function makeShell(roomFolder)
 	local width = Constants.Room.Width
 	local depth = Constants.Room.Depth
-	local height = Constants.Room.Height
+	local height = Constants.Room.TVHeight
 	local wallColor = Color3.fromRGB(178, 184, 182)
 	local doorWidth = 7
 	local doorHeight = 10
@@ -210,16 +212,43 @@ local function makePedestal(objectsFolder)
 		Enum.Material.Metal
 	)
 
+	local buttonBase = createPart(
+		pedestal,
+		"BigRedButtonBase",
+		Vector3.new(3.55, 0.45, 3.55),
+		CFrame.new(0, 3.72, 0),
+		Color3.fromRGB(117, 14, 22),
+		Enum.Material.Metal,
+		"Part"
+	)
+	buttonBase.Shape = Enum.PartType.Cylinder
+
 	local button = createPart(
 		pedestal,
 		"BigRedButton",
-		Vector3.new(3.25, 0.95, 3.25),
-		CFrame.new(0, 3.95, 0),
+		Vector3.new(3.15, 1.15, 3.15),
+		CFrame.new(0, 4.15, 0),
 		Color3.fromRGB(231, 30, 42),
 		Enum.Material.Neon,
 		"Part"
 	)
 	button.Shape = Enum.PartType.Ball
+	button:SetAttribute("PressedCFrame", CFrame.new(0, 3.88, 0))
+
+	local shine = createPart(
+		pedestal,
+		"BigRedButtonShine",
+		Vector3.new(0.92, 0.08, 0.42),
+		CFrame.new(-0.68, 4.74, -0.58) * CFrame.Angles(0, 0, math.rad(-18)),
+		Color3.fromRGB(255, 176, 182),
+		Enum.Material.Neon,
+		"Part"
+	)
+	shine.Shape = Enum.PartType.Ball
+	shine.CanCollide = false
+	shine.Transparency = 0.12
+	mark(shine)
+
 	createPrompt(button, "Press", "Absolutely Do Not Touch", 0.15)
 	tag(button, Constants.Tags.MainButton)
 
@@ -235,6 +264,42 @@ local function makePedestal(objectsFolder)
 
 	pedestal.PrimaryPart = base
 	return pedestal
+end
+
+local function makeLightSwitch(objectsFolder)
+	local switch = makeModel(objectsFolder, "TVRoomLightSwitch")
+	local wallZ = Constants.Room.Depth / 2 - 0.58
+	local baseCFrame = CFrame.new(-6.15, 4.55, wallZ)
+
+	local plate = createPart(
+		switch,
+		"SwitchPlate",
+		Vector3.new(1.15, 1.85, 0.18),
+		baseCFrame,
+		Color3.fromRGB(238, 238, 226),
+		Enum.Material.SmoothPlastic
+	)
+	local leverNeutralCFrame = baseCFrame * CFrame.new(0, 0.05, -0.2)
+	local leverOnCFrame = leverNeutralCFrame * CFrame.Angles(math.rad(-18), 0, 0)
+	local leverOffCFrame = leverNeutralCFrame * CFrame.Angles(math.rad(18), 0, 0)
+	local lever = createPart(
+		switch,
+		"SwitchLever",
+		Vector3.new(0.26, 0.88, 0.22),
+		leverOnCFrame,
+		Color3.fromRGB(244, 244, 238),
+		Enum.Material.Metal
+	)
+	lever:SetAttribute("SwitchOnCFrame", leverOnCFrame)
+	lever:SetAttribute("SwitchOffCFrame", leverOffCFrame)
+
+	plate:SetAttribute("IsOn", true)
+	createSurfaceText(plate, "SwitchText", "LIGHT", Enum.NormalId.Front, Color3.fromRGB(34, 34, 32), Color3.fromRGB(238, 238, 226))
+	createPrompt(plate, "Flip", "Light Switch", 0)
+	tag(switch, Constants.Tags.LightSwitch)
+
+	switch.PrimaryPart = plate
+	return switch, { plate, lever }
 end
 
 local function makeCouch(objectsFolder)
@@ -267,6 +332,28 @@ local function makeLamp(objectsFolder)
 	local shade = createPart(lamp, "LampShade", Vector3.new(2.6, 1.2, 2.6), CFrame.new(14, 6.25, -9), Color3.fromRGB(255, 231, 125), Enum.Material.SmoothPlastic)
 	shade.Shape = Enum.PartType.Cylinder
 	shade.Name = "LampShade"
+
+	for index = 1, 5 do
+		local bead = createPart(
+			lamp,
+			"LampChainBead",
+			Vector3.new(0.16, 0.16, 0.16),
+			CFrame.new(15.05, 6.15 - index * 0.24, -8.35),
+			Color3.fromRGB(214, 203, 168),
+			Enum.Material.Metal
+		)
+		bead.Shape = Enum.PartType.Ball
+	end
+
+	local chainHandle = createPart(
+		lamp,
+		"LampPullHandle",
+		Vector3.new(0.34, 0.34, 0.34),
+		CFrame.new(15.05, 4.65, -8.35),
+		Color3.fromRGB(255, 235, 136),
+		Enum.Material.Metal
+	)
+	chainHandle.Shape = Enum.PartType.Ball
 
 	local light = Instance.new("PointLight")
 	light.Name = "LampLight"
@@ -732,6 +819,7 @@ function RoomBuilder.Build()
 	local snackLab = makeSnackLabShell(roomFolder)
 
 	local pedestal = makePedestal(objectsFolder)
+	local lightSwitch = makeLightSwitch(objectsFolder)
 	local couch = makeCouch(objectsFolder)
 	local lamp = makeLamp(objectsFolder)
 	makeTableAndAppliance(objectsFolder)
@@ -756,6 +844,7 @@ function RoomBuilder.Build()
 		ExitDoor = exitDoor,
 		Hallway = hallway,
 		Pedestal = pedestal,
+		LightSwitch = lightSwitch,
 		Couch = couch,
 		Lamp = lamp,
 		Squishy = squishy,

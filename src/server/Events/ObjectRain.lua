@@ -15,8 +15,8 @@ local COLORS = {
 return {
 	Id = "object_rain",
 	Name = "Object Rain",
-	Weight = 1,
-	StartMessage = "The ceiling is dropping things inside the room.",
+	Weight = 0,
+	StartMessage = "Button milestone reached: the ceiling is dropping things inside the room.",
 
 	Run = function(context)
 		local folder = Instance.new("Folder")
@@ -30,7 +30,7 @@ return {
 			context.BroadcastMessage("Object rain is actually inside the ceiling this time. Look up.")
 		end
 
-		for index = 1, 72 do
+		for index = 1, 110 do
 			local blob = Instance.new("Part")
 			blob.Name = "FallingBlob"
 			if index % 3 == 0 then
@@ -43,7 +43,11 @@ return {
 			)
 			blob.Color = COLORS[random:NextInteger(1, #COLORS)]
 			blob.Material = index % 4 == 0 and Enum.Material.Neon or Enum.Material.SmoothPlastic
-			blob.CFrame = CFrame.new(random:NextNumber(-18, 18), random:NextNumber(10.8, 14), random:NextNumber(-14, 14))
+			blob.CFrame = CFrame.new(
+				random:NextNumber(-18, 18),
+				random:NextNumber(Constants.Room.TVHeight - 5, Constants.Room.TVHeight - 1.5),
+				random:NextNumber(-14, 14)
+			)
 			blob.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.25, 0.75)
 			blob.Parent = folder
 			CollectionService:AddTag(blob, Constants.Tags.TemporaryObject)
@@ -51,8 +55,8 @@ return {
 			blob.AssemblyAngularVelocity = Vector3.new(random:NextNumber(-7, 7), random:NextNumber(-7, 7), random:NextNumber(-7, 7))
 			Debris:AddItem(blob, Constants.EventDuration + 4)
 
-			if index % 12 == 0 then
-				task.wait(0.08)
+			if index % 10 == 0 then
+				task.wait(0.05)
 			end
 		end
 

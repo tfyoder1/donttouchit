@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local PlayerScale = require(script.Parent:WaitForChild("PlayerScale"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 
 local InteractionService = {}
@@ -23,6 +24,14 @@ local COUCH_REFUSAL_MESSAGES = {
 	"The couch pretends not to hear you.",
 	"The cushions tighten their argument.",
 	"The couch is still considering your request.",
+}
+
+local SWITCH_ON_COLORS = {
+	Color3.fromRGB(255, 224, 145),
+	Color3.fromRGB(142, 210, 255),
+	Color3.fromRGB(206, 153, 255),
+	Color3.fromRGB(133, 255, 190),
+	Color3.fromRGB(255, 144, 177),
 }
 
 local function getPrompt(root)
@@ -98,6 +107,22 @@ local function tweenModel(model, targetPivot, duration)
 	pivotValue:Destroy()
 end
 
+local function playSound(parent, soundId, volume, playbackSpeed)
+	if not parent or not parent.Parent then
+		return
+	end
+
+	local sound = Instance.new("Sound")
+	sound.Name = "TemporarySound"
+	sound.SoundId = soundId
+	sound.Volume = volume or 0.7
+	sound.PlaybackSpeed = playbackSpeed or 1
+	sound.RollOffMaxDistance = 45
+	sound.Parent = parent
+	sound:Play()
+	Debris:AddItem(sound, 3)
+end
+
 function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService)
 	local self = setmetatable({}, InteractionService)
 	self.eventManager = eventManager
@@ -109,6 +134,8 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.couchState = {}
 	self.couchRiding = {}
 	self.lampState = {}
+	self.lightSwitchState = {}
+	self.floorPressStateByUserId = {}
 	self.squishyState = {}
 	self.tvState = {}
 	self.applianceState = {}
@@ -133,6 +160,14 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
 		self:_wireMainButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LightSwitch, function(instance)
+		self:_wireLightSwitch(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.FloorSection, function(instance)
+		self:_wireFloorSection(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.Couch, function(instance)
@@ -231,7 +266,163 @@ function InteractionService:_wireMainButton(button)
 	local prompt = getPrompt(button)
 
 	self:_connectPrompt(prompt, function(player)
-		self.eventManager:TriggerRandom(player)
+		local accepted = self.eventManager:TriggerRandom(player)
+		if accepted and button:IsA("BasePart") then
+			task.spawn(function()
+				self:_pressButtonVisual(button)
+			end)
+		end
+	end)
+end
+
+function InteractionService:_pressButtonVisual(button)
+	local visualParts = { button }
+	local shine = button.Parent and button.Parent:FindFirstChild("BigRedButtonShine")
+	if shine and shine:IsA("BasePart") then
+		table.insert(visualParts, shine)
+	end
+
+	local baseColor = button:GetAttribute("BaseColor") or button.Color
+
+	playSound(button, "rbxasset://sounds/button.wav", 0.45, 0.9)
+
+	local downTween = nil
+	for _, part in ipairs(visualParts) do
+		local properties = {
+			CFrame = (part:GetAttribute("BaseCFrame") or part.CFrame) + Vector3.new(0, -0.28, 0),
+		}
+		if part == button then
+			properties.Color = Color3.fromRGB(165, 12, 23)
+		end
+
+		downTween = tweenPart(part, 0.1, properties, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+
+	downTween.Completed:Wait()
+
+	local upTween = nil
+	for _, part in ipairs(visualParts) do
+		local properties = {
+			CFrame = part:GetAttribute("BaseCFrame") or part.CFrame,
+		}
+		if part == button then
+			properties.Color = baseColor
+		end
+
+		upTween = tweenPart(part, 0.18, properties, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	end
+
+	upTween.Completed:Wait()
+end
+
+function InteractionService:_wireFloorSection(floorSection)
+	local prompt = getPrompt(floorSection)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.floorPressStateByUserId[player.UserId]
+		if not state then
+			state = {
+				PressCount = 0,
+			}
+			self.floorPressStateByUserId[player.UserId] = state
+		end
+
+		state.PressCount += 1
+
+		if state.PressCount < 5 then
+			self.systemMessageRemote:FireClient(player, ("The floor accepts press %d / 5."):format(state.PressCount))
+			return
+		end
+
+		state.PressCount = 0
+		local triggered = self.eventManager:TriggerById(player, "low_gravity")
+		if not triggered then
+			state.PressCount = 4
+		end
+	end)
+end
+
+function InteractionService:_wireLightSwitch(lightSwitch)
+	local prompt = getPrompt(lightSwitch)
+	local plate = lightSwitch:FindFirstChild("SwitchPlate", true)
+	local lever = lightSwitch:FindFirstChild("SwitchLever", true)
+
+	self.lightSwitchState[lightSwitch] = self.lightSwitchState[lightSwitch] or {
+		IsOn = true,
+		OnCycle = 0,
+		Reacting = false,
+		GiantAwardedByUserId = {},
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.lightSwitchState[lightSwitch]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		state.IsOn = not state.IsOn
+		self:_animateLightSwitch(lever, state.IsOn)
+
+		if state.IsOn then
+			state.OnCycle += 1
+			local color = SWITCH_ON_COLORS[((state.OnCycle - 1) % #SWITCH_ON_COLORS) + 1]
+			Lighting.Brightness = 2.2
+			Lighting.ClockTime = 16
+			Lighting.Ambient = color
+			Lighting.OutdoorAmbient = color:Lerp(Color3.fromRGB(255, 255, 255), 0.22)
+
+			if plate and plate:IsA("BasePart") then
+				plate.Color = color:Lerp(Color3.fromRGB(255, 255, 255), 0.7)
+			end
+
+			playSound(plate or lever or lightSwitch, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.1)
+			self.systemMessageRemote:FireClient(player, "The room lights came back in a different mood.")
+
+			if not state.GiantAwardedByUserId[player.UserId] and state.OnCycle >= 3 then
+				state.GiantAwardedByUserId[player.UserId] = true
+				self:_lightSwitchGiant(player)
+			end
+		else
+			Lighting.Brightness = 0.35
+			Lighting.ClockTime = 0
+			Lighting.Ambient = Color3.fromRGB(10, 12, 18)
+			Lighting.OutdoorAmbient = Color3.fromRGB(5, 6, 10)
+
+			if plate and plate:IsA("BasePart") then
+				plate.Color = Color3.fromRGB(205, 205, 195)
+			end
+
+			playSound(plate or lever or lightSwitch, "rbxasset://sounds/button.wav", 0.45, 0.82)
+			self.systemMessageRemote:FireClient(player, "The room goes suspiciously dark.")
+		end
+
+		task.wait(0.15)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_animateLightSwitch(lever, isOn)
+	if not lever or not lever:IsA("BasePart") then
+		return
+	end
+
+	local targetCFrame = if isOn
+		then lever:GetAttribute("SwitchOnCFrame")
+		else lever:GetAttribute("SwitchOffCFrame")
+	targetCFrame = targetCFrame or lever:GetAttribute("BaseCFrame") or lever.CFrame
+	tweenPart(lever, 0.12, {
+		CFrame = targetCFrame,
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+end
+
+function InteractionService:_lightSwitchGiant(player)
+	local snapshot = PlayerScale.Apply(player, 2.25)
+	self.discoveryService:Unlock(player, Constants.Discoveries.GiantPlayer.Id)
+	self.systemMessageRemote:FireClient(player, "The light switch made you inconveniently tall.")
+
+	task.delay(Constants.EventDuration, function()
+		PlayerScale.Restore(snapshot)
 	end)
 end
 
@@ -298,6 +489,8 @@ function InteractionService:_wireAppliance(appliance)
 			textLabel.Text = "DING?"
 			textLabel.TextColor3 = Color3.fromRGB(255, 94, 94)
 		end
+
+		playSound(door or body, "rbxasset://sounds/electronicpingshort.wav", 0.85, 1.45)
 
 		if body and body:IsA("BasePart") then
 			local pulseTween = tweenPart(body, 0.18, {
@@ -519,6 +712,8 @@ function InteractionService:_wireLamp(lamp)
 		end
 
 		state.ToggleCount += 1
+		self:_animateLampChain(lamp)
+		playSound(shade, "rbxasset://sounds/button.wav", 0.35, 1.35)
 		light.Enabled = not light.Enabled
 		shade.Material = light.Enabled and Enum.Material.Neon or Enum.Material.SmoothPlastic
 		shade.Color = light.Enabled and Color3.fromRGB(255, 245, 151) or Color3.fromRGB(255, 231, 125)
@@ -528,6 +723,32 @@ function InteractionService:_wireLamp(lamp)
 			self:_lampSecret(lamp, shade, light, player, state)
 		end
 	end)
+end
+
+function InteractionService:_animateLampChain(lamp)
+	local parts = {}
+
+	for _, descendant in ipairs(lamp:GetDescendants()) do
+		if descendant:IsA("BasePart") and (descendant.Name == "LampPullHandle" or descendant.Name == "LampChainBead") then
+			table.insert(parts, descendant)
+		end
+	end
+
+	for _, part in ipairs(parts) do
+		task.spawn(function()
+			local baseCFrame = part:GetAttribute("BaseCFrame") or part.CFrame
+			local downTween = tweenPart(part, 0.08, {
+				CFrame = baseCFrame + Vector3.new(0, -0.36, 0),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			downTween.Completed:Wait()
+
+			if part.Parent then
+				tweenPart(part, 0.16, {
+					CFrame = baseCFrame,
+				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			end
+		end)
+	end
 end
 
 function InteractionService:_lampSecret(lamp, shade, light, player, state)
@@ -547,6 +768,7 @@ function InteractionService:_lampSecret(lamp, shade, light, player, state)
 	light.Enabled = true
 	light.Brightness = 8
 	light.Range = 35
+	playSound(shade, "rbxasset://sounds/electronicpingshort.wav", 0.75, 0.72)
 	tweenPart(shade, 0.35, {
 		Size = originalSize * 1.6,
 		CFrame = originalCFrame + Vector3.new(0, 0.35, 0),
@@ -555,9 +777,14 @@ function InteractionService:_lampSecret(lamp, shade, light, player, state)
 	for index = 1, 6 do
 		Lighting.Brightness = index % 2 == 0 and 1.5 or 5
 		Lighting.Ambient = index % 2 == 0 and Color3.fromRGB(180, 220, 255) or Color3.fromRGB(255, 170, 90)
+		if index == 3 then
+			playSound(shade, "rbxasset://sounds/snap.wav", 0.95, 0.88)
+		end
 		task.wait(0.16)
 	end
 
+	playSound(shade, "rbxasset://sounds/electronicpingshort.wav", 0.45, 0.45)
+	self.systemMessageRemote:FireClient(player, "The lamp sizzles like it has learned a lesson.")
 	task.wait(1)
 	Lighting.Ambient = oldLighting.Ambient
 	Lighting.Brightness = oldLighting.Brightness

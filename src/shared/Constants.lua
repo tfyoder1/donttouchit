@@ -8,6 +8,7 @@ Constants.Room = {
 	Width = 42,
 	Depth = 34,
 	Height = 16,
+	TVHeight = 24,
 	FloorY = 0,
 	RecoveryY = -18,
 }
@@ -17,10 +18,12 @@ Constants.Remotes = {
 	ReferenceBook = "ReferenceBook",
 	HintPackRequest = "HintPackRequest",
 	SystemMessage = "SystemMessage",
+	RoomStatus = "RoomStatus",
 }
 
 Constants.Tags = {
 	MainButton = "DontTouchIt_MainButton",
+	LightSwitch = "DontTouchIt_LightSwitch",
 	Couch = "DontTouchIt_Couch",
 	FloorLamp = "DontTouchIt_FloorLamp",
 	Squishy = "DontTouchIt_Squishy",
@@ -41,6 +44,17 @@ Constants.Tags = {
 	TemporaryObject = "DontTouchIt_TemporaryObject",
 }
 
+Constants.Hallway = {
+	Id = "Hallway",
+	Name = "Hallway",
+	UnlockedRoomCount = 1,
+	TotalRoomCount = 4,
+	Zone = {
+		Min = Vector3.new(-7.75, -3, Constants.Room.Depth / 2 - 0.5),
+		Max = Vector3.new(7.75, 13, 74),
+	},
+}
+
 Constants.Discoveries = {
 	PressedButton = {
 		Id = "pressed_button",
@@ -50,7 +64,7 @@ Constants.Discoveries = {
 	LowGravity = {
 		Id = "low_gravity",
 		Name = "Experienced Low Gravity",
-		Hint = "Keep testing the red button until gravity loses the argument.",
+		Hint = "The floor only gives up on gravity after five presses.",
 	},
 	TinyPlayers = {
 		Id = "tiny_players",
@@ -60,12 +74,12 @@ Constants.Discoveries = {
 	GiantPlayer = {
 		Id = "giant_player",
 		Name = "Saw a Giant Player",
-		Hint = "The red button can pick one player for a growth spurt.",
+		Hint = "Cycle the light switch back on a few times.",
 	},
 	ObjectRain = {
 		Id = "object_rain",
 		Name = "Survived Object Rain",
-		Hint = "The red button can make the ceiling drop things.",
+		Hint = "The red button has a reliable bad idea every eighth accepted press.",
 	},
 	DelayedSurprise = {
 		Id = "delayed_surprise",
@@ -201,7 +215,7 @@ Constants.Rooms = {
 		NoTouchDiscoveryId = Constants.Discoveries.TVRoomNoTouch.Id,
 		Zone = {
 			Min = Vector3.new(-Constants.Room.Width / 2, Constants.Room.RecoveryY - 3, -Constants.Room.Depth / 2),
-			Max = Vector3.new(Constants.Room.Width / 2, Constants.Room.Height + 2, Constants.Room.Depth / 2),
+			Max = Vector3.new(Constants.Room.Width / 2, Constants.Room.TVHeight + 2, Constants.Room.Depth / 2),
 		},
 	},
 	SnackLab = {

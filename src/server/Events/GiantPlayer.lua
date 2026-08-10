@@ -6,7 +6,7 @@ local PlayerScale = require(script.Parent.Parent:WaitForChild("PlayerScale"))
 return {
 	Id = "giant_player",
 	Name = "Giant Player",
-	Weight = 1,
+	Weight = 0,
 	StartMessage = "One person has been promoted to problem size.",
 
 	Run = function(context)

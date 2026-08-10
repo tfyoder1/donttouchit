@@ -36,6 +36,7 @@ function RoomProgressService.new(discoveryService)
 	self.referenceBookRemote = RemoteService.GetRemote(Constants.Remotes.ReferenceBook)
 	self.hintPackRemote = RemoteService.GetRemote(Constants.Remotes.HintPackRequest)
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
+	self.roomStatusRemote = RemoteService.GetRemote(Constants.Remotes.RoomStatus)
 	self.stateByUserId = {}
 	return self
 end
@@ -91,6 +92,19 @@ function RoomProgressService:GetRoomForPlayer(player)
 	return nil
 end
 
+function RoomProgressService:GetAreaForPlayer(player)
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return nil
+	end
+
+	if positionInZone(rootPart.Position, Constants.Hallway.Zone) then
+		return Constants.Hallway.Id
+	end
+
+	return self:GetRoomForPlayer(player)
+end
+
 function RoomProgressService:RecordInteraction(player)
 	if not player or not player.Parent then
 		return
@@ -122,6 +136,8 @@ function RoomProgressService:_tick(now)
 end
 
 function RoomProgressService:_tickPlayer(player, now)
+	self:_sendRoomStatus(player)
+
 	local roomId = self:GetRoomForPlayer(player)
 	local state = self:_getState(player)
 
@@ -157,6 +173,38 @@ function RoomProgressService:_tickPlayer(player, now)
 		self.discoveryService:GrantHints(player, Constants.NoTouch.BonusHintCount)
 		self.systemMessageRemote:FireClient(player, "Super bonus: 10 free hints for impressive restraint.")
 	end
+end
+
+function RoomProgressService:_sendRoomStatus(player)
+	local areaId = self:GetAreaForPlayer(player)
+
+	if areaId == Constants.Hallway.Id then
+		self.roomStatusRemote:FireClient(player, {
+			Type = "Hallway",
+			Name = Constants.Hallway.Name,
+			UnlockedRooms = Constants.Hallway.UnlockedRoomCount,
+			TotalRooms = Constants.Hallway.TotalRoomCount,
+		})
+		return
+	end
+
+	if areaId then
+		local snapshot = self.discoveryService:GetRoomSnapshot(player, areaId)
+		if snapshot then
+			self.roomStatusRemote:FireClient(player, {
+				Type = "Room",
+				RoomId = snapshot.RoomId,
+				RoomName = snapshot.RoomName,
+				Count = snapshot.Count,
+				Total = snapshot.Total,
+			})
+			return
+		end
+	end
+
+	self.roomStatusRemote:FireClient(player, {
+		Type = "None",
+	})
 end
 
 function RoomProgressService:_handleHintRequest(player, payload)

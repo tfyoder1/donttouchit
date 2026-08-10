@@ -9,6 +9,7 @@ local discoveryRemote = remotes:WaitForChild(Constants.Remotes.DiscoveryUpdate)
 local referenceBookRemote = remotes:WaitForChild(Constants.Remotes.ReferenceBook)
 local hintPackRemote = remotes:WaitForChild(Constants.Remotes.HintPackRequest)
 local systemMessageRemote = remotes:WaitForChild(Constants.Remotes.SystemMessage)
+local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
@@ -43,8 +44,8 @@ counter.BackgroundTransparency = 0.18
 counter.BorderSizePixel = 0
 counter.Font = Enum.Font.GothamBold
 counter.Position = UDim2.new(1, -18, 0, 18)
-counter.Size = UDim2.fromOffset(330, 38)
-counter.Text = ("Discoveries: 0 / %d"):format(Constants.TotalDiscoveries)
+counter.Size = UDim2.fromOffset(280, 38)
+counter.Text = "Finding room..."
 counter.TextColor3 = Color3.fromRGB(236, 246, 255)
 counter.TextScaled = true
 counter.Parent = gui
@@ -256,6 +257,8 @@ local activeMessageTween = nil
 local toastSequence = 0
 local messageSequence = 0
 local activeBookRoomId = nil
+local currentStatusType = nil
+local currentStatusRoomId = nil
 
 local function tween(instance, duration, properties)
 	local tweenObject = TweenService:Create(
@@ -321,18 +324,45 @@ local function showSystemMessage(text)
 end
 
 local function updateCounter(payload)
-	if typeof(payload.Rooms) == "table" and #payload.Rooms > 0 then
-		local roomText = {}
-
-		for _, room in ipairs(payload.Rooms) do
-			table.insert(roomText, ("%s %d/%d"):format(room.Name or "Room", room.Count or 0, room.Total or 0))
-		end
-
-		counter.Text = table.concat(roomText, " | ")
+	if currentStatusType == "Hallway" then
 		return
 	end
 
+	if currentStatusType == "Room" and currentStatusRoomId and typeof(payload.Rooms) == "table" then
+		for _, room in ipairs(payload.Rooms) do
+			if room.RoomId == currentStatusRoomId then
+				counter.Text = ("%s: %d / %d"):format(room.Name or "Room", room.Count or 0, room.Total or 0)
+				return
+			end
+		end
+	end
+
 	counter.Text = ("Discoveries: %d / %d"):format(payload.Count or 0, payload.Total or Constants.TotalDiscoveries)
+end
+
+local function updateRoomStatus(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	currentStatusType = payload.Type
+	currentStatusRoomId = payload.RoomId
+
+	if payload.Type == "Hallway" then
+		counter.Text = ("%s: %d / %d rooms unlocked"):format(
+			payload.Name or "Hallway",
+			payload.UnlockedRooms or 0,
+			payload.TotalRooms or 0
+		)
+	elseif payload.Type == "Room" then
+		counter.Text = ("%s: %d / %d"):format(
+			payload.RoomName or "Room",
+			payload.Count or 0,
+			payload.Total or 0
+		)
+	else
+		counter.Text = ""
+	end
 end
 
 local function clearBookList()
@@ -425,6 +455,7 @@ discoveryRemote.OnClientEvent:Connect(function(payload)
 end)
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
+roomStatusRemote.OnClientEvent:Connect(updateRoomStatus)
 
 systemMessageRemote.OnClientEvent:Connect(function(text)
 	if typeof(text) == "string" and text ~= "" then
