@@ -34,6 +34,7 @@ Constants.Tags = {
 	ExitDoor = "DontTouchIt_ExitDoor",
 	HallDoor = "DontTouchIt_HallDoor",
 	ReferenceBook = "DontTouchIt_ReferenceBook",
+	ResetRoomButton = "DontTouchIt_ResetRoomButton",
 	UnderfloorReturn = "DontTouchIt_UnderfloorReturn",
 	SnackButton = "DontTouchIt_SnackButton",
 	SnackFridge = "DontTouchIt_SnackFridge",
@@ -62,12 +63,17 @@ Constants.Hallway = {
 Constants.DataStore = {
 	Name = "DontTouchItPrototype_v1",
 	AutosaveSeconds = 45,
+	RetryCount = 3,
 }
 
 Constants.Sparkle = {
 	FirstDelaySeconds = 600,
 	IntervalSeconds = 60,
 	DurationSeconds = 4,
+}
+
+Constants.Confetti = {
+	DurationSeconds = 90,
 }
 
 Constants.FloorPressMessages = {

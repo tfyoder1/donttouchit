@@ -247,14 +247,13 @@ function RoomProgressService:_tick(now)
 end
 
 function RoomProgressService:_tickPlayer(player, now)
-	self:_sendRoomStatus(player)
-
 	local roomId = self:GetRoomForPlayer(player)
 	local state = self:_getState(player)
 
 	if not roomId then
 		state.CurrentRoomId = nil
 		state.TimerStartedAt = now
+		self:_sendRoomStatus(player, now)
 		return
 	end
 
@@ -265,10 +264,12 @@ function RoomProgressService:_tickPlayer(player, now)
 
 	local room = Constants.GetRoom(roomId)
 	if not room then
+		self:_sendRoomStatus(player, now)
 		return
 	end
 
 	local elapsed = now - state.TimerStartedAt
+	self:_sendRoomStatus(player, now)
 
 	if room.NoTouchDiscoveryId
 		and elapsed >= Constants.NoTouch.AccomplishmentSeconds
@@ -288,7 +289,7 @@ function RoomProgressService:_tickPlayer(player, now)
 	self:_tickSparkle(player, roomId, now, state)
 end
 
-function RoomProgressService:_sendRoomStatus(player)
+function RoomProgressService:_sendRoomStatus(player, now)
 	local areaId = self:GetAreaForPlayer(player)
 
 	if areaId == Constants.Hallway.Id then
@@ -304,12 +305,20 @@ function RoomProgressService:_sendRoomStatus(player)
 	if areaId then
 		local snapshot = self.discoveryService:GetRoomSnapshot(player, areaId)
 		if snapshot then
+			local state = self:_getState(player)
+			local elapsed = 0
+			if state.CurrentRoomId == areaId then
+				elapsed = math.max(0, (now or os.clock()) - state.TimerStartedAt)
+			end
+
 			self.roomStatusRemote:FireClient(player, {
 				Type = "Room",
 				RoomId = snapshot.RoomId,
 				RoomName = snapshot.RoomName,
 				Count = snapshot.Count,
 				Total = snapshot.Total,
+				NoTouchElapsed = elapsed,
+				NoTouchTarget = Constants.NoTouch.AccomplishmentSeconds,
 			})
 			return
 		end

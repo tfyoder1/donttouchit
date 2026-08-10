@@ -35,8 +35,10 @@ function DiscoveryService.new()
 	self.hasSavedDataByUserId = {}
 	self.loadedByUserId = {}
 	self.saveQueuedByUserId = {}
+	self.saveWarningShownByUserId = {}
 	self.dataStore = nil
 	self.remote = RemoteService.GetRemote(Constants.Remotes.DiscoveryUpdate)
+	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self._unlockedEvent = Instance.new("BindableEvent")
 	self.DiscoveryUnlocked = self._unlockedEvent.Event
 
@@ -66,6 +68,7 @@ function DiscoveryService:Initialize()
 		self.hasSavedDataByUserId[player.UserId] = nil
 		self.loadedByUserId[player.UserId] = nil
 		self.saveQueuedByUserId[player.UserId] = nil
+		self.saveWarningShownByUserId[player.UserId] = nil
 	end)
 
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -111,6 +114,18 @@ function DiscoveryService:_ensurePlayer(player)
 	end
 end
 
+function DiscoveryService:_warnSaveIssue(player)
+	if not player or not player.Parent or self.saveWarningShownByUserId[player.UserId] then
+		return
+	end
+
+	self.saveWarningShownByUserId[player.UserId] = true
+	self.systemMessageRemote:FireClient(
+		player,
+		"Progress saving is unavailable in this session. In Studio, publish the game and enable API Services to test saves."
+	)
+end
+
 function DiscoveryService:_loadPlayer(player)
 	self.discoveryByUserId[player.UserId] = {}
 	self.hintsByUserId[player.UserId] = 0
@@ -130,6 +145,7 @@ function DiscoveryService:_loadPlayer(player)
 	if not ok then
 		warn(("[DON'T TOUCH IT] Could not load progress for %s: %s"):format(player.Name, tostring(data)))
 		self.loadedByUserId[player.UserId] = true
+		self:_warnSaveIssue(player)
 		return
 	end
 
@@ -177,19 +193,33 @@ end
 
 function DiscoveryService:_savePlayer(player)
 	if not player or not self.dataStore or not self.discoveryByUserId[player.UserId] then
+		self:_warnSaveIssue(player)
 		return false
 	end
 
 	local data = self:_buildSaveData(player)
-	local ok, errorMessage = pcall(function()
-		self.dataStore:SetAsync(getDataKey(player), data)
-	end)
+	local ok = false
+	local errorMessage = nil
+
+	for attempt = 1, Constants.DataStore.RetryCount do
+		ok, errorMessage = pcall(function()
+			self.dataStore:SetAsync(getDataKey(player), data)
+		end)
+
+		if ok then
+			self.hasSavedDataByUserId[player.UserId] = true
+			return true
+		end
+
+		task.wait(0.4 * attempt)
+	end
 
 	if not ok then
 		warn(("[DON'T TOUCH IT] Could not save progress for %s: %s"):format(player.Name, tostring(errorMessage)))
+		self:_warnSaveIssue(player)
 	end
 
-	return ok
+	return false
 end
 
 function DiscoveryService:_queueSave(player)
@@ -202,7 +232,7 @@ function DiscoveryService:_queueSave(player)
 	end
 
 	self.saveQueuedByUserId[player.UserId] = true
-	task.delay(2, function()
+	task.delay(0.25, function()
 		self.saveQueuedByUserId[player.UserId] = nil
 		if player.Parent then
 			self:_savePlayer(player)

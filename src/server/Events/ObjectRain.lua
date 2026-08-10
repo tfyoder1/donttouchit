@@ -1,5 +1,4 @@
 local CollectionService = game:GetService("CollectionService")
-local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
@@ -53,7 +52,6 @@ return {
 			CollectionService:AddTag(blob, Constants.Tags.TemporaryObject)
 			blob.AssemblyLinearVelocity = Vector3.new(random:NextNumber(-5, 5), random:NextNumber(-42, -26), random:NextNumber(-5, 5))
 			blob.AssemblyAngularVelocity = Vector3.new(random:NextNumber(-7, 7), random:NextNumber(-7, 7), random:NextNumber(-7, 7))
-			Debris:AddItem(blob, Constants.EventDuration + 4)
 
 			if index % 10 == 0 then
 				task.wait(0.05)
@@ -61,6 +59,6 @@ return {
 		end
 
 		context.DiscoveryService:UnlockForAll(Constants.Discoveries.ObjectRain.Id)
-		task.wait(Constants.EventDuration)
+		task.wait(1)
 	end,
 }

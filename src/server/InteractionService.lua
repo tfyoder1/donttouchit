@@ -34,6 +34,12 @@ local SWITCH_ON_COLORS = {
 	Color3.fromRGB(255, 144, 177),
 }
 
+local TV_SOUND_IDS = {
+	Static = "rbxasset://sounds/electronicpingshort.wav",
+	TestTone = "rbxasset://sounds/electronicpingshort.wav",
+	Warning = "rbxasset://sounds/snap.wav",
+}
+
 local function getPrompt(root)
 	if root:IsA("ProximityPrompt") then
 		return root
@@ -200,6 +206,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.ReferenceBook, function(instance)
 		self:_wireReferenceBook(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.ResetRoomButton, function(instance)
+		self:_wireResetRoomButton(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.UnderfloorReturn, function(instance)
@@ -446,6 +456,33 @@ function InteractionService:_wireReferenceBook(bookPart)
 		local roomId = bookPart:GetAttribute("RoomId") or "TVRoom"
 		if self.roomProgressService then
 			self.roomProgressService:ShowReferenceBook(player, roomId)
+		end
+	end)
+end
+
+function InteractionService:_wireResetRoomButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		playSound(button, "rbxasset://sounds/button.wav", 0.5, 0.75)
+
+		if button:IsA("BasePart") then
+			local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
+			local downTween = tweenPart(button, 0.1, {
+				CFrame = baseCFrame + Vector3.new(0, 0, 0.18),
+				Color = Color3.fromRGB(255, 190, 67),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			downTween.Completed:Wait()
+			tweenPart(button, 0.16, {
+				CFrame = baseCFrame,
+				Color = button:GetAttribute("BaseColor") or Color3.fromRGB(255, 221, 84),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+
+		self:_clearAllTelevisions()
+		self.eventManager:ResetRoom(player)
+		for _, currentPlayer in ipairs(Players:GetPlayers()) do
+			self:_checkExitUnlock(currentPlayer)
 		end
 	end)
 end
@@ -908,12 +945,29 @@ function InteractionService:_cycleTelevision(screen, textLabel, pressCount)
 		"PLEASE STOP",
 	}
 
-	textLabel.Text = staticMessages[((pressCount - 1) % #staticMessages) + 1]
+	local channelIndex = ((pressCount - 1) % #staticMessages) + 1
+	textLabel.Text = staticMessages[channelIndex]
 	screen.Color = Color3.fromRGB(40 + pressCount * 20, 55, 80 + pressCount * 25)
+
+	local tv = screen:FindFirstAncestorOfClass("Model")
+	if not tv then
+		return
+	end
+
+	self:_clearTelevisionSounds(tv)
+
+	if channelIndex == 1 then
+		self:_playTelevisionLoop(screen, "TVStaticSound", TV_SOUND_IDS.Static, 0.28, 7.5)
+	elseif channelIndex == 2 then
+		self:_playTelevisionLoop(screen, "TVTestTone", TV_SOUND_IDS.TestTone, 0.2, 0.38)
+	else
+		self:_startTelevisionWarning(tv, screen)
+	end
 end
 
 function InteractionService:_televisionSecret(tv, screen, textLabel, player, state)
 	state.Reacting = true
+	self:_clearTelevisionSounds(tv)
 	self.discoveryService:Unlock(player, Constants.Discoveries.AngeredTelevision.Id)
 	self.systemMessageRemote:FireClient(player, "The television noticed you.")
 
@@ -922,10 +976,137 @@ function InteractionService:_televisionSecret(tv, screen, textLabel, player, sta
 	screen.Color = Color3.fromRGB(255, 255, 255)
 	task.wait(0.15)
 	screen.Color = Color3.fromRGB(40, 10, 18)
-	task.wait(2.5)
+	self:_spawnTelevisionEye(tv, screen, player)
+	self:_startTelevisionWarning(tv, screen)
+	task.wait(30)
 
 	self.resetService.RestoreInstance(tv)
 	state.Reacting = false
+end
+
+function InteractionService:_clearTelevisionSounds(tv)
+	local state = self.tvState[tv]
+	if state then
+		state.WarningToken = {}
+	end
+
+	for _, descendant in ipairs(tv:GetDescendants()) do
+		if descendant:IsA("Sound") and descendant.Name:match("^TV") then
+			descendant:Destroy()
+		end
+	end
+end
+
+function InteractionService:_playTelevisionLoop(parent, name, soundId, volume, playbackSpeed)
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.SoundId = soundId
+	sound.Volume = volume
+	sound.PlaybackSpeed = playbackSpeed
+	sound.Looped = true
+	sound.RollOffMaxDistance = 55
+	sound.Parent = parent
+	CollectionService:AddTag(sound, Constants.Tags.TemporaryObject)
+	sound:Play()
+	return sound
+end
+
+function InteractionService:_clearAllTelevisions()
+	for _, tv in ipairs(CollectionService:GetTagged(Constants.Tags.Television)) do
+		self:_clearTelevisionSounds(tv)
+		local state = self.tvState[tv]
+		if state then
+			state.Reacting = false
+		end
+	end
+end
+
+function InteractionService:_startTelevisionWarning(tv, screen)
+	local state = self.tvState[tv]
+	if not state then
+		return
+	end
+
+	local token = {}
+	state.WarningToken = token
+
+	task.spawn(function()
+		local warnings = {
+			"TV advisory: stop pressing buttons.",
+			"Your television strongly recommends doing literally anything else.",
+			"Final-ish warning: the button is making the TV emotionally available.",
+		}
+		local index = 0
+
+		while tv.Parent and state.WarningToken == token do
+			index += 1
+			local warning = warnings[((index - 1) % #warnings) + 1]
+			self.systemMessageRemote:FireAllClients(warning)
+			playSound(screen, TV_SOUND_IDS.Warning, 0.45, 0.7 + (index % 2) * 0.45)
+			task.wait(1.35)
+		end
+	end)
+end
+
+function InteractionService:_spawnTelevisionEye(tv, screen, player)
+	local existingEye = tv:FindFirstChild("WatchingEye")
+	if existingEye then
+		existingEye:Destroy()
+	end
+
+	local model = Instance.new("Model")
+	model.Name = "WatchingEye"
+	model.Parent = tv
+	CollectionService:AddTag(model, Constants.Tags.TemporaryObject)
+
+	local eye = Instance.new("Part")
+	eye.Name = "EyeWhite"
+	eye.Anchored = true
+	eye.CanCollide = false
+	eye.Shape = Enum.PartType.Ball
+	eye.Size = Vector3.new(2.6, 2.6, 0.9)
+	eye.Color = Color3.fromRGB(255, 255, 245)
+	eye.Material = Enum.Material.Neon
+	eye.Parent = model
+	CollectionService:AddTag(eye, Constants.Tags.TemporaryObject)
+
+	local pupil = Instance.new("Part")
+	pupil.Name = "EyePupil"
+	pupil.Anchored = true
+	pupil.CanCollide = false
+	pupil.Shape = Enum.PartType.Ball
+	pupil.Size = Vector3.new(0.7, 0.7, 0.18)
+	pupil.Color = Color3.fromRGB(12, 14, 18)
+	pupil.Material = Enum.Material.SmoothPlastic
+	pupil.Parent = model
+	CollectionService:AddTag(pupil, Constants.Tags.TemporaryObject)
+
+	local origin = screen.Position + Vector3.new(0, 0, 0.45)
+	local startedAt = os.clock()
+
+	task.spawn(function()
+		while model.Parent and os.clock() - startedAt < 30 do
+			local rootPart = getRootPart(player)
+			local targetPosition = rootPart and rootPart.Position or origin + Vector3.new(0, 0, 8)
+			local direction = targetPosition - origin
+			if direction.Magnitude < 0.1 then
+				direction = Vector3.new(0, 0, 1)
+			end
+
+			direction = direction.Unit
+			eye.CFrame = CFrame.new(origin, origin + direction)
+			pupil.CFrame = CFrame.new(origin + direction * 0.5, origin + direction)
+			task.wait(0.08)
+		end
+
+		if model.Parent then
+			model:Destroy()
+		end
+
+		if tv.Parent then
+			self:_clearTelevisionSounds(tv)
+		end
+	end)
 end
 
 function InteractionService:_persistResetBaseline(root)

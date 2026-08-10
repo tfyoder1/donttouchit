@@ -193,6 +193,37 @@ local function makeShell(roomFolder)
 	return door
 end
 
+local function makeResetRoomButton(roomFolder)
+	local resetModel = makeModel(roomFolder, "ResetRoomButton")
+	local wallZ = Constants.Room.Depth / 2 - 0.6
+
+	local plate = createPart(
+		resetModel,
+		"ResetButtonPlate",
+		Vector3.new(3.4, 2.1, 0.24),
+		CFrame.new(-8.4, 4.5, wallZ),
+		Color3.fromRGB(42, 47, 56),
+		Enum.Material.Metal
+	)
+
+	local button = createPart(
+		resetModel,
+		"ResetButton",
+		Vector3.new(1.45, 0.38, 1.45),
+		CFrame.new(-8.4, 4.5, wallZ - 0.24) * CFrame.Angles(math.rad(90), 0, 0),
+		Color3.fromRGB(255, 221, 84),
+		Enum.Material.Neon
+	)
+	button.Shape = Enum.PartType.Cylinder
+
+	createSurfaceText(plate, "ResetButtonText", "RESET\nROOM", Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
+	createPrompt(button, "Reset", "Room Reset", 0.2)
+	tag(button, Constants.Tags.ResetRoomButton)
+
+	resetModel.PrimaryPart = plate
+	return resetModel
+end
+
 local function makeSpawn(roomFolder)
 	return createSpawnLocation(
 		roomFolder,
@@ -826,6 +857,7 @@ function RoomBuilder.Build()
 
 	local _, recoveryFloor = makeFloor(roomFolder)
 	local exitDoor = makeShell(roomFolder)
+	local resetRoomButton = makeResetRoomButton(roomFolder)
 	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
 	local hallway = makeHallway(roomFolder)
@@ -855,6 +887,7 @@ function RoomBuilder.Build()
 		RecoveryFloor = recoveryFloor,
 		UnderfloorChamber = underfloorChamber,
 		ExitDoor = exitDoor,
+		ResetRoomButton = resetRoomButton,
 		Hallway = hallway,
 		Pedestal = pedestal,
 		LightSwitch = lightSwitch,

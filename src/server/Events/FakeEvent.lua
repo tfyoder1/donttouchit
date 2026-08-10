@@ -44,14 +44,14 @@ local function spawnConfetti()
 
 	local random = Random.new()
 	local corners = {
-		Vector3.new(-Constants.Room.Width / 2 + 2, 3.6, -Constants.Room.Depth / 2 + 2),
-		Vector3.new(Constants.Room.Width / 2 - 2, 3.6, -Constants.Room.Depth / 2 + 2),
-		Vector3.new(-Constants.Room.Width / 2 + 2, 3.6, Constants.Room.Depth / 2 - 2),
-		Vector3.new(Constants.Room.Width / 2 - 2, 3.6, Constants.Room.Depth / 2 - 2),
+		Vector3.new(-Constants.Room.Width / 2 + 2, Constants.Room.TVHeight - 5, -Constants.Room.Depth / 2 + 2),
+		Vector3.new(Constants.Room.Width / 2 - 2, Constants.Room.TVHeight - 5, -Constants.Room.Depth / 2 + 2),
+		Vector3.new(-Constants.Room.Width / 2 + 2, Constants.Room.TVHeight - 5, Constants.Room.Depth / 2 - 2),
+		Vector3.new(Constants.Room.Width / 2 - 2, Constants.Room.TVHeight - 5, Constants.Room.Depth / 2 - 2),
 	}
 
 	for _, corner in ipairs(corners) do
-		for _ = 1, 28 do
+		for _ = 1, 42 do
 			local confetti = Instance.new("Part")
 			confetti.Name = "CornerConfetti"
 			confetti.Anchored = false
@@ -67,19 +67,19 @@ local function spawnConfetti()
 			confetti.Parent = folder
 			CollectionService:AddTag(confetti, Constants.Tags.TemporaryObject)
 
-			local inward = (Vector3.new(0, 5.5, 0) - corner).Unit
-			confetti.AssemblyLinearVelocity = inward * random:NextNumber(32, 48)
-				+ Vector3.new(0, random:NextNumber(12, 22), 0)
+			local inward = (Vector3.new(0, Constants.Room.TVHeight - 2, 0) - corner).Unit
+			confetti.AssemblyLinearVelocity = inward * random:NextNumber(38, 58)
+				+ Vector3.new(0, random:NextNumber(28, 45), 0)
 			confetti.AssemblyAngularVelocity = Vector3.new(
 				random:NextNumber(-12, 12),
 				random:NextNumber(-12, 12),
 				random:NextNumber(-12, 12)
 			)
-			Debris:AddItem(confetti, 6)
+			Debris:AddItem(confetti, Constants.Confetti.DurationSeconds)
 		end
 	end
 
-	Debris:AddItem(folder, 7)
+	Debris:AddItem(folder, Constants.Confetti.DurationSeconds + 1)
 end
 
 local function launchPlayer(player)

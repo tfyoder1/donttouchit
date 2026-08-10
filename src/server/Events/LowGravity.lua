@@ -1,3 +1,4 @@
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,13 +11,15 @@ return {
 	StartMessage = "Gravity just got very negotiable.",
 
 	Run = function(context)
-		local oldLighting = {
-			Ambient = Lighting.Ambient,
-			Brightness = Lighting.Brightness,
-			ColorShift_Top = Lighting.ColorShift_Top,
-			ColorShift_Bottom = Lighting.ColorShift_Bottom,
-			OutdoorAmbient = Lighting.OutdoorAmbient,
-		}
+		local existingOptic = Lighting:FindFirstChild("LowGravityOptic")
+		local existingBloom = Lighting:FindFirstChild("LowGravityBloom")
+		if existingOptic then
+			existingOptic:Destroy()
+		end
+		if existingBloom then
+			existingBloom:Destroy()
+		end
+
 		local colorCorrection = Instance.new("ColorCorrectionEffect")
 		colorCorrection.Name = "LowGravityOptic"
 		colorCorrection.Brightness = 0.06
@@ -24,6 +27,7 @@ return {
 		colorCorrection.Saturation = 0.38
 		colorCorrection.TintColor = Color3.fromRGB(154, 218, 255)
 		colorCorrection.Parent = Lighting
+		CollectionService:AddTag(colorCorrection, Constants.Tags.TemporaryObject)
 
 		local bloom = Instance.new("BloomEffect")
 		bloom.Name = "LowGravityBloom"
@@ -31,25 +35,29 @@ return {
 		bloom.Size = 32
 		bloom.Threshold = 1.2
 		bloom.Parent = Lighting
+		CollectionService:AddTag(bloom, Constants.Tags.TemporaryObject)
 
 		workspace.Gravity = 45
 		context.DiscoveryService:UnlockForAll(Constants.Discoveries.LowGravity.Id)
-		for index = 1, Constants.EventDuration * 2 do
-			local color = index % 2 == 0 and Color3.fromRGB(142, 210, 255) or Color3.fromRGB(218, 156, 255)
-			Lighting.Ambient = color
-			Lighting.OutdoorAmbient = color:Lerp(Color3.fromRGB(255, 255, 255), 0.2)
-			Lighting.ColorShift_Top = color
-			Lighting.Brightness = 2.4
-			colorCorrection.TintColor = color
-			task.wait(0.5)
+
+		task.spawn(function()
+			local index = 0
+			while colorCorrection.Parent and bloom.Parent do
+				index += 1
+				local color = index % 2 == 0 and Color3.fromRGB(142, 210, 255) or Color3.fromRGB(218, 156, 255)
+				Lighting.Ambient = color
+				Lighting.OutdoorAmbient = color:Lerp(Color3.fromRGB(255, 255, 255), 0.2)
+				Lighting.ColorShift_Top = color
+				Lighting.Brightness = 2.4
+				colorCorrection.TintColor = color
+				task.wait(0.5)
+			end
+		end)
+
+		if context.BroadcastMessage then
+			context.BroadcastMessage("Low gravity will keep misbehaving until someone presses RESET ROOM.")
 		end
 
-		workspace.Gravity = Constants.NormalGravity
-		colorCorrection:Destroy()
-		bloom:Destroy()
-
-		for propertyName, value in pairs(oldLighting) do
-			Lighting[propertyName] = value
-		end
+		task.wait(1)
 	end,
 }

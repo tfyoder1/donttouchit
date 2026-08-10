@@ -1,7 +1,9 @@
 local Debris = game:GetService("Debris")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
@@ -56,6 +58,56 @@ counter.Parent = gui
 local counterCorner = Instance.new("UICorner")
 counterCorner.CornerRadius = UDim.new(0, 6)
 counterCorner.Parent = counter
+
+local noTouchPanel = Instance.new("Frame")
+noTouchPanel.Name = "NoTouchProgress"
+noTouchPanel.AnchorPoint = Vector2.new(1, 0)
+noTouchPanel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+noTouchPanel.BackgroundTransparency = 0.18
+noTouchPanel.BorderSizePixel = 0
+noTouchPanel.Position = UDim2.new(1, -18, 0, 140)
+noTouchPanel.Size = UDim2.fromOffset(280, 48)
+noTouchPanel.Visible = false
+noTouchPanel.Parent = gui
+
+local noTouchCorner = Instance.new("UICorner")
+noTouchCorner.CornerRadius = UDim.new(0, 6)
+noTouchCorner.Parent = noTouchPanel
+
+local noTouchLabel = Instance.new("TextLabel")
+noTouchLabel.Name = "NoTouchLabel"
+noTouchLabel.BackgroundTransparency = 1
+noTouchLabel.Font = Enum.Font.GothamBold
+noTouchLabel.Position = UDim2.fromOffset(10, 4)
+noTouchLabel.Size = UDim2.new(1, -20, 0, 20)
+noTouchLabel.Text = "No interaction: 0.0 / 2.0 min"
+noTouchLabel.TextColor3 = Color3.fromRGB(236, 246, 255)
+noTouchLabel.TextScaled = true
+noTouchLabel.TextXAlignment = Enum.TextXAlignment.Left
+noTouchLabel.Parent = noTouchPanel
+
+local noTouchTrack = Instance.new("Frame")
+noTouchTrack.Name = "NoTouchTrack"
+noTouchTrack.BackgroundColor3 = Color3.fromRGB(42, 47, 56)
+noTouchTrack.BorderSizePixel = 0
+noTouchTrack.Position = UDim2.fromOffset(10, 29)
+noTouchTrack.Size = UDim2.new(1, -20, 0, 10)
+noTouchTrack.Parent = noTouchPanel
+
+local noTouchTrackCorner = Instance.new("UICorner")
+noTouchTrackCorner.CornerRadius = UDim.new(0, 5)
+noTouchTrackCorner.Parent = noTouchTrack
+
+local noTouchFill = Instance.new("Frame")
+noTouchFill.Name = "NoTouchFill"
+noTouchFill.BackgroundColor3 = Color3.fromRGB(255, 221, 84)
+noTouchFill.BorderSizePixel = 0
+noTouchFill.Size = UDim2.fromScale(0, 1)
+noTouchFill.Parent = noTouchTrack
+
+local noTouchFillCorner = Instance.new("UICorner")
+noTouchFillCorner.CornerRadius = UDim.new(0, 5)
+noTouchFillCorner.Parent = noTouchFill
 
 local toast = Instance.new("TextLabel")
 toast.Name = "DiscoveryToast"
@@ -114,6 +166,7 @@ bookPanel.BorderSizePixel = 0
 bookPanel.Position = UDim2.fromScale(0.5, 0.52)
 bookPanel.Size = UDim2.fromOffset(440, 500)
 bookPanel.Visible = false
+bookPanel.Active = true
 bookPanel.Parent = gui
 
 local bookPanelConstraint = Instance.new("UISizeConstraint")
@@ -148,6 +201,7 @@ closeBookButton.Size = UDim2.fromOffset(36, 32)
 closeBookButton.Text = "X"
 closeBookButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBookButton.TextScaled = true
+closeBookButton.Modal = false
 closeBookButton.Parent = bookPanel
 
 local closeCorner = Instance.new("UICorner")
@@ -262,6 +316,7 @@ startOverlay.BackgroundTransparency = 0.28
 startOverlay.BorderSizePixel = 0
 startOverlay.Size = UDim2.fromScale(1, 1)
 startOverlay.Visible = false
+startOverlay.Active = true
 startOverlay.ZIndex = 20
 startOverlay.Parent = gui
 
@@ -320,6 +375,7 @@ continueButton.Size = UDim2.new(1, -48, 0, 42)
 continueButton.Text = "Continue"
 continueButton.TextColor3 = Color3.fromRGB(14, 40, 24)
 continueButton.TextScaled = true
+continueButton.Modal = false
 continueButton.ZIndex = 22
 continueButton.Parent = startPanel
 
@@ -337,6 +393,7 @@ restartButton.Size = UDim2.new(1, -48, 0, 34)
 restartButton.Text = "Start Over"
 restartButton.TextColor3 = Color3.fromRGB(14, 27, 46)
 restartButton.TextScaled = true
+restartButton.Modal = false
 restartButton.ZIndex = 22
 restartButton.Parent = startPanel
 
@@ -352,6 +409,10 @@ local activeBookRoomId = nil
 local currentStatusType = nil
 local currentStatusRoomId = nil
 local pendingStartOptions = nil
+local overlayMouseDepth = 0
+local previousMouseBehavior = nil
+local previousMouseIconEnabled = nil
+local previousSelectedObject = nil
 
 local function tween(instance, duration, properties)
 	local tweenObject = TweenService:Create(
@@ -453,13 +514,65 @@ local function updateRoomStatus(payload)
 			payload.Count or 0,
 			payload.Total or 0
 		)
+		local elapsed = math.max(0, payload.NoTouchElapsed or 0)
+		local target = math.max(1, payload.NoTouchTarget or Constants.NoTouch.AccomplishmentSeconds)
+		local ratio = math.clamp(elapsed / target, 0, 1)
+		noTouchPanel.Visible = true
+		noTouchFill.Size = UDim2.fromScale(ratio, 1)
+		noTouchLabel.Text = ("No interaction: %.1f / %.1f min"):format(elapsed / 60, target / 60)
 	else
 		counter.Text = ""
+		noTouchPanel.Visible = false
 	end
+
+	if payload.Type == "Hallway" then
+		noTouchPanel.Visible = false
+	end
+end
+
+local function setOverlayMouse(active, selectedObject)
+	if active then
+		if overlayMouseDepth == 0 then
+			previousMouseBehavior = UserInputService.MouseBehavior
+			previousMouseIconEnabled = UserInputService.MouseIconEnabled
+			previousSelectedObject = GuiService.SelectedObject
+		end
+
+		overlayMouseDepth += 1
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+		GuiService.SelectedObject = selectedObject
+		return
+	end
+
+	overlayMouseDepth = math.max(0, overlayMouseDepth - 1)
+	if overlayMouseDepth > 0 then
+		return
+	end
+
+	UserInputService.MouseBehavior = previousMouseBehavior or Enum.MouseBehavior.Default
+	UserInputService.MouseIconEnabled = previousMouseIconEnabled ~= false
+	GuiService.SelectedObject = previousSelectedObject
+	previousMouseBehavior = nil
+	previousMouseIconEnabled = nil
+	previousSelectedObject = nil
+end
+
+local function closeReferenceBook()
+	if not bookPanel.Visible then
+		return
+	end
+
+	bookPanel.Visible = false
+	closeBookButton.Modal = false
+	setOverlayMouse(false)
 end
 
 local function sendStartChoice(action)
 	startOverlay.Visible = false
+	continueButton.Modal = false
+	restartButton.Modal = false
+	setOverlayMouse(false)
 	pendingStartOptions = nil
 	sessionStartRemote:FireServer({
 		Action = action,
@@ -473,6 +586,9 @@ local function renderStartOptions(payload)
 
 	pendingStartOptions = payload
 	startOverlay.Visible = true
+	continueButton.Modal = true
+	restartButton.Modal = true
+	setOverlayMouse(true, continueButton)
 	startSubtitle.Text = ("Book: %d / %d found    Hints: %d"):format(
 		payload.DiscoveryCount or 0,
 		payload.TotalDiscoveries or Constants.TotalDiscoveries,
@@ -564,8 +680,13 @@ local function renderReferenceBook(payload)
 		return
 	end
 
+	local wasVisible = bookPanel.Visible
 	activeBookRoomId = payload.RoomId
 	bookPanel.Visible = true
+	if not wasVisible then
+		closeBookButton.Modal = true
+		setOverlayMouse(true, closeBookButton)
+	end
 	bookTitle.Text = (payload.RoomName or "Room") .. " Log"
 	bookCount.Text = ("%d / %d found"):format(payload.Count or 0, payload.Total or 0)
 	hintCount.Text = ("Hints: %d"):format(payload.Hints or 0)
@@ -606,9 +727,7 @@ listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	bookList.CanvasSize = UDim2.fromOffset(0, listLayout.AbsoluteContentSize.Y + 16)
 end)
 
-closeBookButton.MouseButton1Click:Connect(function()
-	bookPanel.Visible = false
-end)
+closeBookButton.MouseButton1Click:Connect(closeReferenceBook)
 
 continueButton.MouseButton1Click:Connect(function()
 	sendStartChoice("Resume")
@@ -633,6 +752,18 @@ useHintButton.MouseButton1Click:Connect(function()
 			Action = "UseHint",
 			RoomId = activeBookRoomId,
 		})
+	end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
+		return
+	end
+
+	if bookPanel.Visible and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) then
+		closeReferenceBook()
+	elseif startOverlay.Visible and input.KeyCode == Enum.KeyCode.ButtonA then
+		sendStartChoice("Resume")
 	end
 end)
 

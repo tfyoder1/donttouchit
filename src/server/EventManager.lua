@@ -119,10 +119,9 @@ function EventManager:_startEvent(triggeringPlayer, eventDefinition, unlockButto
 
 		if not ok then
 			warn(("[DON'T TOUCH IT] Event '%s' failed: %s"):format(eventDefinition.Id, tostring(errorMessage)))
-			self:_broadcastMessage("The room coughed. Resetting...")
+			self:_broadcastMessage("The room coughed. The reset button is looking useful.")
 		end
 
-		self.resetService.RestoreAll()
 		task.wait(Constants.EventCooldown)
 		self.active = false
 	end)
@@ -150,6 +149,12 @@ end
 function EventManager:TriggerById(triggeringPlayer, eventId)
 	local eventDefinition = self:_getEventById(eventId)
 	return self:_startEvent(triggeringPlayer, eventDefinition, false)
+end
+
+function EventManager:ResetRoom(triggeringPlayer)
+	self.resetService.RestoreAll()
+	self.active = false
+	self:_broadcastMessage("Room reset. The evidence has been cleaned up, but the book remembers.")
 end
 
 return EventManager
