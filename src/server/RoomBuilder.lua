@@ -194,24 +194,32 @@ local function makePedestal(objectsFolder)
 	local base = createPart(
 		pedestal,
 		"PedestalBase",
-		Vector3.new(4.8, 3, 4.8),
-		CFrame.new(0, 2, 0),
+		Vector3.new(5.2, 2.8, 5.2),
+		CFrame.new(0, 1.9, 0),
 		Color3.fromRGB(72, 76, 82),
 		Enum.Material.Metal,
 		"Part"
 	)
-	base.Shape = Enum.PartType.Cylinder
+
+	createPart(
+		pedestal,
+		"ButtonPlate",
+		Vector3.new(4.4, 0.25, 4.4),
+		CFrame.new(0, 3.42, 0),
+		Color3.fromRGB(32, 35, 40),
+		Enum.Material.Metal
+	)
 
 	local button = createPart(
 		pedestal,
 		"BigRedButton",
-		Vector3.new(3.2, 0.7, 3.2),
-		CFrame.new(0, 3.85, 0),
-		Color3.fromRGB(220, 25, 35),
-		Enum.Material.SmoothPlastic,
+		Vector3.new(3.25, 0.95, 3.25),
+		CFrame.new(0, 3.95, 0),
+		Color3.fromRGB(231, 30, 42),
+		Enum.Material.Neon,
 		"Part"
 	)
-	button.Shape = Enum.PartType.Cylinder
+	button.Shape = Enum.PartType.Ball
 	createPrompt(button, "Press", "Absolutely Do Not Touch", 0.15)
 	tag(button, Constants.Tags.MainButton)
 
@@ -282,9 +290,12 @@ local function makeTableAndAppliance(objectsFolder)
 	end
 
 	local appliance = makeModel(objectsFolder, "TinyAppliance")
-	createPart(appliance, "ApplianceBody", Vector3.new(3.8, 2.1, 2.2), CFrame.new(9, 3.65, 6), Color3.fromRGB(205, 209, 214), Enum.Material.Metal)
+	local body = createPart(appliance, "ApplianceBody", Vector3.new(3.8, 2.1, 2.2), CFrame.new(9, 3.65, 6), Color3.fromRGB(205, 209, 214), Enum.Material.Metal)
 	local door = createPart(appliance, "ApplianceDoor", Vector3.new(3.4, 1.6, 0.15), CFrame.new(9, 3.65, 4.86), Color3.fromRGB(38, 42, 47), Enum.Material.Glass)
 	createSurfaceText(door, "ApplianceText", "00:00", Enum.NormalId.Front, Color3.fromRGB(109, 255, 177), Color3.fromRGB(23, 28, 31))
+	createPrompt(door, "Start", "Tiny Appliance", 0)
+	tag(appliance, Constants.Tags.Appliance)
+	appliance.PrimaryPart = body
 end
 
 local function makeSquishy(objectsFolder)
@@ -321,6 +332,57 @@ local function makeTelevision(objectsFolder)
 	return tv, { body, screen, stand }
 end
 
+local function makeUnderfloorChamber(roomFolder, recoveryFloor)
+	local chamber = makeModel(roomFolder, "UnderfloorChamber")
+	local y = Constants.Room.RecoveryY
+	local width = Constants.Room.Width + 14
+	local depth = Constants.Room.Depth + 14
+	local wallColor = Color3.fromRGB(61, 70, 82)
+
+	recoveryFloor.Name = "UnderfloorFloor"
+	recoveryFloor.Color = Color3.fromRGB(55, 88, 123)
+	recoveryFloor.Material = Enum.Material.Concrete
+	recoveryFloor.Transparency = 0.05
+	recoveryFloor:SetAttribute("BaseTransparency", recoveryFloor.Transparency)
+
+	createPart(chamber, "UnderfloorBackWall", Vector3.new(width, 8, 1), CFrame.new(0, y + 4, -depth / 2), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "UnderfloorFrontWall", Vector3.new(width, 8, 1), CFrame.new(0, y + 4, depth / 2), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "UnderfloorLeftWall", Vector3.new(1, 8, depth), CFrame.new(-width / 2, y + 4, 0), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "UnderfloorRightWall", Vector3.new(1, 8, depth), CFrame.new(width / 2, y + 4, 0), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "UnderfloorCeiling", Vector3.new(width, 0.45, depth), CFrame.new(0, y + 8.2, 0), Color3.fromRGB(40, 47, 58), Enum.Material.Concrete)
+
+	local sign = createPart(chamber, "UnderfloorSign", Vector3.new(12, 2.2, 0.3), CFrame.new(0, y + 4.7, -depth / 2 + 0.55), Color3.fromRGB(106, 255, 196), Enum.Material.Neon)
+	createSurfaceText(sign, "UnderfloorSignText", "FLOOR LOST & FOUND", Enum.NormalId.Front, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
+
+	local pad = createPart(chamber, "UnderfloorReturnPad", Vector3.new(6.5, 0.35, 6.5), CFrame.new(0, y + 0.72, 5.5), Color3.fromRGB(61, 217, 132), Enum.Material.Neon)
+	pad.Transparency = 0.12
+	pad:SetAttribute("BaseTransparency", pad.Transparency)
+	pad:SetAttribute("DestinationCFrame", CFrame.new(0, 5, 10))
+	createPrompt(pad, "Return", "Elevator Pad", 0)
+	tag(pad, Constants.Tags.UnderfloorReturn)
+
+	local ceilingButton = createPart(chamber, "UnderfloorCeilingButton", Vector3.new(2.4, 0.7, 2.4), CFrame.new(0, y + 7.62, -4), Color3.fromRGB(235, 47, 61), Enum.Material.Neon)
+	ceilingButton.Shape = Enum.PartType.Ball
+	ceilingButton:SetAttribute("DestinationCFrame", CFrame.new(0, 5, 10))
+	createPrompt(ceilingButton, "Press", "Ceiling Button", 0)
+	tag(ceilingButton, Constants.Tags.UnderfloorReturn)
+
+	local light = Instance.new("PointLight")
+	light.Name = "UnderfloorReturnLight"
+	light.Brightness = 2.3
+	light.Color = Color3.fromRGB(116, 255, 205)
+	light.Range = 18
+	light.Parent = pad
+	mark(light)
+
+	local safetyFloor = createPart(chamber, "UnderfloorSafetyNet", Vector3.new(width + 10, 1, depth + 10), CFrame.new(0, y - 14, 0), Color3.fromRGB(61, 217, 132), Enum.Material.Neon)
+	safetyFloor.Transparency = 0.6
+	safetyFloor:SetAttribute("BaseTransparency", safetyFloor.Transparency)
+	safetyFloor:SetAttribute("DestinationCFrame", CFrame.new(0, y + 3, 5.5))
+
+	return chamber, safetyFloor
+end
+
 local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
@@ -343,6 +405,20 @@ local function makeHallDoor(parent, name, size, cframe, face, label, destination
 	return door
 end
 
+local function makeReferenceBook(parent, name, cframe, roomId, title)
+	local book = makeModel(parent, name)
+	local base = createPart(book, "BookStand", Vector3.new(3.8, 2.4, 2.4), cframe * CFrame.new(0, 1.2, 0), Color3.fromRGB(53, 59, 68), Enum.Material.Metal)
+	local cover = createPart(book, "BookCover", Vector3.new(3.4, 0.35, 2.5), cframe * CFrame.new(0, 2.55, -0.08) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(70, 45, 122), Enum.Material.SmoothPlastic)
+
+	cover:SetAttribute("RoomId", roomId)
+	createSurfaceText(cover, "BookText", title .. "\nLOG", Enum.NormalId.Top, Color3.fromRGB(255, 242, 181), Color3.fromRGB(70, 45, 122))
+	createPrompt(cover, "Read", title .. " Book", 0)
+	tag(cover, Constants.Tags.ReferenceBook)
+
+	book.PrimaryPart = base
+	return book
+end
+
 local function makeHallway(roomFolder)
 	local hallway = makeModel(roomFolder, "DoorHallway")
 
@@ -354,6 +430,8 @@ local function makeHallway(roomFolder)
 
 	local label = createPart(hallway, "HallwaySign", Vector3.new(9.5, 2.2, 0.3), CFrame.new(0, 7.1, 22), Color3.fromRGB(250, 238, 111), Enum.Material.SmoothPlastic)
 	createSurfaceText(label, "HallwaySignText", "ROOMS", Enum.NormalId.Back, Color3.fromRGB(22, 22, 26), Color3.fromRGB(250, 238, 111))
+	makeReferenceBook(hallway, "TVRoomReferenceBook", CFrame.new(-3.5, 0, 30), "TVRoom", "TV ROOM")
+	makeReferenceBook(hallway, "SnackLabReferenceBook", CFrame.new(3.5, 0, 38), "SnackLab", "SNACK LAB")
 
 	local snackDoor = makeHallDoor(
 		hallway,
@@ -439,10 +517,9 @@ local function makeSnackButton(objectsFolder)
 	local model = makeModel(objectsFolder, "SnackLabButton")
 
 	local base = createPart(model, "SnackButtonBase", Vector3.new(4.6, 2.6, 4.6), cframeAt(origin, 0, 1.8, 0), Color3.fromRGB(59, 67, 76), Enum.Material.Metal)
-	base.Shape = Enum.PartType.Cylinder
 
 	local button = createPart(model, "SnackBlueButton", Vector3.new(3.1, 0.65, 3.1), cframeAt(origin, 0, 3.4, 0), Color3.fromRGB(45, 151, 255), Enum.Material.SmoothPlastic)
-	button.Shape = Enum.PartType.Cylinder
+	button.Shape = Enum.PartType.Ball
 	createPrompt(button, "Press", "Snack Lab Button", 0.1)
 	tag(button, Constants.Tags.SnackButton)
 
@@ -458,6 +535,20 @@ local function makeSnackFridge(objectsFolder)
 	local fridge = makeModel(objectsFolder, "Fridge")
 
 	local body = createPart(fridge, "FridgeBody", Vector3.new(6, 9, 4), cframeAt(origin, -13, 4.9, -9), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
+	createPart(fridge, "FridgeInterior", Vector3.new(5.2, 7.3, 0.24), cframeAt(origin, -13, 4.9, -7.18), Color3.fromRGB(55, 78, 92), Enum.Material.SmoothPlastic)
+	createPart(fridge, "FridgeShelfTop", Vector3.new(5.1, 0.18, 2.7), cframeAt(origin, -13, 6.2, -8.55), Color3.fromRGB(185, 244, 255), Enum.Material.Glass)
+	createPart(fridge, "FridgeShelfBottom", Vector3.new(5.1, 0.18, 2.7), cframeAt(origin, -13, 3.9, -8.55), Color3.fromRGB(185, 244, 255), Enum.Material.Glass)
+	local iceCube = createPart(fridge, "ColdIdeaIceCube", Vector3.new(1.4, 1.4, 1.4), cframeAt(origin, -13, 5.05, -7.55), Color3.fromRGB(134, 238, 255), Enum.Material.Ice)
+	iceCube.Transparency = 0.22
+	iceCube:SetAttribute("BaseTransparency", iceCube.Transparency)
+	local iceLight = Instance.new("PointLight")
+	iceLight.Name = "ColdIdeaLight"
+	iceLight.Brightness = 1.5
+	iceLight.Color = Color3.fromRGB(134, 238, 255)
+	iceLight.Range = 8
+	iceLight.Parent = iceCube
+	mark(iceLight)
+
 	local door = createPart(fridge, "FridgeDoor", Vector3.new(5.5, 8, 0.32), cframeAt(origin, -13, 4.9, -6.83), Color3.fromRGB(237, 246, 247), Enum.Material.Metal)
 	createSurfaceText(door, "FridgeDoorText", "DO NOT OPEN", Enum.NormalId.Front, Color3.fromRGB(26, 35, 39), Color3.fromRGB(237, 246, 247))
 	createPrompt(door, "Open", "Fridge", 0)
@@ -486,12 +577,17 @@ local function makeSnackSink(objectsFolder)
 	local sink = makeModel(objectsFolder, "Sink")
 
 	createPart(sink, "SinkCounter", Vector3.new(9, 2.2, 3.8), cframeAt(origin, 10, 1.55, -9), Color3.fromRGB(122, 128, 132), Enum.Material.Metal)
-	createPart(sink, "SinkBasin", Vector3.new(4.6, 0.55, 2.2), cframeAt(origin, 10, 2.95, -9), Color3.fromRGB(61, 75, 83), Enum.Material.Metal)
-	local faucet = createPart(sink, "Faucet", Vector3.new(0.45, 2.3, 0.45), cframeAt(origin, 10, 4, -10.1), Color3.fromRGB(216, 223, 226), Enum.Material.Metal)
-	createPrompt(faucet, "Turn", "Sink", 0)
+	createPart(sink, "SinkBasinOuter", Vector3.new(5.2, 0.45, 2.8), cframeAt(origin, 10, 2.93, -9), Color3.fromRGB(215, 224, 229), Enum.Material.Metal)
+	createPart(sink, "SinkBasinDark", Vector3.new(4.1, 0.5, 1.8), cframeAt(origin, 10, 3.02, -9), Color3.fromRGB(40, 55, 65), Enum.Material.SmoothPlastic)
+	createPart(sink, "SinkWaterRest", Vector3.new(3.4, 0.08, 1.25), cframeAt(origin, 10, 3.33, -9), Color3.fromRGB(72, 183, 238), Enum.Material.Glass)
+	local faucetPost = createPart(sink, "FaucetPost", Vector3.new(0.42, 1.9, 0.42), cframeAt(origin, 10, 4.05, -10.22), Color3.fromRGB(216, 223, 226), Enum.Material.Metal)
+	local faucetSpout = createPart(sink, "FaucetSpout", Vector3.new(0.42, 0.42, 1.65), cframeAt(origin, 10, 4.78, -9.55), Color3.fromRGB(216, 223, 226), Enum.Material.Metal)
+	createPart(sink, "HotHandle", Vector3.new(0.7, 0.25, 0.7), cframeAt(origin, 8.65, 3.55, -10.35), Color3.fromRGB(255, 80, 80), Enum.Material.Neon)
+	createPart(sink, "ColdHandle", Vector3.new(0.7, 0.25, 0.7), cframeAt(origin, 11.35, 3.55, -10.35), Color3.fromRGB(80, 160, 255), Enum.Material.Neon)
+	createPrompt(faucetSpout, "Turn", "Sink", 0)
 	tag(sink, Constants.Tags.SnackSink)
 
-	sink.PrimaryPart = faucet
+	sink.PrimaryPart = faucetPost
 	return sink
 end
 
@@ -500,20 +596,100 @@ local function makeSnackMixer(objectsFolder)
 	local mixer = makeModel(objectsFolder, "Mixer")
 
 	local base = createPart(mixer, "MixerBase", Vector3.new(5.2, 0.8, 4.2), cframeAt(origin, 12, 1.15, 7), Color3.fromRGB(94, 101, 115), Enum.Material.Metal)
-	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 2.2, 3.6), cframeAt(origin, 12, 2.5, 7), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
+	createPart(mixer, "MixerStand", Vector3.new(0.75, 3.4, 0.75), cframeAt(origin, 10.1, 2.75, 7), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
+	local head = createPart(mixer, "MixerHead", Vector3.new(3.9, 1.3, 2.1), cframeAt(origin, 11.75, 4.35, 7), Color3.fromRGB(236, 63, 77), Enum.Material.Metal)
+	local bowl = createPart(mixer, "MixerBowl", Vector3.new(3.6, 1.75, 3.6), cframeAt(origin, 12.25, 2.25, 7), Color3.fromRGB(116, 210, 225), Enum.Material.Glass)
 	bowl.Shape = Enum.PartType.Ball
-	local arm = createPart(mixer, "MixerArm", Vector3.new(4.6, 0.75, 1.1), cframeAt(origin, 12, 4.05, 7), Color3.fromRGB(225, 229, 235), Enum.Material.Metal)
-	createPrompt(bowl, "Mix", "Mixer", 0)
+	bowl.Transparency = 0.25
+	bowl:SetAttribute("BaseTransparency", bowl.Transparency)
+	createPart(mixer, "BeaterLeft", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8, 3.15, 6.55), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	createPart(mixer, "BeaterRight", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, 11.8, 3.15, 7.45), Color3.fromRGB(224, 232, 235), Enum.Material.Metal)
+	createPrompt(head, "Mix", "Mixer", 0)
 	tag(mixer, Constants.Tags.SnackMixer)
 
 	mixer.PrimaryPart = base
-	return mixer, bowl, arm
+	return mixer, bowl, head
 end
 
-local function connectRecoveryFloor(recoveryFloor)
+local function makeSnackRack(objectsFolder)
+	local origin = SNACK_LAB_ORIGIN
+	local rack = makeModel(objectsFolder, "SnackRack")
+	local colors = {
+		Color3.fromRGB(255, 86, 86),
+		Color3.fromRGB(255, 207, 78),
+		Color3.fromRGB(76, 208, 123),
+		Color3.fromRGB(84, 154, 255),
+		Color3.fromRGB(219, 112, 255),
+	}
+	local names = { "CRONCH", "ZAP CHIPS", "MYSTERY", "PUFFS", "NOPE" }
+
+	local back = createPart(rack, "RackBack", Vector3.new(9.5, 6.6, 0.35), cframeAt(origin, -12, 4.0, 6.8), Color3.fromRGB(68, 76, 90), Enum.Material.Metal)
+	createPart(rack, "RackLeft", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, -16.9, 4.0, 7.65), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
+	createPart(rack, "RackRight", Vector3.new(0.35, 6.8, 2.2), cframeAt(origin, -7.1, 4.0, 7.65), Color3.fromRGB(48, 54, 66), Enum.Material.Metal)
+
+	for shelfIndex = 1, 3 do
+		local y = 1.65 + shelfIndex * 1.85
+		createPart(rack, "SnackShelf", Vector3.new(10, 0.28, 2.3), cframeAt(origin, -12, y, 7.7), Color3.fromRGB(94, 103, 116), Enum.Material.Metal)
+
+		for packIndex = 1, 5 do
+			local x = -15.6 + (packIndex - 1) * 1.8
+			local pack = createPart(
+				rack,
+				"SnackPack",
+				Vector3.new(1.1, 1.45, 0.28),
+				cframeAt(origin, x, y + 0.88, 6.45),
+				colors[((shelfIndex + packIndex - 2) % #colors) + 1],
+				Enum.Material.SmoothPlastic
+			)
+			pack:SetAttribute("IsSnackPack", true)
+			createSurfaceText(pack, "SnackPackText", names[((shelfIndex + packIndex - 2) % #names) + 1], Enum.NormalId.Back, Color3.fromRGB(255, 255, 255), pack.Color)
+		end
+	end
+
+	createPrompt(back, "Inspect", "Snack Rack", 0)
+	tag(rack, Constants.Tags.SnackRack)
+	rack.PrimaryPart = back
+	return rack
+end
+
+local function makeFruitBowl(objectsFolder)
+	local origin = SNACK_LAB_ORIGIN
+	local fruitBowl = makeModel(objectsFolder, "FruitBowl")
+
+	local tableTop = createPart(fruitBowl, "FruitTable", Vector3.new(7, 1.3, 4.4), cframeAt(origin, 1.5, 1.1, 7.5), Color3.fromRGB(119, 82, 55), Enum.Material.Wood)
+	local bowl = createPart(fruitBowl, "Bowl", Vector3.new(4.7, 1.25, 4.7), cframeAt(origin, 1.5, 2.2, 7.5), Color3.fromRGB(255, 226, 122), Enum.Material.SmoothPlastic)
+	bowl.Shape = Enum.PartType.Ball
+
+	local fruitData = {
+		{ Name = "Apple", Offset = Vector3.new(-0.9, 1.0, -0.35), Color = Color3.fromRGB(233, 52, 60), Size = 0.95 },
+		{ Name = "Lemon", Offset = Vector3.new(0.2, 1.12, 0.2), Color = Color3.fromRGB(247, 224, 55), Size = 0.8 },
+		{ Name = "Lime", Offset = Vector3.new(1.0, 0.95, -0.1), Color = Color3.fromRGB(74, 197, 91), Size = 0.82 },
+		{ Name = "Orange", Offset = Vector3.new(-0.05, 1.2, -0.9), Color = Color3.fromRGB(255, 142, 47), Size = 0.88 },
+	}
+
+	for _, data in ipairs(fruitData) do
+		local fruit = createPart(
+			fruitBowl,
+			data.Name,
+			Vector3.new(data.Size, data.Size, data.Size),
+			cframeAt(origin, 1.5 + data.Offset.X, 2.2 + data.Offset.Y, 7.5 + data.Offset.Z),
+			data.Color,
+			Enum.Material.SmoothPlastic
+		)
+		fruit.Shape = Enum.PartType.Ball
+		fruit:SetAttribute("IsFruit", true)
+	end
+
+	createPrompt(bowl, "Inspect", "Fruit Bowl", 0)
+	tag(fruitBowl, Constants.Tags.FruitBowl)
+	fruitBowl.PrimaryPart = tableTop
+	return fruitBowl
+end
+
+local function connectSafetyFloor(safetyFloor)
 	local debounceByCharacter = {}
 
-	recoveryFloor.Touched:Connect(function(hit)
+	safetyFloor.Touched:Connect(function(hit)
 		local character = hit:FindFirstAncestorOfClass("Model")
 		if not character or debounceByCharacter[character] then
 			return
@@ -527,8 +703,9 @@ local function connectRecoveryFloor(recoveryFloor)
 		end
 
 		debounceByCharacter[character] = true
+		local destinationCFrame = safetyFloor:GetAttribute("DestinationCFrame") or CFrame.new(0, 5, 10)
 		rootPart.AssemblyLinearVelocity = Vector3.zero
-		rootPart.CFrame = CFrame.new(0, 5, 10)
+		rootPart.CFrame = destinationCFrame
 		task.delay(1, function()
 			debounceByCharacter[character] = nil
 		end)
@@ -544,6 +721,7 @@ function RoomBuilder.Build()
 
 	local _, recoveryFloor = makeFloor(roomFolder)
 	local exitDoor = makeShell(roomFolder)
+	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
@@ -559,14 +737,17 @@ function RoomBuilder.Build()
 	local toaster = makeSnackToaster(objectsFolder)
 	local sink = makeSnackSink(objectsFolder)
 	local mixer = makeSnackMixer(objectsFolder)
+	local snackRack = makeSnackRack(objectsFolder)
+	local fruitBowl = makeFruitBowl(objectsFolder)
 
-	connectRecoveryFloor(recoveryFloor)
+	connectSafetyFloor(safetyFloor)
 	ResetService.CaptureRoots(roomFolder, objectsFolder)
 
 	return {
 		Room = roomFolder,
 		InteractiveObjects = objectsFolder,
 		RecoveryFloor = recoveryFloor,
+		UnderfloorChamber = underfloorChamber,
 		ExitDoor = exitDoor,
 		Hallway = hallway,
 		Pedestal = pedestal,
@@ -580,6 +761,8 @@ function RoomBuilder.Build()
 		Toaster = toaster,
 		Sink = sink,
 		Mixer = mixer,
+		SnackRack = snackRack,
+		FruitBowl = fruitBowl,
 	}
 end
 

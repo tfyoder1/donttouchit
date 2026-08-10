@@ -84,23 +84,28 @@ local function tweenModel(model, targetPivot, duration)
 	pivotValue:Destroy()
 end
 
-function InteractionService.new(eventManager, discoveryService, resetService)
+function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService)
 	local self = setmetatable({}, InteractionService)
 	self.eventManager = eventManager
 	self.discoveryService = discoveryService
 	self.resetService = resetService
+	self.roomProgressService = roomProgressService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.connectedPrompts = {}
 	self.couchRiding = {}
 	self.lampState = {}
 	self.squishyState = {}
 	self.tvState = {}
+	self.applianceState = {}
 	self.exitUnlocked = false
+	self.underfloorReturnState = {}
 	self.snackButtonState = {}
 	self.fridgeState = {}
 	self.toasterState = {}
 	self.sinkState = {}
 	self.mixerState = {}
+	self.snackRackState = {}
+	self.fruitBowlState = {}
 	return self
 end
 
@@ -131,12 +136,24 @@ function InteractionService:Initialize()
 		self:_wireTelevision(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.Appliance, function(instance)
+		self:_wireAppliance(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.ExitDoor, function(instance)
 		self:_wireExitDoor(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.HallDoor, function(instance)
 		self:_wireHallDoor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.ReferenceBook, function(instance)
+		self:_wireReferenceBook(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.UnderfloorReturn, function(instance)
+		self:_wireUnderfloorReturn(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.SnackButton, function(instance)
@@ -159,6 +176,14 @@ function InteractionService:Initialize()
 		self:_wireSnackMixer(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.SnackRack, function(instance)
+		self:_wireSnackRack(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.FruitBowl, function(instance)
+		self:_wireFruitBowl(instance)
+	end)
+
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
 	end
@@ -178,7 +203,13 @@ function InteractionService:_connectPrompt(prompt, callback)
 	end
 
 	self.connectedPrompts[prompt] = true
-	prompt.Triggered:Connect(callback)
+	prompt.Triggered:Connect(function(player)
+		if self.roomProgressService then
+			self.roomProgressService:RecordInteraction(player)
+		end
+
+		callback(player)
+	end)
 end
 
 function InteractionService:_wireMainButton(button)
@@ -186,6 +217,100 @@ function InteractionService:_wireMainButton(button)
 
 	self:_connectPrompt(prompt, function(player)
 		self.eventManager:TriggerRandom(player)
+	end)
+end
+
+function InteractionService:_wireUnderfloorReturn(instance)
+	local prompt = getPrompt(instance)
+
+	self:_connectPrompt(prompt, function(player)
+		local destinationCFrame = instance:GetAttribute("DestinationCFrame") or CFrame.new(0, 5, 10)
+		self.discoveryService:Unlock(player, Constants.Discoveries.EscapedUnderfloor.Id)
+		self.systemMessageRemote:FireClient(player, "The room underside sent you back upstairs.")
+		teleportPlayer(player, destinationCFrame)
+	end)
+end
+
+function InteractionService:_wireReferenceBook(bookPart)
+	local prompt = getPrompt(bookPart)
+
+	self:_connectPrompt(prompt, function(player)
+		local roomId = bookPart:GetAttribute("RoomId") or "TVRoom"
+		if self.roomProgressService then
+			self.roomProgressService:ShowReferenceBook(player, roomId)
+		end
+	end)
+end
+
+function InteractionService:_wireAppliance(appliance)
+	local prompt = getPrompt(appliance)
+	local body = appliance:FindFirstChild("ApplianceBody", true)
+	local door = appliance:FindFirstChild("ApplianceDoor", true)
+	local textLabel = appliance:FindFirstChild("ApplianceText", true)
+
+	self.applianceState[appliance] = self.applianceState[appliance] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.applianceState[appliance]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		if prompt then
+			prompt.Enabled = false
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.RanAppliance.Id)
+		self.systemMessageRemote:FireClient(player, "The tiny appliance is reheating time.")
+
+		for seconds = 3, 1, -1 do
+			if textLabel and textLabel:IsA("TextLabel") then
+				textLabel.Text = ("00:0%d"):format(seconds)
+				textLabel.TextColor3 = seconds % 2 == 0 and Color3.fromRGB(255, 235, 119) or Color3.fromRGB(109, 255, 177)
+			end
+
+			if door and door:IsA("BasePart") then
+				door.Color = seconds % 2 == 0 and Color3.fromRGB(58, 32, 42) or Color3.fromRGB(32, 45, 47)
+			end
+
+			task.wait(0.45)
+		end
+
+		if textLabel and textLabel:IsA("TextLabel") then
+			textLabel.Text = "DING?"
+			textLabel.TextColor3 = Color3.fromRGB(255, 94, 94)
+		end
+
+		if body and body:IsA("BasePart") then
+			local pulseTween = tweenPart(body, 0.18, {
+				Color = Color3.fromRGB(255, 214, 107),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			pulseTween.Completed:Wait()
+		end
+
+		local spark = Instance.new("Part")
+		spark.Name = "TinyApplianceSpark"
+		spark.Anchored = true
+		spark.CanCollide = false
+		spark.Shape = Enum.PartType.Ball
+		spark.Size = Vector3.new(0.8, 0.8, 0.8)
+		spark.Color = Color3.fromRGB(109, 255, 177)
+		spark.Material = Enum.Material.Neon
+		spark.CFrame = (door and door.CFrame or appliance:GetPivot()) + Vector3.new(0, 1.5, -0.2)
+		spark.Parent = workspace
+		CollectionService:AddTag(spark, Constants.Tags.TemporaryObject)
+		Debris:AddItem(spark, 2)
+
+		task.wait(0.7)
+		self.resetService.RestoreInstance(appliance)
+
+		if prompt then
+			prompt.Enabled = true
+		end
+		state.Reacting = false
 	end)
 end
 
@@ -575,10 +700,12 @@ function InteractionService:_wireSnackFridge(fridge)
 	local prompt = getPrompt(fridge)
 	local door = fridge:FindFirstChild("FridgeDoor", true)
 	local textLabel = fridge:FindFirstChild("FridgeDoorText", true)
+	local iceCube = fridge:FindFirstChild("ColdIdeaIceCube", true)
 
 	self.fridgeState[fridge] = self.fridgeState[fridge] or {
 		Reacting = false,
 		Opened = false,
+		IceSpinToken = nil,
 	}
 
 	self:_connectPrompt(prompt, function(player)
@@ -602,7 +729,29 @@ function InteractionService:_wireSnackFridge(fridge)
 				CFrame = (door:GetAttribute("BaseCFrame") or door.CFrame) + Vector3.new(-2.7, 0, 0.9),
 				Color = Color3.fromRGB(172, 242, 255),
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+			if iceCube and iceCube:IsA("BasePart") then
+				local token = {}
+				state.IceSpinToken = token
+				local baseCFrame = iceCube:GetAttribute("BaseCFrame") or iceCube.CFrame
+
+				task.spawn(function()
+					for index = 1, 18 do
+						if state.IceSpinToken ~= token or not iceCube.Parent then
+							return
+						end
+
+						local floatOffset = Vector3.new(0, math.sin(index * 0.8) * 0.22, 0)
+						local spinTween = tweenPart(iceCube, 0.22, {
+							CFrame = (baseCFrame + floatOffset) * CFrame.Angles(math.rad(index * 22), math.rad(index * 35), math.rad(index * 18)),
+							Transparency = 0.12,
+						}, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+						spinTween.Completed:Wait()
+					end
+				end)
+			end
 		else
+			state.IceSpinToken = nil
 			self.resetService.RestoreInstance(fridge)
 		end
 
@@ -629,18 +778,47 @@ function InteractionService:_wireSnackToaster(toaster)
 		self.discoveryService:Unlock(player, Constants.Discoveries.SuspiciousToast.Id)
 		self.systemMessageRemote:FireClient(player, "That toast is achieving escape velocity.")
 
+		local toastModel = Instance.new("Model")
+		toastModel.Name = "SuspiciousToast"
+		toastModel.Parent = workspace
+		CollectionService:AddTag(toastModel, Constants.Tags.TemporaryObject)
+
 		local toast = Instance.new("Part")
-		toast.Name = "SuspiciousToast"
+		toast.Name = "ToastSlice"
 		toast.Anchored = false
-		toast.Size = Vector3.new(2.2, 0.25, 1.4)
-		toast.Color = Color3.fromRGB(230, 176, 91)
-		toast.Material = Enum.Material.Wood
-		toast.CFrame = slot and slot.CFrame + Vector3.new(0, 1.2, 0) or toaster:GetPivot() + Vector3.new(0, 5, 0)
-		toast.Parent = workspace
+		toast.Size = Vector3.new(2.2, 1.55, 0.26)
+		toast.Color = Color3.fromRGB(241, 190, 102)
+		toast.Material = Enum.Material.SmoothPlastic
+		toast.CFrame = slot and slot.CFrame + Vector3.new(0, 1.45, 0) or toaster:GetPivot() + Vector3.new(0, 5, 0)
+		toast.Parent = toastModel
+		toastModel.PrimaryPart = toast
+
+		local crustData = {
+			{ Name = "TopCrust", Size = Vector3.new(2.25, 0.24, 0.3), Offset = Vector3.new(0, 0.68, 0) },
+			{ Name = "LeftCrust", Size = Vector3.new(0.22, 1.42, 0.3), Offset = Vector3.new(-1.05, 0, 0) },
+			{ Name = "RightCrust", Size = Vector3.new(0.22, 1.42, 0.3), Offset = Vector3.new(1.05, 0, 0) },
+		}
+
+		for _, data in ipairs(crustData) do
+			local crust = Instance.new("Part")
+			crust.Name = data.Name
+			crust.Anchored = false
+			crust.Size = data.Size
+			crust.Color = Color3.fromRGB(153, 92, 45)
+			crust.Material = Enum.Material.SmoothPlastic
+			crust.CFrame = toast.CFrame * CFrame.new(data.Offset.X, data.Offset.Y, data.Offset.Z)
+			crust.Parent = toastModel
+
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = toast
+			weld.Part1 = crust
+			weld.Parent = crust
+		end
+
 		CollectionService:AddTag(toast, Constants.Tags.TemporaryObject)
-		toast.AssemblyLinearVelocity = Vector3.new(0, 70, 0)
+		toast.AssemblyLinearVelocity = Vector3.new(0, 72, 0)
 		toast.AssemblyAngularVelocity = Vector3.new(8, 2, 12)
-		Debris:AddItem(toast, 6)
+		Debris:AddItem(toastModel, 6)
 
 		task.wait(0.45)
 		state.Reacting = false
@@ -649,7 +827,7 @@ end
 
 function InteractionService:_wireSnackSink(sink)
 	local prompt = getPrompt(sink)
-	local faucet = sink:FindFirstChild("Faucet", true)
+	local faucet = sink:FindFirstChild("FaucetSpout", true) or sink:FindFirstChild("FaucetPost", true)
 
 	self.sinkState[sink] = self.sinkState[sink] or {
 		CountByUserId = {},
@@ -698,6 +876,8 @@ end
 function InteractionService:_wireSnackMixer(mixer)
 	local prompt = getPrompt(mixer)
 	local bowl = mixer:FindFirstChild("MixerBowl", true)
+	local beaterLeft = mixer:FindFirstChild("BeaterLeft", true)
+	local beaterRight = mixer:FindFirstChild("BeaterRight", true)
 
 	self.mixerState[mixer] = self.mixerState[mixer] or {
 		Reacting = false,
@@ -718,6 +898,14 @@ function InteractionService:_wireSnackMixer(mixer)
 		bowl.Color = Color3.fromRGB(190, 255, 235)
 
 		for index = 1, 7 do
+			if beaterLeft and beaterLeft:IsA("BasePart") then
+				beaterLeft.CFrame = (beaterLeft:GetAttribute("BaseCFrame") or beaterLeft.CFrame) * CFrame.Angles(0, math.rad(index * 65), 0)
+			end
+
+			if beaterRight and beaterRight:IsA("BasePart") then
+				beaterRight.CFrame = (beaterRight:GetAttribute("BaseCFrame") or beaterRight.CFrame) * CFrame.Angles(0, math.rad(-index * 65), 0)
+			end
+
 			local cloud = Instance.new("Part")
 			cloud.Name = "MixerCloud"
 			cloud.Anchored = true
@@ -735,8 +923,101 @@ function InteractionService:_wireSnackMixer(mixer)
 		end
 
 		task.wait(1)
+		self.resetService.RestoreInstance(mixer)
 		bowl.Material = Enum.Material.Glass
 		bowl.Color = originalColor
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireSnackRack(rack)
+	local prompt = getPrompt(rack)
+
+	self.snackRackState[rack] = self.snackRackState[rack] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.snackRackState[rack]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SnackRack.Id)
+		self.systemMessageRemote:FireClient(player, "The snack rack audited your snack intentions.")
+
+		local packs = {}
+		for _, descendant in ipairs(rack:GetDescendants()) do
+			if descendant:IsA("BasePart") and descendant:GetAttribute("IsSnackPack") then
+				table.insert(packs, descendant)
+			end
+		end
+
+		for index, pack in ipairs(packs) do
+			local baseCFrame = pack:GetAttribute("BaseCFrame") or pack.CFrame
+			local offset = Vector3.new(0, 0.15 + (index % 3) * 0.08, 0.22)
+			tweenPart(pack, 0.12, {
+				CFrame = baseCFrame + offset,
+				Color = Color3.fromRGB(255, 255, 255),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+			task.delay(0.2, function()
+				if pack.Parent then
+					self.resetService.RestoreInstance(pack)
+				end
+			end)
+		end
+
+		task.wait(0.6)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireFruitBowl(fruitBowl)
+	local prompt = getPrompt(fruitBowl)
+
+	self.fruitBowlState[fruitBowl] = self.fruitBowlState[fruitBowl] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.fruitBowlState[fruitBowl]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.LivingFruit.Id)
+		self.systemMessageRemote:FireClient(player, "The fruit bowl has become self-aware.")
+
+		local fruit = {}
+		for _, descendant in ipairs(fruitBowl:GetDescendants()) do
+			if descendant:IsA("BasePart") and descendant:GetAttribute("IsFruit") then
+				table.insert(fruit, descendant)
+			end
+		end
+
+		for index, piece in ipairs(fruit) do
+			task.spawn(function()
+				local baseCFrame = piece:GetAttribute("BaseCFrame") or piece.CFrame
+				local jumpTween = tweenPart(piece, 0.22, {
+					CFrame = baseCFrame + Vector3.new(0, 1.2 + index * 0.15, 0),
+				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				jumpTween.Completed:Wait()
+
+				local spinTween = tweenPart(piece, 0.28, {
+					CFrame = baseCFrame * CFrame.Angles(math.rad(0), math.rad(180 + index * 25), math.rad(0)),
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+				spinTween.Completed:Wait()
+
+				if piece.Parent then
+					self.resetService.RestoreInstance(piece)
+				end
+			end)
+		end
+
+		task.wait(0.9)
 		state.Reacting = false
 	end)
 end

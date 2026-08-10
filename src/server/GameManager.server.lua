@@ -6,6 +6,7 @@ local EventManager = require(script.Parent:WaitForChild("EventManager"))
 local InteractionService = require(script.Parent:WaitForChild("InteractionService"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
+local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
 local RoomBuilder = require(script.Parent:WaitForChild("RoomBuilder"))
 
 workspace.Gravity = Constants.NormalGravity
@@ -15,9 +16,11 @@ local roomReferences = RoomBuilder.Build()
 local discoveryService = DiscoveryService.new()
 discoveryService:Initialize()
 
+local roomProgressService = RoomProgressService.new(discoveryService)
+roomProgressService:Initialize()
+
 local eventManager = EventManager.new(discoveryService, ResetService, roomReferences)
-local interactionService = InteractionService.new(eventManager, discoveryService, ResetService)
+local interactionService = InteractionService.new(eventManager, discoveryService, ResetService, roomProgressService)
 interactionService:Initialize()
 
 print("[DON'T TOUCH IT] Prototype initialized.")
-
