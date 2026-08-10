@@ -1,3 +1,4 @@
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -8,8 +9,10 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local discoveryRemote = remotes:WaitForChild(Constants.Remotes.DiscoveryUpdate)
 local referenceBookRemote = remotes:WaitForChild(Constants.Remotes.ReferenceBook)
 local hintPackRemote = remotes:WaitForChild(Constants.Remotes.HintPackRequest)
+local sessionStartRemote = remotes:WaitForChild(Constants.Remotes.SessionStart)
 local systemMessageRemote = remotes:WaitForChild(Constants.Remotes.SystemMessage)
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
+local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
@@ -43,7 +46,7 @@ counter.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 counter.BackgroundTransparency = 0.18
 counter.BorderSizePixel = 0
 counter.Font = Enum.Font.GothamBold
-counter.Position = UDim2.new(1, -18, 0, 18)
+counter.Position = UDim2.new(1, -18, 0, 96)
 counter.Size = UDim2.fromOffset(280, 38)
 counter.Text = "Finding room..."
 counter.TextColor3 = Color3.fromRGB(236, 246, 255)
@@ -252,6 +255,95 @@ local useCorner = Instance.new("UICorner")
 useCorner.CornerRadius = UDim.new(0, 6)
 useCorner.Parent = useHintButton
 
+local startOverlay = Instance.new("Frame")
+startOverlay.Name = "StartChoiceOverlay"
+startOverlay.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
+startOverlay.BackgroundTransparency = 0.28
+startOverlay.BorderSizePixel = 0
+startOverlay.Size = UDim2.fromScale(1, 1)
+startOverlay.Visible = false
+startOverlay.ZIndex = 20
+startOverlay.Parent = gui
+
+local startPanel = Instance.new("Frame")
+startPanel.Name = "StartChoicePanel"
+startPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+startPanel.BackgroundColor3 = Color3.fromRGB(24, 27, 34)
+startPanel.BackgroundTransparency = 0.04
+startPanel.BorderSizePixel = 0
+startPanel.Position = UDim2.fromScale(0.5, 0.52)
+startPanel.Size = UDim2.fromOffset(420, 246)
+startPanel.ZIndex = 21
+startPanel.Parent = startOverlay
+
+local startPanelConstraint = Instance.new("UISizeConstraint")
+startPanelConstraint.MaxSize = Vector2.new(420, 246)
+startPanelConstraint.MinSize = Vector2.new(300, 220)
+startPanelConstraint.Parent = startPanel
+
+local startCorner = Instance.new("UICorner")
+startCorner.CornerRadius = UDim.new(0, 8)
+startCorner.Parent = startPanel
+
+local startTitle = Instance.new("TextLabel")
+startTitle.Name = "StartTitle"
+startTitle.BackgroundTransparency = 1
+startTitle.Font = Enum.Font.GothamBlack
+startTitle.Position = UDim2.fromOffset(18, 18)
+startTitle.Size = UDim2.new(1, -36, 0, 42)
+startTitle.Text = "DON'T TOUCH IT"
+startTitle.TextColor3 = Color3.fromRGB(255, 242, 181)
+startTitle.TextScaled = true
+startTitle.ZIndex = 22
+startTitle.Parent = startPanel
+
+local startSubtitle = Instance.new("TextLabel")
+startSubtitle.Name = "StartSubtitle"
+startSubtitle.BackgroundTransparency = 1
+startSubtitle.Font = Enum.Font.GothamSemibold
+startSubtitle.Position = UDim2.fromOffset(24, 70)
+startSubtitle.Size = UDim2.new(1, -48, 0, 44)
+startSubtitle.Text = ""
+startSubtitle.TextColor3 = Color3.fromRGB(224, 236, 245)
+startSubtitle.TextScaled = true
+startSubtitle.TextWrapped = true
+startSubtitle.ZIndex = 22
+startSubtitle.Parent = startPanel
+
+local continueButton = Instance.new("TextButton")
+continueButton.Name = "ContinueButton"
+continueButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
+continueButton.BorderSizePixel = 0
+continueButton.Font = Enum.Font.GothamBlack
+continueButton.Position = UDim2.new(0, 24, 1, -106)
+continueButton.Size = UDim2.new(1, -48, 0, 42)
+continueButton.Text = "Continue"
+continueButton.TextColor3 = Color3.fromRGB(14, 40, 24)
+continueButton.TextScaled = true
+continueButton.ZIndex = 22
+continueButton.Parent = startPanel
+
+local continueCorner = Instance.new("UICorner")
+continueCorner.CornerRadius = UDim.new(0, 6)
+continueCorner.Parent = continueButton
+
+local restartButton = Instance.new("TextButton")
+restartButton.Name = "RestartButton"
+restartButton.BackgroundColor3 = Color3.fromRGB(84, 154, 255)
+restartButton.BorderSizePixel = 0
+restartButton.Font = Enum.Font.GothamBlack
+restartButton.Position = UDim2.new(0, 24, 1, -54)
+restartButton.Size = UDim2.new(1, -48, 0, 34)
+restartButton.Text = "Start Over"
+restartButton.TextColor3 = Color3.fromRGB(14, 27, 46)
+restartButton.TextScaled = true
+restartButton.ZIndex = 22
+restartButton.Parent = startPanel
+
+local restartCorner = Instance.new("UICorner")
+restartCorner.CornerRadius = UDim.new(0, 6)
+restartCorner.Parent = restartButton
+
 local activeToastTween = nil
 local activeMessageTween = nil
 local toastSequence = 0
@@ -259,6 +351,7 @@ local messageSequence = 0
 local activeBookRoomId = nil
 local currentStatusType = nil
 local currentStatusRoomId = nil
+local pendingStartOptions = nil
 
 local function tween(instance, duration, properties)
 	local tweenObject = TweenService:Create(
@@ -365,6 +458,99 @@ local function updateRoomStatus(payload)
 	end
 end
 
+local function sendStartChoice(action)
+	startOverlay.Visible = false
+	pendingStartOptions = nil
+	sessionStartRemote:FireServer({
+		Action = action,
+	})
+end
+
+local function renderStartOptions(payload)
+	if typeof(payload) ~= "table" or payload.Action ~= "Show" then
+		return
+	end
+
+	pendingStartOptions = payload
+	startOverlay.Visible = true
+	startSubtitle.Text = ("Book: %d / %d found    Hints: %d"):format(
+		payload.DiscoveryCount or 0,
+		payload.TotalDiscoveries or Constants.TotalDiscoveries,
+		payload.Hints or 0
+	)
+
+	if payload.HasProgress then
+		continueButton.Text = ("Continue: %s"):format(payload.ResumeRoomName or "TV Room")
+		restartButton.Visible = true
+	else
+		continueButton.Text = "Enter TV Room"
+		restartButton.Visible = false
+	end
+end
+
+local function getSparklePart(target)
+	if not target then
+		return nil
+	end
+
+	if target:IsA("BasePart") then
+		return target
+	end
+
+	if target:IsA("Model") then
+		return target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart", true)
+	end
+
+	return target:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function showSparkleHint(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	local target = payload.Target
+	if typeof(target) ~= "Instance" or not target:IsDescendantOf(workspace) then
+		return
+	end
+
+	local duration = payload.Duration or Constants.Sparkle.DurationSeconds
+	local part = getSparklePart(target)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "PendingDiscoveryHighlight"
+	highlight.Adornee = target
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillColor = Color3.fromRGB(255, 242, 125)
+	highlight.FillTransparency = 0.35
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.OutlineTransparency = 0.05
+	highlight.Parent = target
+
+	local pulseOut = tween(highlight, 0.35, {
+		FillTransparency = 0.68,
+		OutlineTransparency = 0.22,
+	})
+	pulseOut.Completed:Connect(function()
+		if highlight.Parent then
+			tween(highlight, 0.35, {
+				FillTransparency = 0.25,
+				OutlineTransparency = 0.02,
+			})
+		end
+	end)
+
+	if part then
+		local sparkles = Instance.new("Sparkles")
+		sparkles.Name = "PendingDiscoverySparkles"
+		sparkles.SparkleColor = Color3.fromRGB(255, 242, 125)
+		sparkles.Parent = part
+		Debris:AddItem(sparkles, duration)
+	end
+
+	Debris:AddItem(highlight, duration)
+end
+
 local function clearBookList()
 	for _, child in ipairs(bookList:GetChildren()) do
 		if child:IsA("TextLabel") then
@@ -424,6 +610,14 @@ closeBookButton.MouseButton1Click:Connect(function()
 	bookPanel.Visible = false
 end)
 
+continueButton.MouseButton1Click:Connect(function()
+	sendStartChoice("Resume")
+end)
+
+restartButton.MouseButton1Click:Connect(function()
+	sendStartChoice("Restart")
+end)
+
 buyHintButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
@@ -455,7 +649,9 @@ discoveryRemote.OnClientEvent:Connect(function(payload)
 end)
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
+sessionStartRemote.OnClientEvent:Connect(renderStartOptions)
 roomStatusRemote.OnClientEvent:Connect(updateRoomStatus)
+sparkleRemote.OnClientEvent:Connect(showSparkleHint)
 
 systemMessageRemote.OnClientEvent:Connect(function(text)
 	if typeof(text) == "string" and text ~= "" then

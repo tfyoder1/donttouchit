@@ -1,3 +1,4 @@
+local CollectionService = game:GetService("CollectionService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +16,23 @@ local function getRootPart(player)
 	end
 
 	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function teleportPlayer(player, destinationCFrame)
+	local rootPart = getRootPart(player)
+	if not rootPart and player and player.Parent then
+		player.CharacterAdded:Wait()
+		task.wait(0.1)
+		rootPart = getRootPart(player)
+	end
+
+	if not rootPart or typeof(destinationCFrame) ~= "CFrame" then
+		return
+	end
+
+	rootPart.AssemblyLinearVelocity = Vector3.zero
+	rootPart.AssemblyAngularVelocity = Vector3.zero
+	rootPart.CFrame = destinationCFrame
 end
 
 local function positionInZone(position, zone)
@@ -35,15 +53,41 @@ function RoomProgressService.new(discoveryService)
 	self.discoveryService = discoveryService
 	self.referenceBookRemote = RemoteService.GetRemote(Constants.Remotes.ReferenceBook)
 	self.hintPackRemote = RemoteService.GetRemote(Constants.Remotes.HintPackRequest)
+	self.sessionStartRemote = RemoteService.GetRemote(Constants.Remotes.SessionStart)
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.roomStatusRemote = RemoteService.GetRemote(Constants.Remotes.RoomStatus)
+	self.sparkleRemote = RemoteService.GetRemote(Constants.Remotes.SparkleHint)
 	self.stateByUserId = {}
 	return self
 end
 
 function RoomProgressService:Initialize()
+	local function setupPlayer(player)
+		self:_getState(player)
+
+		player.CharacterAdded:Connect(function()
+			task.delay(0.8, function()
+				if player.Parent then
+					self:_sendStartOptions(player)
+				end
+			end)
+		end)
+
+		task.delay(1, function()
+			if player.Parent then
+				self:_sendStartOptions(player)
+			end
+		end)
+	end
+
+	Players.PlayerAdded:Connect(setupPlayer)
+
 	Players.PlayerRemoving:Connect(function(player)
 		self.stateByUserId[player.UserId] = nil
+	end)
+
+	self.sessionStartRemote.OnServerEvent:Connect(function(player, payload)
+		self:_handleSessionStart(player, payload)
 	end)
 
 	self.hintPackRemote.OnServerEvent:Connect(function(player, payload)
@@ -51,6 +95,10 @@ function RoomProgressService:Initialize()
 	end)
 
 	self:_installReceiptHandler()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		setupPlayer(player)
+	end
 
 	task.spawn(function()
 		while true do
@@ -64,9 +112,14 @@ function RoomProgressService:_getState(player)
 	local state = self.stateByUserId[player.UserId]
 
 	if not state then
+		local now = os.clock()
 		state = {
 			CurrentRoomId = nil,
-			TimerStartedAt = os.clock(),
+			TimerStartedAt = now,
+			PlayStartedAt = now,
+			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
+			StartOptionsSent = false,
+			StartChoiceHandled = false,
 			TwoMinuteAwarded = {},
 			BonusAwarded = {},
 		}
@@ -129,6 +182,64 @@ function RoomProgressService:ShowReferenceBook(player, roomId, extra)
 	self.referenceBookRemote:FireClient(player, snapshot)
 end
 
+function RoomProgressService:_sendStartOptions(player)
+	local state = self:_getState(player)
+	if state.StartOptionsSent then
+		return
+	end
+
+	if not self.discoveryService:IsLoaded(player) then
+		task.delay(0.5, function()
+			if player.Parent then
+				self:_sendStartOptions(player)
+			end
+		end)
+		return
+	end
+
+	state.StartOptionsSent = true
+
+	local resumeRoomId = self.discoveryService:GetLastUnlockedRoomId(player)
+	local resumeRoom = Constants.GetRoom(resumeRoomId)
+	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
+	local hintCount = self.discoveryService:GetHintCount(player)
+
+	self.sessionStartRemote:FireClient(player, {
+		Action = "Show",
+		HasProgress = discoveryCount > 0 or hintCount > 0 or resumeRoomId ~= Constants.RoomOrder[1],
+		ResumeRoomId = resumeRoomId,
+		ResumeRoomName = resumeRoom and resumeRoom.Name or "TV Room",
+		DiscoveryCount = discoveryCount,
+		TotalDiscoveries = Constants.TotalDiscoveries,
+		Hints = hintCount,
+	})
+end
+
+function RoomProgressService:_handleSessionStart(player, payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	local action = payload.Action
+	local roomId = Constants.RoomOrder[1]
+	local message = "Starting from the TV Room. The book remembers what you found."
+
+	if action == "Resume" then
+		roomId = self.discoveryService:GetLastUnlockedRoomId(player)
+		local room = Constants.GetRoom(roomId)
+		message = ("Returning to %s. Try to look innocent."):format(room and room.Name or "the room")
+	elseif action ~= "Restart" then
+		return
+	end
+
+	local state = self:_getState(player)
+	state.StartChoiceHandled = true
+	state.TimerStartedAt = os.clock()
+
+	teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId))
+	self.systemMessageRemote:FireClient(player, message)
+end
+
 function RoomProgressService:_tick(now)
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_tickPlayer(player, now)
@@ -173,6 +284,8 @@ function RoomProgressService:_tickPlayer(player, now)
 		self.discoveryService:GrantHints(player, Constants.NoTouch.BonusHintCount)
 		self.systemMessageRemote:FireClient(player, "Super bonus: 10 free hints for impressive restraint.")
 	end
+
+	self:_tickSparkle(player, roomId, now, state)
 end
 
 function RoomProgressService:_sendRoomStatus(player)
@@ -182,7 +295,7 @@ function RoomProgressService:_sendRoomStatus(player)
 		self.roomStatusRemote:FireClient(player, {
 			Type = "Hallway",
 			Name = Constants.Hallway.Name,
-			UnlockedRooms = Constants.Hallway.UnlockedRoomCount,
+			UnlockedRooms = self.discoveryService:GetUnlockedRoomCount(player),
 			TotalRooms = Constants.Hallway.TotalRoomCount,
 		})
 		return
@@ -205,6 +318,39 @@ function RoomProgressService:_sendRoomStatus(player)
 	self.roomStatusRemote:FireClient(player, {
 		Type = "None",
 	})
+end
+
+function RoomProgressService:_tickSparkle(player, roomId, now, state)
+	if now < state.NextSparkleAt then
+		return
+	end
+
+	state.NextSparkleAt = now + Constants.Sparkle.IntervalSeconds
+
+	local _, targetTag = self.discoveryService:GetNextPendingHighlight(player, roomId)
+	if not targetTag then
+		return
+	end
+
+	local target = self:_findHighlightTarget(targetTag)
+	if not target then
+		return
+	end
+
+	self.sparkleRemote:FireClient(player, {
+		Target = target,
+		Duration = Constants.Sparkle.DurationSeconds,
+	})
+end
+
+function RoomProgressService:_findHighlightTarget(targetTag)
+	for _, instance in ipairs(CollectionService:GetTagged(targetTag)) do
+		if instance and instance.Parent then
+			return instance
+		end
+	end
+
+	return nil
 end
 
 function RoomProgressService:_handleHintRequest(player, payload)

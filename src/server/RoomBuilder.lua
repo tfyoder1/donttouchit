@@ -45,6 +45,26 @@ local function createPrompt(parent, actionText, objectText, holdDuration)
 	return prompt
 end
 
+local function createSpawnLocation(parent, name, roomId, destinationCFrame, color, enabled)
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = name
+	spawn.Anchored = true
+	spawn.BottomSurface = Enum.SurfaceType.Smooth
+	spawn.TopSurface = Enum.SurfaceType.Smooth
+	spawn.Size = Vector3.new(7, 1, 7)
+	spawn.CFrame = CFrame.new(destinationCFrame.Position - Vector3.new(0, 2.45, 0))
+	spawn.Color = color
+	spawn.Material = Enum.Material.Neon
+	spawn.Neutral = true
+	spawn.Enabled = enabled == true
+	spawn.Transparency = 0.32
+	spawn:SetAttribute("RoomId", roomId)
+	spawn:SetAttribute("DestinationCFrame", destinationCFrame)
+	spawn.Parent = parent
+	mark(spawn)
+	return spawn
+end
+
 local function createSurfaceText(parent, name, text, face, textColor, backgroundColor)
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = name .. "SurfaceGui"
@@ -174,20 +194,14 @@ local function makeShell(roomFolder)
 end
 
 local function makeSpawn(roomFolder)
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "PlayerSpawn"
-	spawn.Anchored = true
-	spawn.BottomSurface = Enum.SurfaceType.Smooth
-	spawn.TopSurface = Enum.SurfaceType.Smooth
-	spawn.Size = Vector3.new(7, 1, 7)
-	spawn.CFrame = CFrame.new(0, 0.55, 11)
-	spawn.Color = Color3.fromRGB(91, 188, 124)
-	spawn.Material = Enum.Material.Neon
-	spawn.Neutral = true
-	spawn.Transparency = 0.25
-	spawn.Parent = roomFolder
-	mark(spawn)
-	return spawn
+	return createSpawnLocation(
+		roomFolder,
+		"TVRoomSpawn",
+		"TVRoom",
+		Constants.GetRoomSpawnCFrame("TVRoom"),
+		Color3.fromRGB(91, 188, 124),
+		true
+	)
 end
 
 local function makePedestal(objectsFolder)
@@ -522,6 +536,7 @@ local function makeHallway(roomFolder)
 
 	local label = createPart(hallway, "HallwaySign", Vector3.new(9.5, 2.2, 0.3), CFrame.new(0, 7.1, 22), Color3.fromRGB(250, 238, 111), Enum.Material.SmoothPlastic)
 	createSurfaceText(label, "HallwaySignText", "ROOMS", Enum.NormalId.Back, Color3.fromRGB(22, 22, 26), Color3.fromRGB(250, 238, 111))
+	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
 	makeReferenceBook(hallway, "TVRoomReferenceBook", CFrame.new(-3.5, 0, 30), "TVRoom", "TV ROOM")
 	makeReferenceBook(hallway, "SnackLabReferenceBook", CFrame.new(3.5, 0, 38), "SnackLab", "SNACK LAB")
 
@@ -594,9 +609,7 @@ local function makeSnackLabShell(roomFolder)
 	local roomSign = createPart(room, "SnackLabSign", Vector3.new(14, 2.6, 0.35), cframeAt(origin, 0, 7.2, -depth / 2 + 0.54), Color3.fromRGB(255, 232, 115), Enum.Material.SmoothPlastic)
 	createSurfaceText(roomSign, "SnackLabSignText", "SNACK LAB", Enum.NormalId.Front, Color3.fromRGB(28, 27, 24), Color3.fromRGB(255, 232, 115))
 
-	local spawnPad = createPart(room, "SnackSpawnPad", Vector3.new(7, 0.25, 7), CFrame.new(SNACK_LAB_SPAWN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(91, 188, 124), Enum.Material.Neon)
-	spawnPad.Transparency = 0.35
-	spawnPad:SetAttribute("BaseTransparency", spawnPad.Transparency)
+	createSpawnLocation(room, "SnackLabSpawn", "SnackLab", Constants.GetRoomSpawnCFrame("SnackLab"), Color3.fromRGB(91, 188, 124), false)
 
 	return {
 		Model = room,

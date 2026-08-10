@@ -17,8 +17,10 @@ Constants.Remotes = {
 	DiscoveryUpdate = "DiscoveryUpdate",
 	ReferenceBook = "ReferenceBook",
 	HintPackRequest = "HintPackRequest",
+	SessionStart = "SessionStart",
 	SystemMessage = "SystemMessage",
 	RoomStatus = "RoomStatus",
+	SparkleHint = "SparkleHint",
 }
 
 Constants.Tags = {
@@ -49,10 +51,30 @@ Constants.Hallway = {
 	Name = "Hallway",
 	UnlockedRoomCount = 1,
 	TotalRoomCount = 4,
+	UnlockDiscoveryFraction = 0.5,
 	Zone = {
 		Min = Vector3.new(-7.75, -3, Constants.Room.Depth / 2 - 0.5),
 		Max = Vector3.new(7.75, 13, 74),
 	},
+	SpawnCFrame = CFrame.new(0, 3, 27),
+}
+
+Constants.DataStore = {
+	Name = "DontTouchItPrototype_v1",
+	AutosaveSeconds = 45,
+}
+
+Constants.Sparkle = {
+	FirstDelaySeconds = 600,
+	IntervalSeconds = 60,
+	DurationSeconds = 4,
+}
+
+Constants.FloorPressMessages = {
+	[1] = "The floor files a complaint: 1 / 5.",
+	[2] = "The floor is now taking this personally: 2 / 5.",
+	[3] = "A sensible floor would ignore you. This one cannot: 3 / 5.",
+	[4] = "The floor is one press away from a dramatic career change: 4 / 5.",
 }
 
 Constants.Discoveries = {
@@ -213,6 +235,7 @@ Constants.Rooms = {
 		Name = "TV Room",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.TVRoom,
 		NoTouchDiscoveryId = Constants.Discoveries.TVRoomNoTouch.Id,
+		SpawnCFrame = CFrame.new(0, 3, 11),
 		Zone = {
 			Min = Vector3.new(-Constants.Room.Width / 2, Constants.Room.RecoveryY - 3, -Constants.Room.Depth / 2),
 			Max = Vector3.new(Constants.Room.Width / 2, Constants.Room.TVHeight + 2, Constants.Room.Depth / 2),
@@ -223,11 +246,41 @@ Constants.Rooms = {
 		Name = "Snack Lab",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.SnackLab,
 		NoTouchDiscoveryId = Constants.Discoveries.SnackLabNoTouch.Id,
+		SpawnCFrame = CFrame.new(37, 3, 54),
 		Zone = {
 			Min = Vector3.new(48 - Constants.Room.Width / 2, -3, 44 - Constants.Room.Depth / 2),
 			Max = Vector3.new(48 + Constants.Room.Width / 2, Constants.Room.Height + 2, 44 + Constants.Room.Depth / 2),
 		},
 	},
+}
+
+Constants.RoomUnlockRules = {
+	SnackLab = {
+		RequiredRoomId = "TVRoom",
+		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
+	},
+}
+
+Constants.DiscoveryHighlightTargets = {
+	[Constants.Discoveries.PressedButton.Id] = Constants.Tags.MainButton,
+	[Constants.Discoveries.LowGravity.Id] = Constants.Tags.FloorSection,
+	[Constants.Discoveries.TinyPlayers.Id] = Constants.Tags.MainButton,
+	[Constants.Discoveries.GiantPlayer.Id] = Constants.Tags.LightSwitch,
+	[Constants.Discoveries.ObjectRain.Id] = Constants.Tags.MainButton,
+	[Constants.Discoveries.DelayedSurprise.Id] = Constants.Tags.MainButton,
+	[Constants.Discoveries.EscapedUnderfloor.Id] = Constants.Tags.UnderfloorReturn,
+	[Constants.Discoveries.RanAppliance.Id] = Constants.Tags.Appliance,
+	[Constants.Discoveries.RodeCouch.Id] = Constants.Tags.Couch,
+	[Constants.Discoveries.AnnoyedLamp.Id] = Constants.Tags.FloorLamp,
+	[Constants.Discoveries.OverSquished.Id] = Constants.Tags.Squishy,
+	[Constants.Discoveries.AngeredTelevision.Id] = Constants.Tags.Television,
+	[Constants.Discoveries.PressedSnackButton.Id] = Constants.Tags.SnackButton,
+	[Constants.Discoveries.OpenedFridge.Id] = Constants.Tags.SnackFridge,
+	[Constants.Discoveries.SuspiciousToast.Id] = Constants.Tags.SnackToaster,
+	[Constants.Discoveries.AngrySink.Id] = Constants.Tags.SnackSink,
+	[Constants.Discoveries.MixedCloud.Id] = Constants.Tags.SnackMixer,
+	[Constants.Discoveries.SnackRack.Id] = Constants.Tags.SnackRack,
+	[Constants.Discoveries.LivingFruit.Id] = Constants.Tags.FruitBowl,
 }
 
 Constants.NoTouch = {
@@ -261,6 +314,29 @@ end
 
 function Constants.GetRoom(roomId)
 	return Constants.Rooms[roomId]
+end
+
+function Constants.GetRoomUnlockRequirement(roomId)
+	local rule = Constants.RoomUnlockRules[roomId]
+	if not rule then
+		return nil
+	end
+
+	local requiredRoom = Constants.GetRoom(rule.RequiredRoomId)
+	if not requiredRoom then
+		return nil
+	end
+
+	return rule.RequiredRoomId, math.ceil(#requiredRoom.DiscoveryOrder * rule.Fraction)
+end
+
+function Constants.GetRoomSpawnCFrame(roomId)
+	local room = Constants.GetRoom(roomId)
+	if room and room.SpawnCFrame then
+		return room.SpawnCFrame
+	end
+
+	return Constants.Rooms.TVRoom.SpawnCFrame
 end
 
 return Constants

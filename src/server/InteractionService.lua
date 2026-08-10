@@ -330,7 +330,9 @@ function InteractionService:_wireFloorSection(floorSection)
 		state.PressCount += 1
 
 		if state.PressCount < 5 then
-			self.systemMessageRemote:FireClient(player, ("The floor accepts press %d / 5."):format(state.PressCount))
+			local message = Constants.FloorPressMessages[state.PressCount]
+				or ("The floor reluctantly counts this as %d / 5."):format(state.PressCount)
+			self.systemMessageRemote:FireClient(player, message)
 			return
 		end
 
@@ -944,7 +946,7 @@ function InteractionService:_checkExitUnlock(player)
 		return
 	end
 
-	if not self.discoveryService:HasAll(player, Constants.RoomCompletionOrder.TVRoom) then
+	if not self.discoveryService:CanEnterHall(player) then
 		return
 	end
 
@@ -954,7 +956,7 @@ function InteractionService:_checkExitUnlock(player)
 		self:_unlockExitDoor(door)
 	end
 
-	self.systemMessageRemote:FireAllClients("TV Room complete. The entrance has changed its mind.")
+	self.systemMessageRemote:FireAllClients("The hallway is unlocked. The entrance has changed its mind early.")
 end
 
 function InteractionService:_wireExitDoor(door)
@@ -965,7 +967,11 @@ function InteractionService:_wireExitDoor(door)
 	local prompt = getPrompt(door)
 	self:_connectPrompt(prompt, function(player)
 		if not self.exitUnlocked then
-			self.systemMessageRemote:FireClient(player, "It still says ENTRANCE. The room is waiting for every discovery.")
+			self:_checkExitUnlock(player)
+		end
+
+		if not self.exitUnlocked then
+			self.systemMessageRemote:FireClient(player, self.discoveryService:GetHallUnlockRequirementText(player))
 			return
 		end
 
