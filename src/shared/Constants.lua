@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.4.1"
+Constants.BuildVersion = "0.4.2"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -335,7 +335,7 @@ Constants.SecretDiscoveries = {
 		PrizeHints = 5,
 		PrizeMessage = "Secret prize: +5 hints for relocating the rain.",
 		PrizeSecretKeyRoomId = "TVRoom",
-		PrizeSecretKeyMessage = "Secret prize: TV Secret Key added to your inventory.",
+		PrizeSecretKeyMessage = "Secret prize: Library Key added to your inventory.",
 	},
 }
 
@@ -343,9 +343,9 @@ Constants.SecretDoors = {
 	TVRoom = {
 		Id = "tv_room_secret_door",
 		RoomId = "TVRoom",
-		Name = "TV Room Secret Door",
+		Name = "Library",
 		KeyId = "tv_secret_key",
-		KeyName = "TV Secret Key",
+		KeyName = "Library Key",
 		RevealHintCost = 5,
 		RevealRobux = 5,
 		RevealProductId = 0,

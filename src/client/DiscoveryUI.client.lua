@@ -804,23 +804,23 @@ local function renderReferenceBook(payload)
 	secretDoorButton.Visible = secretDoor ~= nil
 	if secretDoor then
 		if secretDoor.CanOpen then
-			secretDoorButton.Text = "Secret\nReady"
+			secretDoorButton.Text = "Library\nReady"
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
 			secretDoorButton.TextColor3 = Color3.fromRGB(14, 40, 24)
-		elseif secretDoor.Visible and secretDoor.HasKey == false then
-			secretDoorButton.Text = ("Find\n%s"):format(secretDoor.KeyName or "Key")
+		elseif secretDoor.RoomComplete and secretDoor.HasKey == false then
+			secretDoorButton.Text = "Library\nNeeds Key"
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(255, 198, 82)
 			secretDoorButton.TextColor3 = Color3.fromRGB(57, 38, 4)
-		elseif secretDoor.RoomComplete then
-			secretDoorButton.Text = "Secret\nVisible"
+		elseif secretDoor.Visible then
+			secretDoorButton.Text = "Library\nOutlined"
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
 			secretDoorButton.TextColor3 = Color3.fromRGB(14, 40, 24)
 		elseif (secretDoor.RevealProductId or 0) > 0 then
-			secretDoorButton.Text = ("Secret\n%d R$"):format(secretDoor.RevealRobux or 0)
+			secretDoorButton.Text = ("Library\n%d R$"):format(secretDoor.RevealRobux or 0)
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(150, 112, 255)
 			secretDoorButton.TextColor3 = Color3.fromRGB(242, 236, 255)
 		else
-			secretDoorButton.Text = ("Secret\n%d hints"):format(secretDoor.RevealHintCost or 0)
+			secretDoorButton.Text = ("Library\n%d hints"):format(secretDoor.RevealHintCost or 0)
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(150, 112, 255)
 			secretDoorButton.TextColor3 = Color3.fromRGB(242, 236, 255)
 		end

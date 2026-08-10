@@ -828,41 +828,71 @@ function InteractionService:_getSecretDoorRoot(door)
 	return door
 end
 
-function InteractionService:_setSecretDoorVisible(door, visible)
+function InteractionService:_setSecretDoorState(door, state)
 	local root = self:_getSecretDoorRoot(door)
 	if not root then
 		return
 	end
 
+	state = state or {}
+	local outlineVisible = state.OutlineVisible == true
+	local active = state.Active == true
+	local hasKey = state.HasKey == true
+
 	for _, instance in ipairs(getInstanceAndDescendants(root)) do
 		if instance:IsA("BasePart") then
-			if visible then
+			if active then
 				local visibleTransparency = instance:GetAttribute("SecretVisibleTransparency")
 				local visibleCanCollide = instance:GetAttribute("SecretVisibleCanCollide")
 				instance.Transparency = if visibleTransparency ~= nil then visibleTransparency else 0
 				instance.CanCollide = if visibleCanCollide ~= nil then visibleCanCollide else true
+			elseif outlineVisible and instance:GetAttribute("SecretOutlineVisible") == true then
+				local outlineTransparency = instance:GetAttribute("SecretOutlineTransparency")
+				local outlineCanCollide = instance:GetAttribute("SecretOutlineCanCollide")
+				instance.Transparency = if outlineTransparency ~= nil then outlineTransparency else 0
+				instance.CanCollide = if outlineCanCollide ~= nil then outlineCanCollide else false
 			else
 				instance.Transparency = 1
 				instance.CanCollide = false
 			end
 		elseif instance:IsA("ProximityPrompt") then
 			local visibleEnabled = instance:GetAttribute("SecretVisibleEnabled")
-			instance.Enabled = visible and (visibleEnabled == nil or visibleEnabled == true)
+			instance.Enabled = active and (visibleEnabled == nil or visibleEnabled == true)
+			if active then
+				instance.ActionText = if hasKey then "Open" else "Inspect"
+				instance.ObjectText = if hasKey then "Library" else "Library - Awaiting Key"
+			end
 		elseif instance:IsA("SurfaceGui") then
 			local visibleEnabled = instance:GetAttribute("SecretVisibleEnabled")
-			instance.Enabled = visible and (visibleEnabled == nil or visibleEnabled == true)
+			instance.Enabled = active and (visibleEnabled == nil or visibleEnabled == true)
+		elseif instance:IsA("TextLabel") and instance.Name == "SecretDoorText" then
+			instance.Text = if hasKey then "LIBRARY\nKEY ACCEPTED" else "LIBRARY\nAWAITING KEY"
 		end
 	end
 end
 
-function InteractionService:_shouldRevealSecretDoorForAnyone(roomId)
+function InteractionService:_getSecretDoorWorldState(roomId)
+	local state = {
+		OutlineVisible = false,
+		Active = false,
+		HasKey = false,
+	}
+
 	for _, player in ipairs(Players:GetPlayers()) do
-		if self.discoveryService:CanSeeSecretDoor(player, roomId) then
-			return true
+		if self.discoveryService:HasSecretDoorReveal(player, roomId) then
+			state.OutlineVisible = true
+		end
+
+		if self.discoveryService:IsRoomComplete(player, roomId) then
+			state.OutlineVisible = true
+			state.Active = true
+			if self.discoveryService:HasSecretKey(player, roomId) then
+				state.HasKey = true
+			end
 		end
 	end
 
-	return false
+	return state
 end
 
 function InteractionService:_refreshSecretDoorsForPlayer(player)
@@ -872,7 +902,7 @@ function InteractionService:_refreshSecretDoorsForPlayer(player)
 
 	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.SecretRoomDoor)) do
 		local roomId = door:GetAttribute("RoomId") or "TVRoom"
-		self:_setSecretDoorVisible(door, self:_shouldRevealSecretDoorForAnyone(roomId))
+		self:_setSecretDoorState(door, self:_getSecretDoorWorldState(roomId))
 	end
 end
 
@@ -893,7 +923,7 @@ function InteractionService:_wireSecretRoomDoor(door)
 	self.secretDoorState[door] = self.secretDoorState[door] or {
 		Reacting = false,
 	}
-	self:_setSecretDoorVisible(door, self:_shouldRevealSecretDoorForAnyone(roomId))
+	self:_setSecretDoorState(door, self:_getSecretDoorWorldState(roomId))
 
 	self:_connectPrompt(prompt, function(player)
 		local state = self.secretDoorState[door]
@@ -901,19 +931,19 @@ function InteractionService:_wireSecretRoomDoor(door)
 			return
 		end
 
-		if not self.discoveryService:CanSeeSecretDoor(player, roomId) then
-			self.systemMessageRemote:FireClient(player, "That wall is still committed to being a wall. Finish the room or reveal the secret door in the log.")
+		if not self.discoveryService:IsRoomComplete(player, roomId) then
+			self.systemMessageRemote:FireClient(player, "The Library outline is visible, but the room is not finished yet.")
 			return
 		end
 
 		if not self.discoveryService:HasSecretKey(player, roomId) then
-			self.systemMessageRemote:FireClient(player, "The secret door wants the TV Secret Key. A secret discovery is probably hoarding it.")
+			self.systemMessageRemote:FireClient(player, "The Library is awaiting the Library Key. A secret discovery is probably hoarding it.")
 			return
 		end
 
 		local destinationCFrame = door:GetAttribute("DestinationCFrame")
 		if typeof(destinationCFrame) ~= "CFrame" then
-			self.systemMessageRemote:FireClient(player, "The secret door forgot where the secret is.")
+			self.systemMessageRemote:FireClient(player, "The Library forgot where it is.")
 			return
 		end
 
@@ -932,7 +962,7 @@ function InteractionService:_wireSecretRoomDoor(door)
 		end
 
 		teleportPlayer(player, destinationCFrame)
-		self.systemMessageRemote:FireClient(player, "The secret door opens. Very suspiciously.")
+		self.systemMessageRemote:FireClient(player, "The Library opens. Very suspiciously.")
 
 		task.delay(1.2, function()
 			if door.Parent and door:IsA("BasePart") then

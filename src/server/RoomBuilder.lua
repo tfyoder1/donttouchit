@@ -1246,6 +1246,14 @@ local function rememberSecretDoorVisibleState(root)
 	end
 end
 
+local function markSecretDoorOutline(part)
+	part:SetAttribute("SecretOutlineVisible", true)
+	part:SetAttribute("SecretOutlineTransparency", part.Transparency)
+	part:SetAttribute("SecretOutlineCanCollide", false)
+	part.CanCollide = false
+	return part
+end
+
 local function makeTVSecretRoom(roomFolder)
 	local secretDoor = makeModel(roomFolder, "TVSecretDoor")
 	secretDoor:SetAttribute("RoomId", "TVRoom")
@@ -1254,13 +1262,17 @@ local function makeTVSecretRoom(roomFolder)
 	local doorFrame = CFrame.new(-14, 5.2, -16.42)
 	local backPlate = createPart(secretDoor, "SecretDoorFrame", Vector3.new(6.6, 8.4, 0.22), doorFrame, Color3.fromRGB(43, 45, 53), Enum.Material.Metal)
 	local panel = createPart(secretDoor, "SecretDoorPanel", Vector3.new(5.55, 7.45, 0.28), doorFrame * CFrame.new(0, 0, 0.12), Color3.fromRGB(76, 55, 132), Enum.Material.Wood)
+	markSecretDoorOutline(createPart(secretDoor, "SecretDoorOutlineTop", Vector3.new(6.95, 0.2, 0.18), doorFrame * CFrame.new(0, 4.25, 0.28), Color3.fromRGB(161, 112, 255), Enum.Material.Neon))
+	markSecretDoorOutline(createPart(secretDoor, "SecretDoorOutlineBottom", Vector3.new(6.95, 0.2, 0.18), doorFrame * CFrame.new(0, -4.25, 0.28), Color3.fromRGB(161, 112, 255), Enum.Material.Neon))
+	markSecretDoorOutline(createPart(secretDoor, "SecretDoorOutlineLeft", Vector3.new(0.2, 8.5, 0.18), doorFrame * CFrame.new(-3.45, 0, 0.28), Color3.fromRGB(161, 112, 255), Enum.Material.Neon))
+	markSecretDoorOutline(createPart(secretDoor, "SecretDoorOutlineRight", Vector3.new(0.2, 8.5, 0.18), doorFrame * CFrame.new(3.45, 0, 0.28), Color3.fromRGB(161, 112, 255), Enum.Material.Neon))
 	panel:SetAttribute("RoomId", "TVRoom")
 	panel:SetAttribute("DestinationCFrame", TV_SECRET_ROOM_ENTRY_CFRAME)
 	panel:SetAttribute("SecretClosedCFrame", panel.CFrame)
 	local handle = createPart(secretDoor, "SecretDoorHandle", Vector3.new(0.42, 0.42, 0.42), doorFrame * CFrame.new(2.1, -0.15, 0.34), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
 	handle.Shape = Enum.PartType.Ball
-	createSurfaceText(panel, "SecretDoorText", "NO DOOR\nHERE", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(76, 55, 132))
-	local prompt = createPrompt(panel, "Open", "Secret Door", 0)
+	createSurfaceText(panel, "SecretDoorText", "LIBRARY\nAWAITING KEY", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(76, 55, 132))
+	local prompt = createPrompt(panel, "Open", "Library", 0)
 	prompt.MaxActivationDistance = 11
 	tag(panel, Constants.Tags.SecretRoomDoor)
 	secretDoor.PrimaryPart = panel
@@ -1277,7 +1289,7 @@ local function makeTVSecretRoom(roomFolder)
 	createPart(room, "SecretRoomCeiling", Vector3.new(18, 1, 16), cframeAt(origin, 0, 12, 0), Color3.fromRGB(34, 36, 48), Enum.Material.Concrete)
 
 	local sign = createPart(room, "SecretRoomSign", Vector3.new(12.5, 2.3, 0.28), cframeAt(origin, 0, 7.8, -7.35), Color3.fromRGB(255, 226, 102), Enum.Material.SmoothPlastic)
-	createSurfaceText(sign, "SecretRoomSignText", "THIS ROOM WAS\nNOT ON THE TOUR", Enum.NormalId.Front, Color3.fromRGB(36, 27, 42), Color3.fromRGB(255, 226, 102))
+	createSurfaceText(sign, "SecretRoomSignText", "THE LIBRARY\nPLEASE TOUCH QUIETLY", Enum.NormalId.Front, Color3.fromRGB(36, 27, 42), Color3.fromRGB(255, 226, 102))
 
 	local keyhole = createPart(room, "SecretRoomKeyhole", Vector3.new(2.1, 2.1, 0.2), cframeAt(origin, 0, 4.5, -7.24), Color3.fromRGB(161, 112, 255), Enum.Material.Neon)
 	keyhole.Shape = Enum.PartType.Ball

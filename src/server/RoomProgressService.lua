@@ -555,7 +555,7 @@ function RoomProgressService:_requestSecretDoorReveal(player, roomId)
 	end
 
 	if self.discoveryService:CanSeeSecretDoor(player, roomId) then
-		self:_showHintResult(player, roomId, nil, "The secret door is already visible. The key is still earned by a secret discovery.")
+		self:_showHintResult(player, roomId, nil, "The Library outline is already visible. Finish the room, then bring the key.")
 		return
 	end
 
@@ -572,14 +572,14 @@ function RoomProgressService:_requestSecretDoorReveal(player, roomId)
 			player,
 			roomId,
 			nil,
-			("Secret door rush reveal needs %d hints, or you can complete the room normally for free."):format(cost)
+			("Library outline reveal needs %d hints, or you can complete the room normally for free."):format(cost)
 		)
 		return
 	end
 
-	self.discoveryService:RevealSecretDoor(player, roomId, "Secret door revealed early. The key is still hiding in a secret discovery.")
+	self.discoveryService:RevealSecretDoor(player, roomId, "Library outline revealed early. Finish the room to activate it.")
 	self:ShowReferenceBook(player, roomId, {
-		StatusText = ("Secret door revealed early for %d hints. Find the secret key to open it."):format(cost),
+		StatusText = ("Library outline revealed for %d hints. Finish the room, then bring the Library Key."):format(cost),
 	})
 end
 
@@ -667,9 +667,9 @@ function RoomProgressService:_installReceiptHandler()
 				return Enum.ProductPurchaseDecision.NotProcessedYet
 			end
 
-			self.discoveryService:RevealSecretDoor(player, secretDoorRoomId, "Secret door revealed early. The key is still hiding in a secret discovery.")
+			self.discoveryService:RevealSecretDoor(player, secretDoorRoomId, "Library outline revealed early. Finish the room to activate it.")
 			self:ShowReferenceBook(player, secretDoorRoomId, {
-				StatusText = "Secret door revealed early. Find the secret key to open it.",
+				StatusText = "Library outline revealed. Finish the room, then bring the Library Key.",
 			})
 			return Enum.ProductPurchaseDecision.PurchaseGranted
 		end

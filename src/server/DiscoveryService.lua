@@ -572,12 +572,12 @@ end
 
 function DiscoveryService:RevealSecretDoor(player, roomId, messageText)
 	if not player or not player.Parent or not Constants.SecretDoors or not Constants.SecretDoors[roomId] then
-		return false, "That secret door is not configured yet."
+		return false, "That Library door is not configured yet."
 	end
 
 	self:_ensurePlayer(player)
 	if self.secretDoorRevealsByUserId[player.UserId][roomId] then
-		return false, "That secret door is already visible."
+		return false, "That Library outline is already visible."
 	end
 
 	self.secretDoorRevealsByUserId[player.UserId][roomId] = true
@@ -625,8 +625,9 @@ function DiscoveryService:GetSecretDoorSnapshot(player, roomId)
 		Name = config.Name,
 		KeyName = config.KeyName,
 		Visible = visible,
+		Active = roomComplete,
 		HasKey = hasKey,
-		CanOpen = visible and hasKey,
+		CanOpen = roomComplete and hasKey,
 		RoomComplete = roomComplete,
 		PurchasedReveal = purchasedReveal,
 		RevealHintCost = config.RevealHintCost or 0,
