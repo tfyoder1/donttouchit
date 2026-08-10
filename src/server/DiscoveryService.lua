@@ -40,10 +40,26 @@ local function buildSecretRoomList(foundByRoomId)
 	return rooms
 end
 
+local function buildDiscoveryStateList(foundById)
+	local discoveries = {}
+
+	for discoveryId, unlocked in pairs(foundById or {}) do
+		if unlocked and Constants.GetDiscovery(discoveryId) then
+			table.insert(discoveries, discoveryId)
+		end
+	end
+
+	table.sort(discoveries)
+	return discoveries
+end
+
 function DiscoveryService.new()
 	local self = setmetatable({}, DiscoveryService)
 	self.discoveryByUserId = {}
 	self.hintsByUserId = {}
+	self.cluesByUserId = {}
+	self.cluedDiscoveriesByUserId = {}
+	self.revealedDiscoveriesByUserId = {}
 	self.secretKeysByUserId = {}
 	self.secretDoorRevealsByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
@@ -90,6 +106,9 @@ function DiscoveryService:Initialize()
 		self:_savePlayer(player)
 		self.discoveryByUserId[player.UserId] = nil
 		self.hintsByUserId[player.UserId] = nil
+		self.cluesByUserId[player.UserId] = nil
+		self.cluedDiscoveriesByUserId[player.UserId] = nil
+		self.revealedDiscoveriesByUserId[player.UserId] = nil
 		self.secretKeysByUserId[player.UserId] = nil
 		self.secretDoorRevealsByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
@@ -130,6 +149,18 @@ function DiscoveryService:_ensurePlayer(player)
 		self.hintsByUserId[player.UserId] = 0
 	end
 
+	if not self.cluesByUserId[player.UserId] then
+		self.cluesByUserId[player.UserId] = 0
+	end
+
+	if not self.cluedDiscoveriesByUserId[player.UserId] then
+		self.cluedDiscoveriesByUserId[player.UserId] = {}
+	end
+
+	if not self.revealedDiscoveriesByUserId[player.UserId] then
+		self.revealedDiscoveriesByUserId[player.UserId] = {}
+	end
+
 	if not self.secretKeysByUserId[player.UserId] then
 		self.secretKeysByUserId[player.UserId] = {}
 	end
@@ -166,6 +197,9 @@ end
 function DiscoveryService:_loadPlayer(player)
 	self.discoveryByUserId[player.UserId] = {}
 	self.hintsByUserId[player.UserId] = 0
+	self.cluesByUserId[player.UserId] = 0
+	self.cluedDiscoveriesByUserId[player.UserId] = {}
+	self.revealedDiscoveriesByUserId[player.UserId] = {}
 	self.secretKeysByUserId[player.UserId] = {}
 	self.secretDoorRevealsByUserId[player.UserId] = {}
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
@@ -207,7 +241,32 @@ function DiscoveryService:_loadPlayer(player)
 		self.hintsByUserId[player.UserId] = math.max(0, math.floor(data.Hints))
 	end
 
+	if typeof(data.Clues) == "number" then
+		self.cluesByUserId[player.UserId] = math.max(0, math.floor(data.Clues))
+	end
+
 	if typeof(data.Inventory) == "table" then
+		if typeof(data.Inventory.Clues) == "number" then
+			self.cluesByUserId[player.UserId] = math.max(0, math.floor(data.Inventory.Clues))
+		end
+
+		if typeof(data.Inventory.CluedDiscoveries) == "table" then
+			for _, discoveryId in ipairs(data.Inventory.CluedDiscoveries) do
+				if Constants.GetDiscovery(discoveryId) then
+					self.cluedDiscoveriesByUserId[player.UserId][discoveryId] = true
+				end
+			end
+		end
+
+		if typeof(data.Inventory.RevealedDiscoveries) == "table" then
+			for _, discoveryId in ipairs(data.Inventory.RevealedDiscoveries) do
+				if Constants.GetDiscovery(discoveryId) then
+					self.cluedDiscoveriesByUserId[player.UserId][discoveryId] = true
+					self.revealedDiscoveriesByUserId[player.UserId][discoveryId] = true
+				end
+			end
+		end
+
 		if typeof(data.Inventory.SecretKeys) == "table" then
 			for _, roomId in ipairs(data.Inventory.SecretKeys) do
 				if Constants.SecretDoors and Constants.SecretDoors[roomId] then
@@ -244,7 +303,11 @@ function DiscoveryService:_buildSaveData(player)
 		Version = 1,
 		Discoveries = buildDiscoveryList(self.discoveryByUserId[player.UserId]),
 		Hints = self.hintsByUserId[player.UserId] or 0,
+		Clues = self.cluesByUserId[player.UserId] or 0,
 		Inventory = {
+			Clues = self.cluesByUserId[player.UserId] or 0,
+			CluedDiscoveries = buildDiscoveryStateList(self.cluedDiscoveriesByUserId[player.UserId]),
+			RevealedDiscoveries = buildDiscoveryStateList(self.revealedDiscoveriesByUserId[player.UserId]),
 			SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
 			SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		},
@@ -605,6 +668,7 @@ function DiscoveryService:_sendSnapshot(player)
 		Total = Constants.TotalDiscoveries,
 		Rooms = self:_buildRoomSummaries(player),
 		Hints = self:GetHintCount(player),
+		Clues = self:GetClueCount(player),
 		SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
 		SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		HasSavedData = self.hasSavedDataByUserId[player.UserId] == true,
@@ -660,6 +724,7 @@ function DiscoveryService:Unlock(player, discoveryId)
 		Total = Constants.TotalDiscoveries,
 		Rooms = self:_buildRoomSummaries(player),
 		Hints = self:GetHintCount(player),
+		Clues = self:GetClueCount(player),
 		SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
 		SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		HasSavedData = true,
@@ -692,6 +757,15 @@ function DiscoveryService:GetHintCount(player)
 	return self.hintsByUserId[player.UserId] or 0
 end
 
+function DiscoveryService:GetClueCount(player)
+	if not player then
+		return 0
+	end
+
+	self:_ensurePlayer(player)
+	return self.cluesByUserId[player.UserId] or 0
+end
+
 function DiscoveryService:GrantHints(player, count)
 	if not player or not player.Parent then
 		return 0
@@ -702,6 +776,35 @@ function DiscoveryService:GrantHints(player, count)
 	self:_sendSnapshot(player)
 	self:_queueSave(player)
 	return self.hintsByUserId[player.UserId]
+end
+
+function DiscoveryService:GrantClues(player, count)
+	if not player or not player.Parent then
+		return 0
+	end
+
+	self:_ensurePlayer(player)
+	self.cluesByUserId[player.UserId] += math.max(0, count or 0)
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+	return self.cluesByUserId[player.UserId]
+end
+
+function DiscoveryService:SpendClues(player, count)
+	if not player or not player.Parent then
+		return false, "No player."
+	end
+
+	local cost = math.max(0, math.floor(count or 0))
+	self:_ensurePlayer(player)
+	if self.cluesByUserId[player.UserId] < cost then
+		return false, ("Needs %d clues."):format(cost)
+	end
+
+	self.cluesByUserId[player.UserId] -= cost
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+	return true, nil
 end
 
 function DiscoveryService:GetRoomSnapshot(player, roomId)
@@ -718,15 +821,22 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 
 	local discoveries = {}
 	local foundById = self.discoveryByUserId[player.UserId]
+	local cluedById = self.cluedDiscoveriesByUserId[player.UserId]
+	local revealedById = self.revealedDiscoveriesByUserId[player.UserId]
 
 	for _, discoveryId in ipairs(room.DiscoveryOrder) do
 		local discovery = Constants.GetDiscovery(discoveryId)
 		if discovery then
 			local unlocked = foundById[discoveryId] == true
+			local revealed = revealedById[discoveryId] == true
+			local clued = revealed or cluedById[discoveryId] == true
 			table.insert(discoveries, {
 				Id = discovery.Id,
-				Name = unlocked and discovery.Name or "???",
+				Name = (unlocked or clued) and discovery.Name or "???",
+				Hint = revealed and discovery.Hint or nil,
 				Unlocked = unlocked,
+				Clued = clued and not unlocked,
+				Revealed = revealed and not unlocked,
 			})
 		end
 	end
@@ -753,6 +863,9 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 		Total = #room.DiscoveryOrder,
 		SecretCount = secretCount,
 		Hints = self:GetHintCount(player),
+		Clues = self:GetClueCount(player),
+		ClueHintCost = Constants.NoTouch.ClueHintCost,
+		RevealClueCost = Constants.NoTouch.RevealClueCost,
 		SecretDoor = self:GetSecretDoorSnapshot(player, room.Id),
 		Discoveries = discoveries,
 		Rooms = self:_buildRoomSummaries(player),
@@ -782,6 +895,55 @@ function DiscoveryService:_getNextDiscovery(player, roomId)
 	return nil, "Everything in this room is already found."
 end
 
+function DiscoveryService:_getNextUncluedDiscovery(player, roomId)
+	if not player or not player.Parent then
+		return nil, "No player."
+	end
+
+	self:_ensurePlayer(player)
+
+	local room = Constants.GetRoom(roomId)
+	if not room then
+		return nil, "That book page is missing."
+	end
+
+	local foundById = self.discoveryByUserId[player.UserId]
+	local cluedById = self.cluedDiscoveriesByUserId[player.UserId]
+
+	for _, discoveryId in ipairs(room.DiscoveryOrder) do
+		if not foundById[discoveryId] and not cluedById[discoveryId] then
+			return Constants.GetDiscovery(discoveryId), nil
+		end
+	end
+
+	return nil, "Every remaining discovery in this room already has a clue."
+end
+
+function DiscoveryService:_getNextRevealDiscovery(player, roomId)
+	if not player or not player.Parent then
+		return nil, nil, "No player."
+	end
+
+	self:_ensurePlayer(player)
+
+	local room = Constants.GetRoom(roomId)
+	if not room then
+		return nil, nil, "That book page is missing."
+	end
+
+	local foundById = self.discoveryByUserId[player.UserId]
+	local revealedById = self.revealedDiscoveriesByUserId[player.UserId]
+
+	for _, discoveryId in ipairs(room.DiscoveryOrder) do
+		local targetTag = Constants.DiscoveryHighlightTargets[discoveryId]
+		if targetTag and not foundById[discoveryId] and not revealedById[discoveryId] then
+			return Constants.GetDiscovery(discoveryId), targetTag, nil
+		end
+	end
+
+	return nil, nil, "No unrevealed locations are left in this room."
+end
+
 function DiscoveryService:GetFreeHint(player, roomId)
 	local nextDiscovery, errorText = self:_getNextDiscovery(player, roomId)
 	if not nextDiscovery then
@@ -801,7 +963,7 @@ function DiscoveryService:GetFreeHint(player, roomId)
 		targetText = "one suspicious object"
 	end
 
-	return ("Free clue: %s still has something left to give."):format(targetText), nil
+	return ("Free hint: %s still has something left to give."):format(targetText), nil
 end
 
 function DiscoveryService:GetPaidHintText(player, roomId)
@@ -821,6 +983,80 @@ function DiscoveryService:GetFullRevealText(player, roomId)
 
 	local hint = nextDiscovery.Hint or "Try one of the untouched objects in this room."
 	return ("Full reveal: %s. %s"):format(nextDiscovery.Name, hint), nil
+end
+
+function DiscoveryService:UseClue(player, roomId, hintCost, skipCost)
+	if not player or not player.Parent then
+		return nil, "No player."
+	end
+
+	self:_ensurePlayer(player)
+
+	local nextDiscovery, errorText = self:_getNextUncluedDiscovery(player, roomId)
+	local pendingDiscovery = nil
+	if not nextDiscovery then
+		pendingDiscovery = self:_getNextDiscovery(player, roomId)
+		if not pendingDiscovery then
+			return nil, errorText
+		end
+	end
+
+	local cost = math.max(0, math.floor(hintCost or Constants.NoTouch.ClueHintCost or 5))
+	if not skipCost and self.hintsByUserId[player.UserId] < cost then
+		return nil, ("Clue needs %d hints."):format(cost)
+	end
+
+	if not skipCost then
+		self.hintsByUserId[player.UserId] -= cost
+	end
+
+	self.cluesByUserId[player.UserId] += 1
+	if nextDiscovery then
+		self.cluedDiscoveriesByUserId[player.UserId][nextDiscovery.Id] = true
+	end
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+
+	if nextDiscovery then
+		return ("Clue unlocked: %s is now named in the log. Clues banked: %d."):format(
+			nextDiscovery.Name,
+			self.cluesByUserId[player.UserId]
+		), nil, nextDiscovery
+	end
+
+	return ("Clue banked. Every remaining discovery in this room is already named. Clues banked: %d."):format(
+		self.cluesByUserId[player.UserId]
+	), nil, pendingDiscovery
+end
+
+function DiscoveryService:UseLocationReveal(player, roomId, clueCost, skipCost)
+	if not player or not player.Parent then
+		return nil, nil, "No player."
+	end
+
+	self:_ensurePlayer(player)
+
+	local nextDiscovery, targetTag, errorText = self:_getNextRevealDiscovery(player, roomId)
+	if not nextDiscovery then
+		return nil, nil, errorText
+	end
+
+	local cost = math.max(0, math.floor(clueCost or Constants.NoTouch.RevealClueCost or 3))
+	if not skipCost and self.cluesByUserId[player.UserId] < cost then
+		return nil, nil, ("Reveal needs %d clues."):format(cost)
+	end
+
+	if not skipCost then
+		self.cluesByUserId[player.UserId] -= cost
+	end
+
+	self.cluedDiscoveriesByUserId[player.UserId][nextDiscovery.Id] = true
+	self.revealedDiscoveriesByUserId[player.UserId][nextDiscovery.Id] = true
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+
+	local hint = nextDiscovery.Hint or "The highlighted object is ready."
+	return ("Reveal: %s. %s"):format(nextDiscovery.Name, hint), targetTag, nil, nextDiscovery
 end
 
 function DiscoveryService:UseHint(player, roomId)

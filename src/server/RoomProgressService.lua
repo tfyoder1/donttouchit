@@ -208,15 +208,19 @@ function RoomProgressService:_sendStartOptions(player)
 	local resumeRoom = Constants.GetRoom(resumeRoomId)
 	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
 	local hintCount = self.discoveryService:GetHintCount(player)
+	local clueCount = self.discoveryService:GetClueCount(player)
 
 	self.sessionStartRemote:FireClient(player, {
 		Action = "Show",
-		HasProgress = discoveryCount > 0 or hintCount > 0 or resumeRoomId ~= Constants.RoomOrder[1],
+		HasProgress = discoveryCount > 0 or hintCount > 0 or clueCount > 0 or resumeRoomId ~= Constants.RoomOrder[1],
 		ResumeRoomId = resumeRoomId,
 		ResumeRoomName = resumeRoom and resumeRoom.Name or "TV Room",
 		DiscoveryCount = discoveryCount,
 		TotalDiscoveries = Constants.TotalDiscoveries,
 		Hints = hintCount,
+		Clues = clueCount,
+		BuildVersion = Constants.BuildVersion,
+		IntroText = Constants.GameIntro,
 	})
 end
 
@@ -446,10 +450,10 @@ function RoomProgressService:_handleHintRequest(player, payload)
 	elseif action == "FreeHint" then
 		local hintText, errorText = self.discoveryService:GetFreeHint(player, roomId)
 		self:_showHintResult(player, roomId, hintText, errorText)
-	elseif action == "PaidHint" or action == "UseHint" then
-		self:_requestPaidHint(player, roomId)
-	elseif action == "FullReveal" then
-		self:_requestFullReveal(player, roomId)
+	elseif action == "Clue" or action == "PaidHint" or action == "UseHint" then
+		self:_requestClue(player, roomId)
+	elseif action == "Reveal" or action == "FullReveal" then
+		self:_requestDiscoveryReveal(player, roomId)
 	elseif action == "RevealSecretDoor" then
 		self:_requestSecretDoorReveal(player, roomId)
 	end
@@ -482,28 +486,44 @@ function RoomProgressService:_promptHintProduct(player, roomId, productId, actio
 	end
 end
 
-function RoomProgressService:_requestPaidHint(player, roomId)
-	local productId = Constants.NoTouch.PaidHintProductId
+function RoomProgressService:_requestClue(player, roomId)
+	local productId = Constants.NoTouch.ClueProductId
+	if not productId or productId <= 0 then
+		productId = Constants.NoTouch.PaidHintProductId
+	end
 
 	if productId and productId > 0 then
-		self:_promptHintProduct(player, roomId, productId, "PaidHint")
+		self:_promptHintProduct(player, roomId, productId, "Clue")
 		return
 	end
 
-	local hintText, errorText = self.discoveryService:UseHint(player, roomId)
+	local hintText, errorText = self.discoveryService:UseClue(player, roomId, Constants.NoTouch.ClueHintCost)
 	self:_showHintResult(player, roomId, hintText, errorText)
 end
 
-function RoomProgressService:_requestFullReveal(player, roomId)
-	local productId = Constants.NoTouch.FullRevealProductId
+function RoomProgressService:_requestDiscoveryReveal(player, roomId)
+	local productId = Constants.NoTouch.RevealProductId
+	if not productId or productId <= 0 then
+		productId = Constants.NoTouch.FullRevealProductId
+	end
 
 	if productId and productId > 0 then
-		self:_promptHintProduct(player, roomId, productId, "FullReveal")
+		self:_promptHintProduct(player, roomId, productId, "Reveal")
 		return
 	end
 
-	local revealText, errorText = self.discoveryService:UseFullReveal(player, roomId, Constants.NoTouch.FullRevealHintCost)
+	local revealText, targetTag, errorText = self.discoveryService:UseLocationReveal(player, roomId, Constants.NoTouch.RevealClueCost)
 	self:_showHintResult(player, roomId, revealText, errorText)
+
+	if revealText and targetTag then
+		local target = self:_findHighlightTarget(targetTag)
+		if target then
+			self.sparkleRemote:FireClient(player, {
+				Target = target,
+				Duration = math.max(Constants.Sparkle.DurationSeconds, 8),
+			})
+		end
+	end
 end
 
 function RoomProgressService:_requestHintPack(player, roomId)
@@ -565,8 +585,14 @@ end
 
 function RoomProgressService:_installReceiptHandler()
 	local hintPackProductId = Constants.NoTouch.HintPackProductId
-	local paidHintProductId = Constants.NoTouch.PaidHintProductId
-	local fullRevealProductId = Constants.NoTouch.FullRevealProductId
+	local paidHintProductId = Constants.NoTouch.ClueProductId
+	if not paidHintProductId or paidHintProductId <= 0 then
+		paidHintProductId = Constants.NoTouch.PaidHintProductId
+	end
+	local fullRevealProductId = Constants.NoTouch.RevealProductId
+	if not fullRevealProductId or fullRevealProductId <= 0 then
+		fullRevealProductId = Constants.NoTouch.FullRevealProductId
+	end
 	local secretDoorProductById = {}
 
 	for roomId, config in pairs(Constants.SecretDoors or {}) do
@@ -614,10 +640,20 @@ function RoomProgressService:_installReceiptHandler()
 
 			local hintText = nil
 			local errorText = nil
-			if pending.Action == "FullReveal" then
-				hintText, errorText = self.discoveryService:GetFullRevealText(player, pending.RoomId)
+			if pending.Action == "Reveal" or pending.Action == "FullReveal" then
+				local targetTag = nil
+				hintText, targetTag, errorText = self.discoveryService:UseLocationReveal(player, pending.RoomId, 0, true)
+				if hintText and targetTag then
+					local target = self:_findHighlightTarget(targetTag)
+					if target then
+						self.sparkleRemote:FireClient(player, {
+							Target = target,
+							Duration = math.max(Constants.Sparkle.DurationSeconds, 8),
+						})
+					end
+				end
 			else
-				hintText, errorText = self.discoveryService:GetPaidHintText(player, pending.RoomId)
+				hintText, errorText = self.discoveryService:UseClue(player, pending.RoomId, 0, true)
 			end
 
 			self:_showHintResult(player, pending.RoomId, hintText, errorText)

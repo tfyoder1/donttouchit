@@ -1,5 +1,7 @@
 local Constants = {}
 
+Constants.BuildVersion = "0.4.0"
+Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
 Constants.EventCooldown = 2.5
@@ -95,7 +97,7 @@ Constants.Confetti = {
 
 Constants.RoomPlay = {
 	HintIntervalSeconds = 300,
-	HintsPerInterval = 1,
+	HintsPerInterval = 5,
 }
 
 Constants.FloorPressMessages = {
@@ -465,6 +467,12 @@ Constants.NoTouch = {
 	FullRevealRobux = 3,
 	FullRevealHintCost = 3,
 	FullRevealProductId = 0,
+	ClueHintCost = 5,
+	ClueRobux = 1,
+	ClueProductId = 0,
+	RevealClueCost = 3,
+	RevealRobux = 3,
+	RevealProductId = 0,
 }
 
 Constants.DiscoveryOrder = {}
