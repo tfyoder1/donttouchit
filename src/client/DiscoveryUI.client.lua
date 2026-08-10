@@ -282,11 +282,14 @@ buyHintButton.Name = "BuyHintPack"
 buyHintButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
 buyHintButton.BorderSizePixel = 0
 buyHintButton.Font = Enum.Font.GothamBlack
-buyHintButton.Position = UDim2.new(0, 18, 1, -42)
-buyHintButton.Size = UDim2.new(0.5, -24, 0, 30)
-buyHintButton.Text = "10 Hints - 1 R$"
+buyHintButton.Position = UDim2.new(0, 18, 1, -48)
+buyHintButton.Size = UDim2.new(0.5, -24, 0, 36)
+buyHintButton.Text = if Constants.NoTouch.HintPackProductId > 0
+	then ("%d Hints - %d R$"):format(Constants.NoTouch.HintPackSize, Constants.NoTouch.HintPackRobux)
+	else ("%d Hints\nCurrently Free"):format(Constants.NoTouch.HintPackSize)
 buyHintButton.TextColor3 = Color3.fromRGB(18, 45, 26)
 buyHintButton.TextScaled = true
+buyHintButton.TextWrapped = true
 buyHintButton.Parent = bookPanel
 
 local buyCorner = Instance.new("UICorner")
@@ -298,8 +301,8 @@ useHintButton.Name = "UseHint"
 useHintButton.BackgroundColor3 = Color3.fromRGB(84, 154, 255)
 useHintButton.BorderSizePixel = 0
 useHintButton.Font = Enum.Font.GothamBlack
-useHintButton.Position = UDim2.new(0.5, 6, 1, -42)
-useHintButton.Size = UDim2.new(0.5, -24, 0, 30)
+useHintButton.Position = UDim2.new(0.5, 6, 1, -48)
+useHintButton.Size = UDim2.new(0.5, -24, 0, 36)
 useHintButton.Text = "Use Hint"
 useHintButton.TextColor3 = Color3.fromRGB(16, 28, 48)
 useHintButton.TextScaled = true

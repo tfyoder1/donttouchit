@@ -465,9 +465,9 @@ function RoomProgressService:_requestHintPack(player, roomId)
 
 	self.discoveryService:GrantHints(player, Constants.NoTouch.HintPackSize)
 	self:ShowReferenceBook(player, roomId, {
-		StatusText = ("Prototype hint pack added: %d hints."):format(Constants.NoTouch.HintPackSize),
+		StatusText = ("Prototype hint pack added: %d hints. Currently free; no Robux charged."):format(Constants.NoTouch.HintPackSize),
 	})
-	self.systemMessageRemote:FireClient(player, "Prototype hint pack added: 10 hints.")
+	self.systemMessageRemote:FireClient(player, "Prototype hint pack added: 10 hints. Currently free; no Robux charged.")
 end
 
 function RoomProgressService:_installReceiptHandler()
