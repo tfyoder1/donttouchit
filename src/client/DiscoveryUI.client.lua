@@ -16,12 +16,18 @@ local systemMessageRemote = remotes:WaitForChild(Constants.Remotes.SystemMessage
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
+local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
+local playerGui = player:WaitForChild("PlayerGui")
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
 gui.IgnoreGuiInset = false
 gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
+gui.Parent = playerGui
+
+local function isStartOverlayDismissedForDevSession()
+	return gui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true or playerGui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true
+end
 
 local title = Instance.new("TextLabel")
 title.Name = "Title"
@@ -851,6 +857,15 @@ local function renderStartOptions(payload)
 		return
 	end
 
+	if isStartOverlayDismissedForDevSession() then
+		pendingStartOptions = nil
+		startOverlay.Visible = false
+		continueButton.Modal = false
+		restartButton.Modal = false
+		setOverlayMouse(false)
+		return
+	end
+
 	pendingStartOptions = payload
 	startOverlay.Visible = true
 	continueButton.Modal = true
@@ -873,6 +888,26 @@ local function renderStartOptions(payload)
 		restartButton.Visible = false
 	end
 end
+
+gui:GetAttributeChangedSignal(DEV_DISMISS_START_ATTRIBUTE):Connect(function()
+	if isStartOverlayDismissedForDevSession() then
+		pendingStartOptions = nil
+		startOverlay.Visible = false
+		continueButton.Modal = false
+		restartButton.Modal = false
+		setOverlayMouse(false)
+	end
+end)
+
+playerGui:GetAttributeChangedSignal(DEV_DISMISS_START_ATTRIBUTE):Connect(function()
+	if isStartOverlayDismissedForDevSession() then
+		pendingStartOptions = nil
+		startOverlay.Visible = false
+		continueButton.Modal = false
+		restartButton.Modal = false
+		setOverlayMouse(false)
+	end
+end)
 
 local function getSparklePart(target)
 	if not target then

@@ -27,6 +27,7 @@ local flyVelocity = nil
 local flyGyro = nil
 local flyConnections = {}
 local pressedKeys = {}
+local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
 
 local function clearList(container)
 	if not container then
@@ -94,6 +95,25 @@ end
 local function send(payload)
 	if authorized and typeof(payload) == "table" then
 		devRemote:FireServer(payload)
+	end
+end
+
+local function dismissStartOverlayForDevSession()
+	local playerGui = player:FindFirstChild("PlayerGui")
+	if not playerGui then
+		return
+	end
+
+	playerGui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, true)
+
+	local mainGui = playerGui:FindFirstChild("DontTouchItUI")
+	if mainGui then
+		mainGui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, true)
+	end
+
+	local startOverlay = mainGui and mainGui:FindFirstChild("StartChoiceOverlay")
+	if startOverlay and startOverlay:IsA("GuiObject") then
+		startOverlay.Visible = false
 	end
 end
 
@@ -508,6 +528,7 @@ local function buildGui()
 	toggleButton.Activated:Connect(function()
 		panel.Visible = not panel.Visible
 		if panel.Visible then
+			dismissStartOverlayForDevSession()
 			send({
 				Action = "Refresh",
 				RoomId = selectedRoomId,
