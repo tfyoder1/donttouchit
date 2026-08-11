@@ -722,6 +722,9 @@ local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
 local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
 local ISLAND_RETURN_CFRAME = CFrame.new(0, 3, 113)
+local SPACE_STATION_ORIGIN = Vector3.new(92, 80, 150)
+local SPACE_STATION_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("SpaceStation")
+local ISLAND_SPACE_BLOCK_ID = "bent_palm_orbit_block"
 
 local function makeSnackCeilingFan(objectsFolder)
 	local fan = makeModel(objectsFolder, "SnackCeilingFan")
@@ -2222,6 +2225,20 @@ local function makePalmTree(parent, name, x, z, leanDegrees, coconutCount, dropC
 	local trunkDiameter = 0.8
 	local baseCFrame = cframeAt(ISLAND_ORIGIN, x, 1.02, z) * CFrame.Angles(0, 0, math.rad(leanDegrees or 0))
 	local trunk = createPart(tree, "PalmTrunk", Vector3.new(trunkDiameter, trunkHeight, trunkDiameter), baseCFrame * CFrame.new(0, trunkHeight / 2, 0), Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
+	trunk.CanCollide = false
+	trunk:SetAttribute("BaseCanCollide", false)
+	local climbTruss = createPart(
+		tree,
+		"PalmClimbTruss",
+		Vector3.new(1.35, trunkHeight + 0.8, 1.35),
+		baseCFrame * CFrame.new(0, trunkHeight / 2, 0),
+		Color3.fromRGB(99, 64, 38),
+		Enum.Material.Wood,
+		"TrussPart"
+	)
+	climbTruss.Transparency = 0.22
+	climbTruss:SetAttribute("BaseTransparency", climbTruss.Transparency)
+	climbTruss:SetAttribute("BaseCanCollide", true)
 	if dropCoconutId then
 		trunk:SetAttribute("DropCoconutId", dropCoconutId)
 		createPrompt(trunk, "Shake", "Coconut Palm", 0)
@@ -2266,6 +2283,58 @@ local function makePalmTree(parent, name, x, z, leanDegrees, coconutCount, dropC
 
 	tree.PrimaryPart = trunk
 	return tree
+end
+
+local function makeIslandSpaceLadderSecret(parent)
+	local secret = makeModel(parent, "IslandSpaceLadderSecret")
+	local blockCFrame = cframeAt(ISLAND_ORIGIN, -10, 11.15, 8)
+	local block = createPart(
+		secret,
+		"IslandHiddenSkyBlock",
+		Vector3.new(4.2, 0.9, 4.2),
+		blockCFrame,
+		Color3.fromRGB(255, 230, 91),
+		Enum.Material.Neon
+	)
+	block.Transparency = 1
+	block.CanCollide = true
+	block:SetAttribute("BaseTransparency", 1)
+	block:SetAttribute("BaseCanCollide", true)
+	block:SetAttribute("SpaceBlockId", ISLAND_SPACE_BLOCK_ID)
+
+	local blockLabel = createSurfaceText(block, "IslandSkyBlockText", "BONK\nBLOCK", Enum.NormalId.Bottom, Color3.fromRGB(44, 35, 18), Color3.fromRGB(255, 230, 91))
+	blockLabel.Parent.Enabled = false
+	blockLabel.Parent:SetAttribute("BaseEnabled", false)
+	local blockPrompt = createPrompt(block, "Inspect", "Bonk Block", 0)
+	blockPrompt.Enabled = false
+	blockPrompt:SetAttribute("BaseEnabled", false)
+	tag(block, Constants.Tags.IslandHiddenSkyBlock)
+
+	local ladderFullSize = Vector3.new(1.45, 14.8, 1.45)
+	local ladderFullCFrame = blockCFrame * CFrame.new(0, 7.85, 0)
+	local ladder = createPart(
+		secret,
+		"IslandSpaceLadder",
+		Vector3.new(1.45, 0.25, 1.45),
+		blockCFrame * CFrame.new(0, 0.65, 0),
+		Color3.fromRGB(119, 255, 203),
+		Enum.Material.Neon,
+		"TrussPart"
+	)
+	ladder.Transparency = 1
+	ladder.CanCollide = false
+	ladder:SetAttribute("BaseTransparency", 1)
+	ladder:SetAttribute("BaseCanCollide", false)
+	ladder:SetAttribute("SpaceBlockId", ISLAND_SPACE_BLOCK_ID)
+	ladder:SetAttribute("FullSize", ladderFullSize)
+	ladder:SetAttribute("FullCFrame", ladderFullCFrame)
+	local ladderPrompt = createPrompt(ladder, "Climb", "Ladder to Orbit", 0.2)
+	ladderPrompt.Enabled = false
+	ladderPrompt:SetAttribute("BaseEnabled", false)
+	tag(ladder, Constants.Tags.IslandSpaceLadder)
+
+	secret.PrimaryPart = block
+	return secret
 end
 
 local function makeIslandWarningSign(parent, name, text, x, z, targetX, targetZ, tagName)
@@ -2336,6 +2405,7 @@ local function makeIslandRoom(roomFolder)
 
 	makePalmTree(room, "BentPalm", -10, 8, -9, 1)
 	makePalmTree(room, "SmallPalm", 10, 1, 6, 2, "dropped_palm_coconut")
+	makeIslandSpaceLadderSecret(room)
 
 	for _, data in ipairs({
 		{ Name = "NorthHorizon", Size = Vector3.new(150, 28, 0.4), CFrame = cframeAt(origin, 0, 13, 87), Color = Color3.fromRGB(133, 215, 255) },
@@ -2452,8 +2522,9 @@ local function makeIslandObjects(objectsFolder)
 			Enum.Material.Wood
 		)
 		coconut.Shape = Enum.PartType.Ball
-		coconut:SetAttribute("CoconutId", coconutId)
-		coconut:SetAttribute("StartsCrab", startsCrab == true)
+			coconut:SetAttribute("CoconutId", coconutId)
+			coconut:SetAttribute("StartsCrab", startsCrab == true)
+			coconut:SetAttribute("StartsSeagulls", coconutId == "quiet_coconut")
 
 		local eyeA = createPart(objects, name .. "EyeA", Vector3.new(0.12, 0.08, 0.08), coconut.CFrame * CFrame.new(-0.18, 0.22, -0.5), Color3.fromRGB(28, 18, 12), Enum.Material.SmoothPlastic)
 		local eyeB = createPart(objects, name .. "EyeB", Vector3.new(0.12, 0.08, 0.08), coconut.CFrame * CFrame.new(0.1, 0.26, -0.52), Color3.fromRGB(28, 18, 12), Enum.Material.SmoothPlastic)
@@ -2673,6 +2744,149 @@ local function makeIslandObjects(objectsFolder)
 	}
 end
 
+local function makeSpaceStationRoom(roomFolder)
+	local room = makeModel(roomFolder, "SpaceStationRoom")
+	local origin = SPACE_STATION_ORIGIN
+	local width = 42
+	local depth = 32
+	local height = 18
+
+	createPart(room, "SpaceStationFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(72, 82, 94), Enum.Material.DiamondPlate)
+	createPart(room, "SpaceStationCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(31, 38, 52), Enum.Material.Metal)
+	createPart(room, "SpaceStationBackWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, -depth / 2), Color3.fromRGB(37, 47, 65), Enum.Material.Metal)
+	createPart(room, "SpaceStationFrontWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, depth / 2), Color3.fromRGB(37, 47, 65), Enum.Material.Metal)
+	createPart(room, "SpaceStationLeftWall", Vector3.new(1, height, depth), cframeAt(origin, -width / 2, height / 2, 0), Color3.fromRGB(32, 41, 58), Enum.Material.Metal)
+	createPart(room, "SpaceStationRightWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(32, 41, 58), Enum.Material.Metal)
+
+	for ribIndex = 1, 5 do
+		local z = -depth / 2 + ribIndex * (depth / 6)
+		createPart(room, "SpaceStationCeilingRib" .. ribIndex, Vector3.new(width - 3, 0.28, 0.28), cframeAt(origin, 0, height - 0.72, z), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	end
+
+	local returnDoor = createPart(room, "SpaceStationReturnDoor", Vector3.new(6.6, 7.4, 0.36), cframeAt(origin, 0, 4.2, depth / 2 - 0.55), Color3.fromRGB(67, 92, 126), Enum.Material.Metal)
+	returnDoor:SetAttribute("DestinationCFrame", ISLAND_SPAWN_CFRAME)
+	returnDoor:SetAttribute("DestinationName", "the island")
+	createSurfaceText(returnDoor, "SpaceStationReturnText", "BACK TO\nISLAND", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(67, 92, 126))
+	createPrompt(returnDoor, "Exit", "Island", 0)
+	tag(returnDoor, Constants.Tags.SecretRoomExit)
+
+	local controls = makeRoomControlPanel(
+		room,
+		"SpaceStationInsideControlPanel",
+		CFrame.new(origin + Vector3.new(-12.4, 4.75, depth / 2 - 0.65), origin + Vector3.new(0, 4.75, 0)),
+		"SpaceStation",
+		"SPACE STATION",
+		{
+			IncludeReset = true,
+			PanelLabel = "ROOM CONTROLS",
+			LightPromptObjectText = "Station Light Switch",
+		}
+	)
+
+	createNoTouchClock(
+		room,
+		"SpaceStationClock",
+		"SpaceStation",
+		Vector3.new(6.4, 2.0, 0.28),
+		CFrame.new(origin + Vector3.new(12.6, 7.6, depth / 2 - 0.7), origin + Vector3.new(0, 5, 0)),
+		Enum.NormalId.Front
+	)
+	createSpawnLocation(room, "SpaceStationSpawn", "SpaceStation", SPACE_STATION_SPAWN_CFRAME, Color3.fromRGB(119, 255, 203), false)
+
+	local airlockHandle = createPart(room, "SpaceStationAirlockHandle", Vector3.new(0.55, 1.7, 0.55), cframeAt(origin, 4.2, 3.45, depth / 2 - 1.05), Color3.fromRGB(255, 221, 92), Enum.Material.Metal)
+	airlockHandle.Shape = Enum.PartType.Cylinder
+	createPrompt(airlockHandle, "Inspect", "Airlock Handle", 0)
+	tag(airlockHandle, Constants.Tags.SpaceStationAirlock)
+
+	local gravityPanel = createPart(room, "SpaceStationGravityPanel", Vector3.new(5.6, 3.8, 0.34), cframeAt(origin, -width / 2 + 0.74, 5.0, -8) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(21, 30, 44), Enum.Material.Metal)
+	createSurfaceText(gravityPanel, "GravityPanelText", "GRAVITY\nPLEASE SELECT\nRESPONSIBLE", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(21, 30, 44))
+	local gravityDial = createPart(room, "SpaceStationGravityDial", Vector3.new(1.55, 1.55, 0.36), gravityPanel.CFrame * CFrame.new(0, -0.2, -0.28), Color3.fromRGB(255, 232, 92), Enum.Material.Neon)
+	gravityDial.Shape = Enum.PartType.Cylinder
+	createPrompt(gravityDial, "Turn", "Gravity Dial", 0)
+	tag(gravityDial, Constants.Tags.SpaceStationGravityDial)
+
+	local window = createPart(room, "SpaceObservationWindow", Vector3.new(19, 7.4, 0.24), cframeAt(origin, 0, 8.5, -depth / 2 + 0.45), Color3.fromRGB(18, 21, 36), Enum.Material.Glass)
+	window.Transparency = 0.18
+	window:SetAttribute("BaseTransparency", window.Transparency)
+	createPrompt(window, "Look", "Observation Window", 0)
+	tag(window, Constants.Tags.SpaceStationObservationWindow)
+	for starIndex = 1, 18 do
+		local x = -8.2 + (starIndex * 37 % 164) / 10
+		local y = 5.4 + (starIndex * 29 % 74) / 10
+		local star = createPart(room, "SpaceWindowStar" .. starIndex, Vector3.new(0.18, 0.18, 0.18), cframeAt(origin, x, y, -depth / 2 + 0.22), Color3.fromRGB(235, 246, 255), Enum.Material.Neon)
+		star.Shape = Enum.PartType.Ball
+		star.CanCollide = false
+		star:SetAttribute("BaseCanCollide", false)
+	end
+
+	local comms = createPart(room, "SpaceStationCommsPanel", Vector3.new(5.2, 3.2, 0.34), cframeAt(origin, width / 2 - 0.72, 5.2, -8.6) * CFrame.Angles(0, math.rad(-90), 0), Color3.fromRGB(16, 26, 36), Enum.Material.Metal)
+	createSurfaceText(comms, "CommsPanelText", "COMMS\nSEND HELP?\nSEND SNACKS.", Enum.NormalId.Front, Color3.fromRGB(255, 232, 115), Color3.fromRGB(16, 26, 36))
+	createPrompt(comms, "Ping", "Comms Panel", 0)
+	tag(comms, Constants.Tags.SpaceStationCommsPanel)
+
+	local foodPrinter = createPart(room, "SpaceStationFoodPrinter", Vector3.new(5.4, 2.2, 3.1), cframeAt(origin, -13.7, 2.0, 4.4), Color3.fromRGB(198, 205, 214), Enum.Material.Metal)
+	createSurfaceText(foodPrinter, "FoodPrinterText", "FOOD\nPRINTER", Enum.NormalId.Front, Color3.fromRGB(22, 34, 46), Color3.fromRGB(198, 205, 214))
+	local foodCube = createPart(room, "SpaceFoodCube", Vector3.new(1.1, 0.8, 1.1), cframeAt(origin, -13.7, 3.5, 2.9), Color3.fromRGB(255, 186, 88), Enum.Material.SmoothPlastic)
+	foodCube.Shape = Enum.PartType.Ball
+	createPrompt(foodPrinter, "Print", "Space Food", 0)
+	tag(foodPrinter, Constants.Tags.SpaceStationFoodPrinter)
+
+	local suitLocker = createPart(room, "SpaceSuitLocker", Vector3.new(4.4, 7.2, 1.0), cframeAt(origin, 14.5, 4.0, 4.4), Color3.fromRGB(46, 58, 78), Enum.Material.Metal)
+	createSurfaceText(suitLocker, "SuitLockerText", "SUIT\nLOCKER", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(46, 58, 78))
+	local suitHelmet = createPart(room, "SpaceSuitHelmet", Vector3.new(1.65, 1.65, 1.65), cframeAt(origin, 14.5, 6.3, 3.76), Color3.fromRGB(240, 244, 247), Enum.Material.SmoothPlastic)
+	suitHelmet.Shape = Enum.PartType.Ball
+	local suitTorso = createPart(room, "SpaceSuitTorso", Vector3.new(2.2, 2.8, 0.72), cframeAt(origin, 14.5, 4.35, 3.76), Color3.fromRGB(235, 239, 242), Enum.Material.SmoothPlastic)
+	createPrompt(suitTorso, "Inspect", "Space Suit", 0)
+	tag(suitTorso, Constants.Tags.SpaceStationSuit)
+
+	local starMap = createPart(room, "SpaceStationStarMap", Vector3.new(8.4, 4.8, 0.3), cframeAt(origin, 0, 5.5, 7.2), Color3.fromRGB(10, 16, 32), Enum.Material.SmoothPlastic)
+	createSurfaceText(starMap, "StarMapText", "STAR MAP\nYOU ARE\nPROBABLY HERE", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(10, 16, 32))
+	createPrompt(starMap, "Rearrange", "Star Map", 0)
+	tag(starMap, Constants.Tags.SpaceStationStarMap)
+	for dotIndex = 1, 7 do
+		local dot = createPart(room, "StarMapDot" .. dotIndex, Vector3.new(0.28, 0.28, 0.08), starMap.CFrame * CFrame.new(-3.2 + dotIndex, 1.4 - (dotIndex % 3), -0.2), BOWLING_COSMIC_COLORS[((dotIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Enum.Material.Neon)
+		dot.CanCollide = false
+		dot:SetAttribute("BaseCanCollide", false)
+	end
+
+	local plantPod = createPart(room, "SpaceStationPlantPod", Vector3.new(2.2, 3.8, 2.2), cframeAt(origin, -6.5, 3.0, -4.6), Color3.fromRGB(184, 229, 255), Enum.Material.Glass)
+	plantPod.Transparency = 0.32
+	plantPod:SetAttribute("BaseTransparency", plantPod.Transparency)
+	local plantStem = createPart(room, "SpacePlantStem", Vector3.new(0.18, 1.8, 0.18), cframeAt(origin, -6.5, 2.7, -4.6), Color3.fromRGB(71, 187, 95), Enum.Material.Grass)
+	local plantLeaf = createPart(room, "SpacePlantLeaf", Vector3.new(1.2, 0.24, 0.72), cframeAt(origin, -6.2, 3.45, -4.6) * CFrame.Angles(0, 0, math.rad(18)), Color3.fromRGB(91, 220, 112), Enum.Material.Grass)
+	plantStem.CanCollide = false
+	plantLeaf.CanCollide = false
+	plantStem:SetAttribute("BaseCanCollide", false)
+	plantLeaf:SetAttribute("BaseCanCollide", false)
+	createPrompt(plantPod, "Water", "Space Plant", 0)
+	tag(plantPod, Constants.Tags.SpaceStationPlantPod)
+
+	createPart(room, "SpaceMeteorButtonPedestal", Vector3.new(3.2, 2.1, 3.2), cframeAt(origin, 6.2, 1.55, -4.6), Color3.fromRGB(46, 52, 64), Enum.Material.Metal)
+	local meteorButton = createPart(room, "SpaceStationMeteorButton", Vector3.new(1.7, 0.58, 1.7), cframeAt(origin, 6.2, 2.9, -4.6), Color3.fromRGB(235, 42, 51), Enum.Material.Neon)
+	meteorButton.Shape = Enum.PartType.Ball
+	createPrompt(meteorButton, "Press", "Meteor Request", 0)
+	tag(meteorButton, Constants.Tags.SpaceStationMeteorButton)
+
+	local podBase = createPart(room, "SpaceEscapePodBase", Vector3.new(5.4, 3.3, 3.4), cframeAt(origin, 0, 2.2, -10.5), Color3.fromRGB(180, 191, 205), Enum.Material.Metal)
+	local podNose = createPart(room, "SpaceEscapePodNose", Vector3.new(3.2, 3.2, 3.2), cframeAt(origin, 0, 4.15, -10.5), Color3.fromRGB(231, 239, 244), Enum.Material.SmoothPlastic)
+	podNose.Shape = Enum.PartType.Ball
+	local podWindow = createPart(room, "SpaceEscapePodWindow", Vector3.new(2.2, 1.1, 0.18), cframeAt(origin, 0, 4.35, -12.25), Color3.fromRGB(96, 194, 255), Enum.Material.Glass)
+	podWindow.CanCollide = false
+	podWindow:SetAttribute("BaseCanCollide", false)
+	createSurfaceText(podBase, "EscapePodText", "ESCAPE POD\nDO NOT TEST", Enum.NormalId.Front, Color3.fromRGB(31, 38, 52), Color3.fromRGB(180, 191, 205))
+	createPrompt(podBase, "Test", "Escape Pod", 0)
+	tag(podBase, Constants.Tags.SpaceStationEscapePod)
+
+	room.PrimaryPart = returnDoor
+	return {
+		Model = room,
+		ExitDoor = returnDoor,
+		LightSwitch = controls.LightSwitch,
+		ResetRoomButton = controls.ResetRoomButton,
+		ReferenceBook = controls.ReferenceBook,
+	}
+end
+
 local function connectSafetyFloor(safetyFloor)
 	local debounceByCharacter = {}
 
@@ -2732,6 +2946,7 @@ function RoomBuilder.Build()
 	local islandRoom = makeIslandRoom(roomFolder)
 	local tvSecretRoom = makeTVSecretRoom(roomFolder)
 	local bowlingAlley = makeBowlingAlley(roomFolder)
+	local spaceStation = makeSpaceStationRoom(roomFolder)
 	createNoTouchClock(
 		snackLab.Model,
 		"SnackLabWallClock",
@@ -2772,6 +2987,7 @@ function RoomBuilder.Build()
 		Hallway = hallway,
 		TVSecretRoom = tvSecretRoom,
 		BowlingAlley = bowlingAlley,
+		SpaceStation = spaceStation,
 		Island = islandRoom,
 		Pedestal = pedestal,
 		LightSwitch = lightSwitch,

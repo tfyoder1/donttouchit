@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.31"
+Constants.BuildVersion = "0.5.32"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -68,6 +68,8 @@ Constants.Tags = {
 	IslandCoconutTree = "DontTouchIt_IslandCoconutTree",
 	IslandScrapWood = "DontTouchIt_IslandScrapWood",
 	IslandFireRing = "DontTouchIt_IslandFireRing",
+	IslandHiddenSkyBlock = "DontTouchIt_IslandHiddenSkyBlock",
+	IslandSpaceLadder = "DontTouchIt_IslandSpaceLadder",
 	FloorSection = "DontTouchIt_FloorSection",
 	ObjectRainObject = "DontTouchIt_ObjectRainObject",
 	TemporaryObject = "DontTouchIt_TemporaryObject",
@@ -91,6 +93,16 @@ Constants.Tags = {
 	BowlingGutter = "DontTouchIt_BowlingGutter",
 	BowlingBallReturn = "DontTouchIt_BowlingBallReturn",
 	TreetopZipline = "DontTouchIt_TreetopZipline",
+	SpaceStationAirlock = "DontTouchIt_SpaceStationAirlock",
+	SpaceStationGravityDial = "DontTouchIt_SpaceStationGravityDial",
+	SpaceStationObservationWindow = "DontTouchIt_SpaceStationObservationWindow",
+	SpaceStationCommsPanel = "DontTouchIt_SpaceStationCommsPanel",
+	SpaceStationFoodPrinter = "DontTouchIt_SpaceStationFoodPrinter",
+	SpaceStationSuit = "DontTouchIt_SpaceStationSuit",
+	SpaceStationStarMap = "DontTouchIt_SpaceStationStarMap",
+	SpaceStationPlantPod = "DontTouchIt_SpaceStationPlantPod",
+	SpaceStationMeteorButton = "DontTouchIt_SpaceStationMeteorButton",
+	SpaceStationEscapePod = "DontTouchIt_SpaceStationEscapePod",
 }
 
 Constants.Hallway = {
@@ -356,10 +368,75 @@ Constants.Discoveries = {
 		Name = "Lit the Campfire",
 		Hint = "Bring driftwood to the rock ring near the center of the island.",
 	},
+	IslandSeagulls = {
+		Id = "island_seagulls",
+		Name = "Summoned Seagulls",
+		Hint = "One ground coconut has nothing inside, but plenty to say to the sky.",
+	},
 	IslandNoTouch = {
 		Id = "island_no_touch",
 		Name = "Left the Island Alone",
 		Hint = "Stand on the island for two minutes without interacting with anything.",
+	},
+	SpaceStationEntered = {
+		Id = "space_station_entered",
+		Name = "Reached the Space Station",
+		Hint = "The island has a hidden way upward.",
+	},
+	SpaceStationAirlock = {
+		Id = "space_station_airlock",
+		Name = "Questioned the Airlock",
+		Hint = "Start near the door. Space doors always have opinions.",
+	},
+	SpaceStationGravityDial = {
+		Id = "space_station_gravity_dial",
+		Name = "Adjusted the Gravity Dial",
+		Hint = "Look for the dial that claims gravity has settings.",
+	},
+	SpaceStationObservationWindow = {
+		Id = "space_station_observation_window",
+		Name = "Stared Into Space",
+		Hint = "The big window is showing off.",
+	},
+	SpaceStationCommsPanel = {
+		Id = "space_station_comms_panel",
+		Name = "Pinged Mission Control",
+		Hint = "The comms panel would love to send one extremely unhelpful message.",
+	},
+	SpaceStationFoodPrinter = {
+		Id = "space_station_food_printer",
+		Name = "Printed Space Food",
+		Hint = "The food printer is making lunch out of geometry.",
+	},
+	SpaceStationSuit = {
+		Id = "space_station_suit",
+		Name = "Inspected the Space Suit",
+		Hint = "The suit locker is prepared for someone shaped roughly like trouble.",
+	},
+	SpaceStationStarMap = {
+		Id = "space_station_star_map",
+		Name = "Rearranged the Star Map",
+		Hint = "The glowing star map is not nailed down emotionally.",
+	},
+	SpaceStationPlantPod = {
+		Id = "space_station_plant_pod",
+		Name = "Watered the Space Plant",
+		Hint = "Even in orbit, somebody forgot to water the plant.",
+	},
+	SpaceStationMeteorButton = {
+		Id = "space_station_meteor_button",
+		Name = "Requested a Meteor",
+		Hint = "A red button in space is somehow even less reassuring.",
+	},
+	SpaceStationEscapePod = {
+		Id = "space_station_escape_pod",
+		Name = "Tested the Escape Pod",
+		Hint = "The escape pod is not a toy, which is exactly what a toy would say.",
+	},
+	SpaceStationNoTouch = {
+		Id = "space_station_no_touch",
+		Name = "Left Orbit Alone",
+		Hint = "Stand in the Space Station for two minutes without interacting with anything.",
 	},
 	LibraryEntered = {
 		Id = "library_entered",
@@ -526,7 +603,21 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.IslandDroppedCoconut.Id,
 		Constants.Discoveries.IslandDriftwood.Id,
 		Constants.Discoveries.IslandCampfire.Id,
+		Constants.Discoveries.IslandSeagulls.Id,
 		Constants.Discoveries.IslandNoTouch.Id,
+	},
+	SpaceStation = {
+		Constants.Discoveries.SpaceStationAirlock.Id,
+		Constants.Discoveries.SpaceStationGravityDial.Id,
+		Constants.Discoveries.SpaceStationObservationWindow.Id,
+		Constants.Discoveries.SpaceStationCommsPanel.Id,
+		Constants.Discoveries.SpaceStationFoodPrinter.Id,
+		Constants.Discoveries.SpaceStationSuit.Id,
+		Constants.Discoveries.SpaceStationStarMap.Id,
+		Constants.Discoveries.SpaceStationPlantPod.Id,
+		Constants.Discoveries.SpaceStationMeteorButton.Id,
+		Constants.Discoveries.SpaceStationEscapePod.Id,
+		Constants.Discoveries.SpaceStationNoTouch.Id,
 	},
 	Library = {
 		Constants.Discoveries.LibraryEntered.Id,
@@ -613,11 +704,13 @@ Constants.DiscoveryRoomOrder = {
 	"Island",
 	"Library",
 	"BowlingAlley",
+	"SpaceStation",
 }
 
 Constants.RoomResumeDiscoveries = {
 	Library = Constants.Discoveries.LibraryEntered.Id,
 	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
+	SpaceStation = Constants.Discoveries.SpaceStationEntered.Id,
 }
 
 Constants.Rooms = {
@@ -652,6 +745,17 @@ Constants.Rooms = {
 		Zone = {
 			Min = Vector3.new(-55, -3, 126),
 			Max = Vector3.new(55, 28, 192),
+		},
+	},
+	SpaceStation = {
+		Id = "SpaceStation",
+		Name = "Space Station",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.SpaceStation,
+		NoTouchDiscoveryId = Constants.Discoveries.SpaceStationNoTouch.Id,
+		SpawnCFrame = CFrame.new(Vector3.new(92, 83, 164), Vector3.new(92, 83, 150)),
+		Zone = {
+			Min = Vector3.new(66, 76, 126),
+			Max = Vector3.new(118, 106, 176),
 		},
 	},
 	Library = {
@@ -725,6 +829,17 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.IslandDroppedCoconut.Id] = Constants.Tags.IslandCoconutTree,
 	[Constants.Discoveries.IslandDriftwood.Id] = Constants.Tags.IslandScrapWood,
 	[Constants.Discoveries.IslandCampfire.Id] = Constants.Tags.IslandFireRing,
+	[Constants.Discoveries.IslandSeagulls.Id] = Constants.Tags.IslandCoconut,
+	[Constants.Discoveries.SpaceStationAirlock.Id] = Constants.Tags.SpaceStationAirlock,
+	[Constants.Discoveries.SpaceStationGravityDial.Id] = Constants.Tags.SpaceStationGravityDial,
+	[Constants.Discoveries.SpaceStationObservationWindow.Id] = Constants.Tags.SpaceStationObservationWindow,
+	[Constants.Discoveries.SpaceStationCommsPanel.Id] = Constants.Tags.SpaceStationCommsPanel,
+	[Constants.Discoveries.SpaceStationFoodPrinter.Id] = Constants.Tags.SpaceStationFoodPrinter,
+	[Constants.Discoveries.SpaceStationSuit.Id] = Constants.Tags.SpaceStationSuit,
+	[Constants.Discoveries.SpaceStationStarMap.Id] = Constants.Tags.SpaceStationStarMap,
+	[Constants.Discoveries.SpaceStationPlantPod.Id] = Constants.Tags.SpaceStationPlantPod,
+	[Constants.Discoveries.SpaceStationMeteorButton.Id] = Constants.Tags.SpaceStationMeteorButton,
+	[Constants.Discoveries.SpaceStationEscapePod.Id] = Constants.Tags.SpaceStationEscapePod,
 	[Constants.Discoveries.LibraryEntered.Id] = Constants.Tags.SecretRoomDoor,
 	[Constants.Discoveries.LibraryForbiddenBook.Id] = Constants.Tags.LibraryBook,
 	[Constants.Discoveries.LibraryShushedShelf.Id] = Constants.Tags.LibraryShelf,

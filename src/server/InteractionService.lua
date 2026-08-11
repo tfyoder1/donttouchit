@@ -413,6 +413,9 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandScrapWoodState = {}
 	self.islandWoodCountByUserId = {}
 	self.islandFireRingState = {}
+	self.islandSkyBlockState = {}
+	self.islandSpaceLadderState = {}
+	self.spaceStationState = {}
 	self.secretDoorState = {}
 	self.libraryLampState = {}
 	self.libraryGlobeState = {}
@@ -610,6 +613,14 @@ function InteractionService:Initialize()
 		self:_wireIslandFireRing(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.IslandHiddenSkyBlock, function(instance)
+		self:_wireIslandHiddenSkyBlock(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandSpaceLadder, function(instance)
+		self:_wireIslandSpaceLadder(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.LibraryBook, function(instance)
 		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryForbiddenBook.Id, "The forbidden book sighs and immediately regrets being readable.")
 	end)
@@ -684,6 +695,46 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.TreetopZipline, function(instance)
 		self:_wireTreetopZipline(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationAirlock, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SpaceStationAirlock.Id, "The airlock confirms that outside is still extremely outside.")
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationGravityDial, function(instance)
+		self:_wireSpaceStationGravityDial(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationObservationWindow, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SpaceStationObservationWindow.Id, "Space stares back, then politely blinks never.")
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationCommsPanel, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SpaceStationCommsPanel.Id, "Mission Control receives: 'Do not touch anything.' They mark it urgent.")
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationFoodPrinter, function(instance)
+		self:_wireSpaceStationFoodPrinter(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationSuit, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SpaceStationSuit.Id, "The space suit fits anyone willing to ignore the return policy.")
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationStarMap, function(instance)
+		self:_wireSpaceStationStarMap(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationPlantPod, function(instance)
+		self:_wireSpaceStationPlantPod(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationMeteorButton, function(instance)
+		self:_wireSpaceStationMeteorButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SpaceStationEscapePod, function(instance)
+		self:_wireSpaceStationEscapePod(instance)
 	end)
 
 	self:_updateBowlingScoreboards()
@@ -2062,6 +2113,7 @@ function InteractionService:_afterRoomReset()
 	for _, state in pairs(self.islandCoconutState) do
 		state.Reacting = false
 		state.CrabStarted = false
+		state.SeagullsStarted = false
 	end
 
 	for _, state in pairs(self.islandCoconutTreeState) do
@@ -2088,6 +2140,27 @@ function InteractionService:_afterRoomReset()
 				prompt.ObjectText = "Rock Ring"
 			end
 		end
+	end
+
+	for block, state in pairs(self.islandSkyBlockState) do
+		state.Revealed = false
+		state.Reacting = false
+		if block and block.Parent then
+			self:_setIslandSkyBlockVisible(block, false)
+		end
+	end
+
+	for ladder, state in pairs(self.islandSpaceLadderState) do
+		state.Grown = false
+		state.Growing = false
+		state.TransportingByUserId = {}
+		if ladder and ladder.Parent then
+			self:_setIslandSpaceLadderVisible(ladder, false)
+		end
+	end
+
+	for _, state in pairs(self.spaceStationState) do
+		state.Reacting = false
 	end
 end
 
@@ -4525,12 +4598,72 @@ function InteractionService:_spawnIslandCoconutCrab(coconut)
 	Debris:AddItem(crab, 3)
 end
 
+function InteractionService:_spawnIslandSeagulls(source)
+	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
+	local flock = Instance.new("Model")
+	flock.Name = "IslandSeagullFlock"
+	flock.Parent = workspace
+	CollectionService:AddTag(flock, Constants.Tags.TemporaryObject)
+
+	local function makeGullPart(name, size, cframe, color, material, shape)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Anchored = true
+		part.CanCollide = false
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.Size = size
+		part.CFrame = cframe
+		part.Color = color
+		part.Material = material or Enum.Material.SmoothPlastic
+		if shape then
+			part.Shape = shape
+		end
+		part.Parent = flock
+		return part
+	end
+
+	playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.4, 2.15)
+	playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.32, 1.75)
+
+	for gullIndex = 1, 4 do
+		local start = sourcePosition + Vector3.new(-31 - gullIndex * 2.2, 14 + gullIndex * 0.55, -3 + gullIndex * 1.7)
+		local finish = sourcePosition + Vector3.new(32, 17 + math.sin(gullIndex) * 1.2, -8 + gullIndex * 1.15)
+		local baseCFrame = CFrame.new(start, finish)
+		local body = makeGullPart("SeagullBody" .. gullIndex, Vector3.new(1.0, 0.32, 0.42), baseCFrame, Color3.fromRGB(245, 246, 238), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		local leftWing = makeGullPart("SeagullLeftWing" .. gullIndex, Vector3.new(1.15, 0.12, 0.42), baseCFrame * CFrame.new(-0.58, 0.02, 0) * CFrame.Angles(0, 0, math.rad(18)), Color3.fromRGB(235, 238, 232), Enum.Material.SmoothPlastic)
+		local rightWing = makeGullPart("SeagullRightWing" .. gullIndex, Vector3.new(1.15, 0.12, 0.42), baseCFrame * CFrame.new(0.58, 0.02, 0) * CFrame.Angles(0, 0, math.rad(-18)), Color3.fromRGB(235, 238, 232), Enum.Material.SmoothPlastic)
+		local beak = makeGullPart("SeagullBeak" .. gullIndex, Vector3.new(0.32, 0.14, 0.14), baseCFrame * CFrame.new(0, 0, -0.42), Color3.fromRGB(255, 204, 65), Enum.Material.SmoothPlastic)
+
+		task.delay((gullIndex - 1) * 0.18, function()
+			for _, part in ipairs({ body, leftWing, rightWing, beak }) do
+				if part and part.Parent then
+					local offset = baseCFrame:ToObjectSpace(part.CFrame)
+					tweenPart(part, 4.2, {
+						CFrame = CFrame.new(finish, finish + (finish - start)) * offset,
+					}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+				end
+			end
+		end)
+	end
+
+	task.delay(4.4, function()
+		for _, part in ipairs(flock:GetChildren()) do
+			if part:IsA("BasePart") then
+				tweenPart(part, 0.55, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end
+	end)
+	Debris:AddItem(flock, 5.3)
+end
+
 function InteractionService:_wireIslandCoconut(coconut)
 	local prompt = getPrompt(coconut)
 
 	self.islandCoconutState[coconut] = self.islandCoconutState[coconut] or {
 		Reacting = false,
 		CrabStarted = false,
+		SeagullsStarted = false,
 	}
 
 	self:_connectPrompt(prompt, function(player)
@@ -4545,6 +4678,11 @@ function InteractionService:_wireIslandCoconut(coconut)
 			self.discoveryService:Unlock(player, Constants.Discoveries.IslandCoconutCrab.Id)
 			self:_spawnIslandCoconutCrab(coconut)
 			self.systemMessageRemote:FireClient(player, "The coconut was occupied. Briefly.")
+		elseif coconut:GetAttribute("StartsSeagulls") and not state.SeagullsStarted then
+			state.SeagullsStarted = true
+			self.discoveryService:Unlock(player, Constants.Discoveries.IslandSeagulls.Id)
+			self:_spawnIslandSeagulls(coconut)
+			self.systemMessageRemote:FireClient(player, "The coconut was empty, so the sky filled in the paperwork.")
 		else
 			playSound(coconut, "rbxasset://sounds/button.wav", 0.28, 0.62)
 			self.systemMessageRemote:FireClient(player, "The coconut sounds hollow, which is exactly what a coconut would say.")
@@ -4603,6 +4741,175 @@ function InteractionService:_wireIslandCoconutTree(treePart)
 		self.systemMessageRemote:FireClient(player, "A coconut drops with the confidence of gravity.")
 		task.wait(0.24)
 		state.Reacting = false
+	end)
+end
+
+function InteractionService:_setIslandSkyBlockVisible(block, visible)
+	if not block or not block.Parent then
+		return
+	end
+
+	block.Transparency = visible and 0 or 1
+	block.CanCollide = true
+	setPromptEnabled(block, visible)
+	for _, instance in ipairs(block:GetDescendants()) do
+		if instance:IsA("SurfaceGui") then
+			instance.Enabled = visible
+		end
+	end
+end
+
+function InteractionService:_findIslandSpaceLadder(blockId)
+	for _, ladder in ipairs(CollectionService:GetTagged(Constants.Tags.IslandSpaceLadder)) do
+		if ladder:IsA("BasePart") and ladder:GetAttribute("SpaceBlockId") == blockId then
+			return ladder
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_setIslandSpaceLadderVisible(ladder, visible)
+	if not ladder or not ladder.Parent then
+		return
+	end
+
+	if visible then
+		ladder.Transparency = 0.08
+		ladder.CanCollide = true
+		setPromptEnabled(ladder, true)
+		return
+	end
+
+	local baseSize = ladder:GetAttribute("BaseSize")
+	local baseCFrame = ladder:GetAttribute("BaseCFrame")
+	if baseSize then
+		ladder.Size = baseSize
+	end
+	if baseCFrame then
+		ladder.CFrame = baseCFrame
+	end
+	ladder.Transparency = 1
+	ladder.CanCollide = false
+	setPromptEnabled(ladder, false)
+end
+
+function InteractionService:_growIslandSpaceLadder(block)
+	local blockId = block:GetAttribute("SpaceBlockId")
+	local ladder = self:_findIslandSpaceLadder(blockId)
+	if not ladder then
+		return
+	end
+
+	self.islandSpaceLadderState[ladder] = self.islandSpaceLadderState[ladder] or {
+		Grown = false,
+		Growing = false,
+		TransportingByUserId = {},
+	}
+	local state = self.islandSpaceLadderState[ladder]
+	if state.Grown or state.Growing then
+		return
+	end
+
+	state.Growing = true
+	ladder.Transparency = 0.08
+	ladder.CanCollide = true
+	setPromptEnabled(ladder, false)
+	playSound(ladder, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.6)
+
+	local fullSize = ladder:GetAttribute("FullSize")
+	local fullCFrame = ladder:GetAttribute("FullCFrame")
+	if fullSize and fullCFrame then
+		tweenPart(ladder, 0.82, {
+			Size = fullSize,
+			CFrame = fullCFrame,
+		}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	end
+
+	task.delay(0.9, function()
+		if not ladder.Parent then
+			return
+		end
+		state.Growing = false
+		state.Grown = true
+		setPromptEnabled(ladder, true)
+	end)
+end
+
+function InteractionService:_wireIslandHiddenSkyBlock(block)
+	self.islandSkyBlockState[block] = self.islandSkyBlockState[block] or {
+		Revealed = false,
+		Reacting = false,
+	}
+
+	self:_connectPrompt(getPrompt(block), function(player)
+		self.systemMessageRemote:FireClient(player, "The block says BONK BLOCK, which feels more like a confession than a label.")
+	end)
+
+	if self.islandSkyBlockState[block].TouchConnected then
+		return
+	end
+
+	self.islandSkyBlockState[block].TouchConnected = true
+	block.Touched:Connect(function(hit)
+		local state = self.islandSkyBlockState[block]
+		if not state or state.Revealed or state.Reacting then
+			return
+		end
+
+		local character = hit and hit:FindFirstAncestorOfClass("Model")
+		local player = character and Players:GetPlayerFromCharacter(character)
+		local rootPart = player and getRootPart(player)
+		if not player or not rootPart then
+			return
+		end
+
+		if rootPart.Position.Y > block.Position.Y - 0.45 then
+			return
+		end
+
+		state.Reacting = true
+		state.Revealed = true
+		self:_setIslandSkyBlockVisible(block, true)
+		self:_growIslandSpaceLadder(block)
+		playSound(block, "rbxasset://sounds/snap.wav", 0.65, 0.72)
+		self.systemMessageRemote:FireClient(player, "BONK. The palm tree reveals a very unlicensed route upward.")
+		task.delay(0.5, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireIslandSpaceLadder(ladder)
+	self.islandSpaceLadderState[ladder] = self.islandSpaceLadderState[ladder] or {
+		Grown = false,
+		Growing = false,
+		TransportingByUserId = {},
+	}
+
+	self:_connectPrompt(getPrompt(ladder), function(player)
+		local state = self.islandSpaceLadderState[ladder]
+		if not state or not state.Grown then
+			self.systemMessageRemote:FireClient(player, "The ladder is still deciding how tall it wants to be.")
+			return
+		end
+
+		if state.TransportingByUserId[player.UserId] then
+			return
+		end
+
+		state.TransportingByUserId[player.UserId] = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationEntered.Id)
+		playSound(ladder, "rbxasset://sounds/electronicpingshort.wav", 0.65, 2.0)
+		self.systemMessageRemote:FireClient(player, "The ladder takes the scenic route directly to orbit.")
+		task.delay(0.25, function()
+			if player.Parent then
+				teleportPlayer(player, Constants.GetRoomSpawnCFrame("SpaceStation"))
+			end
+			task.delay(1, function()
+				state.TransportingByUserId[player.UserId] = nil
+			end)
+		end)
 	end)
 end
 
@@ -4770,6 +5077,231 @@ function InteractionService:_wireIslandFireRing(fireRingPart)
 		end
 
 		self:_startIslandCampfire(fireRingPart, player)
+	end)
+end
+
+function InteractionService:_getSpaceStationState(instance)
+	self.spaceStationState[instance] = self.spaceStationState[instance] or {
+		Reacting = false,
+		Count = 0,
+	}
+	return self.spaceStationState[instance]
+end
+
+function InteractionService:_wireSpaceStationGravityDial(dial)
+	local prompt = getPrompt(dial)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(dial)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		state.Count += 1
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationGravityDial.Id)
+		playSound(dial, "rbxasset://sounds/electronicpingshort.wav", 0.48, 0.85 + state.Count * 0.18)
+		local baseCFrame = dial:GetAttribute("BaseCFrame") or dial.CFrame
+		tweenPart(dial, 0.22, {
+			CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad(105 + state.Count * 30)),
+		}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		self.systemMessageRemote:FireClient(player, "Gravity politely updates its resume, then changes nothing important.")
+		task.delay(0.3, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireSpaceStationFoodPrinter(printer)
+	local prompt = getPrompt(printer)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(printer)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationFoodPrinter.Id)
+		playSound(printer, "rbxasset://sounds/button.wav", 0.45, 1.55)
+		local cube = printer.Parent and printer.Parent:FindFirstChild("SpaceFoodCube")
+		if cube and cube:IsA("BasePart") then
+			local baseCFrame = cube:GetAttribute("BaseCFrame") or cube.CFrame
+			cube.Color = Color3.fromRGB(255, 186, 88)
+			tweenPart(cube, 0.16, { CFrame = baseCFrame + Vector3.new(0, 0.75, 0) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			task.delay(0.22, function()
+				if cube.Parent then
+					tweenPart(cube, 0.18, { CFrame = baseCFrame }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				end
+			end)
+		end
+		self.systemMessageRemote:FireClient(player, "The food printer produces one perfectly edible cube of uncertainty.")
+		task.delay(0.35, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireSpaceStationStarMap(starMap)
+	local prompt = getPrompt(starMap)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(starMap)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		state.Count += 1
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationStarMap.Id)
+		playSound(starMap, "rbxasset://sounds/electronicpingshort.wav", 0.42, 1.35)
+		for _, dot in ipairs(starMap.Parent and starMap.Parent:GetChildren() or {}) do
+			if dot:IsA("BasePart") and dot.Name:find("StarMapDot", 1, true) then
+				local baseCFrame = dot:GetAttribute("BaseCFrame") or dot.CFrame
+				local offset = Vector3.new(math.sin(state.Count + #dot.Name) * 0.45, math.cos(state.Count + #dot.Name) * 0.35, 0)
+				tweenPart(dot, 0.2, { CFrame = baseCFrame + offset }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+			end
+		end
+		self.systemMessageRemote:FireClient(player, "The star map rearranges itself into a shape labeled probably not legal.")
+		task.delay(0.35, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireSpaceStationPlantPod(plantPod)
+	local prompt = getPrompt(plantPod)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(plantPod)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationPlantPod.Id)
+		playSound(plantPod, "rbxasset://sounds/button.wav", 0.32, 1.85)
+		local leaf = plantPod.Parent and plantPod.Parent:FindFirstChild("SpacePlantLeaf")
+		if leaf and leaf:IsA("BasePart") then
+			local baseSize = leaf:GetAttribute("BaseSize") or leaf.Size
+			tweenPart(leaf, 0.28, { Size = baseSize + Vector3.new(0.45, 0.08, 0.24) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			task.delay(0.55, function()
+				if leaf.Parent then
+					tweenPart(leaf, 0.24, { Size = baseSize }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				end
+			end)
+		end
+		self.systemMessageRemote:FireClient(player, "The space plant appreciates hydration and refuses to elaborate.")
+		task.delay(0.45, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_spawnSpaceMeteor(source)
+	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("SpaceStation").Position
+	local meteor = Instance.new("Model")
+	meteor.Name = "SpaceStationMeteor"
+	meteor.Parent = workspace
+	CollectionService:AddTag(meteor, Constants.Tags.TemporaryObject)
+
+	local rock = Instance.new("Part")
+	rock.Name = "MeteorRock"
+	rock.Anchored = true
+	rock.CanCollide = false
+	rock.BottomSurface = Enum.SurfaceType.Smooth
+	rock.TopSurface = Enum.SurfaceType.Smooth
+	rock.Shape = Enum.PartType.Ball
+	rock.Size = Vector3.new(1.7, 1.7, 1.7)
+	rock.Color = Color3.fromRGB(112, 92, 79)
+	rock.Material = Enum.Material.Slate
+	rock.CFrame = CFrame.new(sourcePosition + Vector3.new(-20, 8, -18))
+	rock.Parent = meteor
+
+	local flame = Instance.new("ParticleEmitter")
+	flame.Name = "MeteorTrail"
+	flame.Texture = "rbxasset://textures/particles/fire_main.dds"
+	flame.Rate = 45
+	flame.Lifetime = NumberRange.new(0.25, 0.55)
+	flame.Speed = NumberRange.new(0.4, 1.2)
+	flame.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1.4),
+		NumberSequenceKeypoint.new(1, 0.15),
+	})
+	flame.Color = ColorSequence.new(Color3.fromRGB(255, 221, 92), Color3.fromRGB(255, 82, 42))
+	flame.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	flame.Parent = rock
+
+	tweenPart(rock, 2.2, {
+		CFrame = CFrame.new(sourcePosition + Vector3.new(20, 4, -18)),
+	}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	task.delay(2.0, function()
+		if rock.Parent then
+			tweenPart(rock, 0.35, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			flame.Enabled = false
+		end
+	end)
+	Debris:AddItem(meteor, 2.8)
+end
+
+function InteractionService:_wireSpaceStationMeteorButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(button)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationMeteorButton.Id)
+		playSound(button, "rbxasset://sounds/snap.wav", 0.55, 0.52)
+		self:_spawnSpaceMeteor(button)
+		local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
+		tweenPart(button, 0.08, { CFrame = baseCFrame + Vector3.new(0, -0.22, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		task.delay(0.12, function()
+			if button.Parent then
+				tweenPart(button, 0.16, { CFrame = baseCFrame }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			end
+		end)
+		self.systemMessageRemote:FireClient(player, "Meteor requested. The window asks why this button exists.")
+		task.delay(0.55, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireSpaceStationEscapePod(pod)
+	local prompt = getPrompt(pod)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(pod)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationEscapePod.Id)
+		playSound(pod, "rbxasset://sounds/electronicpingshort.wav", 0.5, 0.58)
+		local baseCFrame = pod:GetAttribute("BaseCFrame") or pod.CFrame
+		tweenPart(pod, 0.1, { CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad(2)) }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+		task.delay(0.12, function()
+			if pod.Parent then
+				tweenPart(pod, 0.12, { CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad(-2)) }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+			end
+		end)
+		task.delay(0.28, function()
+			if pod.Parent then
+				tweenPart(pod, 0.18, { CFrame = baseCFrame }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			end
+		end)
+		self.systemMessageRemote:FireClient(player, "The escape pod runs a test and chooses dramatic standby.")
+		task.delay(0.45, function()
+			state.Reacting = false
+		end)
 	end)
 end
 

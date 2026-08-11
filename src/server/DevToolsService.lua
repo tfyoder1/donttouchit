@@ -41,6 +41,11 @@ local SECRET_AREAS = {
 		Name = "Maintenance Room",
 		CFrame = CFrame.new(-14, 3, -175),
 	},
+	{
+		Id = "SpaceStation",
+		Name = "Space Station",
+		CFrame = Constants.GetRoomSpawnCFrame("SpaceStation"),
+	},
 }
 
 local function getRootPart(player)
