@@ -641,7 +641,7 @@ local activeSecretDoorAction = "RevealSecretDoor"
 local currentStatusType = nil
 local currentStatusRoomId = nil
 local pendingStartOptions = nil
-local startIntroSequence = 0
+local sessionStartIntroText = nil
 local overlayMouseDepth = 0
 local previousMouseBehavior = nil
 local previousMouseIconEnabled = nil
@@ -652,7 +652,7 @@ local START_INTRO_LINES = {
 	"Welcome back, %s. You have touched %d of %d objects that specifically requested distance.",
 	"%s has touched %d / %d suspicious objects so far. Bold. Incorrect, but bold.",
 	"Official audit: %s touched %d out of %d things they should not have touched at all.",
-	"%s, the room says you touched %d / %d forbidden things. The room is trying to stay professional.",
+	"%s, the room says you touched %d / %d forbidden things. The room is pretending everything is fine.",
 	"Current evidence: %s touched %d of %d objects marked by common sense as probably a bad idea.",
 }
 
@@ -734,19 +734,12 @@ local function formatRandomStartIntro(payload)
 	return template:format(getIntroName(), count, total)
 end
 
-local function rotateStartIntro(payload)
-	startIntroSequence += 1
-	local sequence = startIntroSequence
-	startIntro.Text = formatRandomStartIntro(payload)
+local function setStartIntro(payload)
+	if not sessionStartIntroText then
+		sessionStartIntroText = formatRandomStartIntro(payload)
+	end
 
-	task.spawn(function()
-		while startOverlay.Visible and startIntroSequence == sequence do
-			task.wait(4)
-			if startOverlay.Visible and startIntroSequence == sequence then
-				startIntro.Text = formatRandomStartIntro(payload)
-			end
-		end
-	end)
+	startIntro.Text = sessionStartIntroText
 end
 
 local function updateCounter(payload)
@@ -844,7 +837,6 @@ end
 
 local function sendStartChoice(action)
 	startOverlay.Visible = false
-	startIntroSequence += 1
 	continueButton.Modal = false
 	restartButton.Modal = false
 	setOverlayMouse(false)
@@ -864,7 +856,7 @@ local function renderStartOptions(payload)
 	continueButton.Modal = true
 	restartButton.Modal = true
 	setOverlayMouse(true, continueButton)
-	rotateStartIntro(payload)
+	setStartIntro(payload)
 	startSubtitle.Text = ("Book: %d / %d found    Hints: %d    Clues: %d"):format(
 		payload.DiscoveryCount or 0,
 		payload.TotalDiscoveries or Constants.TotalDiscoveries,
