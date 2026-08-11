@@ -1021,6 +1021,8 @@ function InteractionService:_setSecretDoorState(door, state)
 	local outlineVisible = state.OutlineVisible == true
 	local active = state.Active == true
 	local hasKey = state.HasKey == true
+	local unlocked = state.Unlocked == true
+	local canOpen = hasKey or unlocked
 
 	for _, instance in ipairs(getInstanceAndDescendants(root)) do
 		if instance:IsA("BasePart") then
@@ -1042,14 +1044,14 @@ function InteractionService:_setSecretDoorState(door, state)
 			local visibleEnabled = instance:GetAttribute("SecretVisibleEnabled")
 			instance.Enabled = active and (visibleEnabled == nil or visibleEnabled == true)
 			if active then
-				instance.ActionText = if hasKey then "Open" else "Inspect"
-				instance.ObjectText = if hasKey then "Library" else "Library - Awaiting Key"
+				instance.ActionText = if canOpen then "Open" else "Inspect"
+				instance.ObjectText = if canOpen then "Library" else "Library - Awaiting Key"
 			end
 		elseif instance:IsA("SurfaceGui") then
 			local visibleEnabled = instance:GetAttribute("SecretVisibleEnabled")
 			instance.Enabled = active and (visibleEnabled == nil or visibleEnabled == true)
 		elseif instance:IsA("TextLabel") and instance.Name == "SecretDoorText" then
-			instance.Text = if hasKey then "LIBRARY\nKEY ACCEPTED" else "LIBRARY\nAWAITING KEY"
+			instance.Text = if unlocked then "LIBRARY\nUNLOCKED" elseif hasKey then "LIBRARY\nKEY ACCEPTED" else "LIBRARY\nAWAITING KEY"
 		end
 	end
 end
@@ -1059,9 +1061,17 @@ function InteractionService:_getSecretDoorWorldState(roomId)
 		OutlineVisible = false,
 		Active = false,
 		HasKey = false,
+		Unlocked = false,
 	}
 
 	for _, player in ipairs(Players:GetPlayers()) do
+		local secretConfig = Constants.SecretDoors and Constants.SecretDoors[roomId]
+		if secretConfig and secretConfig.EntryDiscoveryId and self.discoveryService:HasDiscovery(player, secretConfig.EntryDiscoveryId) then
+			state.OutlineVisible = true
+			state.Active = true
+			state.Unlocked = true
+		end
+
 		if self.discoveryService:HasSecretDoorReveal(player, roomId) then
 			state.OutlineVisible = true
 		end
@@ -1119,7 +1129,13 @@ function InteractionService:_wireSecretRoomDoor(door)
 			return
 		end
 
-		if not self.discoveryService:HasSecretKey(player, roomId) then
+		local secretConfig = Constants.SecretDoors and Constants.SecretDoors[roomId]
+		local alreadyUnlocked = secretConfig
+			and secretConfig.EntryDiscoveryId
+			and self.discoveryService:HasDiscovery(player, secretConfig.EntryDiscoveryId)
+		local hasKey = self.discoveryService:HasSecretKey(player, roomId)
+
+		if not alreadyUnlocked and not hasKey then
 			self.systemMessageRemote:FireClient(player, "The Library is awaiting the Library Key. A secret discovery is probably hoarding it.")
 			return
 		end
@@ -1146,6 +1162,9 @@ function InteractionService:_wireSecretRoomDoor(door)
 
 		teleportPlayer(player, destinationCFrame)
 		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryEntered.Id)
+		if hasKey then
+			self.discoveryService:ConsumeSecretKey(player, roomId, "The Library Key unlocks the door and politely retires.")
+		end
 		self.systemMessageRemote:FireClient(player, "The Library opens. Very suspiciously.")
 
 		task.delay(1.2, function()

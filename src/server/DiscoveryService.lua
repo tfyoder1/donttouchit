@@ -822,6 +822,28 @@ function DiscoveryService:GrantSecretKey(player, roomId, messageText)
 	return true
 end
 
+function DiscoveryService:ConsumeSecretKey(player, roomId, messageText)
+	if not player or not player.Parent or not Constants.SecretDoors or not Constants.SecretDoors[roomId] then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	if not self.secretKeysByUserId[player.UserId][roomId] then
+		return false
+	end
+
+	self.secretKeysByUserId[player.UserId][roomId] = nil
+	self:_syncSecretKeyTools(player)
+	if messageText then
+		self.systemMessageRemote:FireClient(player, messageText)
+	end
+
+	self:_sendSnapshot(player)
+	self._secretDoorChangedEvent:Fire(player, roomId)
+	self:_queueSave(player)
+	return true
+end
+
 function DiscoveryService:_grantRoomCompletionSecretKeys(player)
 	if not player or not player.Parent or not Constants.SecretDoors then
 		return
@@ -832,6 +854,7 @@ function DiscoveryService:_grantRoomCompletionSecretKeys(player)
 	for roomId, config in pairs(Constants.SecretDoors) do
 		if config.AutoGrantOnComplete
 			and not self.secretKeysByUserId[player.UserId][roomId]
+			and not (config.EntryDiscoveryId and self.discoveryByUserId[player.UserId][config.EntryDiscoveryId])
 			and self:IsRoomComplete(player, roomId)
 		then
 			self:GrantSecretKey(

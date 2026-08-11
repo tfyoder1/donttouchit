@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.25"
+Constants.BuildVersion = "0.5.26"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -575,6 +575,7 @@ Constants.SecretDoors = {
 		Name = "Library",
 		KeyId = "tv_secret_key",
 		KeyName = "Library Key",
+		EntryDiscoveryId = Constants.Discoveries.LibraryEntered.Id,
 		AutoGrantOnComplete = true,
 		AutoGrantMessage = "TV Room complete: Library Key added to your inventory.",
 		RevealHintCost = 5,
