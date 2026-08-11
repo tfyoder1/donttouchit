@@ -2404,7 +2404,7 @@ local function makeIslandRoom(roomFolder)
 	local resetRoomButton = islandControls.ResetRoomButton
 	local referenceBook = islandControls.ReferenceBook
 
-	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS", 12.5, -7.5, 1, 2, Constants.Tags.IslandSharkSign)
+	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS\nWATCH OUT FOR\nLAND SHARKS!", 12.5, -7.5, 1, 2, Constants.Tags.IslandSharkSign)
 	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", -12.5, 12.5, -1, 5, Constants.Tags.IslandJellyfishSign)
 
 	for _, data in ipairs({

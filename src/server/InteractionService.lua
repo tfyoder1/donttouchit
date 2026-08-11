@@ -575,7 +575,7 @@ function InteractionService:Initialize()
 	end)
 
 	self:_connectTagged(Constants.Tags.IslandSharkSign, function(instance)
-		self:_wireIslandWarningSign(instance, Constants.Discoveries.ReadSharkWarning.Id, "The shark sign feels less like advice and more like a countdown.")
+		self:_wireIslandWarningSign(instance, Constants.Discoveries.ReadSharkWarning.Id, "The shark sign feels less like advice and more like a countdown. Watch out for land sharks!")
 	end)
 
 	self:_connectTagged(Constants.Tags.IslandJellyfishSign, function(instance)
@@ -4082,7 +4082,7 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 	local attackPoint = Vector3.new(20, 2.0, 142.5)
 	local targetCFrame = CFrame.new(attackPoint, Vector3.new(0, 2.0, 150))
 	local baseCFrame = targetCFrame * CFrame.new(0, -4.8, 11)
-	local body = makeSharkPart("SharkBody", "Part", Vector3.new(11.5, 3.2, 4.1), baseCFrame, Color3.fromRGB(89, 103, 116))
+	local body = makeSharkPart("SharkBody", "Part", Vector3.new(4.1, 3.2, 11.5), baseCFrame, Color3.fromRGB(89, 103, 116))
 	body.Shape = Enum.PartType.Ball
 	makeSharkPart("SharkFin", "WedgePart", Vector3.new(2.6, 3.6, 1.6), baseCFrame * CFrame.new(0, 2.2, 0.55), Color3.fromRGB(55, 67, 78))
 	makeSharkPart("SharkTail", "WedgePart", Vector3.new(4.2, 3.4, 1.5), baseCFrame * CFrame.new(0, 0.05, 5.5) * CFrame.Angles(0, math.rad(180), 0), Color3.fromRGB(55, 67, 78))
@@ -4107,7 +4107,7 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 	local rightPupil = makeSharkPart("RightPupil", "Part", Vector3.new(0.18, 0.18, 0.18), baseCFrame * CFrame.new(1.75, 0.75, -4.24), Color3.fromRGB(6, 8, 12))
 	leftPupil.Shape = Enum.PartType.Ball
 	rightPupil.Shape = Enum.PartType.Ball
-	local wake = makeSharkPart("SharkWake", "Part", Vector3.new(14, 0.18, 5.8), baseCFrame * CFrame.new(0, -1.7, 1.8), Color3.fromRGB(175, 240, 255))
+	local wake = makeSharkPart("SharkWake", "Part", Vector3.new(5.8, 0.18, 14), baseCFrame * CFrame.new(0, -1.7, 1.8), Color3.fromRGB(175, 240, 255))
 	wake.Material = Enum.Material.Neon
 	wake.Transparency = 0.35
 
