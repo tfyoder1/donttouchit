@@ -1630,6 +1630,51 @@ function InteractionService:_wireBowlingMaintenanceDoor(door)
 	end)
 end
 
+function InteractionService:_getBowlingPinParts(pin)
+	if not pin or not pin.Parent then
+		return {}
+	end
+
+	local model = pin:FindFirstAncestorWhichIsA("Model")
+	if model and model:GetAttribute("BowlingPinModel") then
+		local parts = {}
+		for _, instance in ipairs(model:GetDescendants()) do
+			if instance:IsA("BasePart") then
+				table.insert(parts, instance)
+			end
+		end
+		return parts
+	end
+
+	return { pin }
+end
+
+function InteractionService:_resetBowlingPin(pin)
+	local parts = self:_getBowlingPinParts(pin)
+	for _, part in ipairs(parts) do
+		if part.Parent then
+			local baseCFrame = part:GetAttribute("BaseCFrame")
+			part.AssemblyLinearVelocity = Vector3.zero
+			part.AssemblyAngularVelocity = Vector3.zero
+			part.Anchored = true
+			if baseCFrame then
+				part.CFrame = baseCFrame
+			end
+		end
+	end
+
+	task.delay(0.16, function()
+		for _, part in ipairs(parts) do
+			if part.Parent then
+				part.AssemblyLinearVelocity = Vector3.zero
+				part.AssemblyAngularVelocity = Vector3.zero
+				local baseAnchored = part:GetAttribute("BaseAnchored")
+				part.Anchored = baseAnchored == true
+			end
+		end
+	end)
+end
+
 function InteractionService:_resetBowlingPins()
 	for _, temporaryObject in ipairs(CollectionService:GetTagged(Constants.Tags.TemporaryObject)) do
 		if temporaryObject and temporaryObject.Parent and temporaryObject.Name == "BowlingBall" then
@@ -1639,18 +1684,7 @@ function InteractionService:_resetBowlingPins()
 
 	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
 		if pin:IsA("BasePart") and pin.Parent then
-			local baseCFrame = pin:GetAttribute("BaseCFrame")
-			if baseCFrame then
-				pin.AssemblyLinearVelocity = Vector3.zero
-				pin.AssemblyAngularVelocity = Vector3.zero
-				pin.Anchored = true
-				pin.CFrame = baseCFrame
-				task.delay(0.08, function()
-					if pin.Parent then
-						pin.Anchored = false
-					end
-				end)
-			end
+			self:_resetBowlingPin(pin)
 		end
 	end
 end
@@ -1743,6 +1777,7 @@ function InteractionService:_afterRoomReset()
 	for _, state in pairs(self.bowlingLaneState) do
 		state.Reacting = false
 	end
+	self:_resetBowlingPins()
 
 	for fridge, state in pairs(self.fridgeState) do
 		if fridge and fridge.Parent then

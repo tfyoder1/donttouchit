@@ -1523,6 +1523,7 @@ end
 
 local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 	origin = origin or Vector3.zero
+	local laneSurfaceY = 0.72 + 0.34 / 2
 	local pinOffsets = {
 		{ 0, 0 },
 		{ -0.7, -1.0 },
@@ -1537,41 +1538,65 @@ local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 	}
 
 	for index, offset in ipairs(pinOffsets) do
+		local pinModel = makeModel(parent, ("Lane%dPin%dModel"):format(laneIndex, index))
+		pinModel:SetAttribute("BowlingPinModel", true)
+		pinModel:SetAttribute("LaneIndex", laneIndex)
+
+		local footPosition = origin + Vector3.new(laneX + offset[1], laneSurfaceY, z + offset[2])
+		local coreHeight = 2.55
 		local pin = createPart(
-			parent,
+			pinModel,
 			("Lane%dPin%d"):format(laneIndex, index),
-			Vector3.new(0.62, 1.85, 0.62),
-			CFrame.new(origin + Vector3.new(laneX + offset[1], 1.42, z + offset[2])),
+			Vector3.new(0.58, coreHeight, 0.58),
+			CFrame.new(footPosition + Vector3.new(0, coreHeight / 2, 0)),
 			Color3.fromRGB(245, 244, 232),
 			Enum.Material.SmoothPlastic
 		)
-		pin.Shape = Enum.PartType.Cylinder
+		pin.Transparency = 1
 		pin.Anchored = false
+		pin.CanCollide = true
+		pin.CustomPhysicalProperties = PhysicalProperties.new(0.8, 0.9, 0.08, 1, 1)
 		pin:SetAttribute("LaneIndex", laneIndex)
+		pin:SetAttribute("BowlingPinCore", true)
+		pin:SetAttribute("BaseTransparency", 1)
+		pin:SetAttribute("BaseCanCollide", true)
 		pin:SetAttribute("BaseAnchored", false)
-		mark(pin)
 		tag(pin, Constants.Tags.BowlingPin)
+		pinModel.PrimaryPart = pin
 
-		local stripe = createPart(
-			parent,
-			("Lane%dPin%dStripe"):format(laneIndex, index),
-			Vector3.new(0.66, 0.2, 0.66),
-			CFrame.new(origin + Vector3.new(laneX + offset[1], 1.95, z + offset[2])),
-			Color3.fromRGB(220, 52, 67),
-			Enum.Material.SmoothPlastic
-		)
-		stripe.Shape = Enum.PartType.Cylinder
-		stripe.Anchored = false
-		stripe.CanCollide = false
-		stripe.Massless = true
-		stripe:SetAttribute("LaneIndex", laneIndex)
-		mark(stripe)
+		local function addPinPiece(name, size, yOffset, color)
+			local piece = createPart(
+				pinModel,
+				("Lane%dPin%d%s"):format(laneIndex, index, name),
+				size,
+				CFrame.new(footPosition + Vector3.new(0, yOffset, 0)),
+				color,
+				Enum.Material.SmoothPlastic
+			)
+			piece.Shape = Enum.PartType.Ball
+			piece.Anchored = false
+			piece.CanCollide = false
+			piece.Massless = true
+			piece:SetAttribute("LaneIndex", laneIndex)
+			piece:SetAttribute("BowlingPinVisual", true)
+			piece:SetAttribute("BaseCanCollide", false)
+			piece:SetAttribute("BaseAnchored", false)
 
-		local weld = Instance.new("WeldConstraint")
-		weld.Name = "PinStripeWeld"
-		weld.Part0 = pin
-		weld.Part1 = stripe
-		weld.Parent = stripe
+			local weld = Instance.new("WeldConstraint")
+			weld.Name = "PinPieceWeld"
+			weld.Part0 = pin
+			weld.Part1 = piece
+			weld.Parent = piece
+			return piece
+		end
+
+		addPinPiece("Foot", Vector3.new(0.9, 0.28, 0.9), 0.14, Color3.fromRGB(248, 247, 237))
+		addPinPiece("Belly", Vector3.new(0.98, 1.05, 0.98), 0.64, Color3.fromRGB(248, 247, 237))
+		addPinPiece("Shoulder", Vector3.new(0.72, 0.78, 0.72), 1.34, Color3.fromRGB(248, 247, 237))
+		addPinPiece("LowerStripe", Vector3.new(0.64, 0.11, 0.64), 1.65, Color3.fromRGB(220, 52, 67))
+		addPinPiece("UpperStripe", Vector3.new(0.55, 0.11, 0.55), 1.82, Color3.fromRGB(220, 52, 67))
+		addPinPiece("Neck", Vector3.new(0.42, 0.66, 0.42), 2.02, Color3.fromRGB(248, 247, 237))
+		addPinPiece("Head", Vector3.new(0.54, 0.54, 0.54), 2.42, Color3.fromRGB(248, 247, 237))
 	end
 end
 
