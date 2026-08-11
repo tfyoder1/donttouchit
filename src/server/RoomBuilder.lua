@@ -260,38 +260,78 @@ local function makePedestal(objectsFolder)
 	local buttonBase = createPart(
 		pedestal,
 		"BigRedButtonBase",
-		Vector3.new(3.55, 0.45, 3.55),
-		CFrame.new(0, 3.72, 0),
-		Color3.fromRGB(117, 14, 22),
-		Enum.Material.Metal,
+		Vector3.new(4.55, 0.44, 4.55),
+		CFrame.new(0, 3.68, 0),
+		Color3.fromRGB(170, 12, 20),
+		Enum.Material.SmoothPlastic,
 		"Part"
 	)
 	buttonBase.Shape = Enum.PartType.Cylinder
 
+	local ringCrown = createPart(
+		pedestal,
+		"BigRedButtonUpperRing",
+		Vector3.new(4.35, 0.58, 4.35),
+		CFrame.new(0, 3.92, 0),
+		Color3.fromRGB(214, 18, 28),
+		Enum.Material.SmoothPlastic,
+		"Part"
+	)
+	ringCrown.Shape = Enum.PartType.Ball
+
+	local groove = createPart(
+		pedestal,
+		"BigRedButtonInnerGroove",
+		Vector3.new(3.35, 0.1, 3.35),
+		CFrame.new(0, 4.12, 0),
+		Color3.fromRGB(34, 6, 8),
+		Enum.Material.SmoothPlastic,
+		"Part"
+	)
+	groove.Shape = Enum.PartType.Cylinder
+	groove.CanCollide = false
+	groove:SetAttribute("BaseCanCollide", false)
+
 	local button = createPart(
 		pedestal,
 		"BigRedButton",
-		Vector3.new(3.15, 1.15, 3.15),
-		CFrame.new(0, 4.15, 0),
-		Color3.fromRGB(231, 30, 42),
-		Enum.Material.Neon,
+		Vector3.new(3.05, 1.18, 3.05),
+		CFrame.new(0, 4.38, 0),
+		Color3.fromRGB(238, 20, 31),
+		Enum.Material.SmoothPlastic,
 		"Part"
 	)
 	button.Shape = Enum.PartType.Ball
-	button:SetAttribute("PressedCFrame", CFrame.new(0, 3.88, 0))
+	button:SetAttribute("PressedCFrame", CFrame.new(0, 4.1, 0))
+
+	local ringShine = createPart(
+		pedestal,
+		"BigRedButtonRingShine",
+		Vector3.new(1.18, 0.08, 0.34),
+		CFrame.new(-1.45, 4.24, -0.74) * CFrame.Angles(0, math.rad(-18), math.rad(-16)),
+		Color3.fromRGB(255, 107, 116),
+		Enum.Material.Neon,
+		"Part"
+	)
+	ringShine.Shape = Enum.PartType.Ball
+	ringShine.CanCollide = false
+	ringShine.Transparency = 0.18
+	ringShine:SetAttribute("BaseCanCollide", false)
+	mark(ringShine)
 
 	local shine = createPart(
 		pedestal,
 		"BigRedButtonShine",
-		Vector3.new(0.92, 0.08, 0.42),
-		CFrame.new(-0.68, 4.74, -0.58) * CFrame.Angles(0, 0, math.rad(-18)),
-		Color3.fromRGB(255, 176, 182),
+		Vector3.new(0.98, 0.11, 0.45),
+		CFrame.new(0.68, 4.98, -0.58) * CFrame.Angles(0, 0, math.rad(16)),
+		Color3.fromRGB(255, 190, 196),
 		Enum.Material.Neon,
 		"Part"
 	)
 	shine.Shape = Enum.PartType.Ball
 	shine.CanCollide = false
 	shine.Transparency = 0.12
+	shine:SetAttribute("BaseCanCollide", false)
 	mark(shine)
 
 	createPrompt(button, "Press", "Absolutely Do Not Touch", 0.15)
