@@ -15,6 +15,7 @@ local sessionStartRemote = remotes:WaitForChild(Constants.Remotes.SessionStart)
 local systemMessageRemote = remotes:WaitForChild(Constants.Remotes.SystemMessage)
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
+local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
@@ -227,8 +228,8 @@ bookList.BackgroundTransparency = 0.16
 bookList.BorderSizePixel = 0
 bookList.CanvasSize = UDim2.fromOffset(0, 0)
 bookList.ScrollBarThickness = 6
-bookList.Position = UDim2.fromOffset(18, 252)
-bookList.Size = UDim2.new(1, -36, 1, -270)
+bookList.Position = UDim2.fromOffset(18, 294)
+bookList.Size = UDim2.new(1, -36, 1, -312)
 bookList.Parent = bookPanel
 
 local listCorner = Instance.new("UICorner")
@@ -253,7 +254,7 @@ hintTray.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 hintTray.BackgroundTransparency = 0.08
 hintTray.BorderSizePixel = 0
 hintTray.Position = UDim2.fromOffset(18, 84)
-hintTray.Size = UDim2.new(1, -36, 0, 156)
+hintTray.Size = UDim2.new(1, -36, 0, 198)
 hintTray.Parent = bookPanel
 
 local hintTrayCorner = Instance.new("UICorner")
@@ -369,6 +370,125 @@ secretDoorButton.Parent = hintTray
 local secretDoorCorner = Instance.new("UICorner")
 secretDoorCorner.CornerRadius = UDim.new(0, 6)
 secretDoorCorner.Parent = secretDoorButton
+
+local feedbackButton = Instance.new("TextButton")
+feedbackButton.Name = "Feedback"
+feedbackButton.BackgroundColor3 = Color3.fromRGB(15, 52, 34)
+feedbackButton.BorderSizePixel = 0
+feedbackButton.Font = Enum.Font.GothamBlack
+feedbackButton.Position = UDim2.new(0, 10, 0, 154)
+feedbackButton.Size = UDim2.new(1, -20, 0, 34)
+feedbackButton.Text = "Feedback / Request"
+feedbackButton.TextColor3 = Color3.fromRGB(136, 255, 178)
+feedbackButton.TextScaled = true
+feedbackButton.Parent = hintTray
+
+local feedbackButtonCorner = Instance.new("UICorner")
+feedbackButtonCorner.CornerRadius = UDim.new(0, 6)
+feedbackButtonCorner.Parent = feedbackButton
+
+local feedbackPanel = Instance.new("Frame")
+feedbackPanel.Name = "FeedbackPanel"
+feedbackPanel.BackgroundColor3 = Color3.fromRGB(5, 12, 9)
+feedbackPanel.BackgroundTransparency = 0.02
+feedbackPanel.BorderSizePixel = 0
+feedbackPanel.Position = UDim2.fromOffset(18, 84)
+feedbackPanel.Size = UDim2.new(1, -36, 0, 238)
+feedbackPanel.Visible = false
+feedbackPanel.Active = true
+feedbackPanel.ZIndex = 30
+feedbackPanel.Parent = bookPanel
+
+local feedbackPanelCorner = Instance.new("UICorner")
+feedbackPanelCorner.CornerRadius = UDim.new(0, 6)
+feedbackPanelCorner.Parent = feedbackPanel
+
+local feedbackTitle = Instance.new("TextLabel")
+feedbackTitle.Name = "FeedbackTitle"
+feedbackTitle.BackgroundTransparency = 1
+feedbackTitle.Font = Enum.Font.GothamBlack
+feedbackTitle.Position = UDim2.fromOffset(12, 8)
+feedbackTitle.Size = UDim2.new(1, -96, 0, 30)
+feedbackTitle.Text = "Feedback"
+feedbackTitle.TextColor3 = Color3.fromRGB(86, 255, 150)
+feedbackTitle.TextScaled = true
+feedbackTitle.TextXAlignment = Enum.TextXAlignment.Left
+feedbackTitle.ZIndex = 31
+feedbackTitle.Parent = feedbackPanel
+
+local closeFeedbackButton = Instance.new("TextButton")
+closeFeedbackButton.Name = "CloseFeedback"
+closeFeedbackButton.AnchorPoint = Vector2.new(1, 0)
+closeFeedbackButton.BackgroundColor3 = Color3.fromRGB(34, 44, 52)
+closeFeedbackButton.BorderSizePixel = 0
+closeFeedbackButton.Font = Enum.Font.GothamBlack
+closeFeedbackButton.Position = UDim2.new(1, -10, 0, 8)
+closeFeedbackButton.Size = UDim2.fromOffset(72, 30)
+closeFeedbackButton.Text = "Done"
+closeFeedbackButton.TextColor3 = Color3.fromRGB(220, 235, 245)
+closeFeedbackButton.TextScaled = true
+closeFeedbackButton.ZIndex = 31
+closeFeedbackButton.Parent = feedbackPanel
+
+local closeFeedbackCorner = Instance.new("UICorner")
+closeFeedbackCorner.CornerRadius = UDim.new(0, 6)
+closeFeedbackCorner.Parent = closeFeedbackButton
+
+local feedbackBody = Instance.new("TextLabel")
+feedbackBody.Name = "FeedbackBody"
+feedbackBody.BackgroundTransparency = 1
+feedbackBody.Font = Enum.Font.GothamSemibold
+feedbackBody.Position = UDim2.fromOffset(12, 42)
+feedbackBody.Size = UDim2.new(1, -24, 0, 32)
+feedbackBody.Text = "Send a quick tagged report for this room."
+feedbackBody.TextColor3 = Color3.fromRGB(202, 244, 214)
+feedbackBody.TextScaled = true
+feedbackBody.TextWrapped = true
+feedbackBody.TextXAlignment = Enum.TextXAlignment.Left
+feedbackBody.ZIndex = 31
+feedbackBody.Parent = feedbackPanel
+
+local feedbackStatus = Instance.new("TextLabel")
+feedbackStatus.Name = "FeedbackStatus"
+feedbackStatus.BackgroundTransparency = 1
+feedbackStatus.Font = Enum.Font.GothamBold
+feedbackStatus.Position = UDim2.fromOffset(12, 202)
+feedbackStatus.Size = UDim2.new(1, -24, 0, 26)
+feedbackStatus.Text = ""
+feedbackStatus.TextColor3 = Color3.fromRGB(136, 255, 178)
+feedbackStatus.TextScaled = true
+feedbackStatus.TextWrapped = true
+feedbackStatus.TextXAlignment = Enum.TextXAlignment.Left
+feedbackStatus.ZIndex = 31
+feedbackStatus.Parent = feedbackPanel
+
+local feedbackCategoryButtons = {}
+for index, category in ipairs(Constants.Feedback.Categories or {}) do
+	local column = (index - 1) % 2
+	local row = math.floor((index - 1) / 2)
+	local categoryButton = Instance.new("TextButton")
+	categoryButton.Name = "Feedback_" .. category.Id
+	categoryButton.BackgroundColor3 = Color3.fromRGB(16, 55, 36)
+	categoryButton.BorderSizePixel = 0
+	categoryButton.Font = Enum.Font.GothamBlack
+	categoryButton.Position = UDim2.new(column * 0.5, 10 + column * 5, 0, 78 + row * 40)
+	categoryButton.Size = UDim2.new(0.5, -15, 0, 34)
+	categoryButton.Text = category.Label
+	categoryButton.TextColor3 = Color3.fromRGB(136, 255, 178)
+	categoryButton.TextScaled = true
+	categoryButton.TextWrapped = true
+	categoryButton.ZIndex = 31
+	categoryButton.Parent = feedbackPanel
+
+	local categoryCorner = Instance.new("UICorner")
+	categoryCorner.CornerRadius = UDim.new(0, 6)
+	categoryCorner.Parent = categoryButton
+
+	table.insert(feedbackCategoryButtons, {
+		Button = categoryButton,
+		CategoryId = category.Id,
+	})
+end
 
 local startOverlay = Instance.new("Frame")
 startOverlay.Name = "StartChoiceOverlay"
@@ -654,6 +774,7 @@ local function closeReferenceBook()
 	end
 
 	bookPanel.Visible = false
+	feedbackPanel.Visible = false
 	closeBookButton.Modal = false
 	setOverlayMouse(false)
 end
@@ -776,6 +897,7 @@ local function renderReferenceBook(payload)
 	local wasVisible = bookPanel.Visible
 	activeBookRoomId = payload.RoomId
 	bookPanel.Visible = true
+	feedbackPanel.Visible = false
 	if not wasVisible then
 		closeBookButton.Modal = true
 		setOverlayMouse(true, closeBookButton)
@@ -934,13 +1056,46 @@ secretDoorButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+feedbackButton.MouseButton1Click:Connect(function()
+	feedbackStatus.Text = ""
+	feedbackPanel.Visible = true
+	local firstButton = feedbackCategoryButtons[1] and feedbackCategoryButtons[1].Button
+	if firstButton then
+		GuiService.SelectedObject = firstButton
+	end
+end)
+
+closeFeedbackButton.MouseButton1Click:Connect(function()
+	feedbackPanel.Visible = false
+	GuiService.SelectedObject = feedbackButton
+end)
+
+for _, entry in ipairs(feedbackCategoryButtons) do
+	entry.Button.MouseButton1Click:Connect(function()
+		if not activeBookRoomId then
+			return
+		end
+
+		feedbackStatus.Text = "Sending..."
+		feedbackRemote:FireServer({
+			Category = entry.CategoryId,
+			RoomId = activeBookRoomId,
+		})
+	end)
+end
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
 
 	if bookPanel.Visible and (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) then
-		closeReferenceBook()
+		if feedbackPanel.Visible then
+			feedbackPanel.Visible = false
+			GuiService.SelectedObject = feedbackButton
+		else
+			closeReferenceBook()
+		end
 	elseif startOverlay.Visible and input.KeyCode == Enum.KeyCode.ButtonA then
 		sendStartChoice("Resume")
 	end
@@ -962,6 +1117,20 @@ referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)
 roomStatusRemote.OnClientEvent:Connect(updateRoomStatus)
 sparkleRemote.OnClientEvent:Connect(showSparkleHint)
+feedbackRemote.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	local text = tostring(payload.Message or "")
+	if text == "" then
+		return
+	end
+
+	feedbackStatus.Text = text
+	hintText.Text = text
+	showSystemMessage(text)
+end)
 
 systemMessageRemote.OnClientEvent:Connect(function(text)
 	if typeof(text) == "string" and text ~= "" then

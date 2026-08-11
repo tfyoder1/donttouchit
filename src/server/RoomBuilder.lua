@@ -602,8 +602,8 @@ local function makeSnackResetRoomButton(parent)
 	)
 	button.Shape = Enum.PartType.Cylinder
 
-	createSurfaceText(plate, "SnackResetButtonText", "RESET\nSNACKS", Enum.NormalId.Right, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
-	local prompt = createPrompt(button, "Reset", "Snack Lab Reset", 0.2)
+	createSurfaceText(plate, "SnackResetButtonText", "RESET\nROOM", Enum.NormalId.Right, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
+	local prompt = createPrompt(button, "Reset", "Room Reset", 0.2)
 	prompt.MaxActivationDistance = 12
 	tag(button, Constants.Tags.ResetRoomButton)
 
@@ -676,17 +676,54 @@ local function makeHallDoor(parent, name, size, cframe, face, label, destination
 end
 
 local function makeReferenceBook(parent, name, cframe, roomId, title)
-	local book = makeModel(parent, name)
-	local base = createPart(book, "BookStand", Vector3.new(3.8, 2.4, 2.4), cframe * CFrame.new(0, 1.2, 0), Color3.fromRGB(53, 59, 68), Enum.Material.Metal)
-	local cover = createPart(book, "BookCover", Vector3.new(3.4, 0.35, 2.5), cframe * CFrame.new(0, 2.55, -0.08) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(70, 45, 122), Enum.Material.SmoothPlastic)
+	local log = makeModel(parent, name)
+	local base = createPart(log, "DigitalLogBase", Vector3.new(4.2, 0.24, 2.5), cframe * CFrame.new(0, 0.58, 0.62), Color3.fromRGB(31, 35, 42), Enum.Material.Metal)
+	local stem = createPart(log, "DigitalLogStem", Vector3.new(0.42, 2.1, 0.42), cframe * CFrame.new(0, 1.52, 0.62), Color3.fromRGB(45, 50, 58), Enum.Material.Metal)
+	local back = createPart(log, "DigitalClipboardBack", Vector3.new(4.1, 0.28, 2.9), cframe * CFrame.new(0, 2.7, 0) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(34, 39, 47), Enum.Material.Metal)
+	local screen = createPart(log, "DigitalClipboardScreen", Vector3.new(3.55, 0.12, 2.2), cframe * CFrame.new(0, 2.82, -0.04) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(4, 10, 8), Enum.Material.Neon)
+	local clip = createPart(log, "DigitalClipboardClip", Vector3.new(1.55, 0.16, 0.24), cframe * CFrame.new(0, 3.26, 1.08) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(118, 130, 144), Enum.Material.Metal)
+	clip.CanCollide = false
+	clip:SetAttribute("BaseCanCollide", false)
 
-	cover:SetAttribute("RoomId", roomId)
-	createSurfaceText(cover, "BookText", title .. "\nLOG", Enum.NormalId.Top, Color3.fromRGB(255, 242, 181), Color3.fromRGB(70, 45, 122))
-	createPrompt(cover, "Read", title .. " Book", 0)
-	tag(cover, Constants.Tags.ReferenceBook)
+	screen:SetAttribute("RoomId", roomId)
+	screen:SetAttribute("FixtureType", "DigitalRoomLog")
+	createSurfaceText(screen, "DigitalLogText", title .. "\nROOM LOG\n> OPEN", Enum.NormalId.Top, Color3.fromRGB(86, 255, 150), Color3.fromRGB(4, 10, 8))
+	createPrompt(screen, "Open", title .. " Log", 0)
+	tag(screen, Constants.Tags.ReferenceBook)
 
-	book.PrimaryPart = base
-	return book
+	log.PrimaryPart = back
+	return log
+end
+
+local function makeWallResetRoomButton(parent, name, baseCFrame, face, promptObjectText)
+	local resetModel = makeModel(parent, name)
+
+	local plate = createPart(
+		resetModel,
+		"ResetButtonPlate",
+		Vector3.new(3.4, 2.1, 0.24),
+		baseCFrame,
+		Color3.fromRGB(42, 47, 56),
+		Enum.Material.Metal
+	)
+
+	local button = createPart(
+		resetModel,
+		"ResetButton",
+		Vector3.new(1.45, 0.38, 1.45),
+		baseCFrame * CFrame.new(0, 0, -0.24) * CFrame.Angles(math.rad(90), 0, 0),
+		Color3.fromRGB(255, 221, 84),
+		Enum.Material.Neon
+	)
+	button.Shape = Enum.PartType.Cylinder
+
+	createSurfaceText(plate, "ResetButtonText", "RESET\nROOM", face or Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
+	local prompt = createPrompt(button, "Reset", promptObjectText or "Room Reset", 0.2)
+	prompt.MaxActivationDistance = 12
+	tag(button, Constants.Tags.ResetRoomButton)
+
+	resetModel.PrimaryPart = plate
+	return resetModel
 end
 
 local function makeHallway(roomFolder)
@@ -833,6 +870,7 @@ local function makeSnackLabShell(roomFolder)
 			PromptObjectText = "Snack Lab Light Switch",
 		}
 	)
+	local referenceBook = makeReferenceBook(room, "SnackLabInsideLog", cframeAt(origin, -14.2, 0, 13.1) * CFrame.Angles(0, math.rad(90), 0), "SnackLab", "SNACK LAB")
 	createSpawnLocation(room, "SnackLabSpawn", "SnackLab", Constants.GetRoomSpawnCFrame("SnackLab"), Color3.fromRGB(91, 188, 124), false)
 
 	return {
@@ -840,6 +878,7 @@ local function makeSnackLabShell(roomFolder)
 		ExitDoor = exitDoor,
 		ResetRoomButton = resetRoomButton,
 		LightSwitch = lightSwitch,
+		ReferenceBook = referenceBook,
 	}
 end
 
@@ -1429,6 +1468,22 @@ local function makeBowlingAlley(roomFolder)
 
 	createSpawnLocation(room, "BowlingAlleySpawn", "BowlingAlley", BOWLING_ALLEY_SPAWN_CFRAME, Color3.fromRGB(119, 203, 255), false)
 	makeReferenceBook(room, "BowlingReferenceBook", cframeAt(origin, -16, 0, 42), "BowlingAlley", "BOWLING")
+	makeLightSwitch(
+		room,
+		"BowlingLightSwitch",
+		CFrame.new(origin + Vector3.new(8.2, 4.45, 48.85), origin + Vector3.new(0, 4.45, 0)),
+		{
+			RoomId = "BowlingAlley",
+			PromptObjectText = "Bowling Light Switch",
+		}
+	)
+	makeWallResetRoomButton(
+		room,
+		"BowlingResetRoomButton",
+		CFrame.new(origin + Vector3.new(16.2, 4.45, 48.85), origin + Vector3.new(0, 4.45, 0)),
+		Enum.NormalId.Front,
+		"Room Reset"
+	)
 	createNoTouchClock(
 		room,
 		"BowlingClock",
@@ -1565,12 +1620,31 @@ local function makeTVSecretRoom(roomFolder)
 	createPrompt(exitDoor, "Exit", "TV Room", 0)
 	tag(exitDoor, Constants.Tags.SecretRoomExit)
 
+	local libraryLightSwitch = makeLightSwitch(
+		room,
+		"LibraryLightSwitch",
+		CFrame.new(origin + Vector3.new(-6.35, 4.45, 7.43), origin + Vector3.new(0, 4.45, 0)),
+		{
+			RoomId = "Library",
+			PromptObjectText = "Library Light Switch",
+		}
+	)
+	local libraryResetRoomButton = makeWallResetRoomButton(
+		room,
+		"LibraryResetRoomButton",
+		CFrame.new(origin + Vector3.new(6.35, 4.45, 7.43), origin + Vector3.new(0, 4.45, 0)),
+		Enum.NormalId.Front,
+		"Room Reset"
+	)
+
 	makeLibraryFurnishings(room)
 	room.PrimaryPart = keyhole
 	return {
 		Door = secretDoor,
 		Room = room,
 		ExitDoor = exitDoor,
+		LightSwitch = libraryLightSwitch,
+		ResetRoomButton = libraryResetRoomButton,
 	}
 end
 
@@ -1711,6 +1785,25 @@ local function makeIslandRoom(roomFolder)
 	createPrompt(exitGate, "Leave", "Hallway", 0)
 	tag(exitGate, Constants.Tags.IslandExit)
 
+	local islandSwitchCFrame = CFrame.new(origin + Vector3.new(-5.7, 4.55, -22.85), origin + Vector3.new(0, 4.55, 4))
+	local lightSwitch = makeLightSwitch(
+		room,
+		"IslandLightSwitch",
+		islandSwitchCFrame,
+		{
+			RoomId = "Island",
+			PromptObjectText = "Island Light Switch",
+		}
+	)
+	local resetRoomButton = makeWallResetRoomButton(
+		room,
+		"IslandResetRoomButton",
+		CFrame.new(origin + Vector3.new(5.7, 4.5, -22.85), origin + Vector3.new(0, 4.5, 4)),
+		Enum.NormalId.Front,
+		"Room Reset"
+	)
+	local referenceBook = makeReferenceBook(room, "IslandInsideLog", cframeAt(origin, -8.6, 0, -18.4) * CFrame.Angles(0, math.rad(24), 0), "Island", "ISLAND")
+
 	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS", -10.5, -7.5, -1, 2, Constants.Tags.IslandSharkSign)
 	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", 12.5, 12.5, 1, 5, Constants.Tags.IslandJellyfishSign)
 
@@ -1739,6 +1832,9 @@ local function makeIslandRoom(roomFolder)
 	return {
 		Model = room,
 		ExitGate = exitGate,
+		LightSwitch = lightSwitch,
+		ResetRoomButton = resetRoomButton,
+		ReferenceBook = referenceBook,
 	}
 end
 
@@ -1827,6 +1923,7 @@ function RoomBuilder.Build()
 	local _, recoveryFloor = makeFloor(roomFolder)
 	local exitDoor = makeShell(roomFolder)
 	local resetRoomButton = makeResetRoomButton(roomFolder)
+	local tvInsideLog = makeReferenceBook(roomFolder, "TVRoomInsideLog", CFrame.new(12.3, 0, Constants.Room.Depth / 2 - 3.1) * CFrame.Angles(0, math.rad(180), 0), "TVRoom", "TV ROOM")
 	makeTVRoomClocks(roomFolder)
 	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
@@ -1880,6 +1977,7 @@ function RoomBuilder.Build()
 		UnderfloorChamber = underfloorChamber,
 		ExitDoor = exitDoor,
 		ResetRoomButton = resetRoomButton,
+		TVInsideLog = tvInsideLog,
 		Hallway = hallway,
 		TVSecretRoom = tvSecretRoom,
 		BowlingAlley = bowlingAlley,

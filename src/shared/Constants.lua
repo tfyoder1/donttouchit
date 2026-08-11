@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.2"
+Constants.BuildVersion = "0.5.3"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -24,6 +24,7 @@ Constants.Remotes = {
 	RoomStatus = "RoomStatus",
 	SparkleHint = "SparkleHint",
 	SnackEffect = "SnackEffect",
+	FeedbackRequest = "FeedbackRequest",
 }
 
 Constants.Tags = {
@@ -101,8 +102,39 @@ Constants.Hallway = {
 
 Constants.DataStore = {
 	Name = "DontTouchItPrototype_v1",
+	FeedbackName = "DontTouchItFeedback_v1",
 	AutosaveSeconds = 45,
 	RetryCount = 3,
+}
+
+Constants.Feedback = {
+	CooldownSeconds = 20,
+	Categories = {
+		{
+			Id = "bug",
+			Label = "Bug",
+		},
+		{
+			Id = "idea",
+			Label = "Idea",
+		},
+		{
+			Id = "stuck",
+			Label = "Stuck",
+		},
+		{
+			Id = "mobile",
+			Label = "Mobile issue",
+		},
+		{
+			Id = "controller",
+			Label = "Controller issue",
+		},
+		{
+			Id = "more",
+			Label = "More like this",
+		},
+	},
 }
 
 Constants.Sparkle = {

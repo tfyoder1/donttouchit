@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local DiscoveryService = require(script.Parent:WaitForChild("DiscoveryService"))
 local EventManager = require(script.Parent:WaitForChild("EventManager"))
+local FeedbackService = require(script.Parent:WaitForChild("FeedbackService"))
 local InteractionService = require(script.Parent:WaitForChild("InteractionService"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
@@ -18,6 +19,9 @@ discoveryService:Initialize()
 
 local roomProgressService = RoomProgressService.new(discoveryService)
 roomProgressService:Initialize()
+
+local feedbackService = FeedbackService.new(roomProgressService)
+feedbackService:Initialize()
 
 local eventManager = EventManager.new(discoveryService, ResetService, roomReferences, roomProgressService)
 local interactionService = InteractionService.new(eventManager, discoveryService, ResetService, roomProgressService)
