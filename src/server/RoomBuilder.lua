@@ -2053,10 +2053,13 @@ local function makeIslandObjects(objectsFolder)
 	local objects = makeModel(objectsFolder, "IslandObjects")
 
 	local shovel = makeModel(objects, "IslandShovel")
-	local handle = createPart(shovel, "ShovelHandle", Vector3.new(0.28, 4.6, 0.28), cframeAt(origin, -8, 2.4, 1.5) * CFrame.Angles(0, 0, math.rad(-32)), Color3.fromRGB(113, 71, 39), Enum.Material.Wood)
+	local shovelCFrame = cframeAt(origin, -8, 2.4, 1.5) * CFrame.Angles(0, 0, math.rad(-32))
+	local handle = createPart(shovel, "ShovelHandle", Vector3.new(0.28, 4.6, 0.28), shovelCFrame, Color3.fromRGB(113, 71, 39), Enum.Material.Wood)
 	handle.Shape = Enum.PartType.Cylinder
-	createPart(shovel, "ShovelGrip", Vector3.new(1.5, 0.22, 0.22), cframeAt(origin, -9.25, 4.3, 1.5) * CFrame.Angles(0, 0, math.rad(-32)), Color3.fromRGB(84, 51, 30), Enum.Material.Wood)
-	createPart(shovel, "ShovelBlade", Vector3.new(1.2, 1.5, 0.24), cframeAt(origin, -6.55, 0.95, 1.5) * CFrame.Angles(0, 0, math.rad(-32)), Color3.fromRGB(191, 197, 201), Enum.Material.Metal, "WedgePart")
+	createPart(shovel, "ShovelGrip", Vector3.new(1.5, 0.22, 0.22), shovelCFrame * CFrame.new(0, 2.42, 0), Color3.fromRGB(84, 51, 30), Enum.Material.Wood)
+	local collar = createPart(shovel, "ShovelBladeCollar", Vector3.new(0.62, 0.34, 0.34), shovelCFrame * CFrame.new(0, -2.18, 0), Color3.fromRGB(137, 143, 148), Enum.Material.Metal)
+	collar.Shape = Enum.PartType.Cylinder
+	createPart(shovel, "ShovelBlade", Vector3.new(1.2, 1.5, 0.24), shovelCFrame * CFrame.new(0, -2.82, 0), Color3.fromRGB(191, 197, 201), Enum.Material.Metal, "WedgePart")
 	createPrompt(handle, "Dig", "Shovel", 0)
 	tag(handle, Constants.Tags.IslandShovel)
 	shovel.PrimaryPart = handle

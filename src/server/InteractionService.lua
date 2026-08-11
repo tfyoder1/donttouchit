@@ -3943,14 +3943,38 @@ function InteractionService:_wireIslandShovel(shovel)
 		playSound(shovel, "rbxasset://sounds/snap.wav", 0.45, 0.58)
 
 		if shovel:IsA("BasePart") then
-			local baseCFrame = shovel:GetAttribute("BaseCFrame") or shovel.CFrame
-			local digTween = tweenPart(shovel, 0.16, {
-				CFrame = baseCFrame * CFrame.Angles(math.rad(0), 0, math.rad(-20)),
-			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			digTween.Completed:Wait()
-			tweenPart(shovel, 0.18, {
-				CFrame = baseCFrame,
-			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			local shovelModel = shovel:FindFirstAncestor("IslandShovel")
+			local shovelParts = {}
+			local basePivot = shovelModel and shovelModel:GetPivot() or shovel.CFrame
+
+			if shovelModel then
+				for _, descendant in ipairs(shovelModel:GetDescendants()) do
+					if descendant:IsA("BasePart") then
+						table.insert(shovelParts, descendant)
+					end
+				end
+			else
+				table.insert(shovelParts, shovel)
+			end
+
+			local digTween = nil
+			local targetPivot = basePivot * CFrame.Angles(0, 0, math.rad(-20))
+			for _, part in ipairs(shovelParts) do
+				local baseCFrame = part:GetAttribute("BaseCFrame") or part.CFrame
+				digTween = tweenPart(part, 0.16, {
+					CFrame = targetPivot * basePivot:ToObjectSpace(baseCFrame),
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			end
+
+			if digTween then
+				digTween.Completed:Wait()
+			end
+
+			for _, part in ipairs(shovelParts) do
+				tweenPart(part, 0.18, {
+					CFrame = part:GetAttribute("BaseCFrame") or part.CFrame,
+				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			end
 		end
 
 		local treasure = self:_revealIslandTreasure()
