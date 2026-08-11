@@ -1120,7 +1120,7 @@ local function makeSnackButton(objectsFolder)
 		"SnackButtonClock",
 		"SnackLab",
 		Vector3.new(4.1, 1.05, 0.22),
-		cframeAt(origin, 0, 2.05, 2.42),
+		cframeAt(origin, 0, 2.05, 2.42) * CFrame.Angles(0, 0, math.rad(180)),
 		Enum.NormalId.Front
 	)
 
@@ -1331,7 +1331,7 @@ local function makeSnackMixer(objectsFolder)
 	local mixer = makeModel(objectsFolder, "Mixer")
 	local mixerX = 17.8
 	local mixerZ = 11.3
-	local mixerFrame = CFrame.new(origin + Vector3.new(mixerX, 0, mixerZ))
+	local mixerFrame = CFrame.new(origin + Vector3.new(mixerX, 0, mixerZ)) * CFrame.Angles(0, math.rad(180), 0)
 
 	local function mixerCFrame(x, y, z)
 		return mixerFrame * CFrame.new(x, y, z)
