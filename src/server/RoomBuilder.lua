@@ -108,6 +108,63 @@ local function createNoTouchClock(parent, name, roomId, size, cframe, face)
 	return clock
 end
 
+local function createReferenceBookcaseFace(door)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "ReferenceBookcaseSurfaceGui"
+	gui.Face = Enum.NormalId.Back
+	gui.LightInfluence = 0.18
+	gui.PixelsPerStud = 60
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.Parent = door
+	mark(gui)
+
+	local frame = Instance.new("Frame")
+	frame.Name = "ReferenceBookcaseFrame"
+	frame.BackgroundColor3 = Color3.fromRGB(66, 41, 30)
+	frame.BorderSizePixel = 0
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.Parent = gui
+
+	local title = Instance.new("TextLabel")
+	title.Name = "ReferenceBookcaseTitle"
+	title.BackgroundColor3 = Color3.fromRGB(96, 62, 40)
+	title.BorderSizePixel = 0
+	title.Font = Enum.Font.GothamBlack
+	title.Position = UDim2.fromScale(0.06, 0.04)
+	title.Size = UDim2.fromScale(0.88, 0.13)
+	title.Text = "REFERENCE BOOKCASE"
+	title.TextColor3 = Color3.fromRGB(255, 235, 149)
+	title.TextScaled = true
+	title.TextWrapped = true
+	title.Parent = frame
+	mark(title)
+
+	for row = 1, 4 do
+		local shelfY = 0.2 + (row - 1) * 0.19
+		local shelf = Instance.new("Frame")
+		shelf.Name = "ReferenceShelf" .. row
+		shelf.BackgroundColor3 = Color3.fromRGB(104, 67, 43)
+		shelf.BorderSizePixel = 0
+		shelf.Position = UDim2.fromScale(0.06, shelfY + 0.12)
+		shelf.Size = UDim2.fromScale(0.88, 0.026)
+		shelf.Parent = frame
+
+		for bookIndex = 1, 9 do
+			local book = Instance.new("Frame")
+			book.Name = ("ReferenceBook%d_%d"):format(row, bookIndex)
+			book.BackgroundColor3 = Color3.fromRGB(
+				74 + (bookIndex * 29 + row * 11) % 135,
+				46 + (bookIndex * 17 + row * 31) % 125,
+				70 + (bookIndex * 23 + row * 13) % 120
+			)
+			book.BorderSizePixel = 0
+			book.Position = UDim2.fromScale(0.08 + (bookIndex - 1) * 0.092, shelfY + 0.01 + (bookIndex % 2) * 0.014)
+			book.Size = UDim2.fromScale(0.055 + (bookIndex % 3) * 0.012, 0.11 - (bookIndex % 2) * 0.015)
+			book.Parent = frame
+		end
+	end
+end
+
 local function clearGeneratedFolder(name)
 	local existing = workspace:FindFirstChild(name)
 	if existing and existing:GetAttribute(ROOM_ATTRIBUTE) then
@@ -1446,7 +1503,7 @@ local function makeLibraryFurnishings(room)
 		end
 
 		for row = 1, 4 do
-			createPart(shelfModel, "ShelfBoard" .. row, Vector3.new(shelf.Width + 0.2, 0.28, 0.72), base * CFrame.new(0, -3.1 + row * 1.55, -0.22), Color3.fromRGB(92, 61, 43), Enum.Material.Wood)
+			createPart(shelfModel, "ShelfBoard" .. row, Vector3.new(shelf.Width + 0.2, 0.28, 0.72), base * CFrame.new(0, -3.1 + row * 1.55, 0.22), Color3.fromRGB(92, 61, 43), Enum.Material.Wood)
 			for bookIndex = 1, 8 do
 				local bookX = -shelf.Width / 2 + 0.7 + (bookIndex - 1) * (shelf.Width - 1.4) / 7
 				local color = Color3.fromRGB(90 + (bookIndex * 17) % 120, 52 + (row * 31) % 130, 70 + (shelfIndex * 43) % 120)
@@ -1454,7 +1511,7 @@ local function makeLibraryFurnishings(room)
 					shelfModel,
 					("Book_%d_%d"):format(row, bookIndex),
 					Vector3.new(0.42, 1.05 + (bookIndex % 3) * 0.14, 0.38),
-					base * CFrame.new(bookX, -3.05 + row * 1.55, -0.58),
+					base * CFrame.new(bookX, -3.05 + row * 1.55, 0.58),
 					color,
 					Enum.Material.SmoothPlastic
 				)
@@ -1516,7 +1573,7 @@ local function makeLibraryFurnishings(room)
 	local bookcaseDoor = createPart(room, "LibraryBookcaseDoor", Vector3.new(5.6, 7.6, 0.42), cframeAt(origin, 7.2, 4.0, -16.55), Color3.fromRGB(76, 48, 34), Enum.Material.Wood)
 	bookcaseDoor:SetAttribute("DestinationCFrame", BOWLING_ALLEY_SPAWN_CFRAME)
 	bookcaseDoor:SetAttribute("SecretClosedCFrame", bookcaseDoor.CFrame)
-	createSurfaceText(bookcaseDoor, "BookcaseDoorText", "REFERENCE\nONLY", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(76, 48, 34))
+	createReferenceBookcaseFace(bookcaseDoor)
 	createPrompt(bookcaseDoor, "Inspect", "Reference Bookcase", 0)
 	tag(bookcaseDoor, Constants.Tags.LibraryBookcaseDoor)
 end
