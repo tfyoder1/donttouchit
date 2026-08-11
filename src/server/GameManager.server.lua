@@ -20,8 +20,14 @@ discoveryService:Initialize()
 local roomProgressService = RoomProgressService.new(discoveryService)
 roomProgressService:Initialize()
 
-local feedbackService = FeedbackService.new(roomProgressService)
-feedbackService:Initialize()
+local feedbackOk, feedbackServiceOrError = pcall(function()
+	local feedbackService = FeedbackService.new(roomProgressService)
+	feedbackService:Initialize()
+	return feedbackService
+end)
+if not feedbackOk then
+	warn(("[DON'T TOUCH IT] Feedback service did not start: %s"):format(tostring(feedbackServiceOrError)))
+end
 
 local eventManager = EventManager.new(discoveryService, ResetService, roomReferences, roomProgressService)
 local interactionService = InteractionService.new(eventManager, discoveryService, ResetService, roomProgressService)

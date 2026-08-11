@@ -203,38 +203,6 @@ local function makeShell(roomFolder)
 	return door
 end
 
-local function makeResetRoomButton(roomFolder)
-	local resetModel = makeModel(roomFolder, "ResetRoomButton")
-	local wallZ = Constants.Room.Depth / 2 - 0.6
-	local panelX = -12.4
-
-	local plate = createPart(
-		resetModel,
-		"ResetButtonPlate",
-		Vector3.new(3.4, 2.1, 0.24),
-		CFrame.new(panelX, 4.5, wallZ),
-		Color3.fromRGB(42, 47, 56),
-		Enum.Material.Metal
-	)
-
-	local button = createPart(
-		resetModel,
-		"ResetButton",
-		Vector3.new(1.45, 0.38, 1.45),
-		CFrame.new(panelX, 4.5, wallZ - 0.24) * CFrame.Angles(math.rad(90), 0, 0),
-		Color3.fromRGB(255, 221, 84),
-		Enum.Material.Neon
-	)
-	button.Shape = Enum.PartType.Cylinder
-
-	createSurfaceText(plate, "ResetButtonText", "RESET\nROOM", Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
-	createPrompt(button, "Reset", "Room Reset", 0.2)
-	tag(button, Constants.Tags.ResetRoomButton)
-
-	resetModel.PrimaryPart = plate
-	return resetModel
-end
-
 local function makeTVRoomClocks(roomFolder)
 	createNoTouchClock(
 		roomFolder,
@@ -344,6 +312,7 @@ end
 
 local function makeLightSwitch(parent, name, baseCFrame, options)
 	options = options or {}
+	local scale = options.Scale or 1
 
 	local switch = makeModel(parent, name or "LightSwitch")
 	baseCFrame = baseCFrame or CFrame.new(-6.15, 4.55, Constants.Room.Depth / 2 - 0.58)
@@ -357,18 +326,18 @@ local function makeLightSwitch(parent, name, baseCFrame, options)
 	local plate = createPart(
 		switch,
 		"SwitchPlate",
-		Vector3.new(1.15, 1.85, 0.18),
+		Vector3.new(1.15 * scale, 1.85 * scale, 0.18 * scale),
 		baseCFrame,
 		Color3.fromRGB(238, 238, 226),
 		Enum.Material.SmoothPlastic
 	)
-	local leverNeutralCFrame = baseCFrame * CFrame.new(0, 0.05, -0.2)
+	local leverNeutralCFrame = baseCFrame * CFrame.new(0, 0.05 * scale, -0.2 * scale)
 	local leverOnCFrame = leverNeutralCFrame * CFrame.Angles(math.rad(-18), 0, 0)
 	local leverOffCFrame = leverNeutralCFrame * CFrame.Angles(math.rad(18), 0, 0)
 	local lever = createPart(
 		switch,
 		"SwitchLever",
-		Vector3.new(0.26, 0.88, 0.22),
+		Vector3.new(0.26 * scale, 0.88 * scale, 0.22 * scale),
 		leverOnCFrame,
 		Color3.fromRGB(244, 244, 238),
 		Enum.Material.Metal
@@ -576,41 +545,6 @@ local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
 local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
 local ISLAND_RETURN_CFRAME = CFrame.new(0, 3, 113)
 
-local function makeSnackResetRoomButton(parent)
-	local resetModel = makeModel(parent, "SnackResetRoomButton")
-	local width = Constants.Room.Width
-	local origin = SNACK_LAB_ORIGIN
-	local wallX = -width / 2 + 0.58
-	local panelZ = 3.7
-
-	local plate = createPart(
-		resetModel,
-		"SnackResetButtonPlate",
-		Vector3.new(0.24, 2.1, 3.4),
-		cframeAt(origin, wallX, 4.45, panelZ),
-		Color3.fromRGB(42, 47, 56),
-		Enum.Material.Metal
-	)
-
-	local button = createPart(
-		resetModel,
-		"SnackResetButton",
-		Vector3.new(1.45, 0.38, 1.45),
-		cframeAt(origin, wallX + 0.28, 4.45, panelZ) * CFrame.Angles(0, 0, math.rad(90)),
-		Color3.fromRGB(255, 221, 84),
-		Enum.Material.Neon
-	)
-	button.Shape = Enum.PartType.Cylinder
-
-	createSurfaceText(plate, "SnackResetButtonText", "RESET\nROOM", Enum.NormalId.Right, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
-	local prompt = createPrompt(button, "Reset", "Room Reset", 0.2)
-	prompt.MaxActivationDistance = 12
-	tag(button, Constants.Tags.ResetRoomButton)
-
-	resetModel.PrimaryPart = plate
-	return resetModel
-end
-
 local function makeSnackCeilingFan(objectsFolder)
 	local fan = makeModel(objectsFolder, "SnackCeilingFan")
 	local origin = SNACK_LAB_ORIGIN
@@ -675,55 +609,155 @@ local function makeHallDoor(parent, name, size, cframe, face, label, destination
 	return door
 end
 
-local function makeReferenceBook(parent, name, cframe, roomId, title)
+local function makeCompactReferenceBook(parent, name, cframe, roomId, title, options)
+	options = options or {}
+	local width = options.Width or 2.35
+	local height = options.Height or 1.7
 	local log = makeModel(parent, name)
-	local base = createPart(log, "DigitalLogBase", Vector3.new(4.2, 0.24, 2.5), cframe * CFrame.new(0, 0.58, 0.62), Color3.fromRGB(31, 35, 42), Enum.Material.Metal)
-	local stem = createPart(log, "DigitalLogStem", Vector3.new(0.42, 2.1, 0.42), cframe * CFrame.new(0, 1.52, 0.62), Color3.fromRGB(45, 50, 58), Enum.Material.Metal)
-	local back = createPart(log, "DigitalClipboardBack", Vector3.new(4.1, 0.28, 2.9), cframe * CFrame.new(0, 2.7, 0) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(34, 39, 47), Enum.Material.Metal)
-	local screen = createPart(log, "DigitalClipboardScreen", Vector3.new(3.55, 0.12, 2.2), cframe * CFrame.new(0, 2.82, -0.04) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(4, 10, 8), Enum.Material.Neon)
-	local clip = createPart(log, "DigitalClipboardClip", Vector3.new(1.55, 0.16, 0.24), cframe * CFrame.new(0, 3.26, 1.08) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(118, 130, 144), Enum.Material.Metal)
+
+	local back = createPart(
+		log,
+		"DigitalLogBack",
+		Vector3.new(width, height, 0.16),
+		cframe,
+		Color3.fromRGB(34, 39, 47),
+		Enum.Material.Metal
+	)
+	local screen = createPart(
+		log,
+		"DigitalLogScreen",
+		Vector3.new(width - 0.34, height - 0.4, 0.08),
+		cframe * CFrame.new(0, -0.08, -0.13),
+		Color3.fromRGB(4, 10, 8),
+		Enum.Material.Neon
+	)
+	local clip = createPart(
+		log,
+		"DigitalLogClip",
+		Vector3.new(width * 0.42, 0.14, 0.1),
+		cframe * CFrame.new(0, height / 2 - 0.18, -0.18),
+		Color3.fromRGB(118, 130, 144),
+		Enum.Material.Metal
+	)
 	clip.CanCollide = false
 	clip:SetAttribute("BaseCanCollide", false)
 
 	screen:SetAttribute("RoomId", roomId)
 	screen:SetAttribute("FixtureType", "DigitalRoomLog")
-	createSurfaceText(screen, "DigitalLogText", title .. "\nROOM LOG\n> OPEN", Enum.NormalId.Top, Color3.fromRGB(86, 255, 150), Color3.fromRGB(4, 10, 8))
-	createPrompt(screen, "Open", title .. " Log", 0)
+	createSurfaceText(screen, "DigitalLogText", options.Text or (title .. "\nLOG\nOPEN"), Enum.NormalId.Front, Color3.fromRGB(86, 255, 150), Color3.fromRGB(4, 10, 8))
+	local prompt = createPrompt(screen, "Open", title .. " Log", 0)
+	prompt.MaxActivationDistance = options.MaxActivationDistance or 12
 	tag(screen, Constants.Tags.ReferenceBook)
 
 	log.PrimaryPart = back
 	return log
 end
 
-local function makeWallResetRoomButton(parent, name, baseCFrame, face, promptObjectText)
+local function makeCompactResetRoomButton(parent, name, cframe, promptObjectText)
 	local resetModel = makeModel(parent, name)
 
 	local plate = createPart(
 		resetModel,
 		"ResetButtonPlate",
-		Vector3.new(3.4, 2.1, 0.24),
-		baseCFrame,
+		Vector3.new(1.2, 1.08, 0.13),
+		cframe,
 		Color3.fromRGB(42, 47, 56),
 		Enum.Material.Metal
 	)
-
 	local button = createPart(
 		resetModel,
 		"ResetButton",
-		Vector3.new(1.45, 0.38, 1.45),
-		baseCFrame * CFrame.new(0, 0, -0.24) * CFrame.Angles(math.rad(90), 0, 0),
+		Vector3.new(0.72, 0.22, 0.72),
+		cframe * CFrame.new(0, -0.05, -0.16) * CFrame.Angles(math.rad(90), 0, 0),
 		Color3.fromRGB(255, 221, 84),
 		Enum.Material.Neon
 	)
 	button.Shape = Enum.PartType.Cylinder
 
-	createSurfaceText(plate, "ResetButtonText", "RESET\nROOM", face or Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
+	createSurfaceText(plate, "ResetButtonText", "RESET", Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
 	local prompt = createPrompt(button, "Reset", promptObjectText or "Room Reset", 0.2)
 	prompt.MaxActivationDistance = 12
 	tag(button, Constants.Tags.ResetRoomButton)
 
 	resetModel.PrimaryPart = plate
 	return resetModel
+end
+
+local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, options)
+	options = options or {}
+	local includeReset = options.IncludeReset == true
+	local includeLightSwitch = options.IncludeLightSwitch ~= false
+	local panelWidth = options.PanelWidth or (includeReset and 5.6 or 4.55)
+	local panelHeight = options.PanelHeight or (includeReset and 3.1 or 2.55)
+	local controls = makeModel(parent, name)
+
+	local panel = createPart(
+		controls,
+		"ControlPanelBack",
+		Vector3.new(panelWidth, panelHeight, 0.22),
+		panelCFrame,
+		Color3.fromRGB(32, 37, 45),
+		Enum.Material.Metal
+	)
+	local titleStrip = createPart(
+		controls,
+		"ControlPanelTitleStrip",
+		Vector3.new(panelWidth - 0.4, 0.36, 0.08),
+		panelCFrame * CFrame.new(0, panelHeight / 2 - 0.28, -0.18),
+		Color3.fromRGB(62, 69, 82),
+		Enum.Material.SmoothPlastic
+	)
+	createSurfaceText(titleStrip, "ControlPanelTitle", options.PanelLabel or (title .. " CONTROLS"), Enum.NormalId.Front, Color3.fromRGB(236, 245, 255), Color3.fromRGB(62, 69, 82))
+
+	local logX = if includeReset then -1.45 else -0.85
+	local logY = if includeReset then -0.24 else -0.18
+	local referenceBook = makeCompactReferenceBook(
+		controls,
+		name .. "Log",
+		panelCFrame * CFrame.new(logX, logY, -0.22),
+		roomId,
+		title,
+		{
+			Height = if includeReset then 1.66 else 1.5,
+			Text = options.LogText,
+		}
+	)
+
+	local lightSwitch = nil
+	if includeLightSwitch then
+		lightSwitch = makeLightSwitch(
+			controls,
+			name .. "LightSwitch",
+			panelCFrame * CFrame.new(if includeReset then 1.55 else 1.38, if includeReset then 0.48 else -0.16, -0.22),
+			{
+				RoomId = roomId,
+				Label = options.SwitchLabel or "LIGHT",
+				PromptObjectText = options.LightPromptObjectText or (title .. " Light Switch"),
+				HighlightTag = options.HighlightTag,
+				UnlocksGiantDiscovery = options.UnlocksGiantDiscovery,
+				Scale = options.SwitchScale or 0.58,
+			}
+		)
+	end
+
+	local resetRoomButton = nil
+	if includeReset then
+		resetRoomButton = makeCompactResetRoomButton(
+			controls,
+			name .. "ResetRoomButton",
+			panelCFrame * CFrame.new(1.55, -0.78, -0.22),
+			options.ResetPromptObjectText or "Room Reset"
+		)
+	end
+
+	controls.PrimaryPart = panel
+	return {
+		Model = controls,
+		Panel = panel,
+		ReferenceBook = referenceBook,
+		LightSwitch = lightSwitch,
+		ResetRoomButton = resetRoomButton,
+	}
 end
 
 local function makeHallway(roomFolder)
@@ -747,23 +781,28 @@ local function makeHallway(roomFolder)
 	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nTO A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSurfaceText(oceanSign, "IslandApproachReturnText", "THIS WAY\nTO PARADISE", Enum.NormalId.Front, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
-	makeReferenceBook(hallway, "TVRoomReferenceBook", CFrame.new(-3.5, 0, 30), "TVRoom", "TV ROOM")
-	makeReferenceBook(hallway, "SnackLabReferenceBook", CFrame.new(3.5, 0, 38), "SnackLab", "SNACK LAB")
-	makeReferenceBook(hallway, "IslandReferenceBook", CFrame.new(-2.8, 0, 107), "Island", "ISLAND")
-	makeLightSwitch(
+	makeRoomControlPanel(
 		hallway,
-		"TVHallLightSwitch",
+		"TVHallControlPanel",
 		CFrame.new(-5.88, 4.55, 25.2) * CFrame.Angles(0, math.rad(-90), 0),
+		"TVRoom",
+		"TV ROOM",
 		{
-			PromptObjectText = "Hall Light Switch",
+			IncludeReset = false,
+			PanelLabel = "TV ROOM",
+			LightPromptObjectText = "Hall Light Switch",
 		}
 	)
-	makeLightSwitch(
+	makeRoomControlPanel(
 		hallway,
-		"SnackHallLightSwitch",
+		"SnackHallControlPanel",
 		CFrame.new(5.88, 4.55, 39.4) * CFrame.Angles(0, math.rad(90), 0),
+		"SnackLab",
+		"SNACK LAB",
 		{
-			PromptObjectText = "Snack Door Light Switch",
+			IncludeReset = false,
+			PanelLabel = "SNACK LAB",
+			LightPromptObjectText = "Snack Door Light Switch",
 		}
 	)
 	makeLightSwitch(
@@ -774,12 +813,16 @@ local function makeHallway(roomFolder)
 			PromptObjectText = "Mystery Door Light Switch",
 		}
 	)
-	makeLightSwitch(
+	makeRoomControlPanel(
 		hallway,
-		"IslandHallLightSwitch",
-		CFrame.new(4.0, 4.55, 120.38),
+		"IslandHallControlPanel",
+		CFrame.new(3.95, 4.55, 114.2) * CFrame.Angles(0, math.rad(90), 0),
+		"Island",
+		"ISLAND",
 		{
-			PromptObjectText = "Island Door Light Switch",
+			IncludeReset = false,
+			PanelLabel = "ISLAND",
+			LightPromptObjectText = "Island Door Light Switch",
 		}
 	)
 
@@ -860,17 +903,21 @@ local function makeSnackLabShell(roomFolder)
 	local roomSign = createPart(room, "SnackLabSign", Vector3.new(14, 2.6, 0.35), cframeAt(origin, 0, 7.2, -depth / 2 + 0.54), Color3.fromRGB(255, 232, 115), Enum.Material.SmoothPlastic)
 	createSurfaceText(roomSign, "SnackLabSignText", "SNACK LAB", Enum.NormalId.Front, Color3.fromRGB(28, 27, 24), Color3.fromRGB(255, 232, 115))
 
-	local resetRoomButton = makeSnackResetRoomButton(room)
-	local lightSwitch = makeLightSwitch(
+	local snackControls = makeRoomControlPanel(
 		room,
-		"SnackLabLightSwitch",
-		cframeAt(origin, -width / 2 + 0.58, 4.55, 4.6) * CFrame.Angles(0, math.rad(-90), 0),
+		"SnackLabInsideControlPanel",
+		cframeAt(origin, -width / 2 + 0.58, 4.6, 3.7) * CFrame.Angles(0, math.rad(-90), 0),
+		"SnackLab",
+		"SNACK LAB",
 		{
-			RoomId = "SnackLab",
-			PromptObjectText = "Snack Lab Light Switch",
+			IncludeReset = true,
+			PanelLabel = "ROOM CONTROLS",
+			LightPromptObjectText = "Snack Lab Light Switch",
 		}
 	)
-	local referenceBook = makeReferenceBook(room, "SnackLabInsideLog", cframeAt(origin, -14.2, 0, 13.1) * CFrame.Angles(0, math.rad(90), 0), "SnackLab", "SNACK LAB")
+	local resetRoomButton = snackControls.ResetRoomButton
+	local lightSwitch = snackControls.LightSwitch
+	local referenceBook = snackControls.ReferenceBook
 	createSpawnLocation(room, "SnackLabSpawn", "SnackLab", Constants.GetRoomSpawnCFrame("SnackLab"), Color3.fromRGB(91, 188, 124), false)
 
 	return {
@@ -1300,7 +1347,6 @@ end
 local function makeLibraryFurnishings(room)
 	local origin = TV_SECRET_ROOM_ORIGIN
 
-	makeReferenceBook(room, "LibraryReferenceBook", cframeAt(origin, -5.8, 0, 3.9), "Library", "LIBRARY")
 	createNoTouchClock(
 		room,
 		"LibraryClock",
@@ -1467,22 +1513,17 @@ local function makeBowlingAlley(roomFolder)
 	createPart(room, "BowlingCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(24, 25, 34), Enum.Material.Concrete)
 
 	createSpawnLocation(room, "BowlingAlleySpawn", "BowlingAlley", BOWLING_ALLEY_SPAWN_CFRAME, Color3.fromRGB(119, 203, 255), false)
-	makeReferenceBook(room, "BowlingReferenceBook", cframeAt(origin, -16, 0, 42), "BowlingAlley", "BOWLING")
-	makeLightSwitch(
+	local bowlingControls = makeRoomControlPanel(
 		room,
-		"BowlingLightSwitch",
-		CFrame.new(origin + Vector3.new(8.2, 4.45, 48.85), origin + Vector3.new(0, 4.45, 0)),
+		"BowlingInsideControlPanel",
+		CFrame.new(origin + Vector3.new(13.2, 4.6, 48.85), origin + Vector3.new(0, 4.6, 0)),
+		"BowlingAlley",
+		"BOWLING",
 		{
-			RoomId = "BowlingAlley",
-			PromptObjectText = "Bowling Light Switch",
+			IncludeReset = true,
+			PanelLabel = "ROOM CONTROLS",
+			LightPromptObjectText = "Bowling Light Switch",
 		}
-	)
-	makeWallResetRoomButton(
-		room,
-		"BowlingResetRoomButton",
-		CFrame.new(origin + Vector3.new(16.2, 4.45, 48.85), origin + Vector3.new(0, 4.45, 0)),
-		Enum.NormalId.Front,
-		"Room Reset"
 	)
 	createNoTouchClock(
 		room,
@@ -1570,6 +1611,9 @@ local function makeBowlingAlley(roomFolder)
 	return {
 		Model = room,
 		ExitDoor = exitDoor,
+		LightSwitch = bowlingControls.LightSwitch,
+		ResetRoomButton = bowlingControls.ResetRoomButton,
+		ReferenceBook = bowlingControls.ReferenceBook,
 	}
 end
 
@@ -1620,22 +1664,20 @@ local function makeTVSecretRoom(roomFolder)
 	createPrompt(exitDoor, "Exit", "TV Room", 0)
 	tag(exitDoor, Constants.Tags.SecretRoomExit)
 
-	local libraryLightSwitch = makeLightSwitch(
+	local libraryControls = makeRoomControlPanel(
 		room,
-		"LibraryLightSwitch",
-		CFrame.new(origin + Vector3.new(-6.35, 4.45, 7.43), origin + Vector3.new(0, 4.45, 0)),
+		"LibraryInsideControlPanel",
+		CFrame.new(origin + Vector3.new(-5.7, 4.6, 7.43), origin + Vector3.new(0, 4.6, 0)),
+		"Library",
+		"LIBRARY",
 		{
-			RoomId = "Library",
-			PromptObjectText = "Library Light Switch",
+			IncludeReset = true,
+			PanelLabel = "ROOM CONTROLS",
+			LightPromptObjectText = "Library Light Switch",
 		}
 	)
-	local libraryResetRoomButton = makeWallResetRoomButton(
-		room,
-		"LibraryResetRoomButton",
-		CFrame.new(origin + Vector3.new(6.35, 4.45, 7.43), origin + Vector3.new(0, 4.45, 0)),
-		Enum.NormalId.Front,
-		"Room Reset"
-	)
+	local libraryLightSwitch = libraryControls.LightSwitch
+	local libraryResetRoomButton = libraryControls.ResetRoomButton
 
 	makeLibraryFurnishings(room)
 	room.PrimaryPart = keyhole
@@ -1645,6 +1687,7 @@ local function makeTVSecretRoom(roomFolder)
 		ExitDoor = exitDoor,
 		LightSwitch = libraryLightSwitch,
 		ResetRoomButton = libraryResetRoomButton,
+		ReferenceBook = libraryControls.ReferenceBook,
 	}
 end
 
@@ -1785,24 +1828,21 @@ local function makeIslandRoom(roomFolder)
 	createPrompt(exitGate, "Leave", "Hallway", 0)
 	tag(exitGate, Constants.Tags.IslandExit)
 
-	local islandSwitchCFrame = CFrame.new(origin + Vector3.new(-5.7, 4.55, -22.85), origin + Vector3.new(0, 4.55, 4))
-	local lightSwitch = makeLightSwitch(
+	local islandControls = makeRoomControlPanel(
 		room,
-		"IslandLightSwitch",
-		islandSwitchCFrame,
+		"IslandInsideControlPanel",
+		CFrame.new(origin + Vector3.new(-7.35, 4.65, -22.85), origin + Vector3.new(0, 4.65, 4)),
+		"Island",
+		"ISLAND",
 		{
-			RoomId = "Island",
-			PromptObjectText = "Island Light Switch",
+			IncludeReset = true,
+			PanelLabel = "ROOM CONTROLS",
+			LightPromptObjectText = "Island Light Switch",
 		}
 	)
-	local resetRoomButton = makeWallResetRoomButton(
-		room,
-		"IslandResetRoomButton",
-		CFrame.new(origin + Vector3.new(5.7, 4.5, -22.85), origin + Vector3.new(0, 4.5, 4)),
-		Enum.NormalId.Front,
-		"Room Reset"
-	)
-	local referenceBook = makeReferenceBook(room, "IslandInsideLog", cframeAt(origin, -8.6, 0, -18.4) * CFrame.Angles(0, math.rad(24), 0), "Island", "ISLAND")
+	local lightSwitch = islandControls.LightSwitch
+	local resetRoomButton = islandControls.ResetRoomButton
+	local referenceBook = islandControls.ReferenceBook
 
 	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS", -10.5, -7.5, -1, 2, Constants.Tags.IslandSharkSign)
 	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", 12.5, 12.5, 1, 5, Constants.Tags.IslandJellyfishSign)
@@ -1922,8 +1962,22 @@ function RoomBuilder.Build()
 
 	local _, recoveryFloor = makeFloor(roomFolder)
 	local exitDoor = makeShell(roomFolder)
-	local resetRoomButton = makeResetRoomButton(roomFolder)
-	local tvInsideLog = makeReferenceBook(roomFolder, "TVRoomInsideLog", CFrame.new(12.3, 0, Constants.Room.Depth / 2 - 3.1) * CFrame.Angles(0, math.rad(180), 0), "TVRoom", "TV ROOM")
+	local tvControls = makeRoomControlPanel(
+		roomFolder,
+		"TVRoomInsideControlPanel",
+		CFrame.new(-12.15, 4.7, Constants.Room.Depth / 2 - 0.62),
+		"TVRoom",
+		"TV ROOM",
+		{
+			IncludeReset = true,
+			PanelLabel = "ROOM CONTROLS",
+			LightPromptObjectText = "Light Switch",
+			HighlightTag = Constants.Tags.TVLightSwitch,
+			UnlocksGiantDiscovery = true,
+		}
+	)
+	local resetRoomButton = tvControls.ResetRoomButton
+	local tvInsideLog = tvControls.ReferenceBook
 	makeTVRoomClocks(roomFolder)
 	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
@@ -1942,16 +1996,7 @@ function RoomBuilder.Build()
 	)
 
 	local pedestal = makePedestal(objectsFolder)
-	local lightSwitch = makeLightSwitch(
-		objectsFolder,
-		"TVRoomLightSwitch",
-		CFrame.new(-6.15, 4.55, Constants.Room.Depth / 2 - 0.58),
-		{
-			RoomId = "TVRoom",
-			HighlightTag = Constants.Tags.TVLightSwitch,
-			UnlocksGiantDiscovery = true,
-		}
-	)
+	local lightSwitch = tvControls.LightSwitch
 	local couch = makeCouch(objectsFolder)
 	local lamp = makeLamp(objectsFolder)
 	makeTableAndAppliance(objectsFolder)

@@ -23,9 +23,19 @@ function FeedbackService.new(roomProgressService)
 	local self = setmetatable({}, FeedbackService)
 	self.roomProgressService = roomProgressService
 	self.remote = RemoteService.GetRemote(Constants.Remotes.FeedbackRequest)
-	self.feedbackStore = DataStoreService:GetDataStore(Constants.DataStore.FeedbackName or "DontTouchItFeedback_v1")
+	self.feedbackStore = nil
 	self.categoryById = buildCategoryLookup()
 	self.lastSubmitAtByUserId = {}
+
+	local ok, feedbackStore = pcall(function()
+		return DataStoreService:GetDataStore(Constants.DataStore.FeedbackName or "DontTouchItFeedback_v1")
+	end)
+	if ok then
+		self.feedbackStore = feedbackStore
+	else
+		warn(("[DON'T TOUCH IT] Feedback DataStore unavailable: %s"):format(tostring(feedbackStore)))
+	end
+
 	return self
 end
 
@@ -92,6 +102,11 @@ function FeedbackService:_handleFeedback(player, payload)
 		JobId = game.JobId,
 		SubmittedAtUnix = now,
 	}
+
+	if not self.feedbackStore then
+		self:_sendResult(player, false, "Feedback saving is unavailable in this Studio session.")
+		return
+	end
 
 	local ok, err = pcall(function()
 		self.feedbackStore:SetAsync(key, record)
