@@ -496,10 +496,23 @@ local function makeUnderfloorChamber(roomFolder, recoveryFloor)
 	createPart(chamber, "UnderfloorFrontWall", Vector3.new(width, 8, 1), CFrame.new(0, y + 4, depth / 2), wallColor, Enum.Material.Concrete)
 	createPart(chamber, "UnderfloorLeftWall", Vector3.new(1, 8, depth), CFrame.new(-width / 2, y + 4, 0), wallColor, Enum.Material.Concrete)
 	createPart(chamber, "UnderfloorRightWall", Vector3.new(1, 8, depth), CFrame.new(width / 2, y + 4, 0), wallColor, Enum.Material.Concrete)
-	createPart(chamber, "UnderfloorCeiling", Vector3.new(width, 0.45, depth), CFrame.new(0, y + 8.2, 0), Color3.fromRGB(40, 47, 58), Enum.Material.Concrete)
+	local subLevelOneFloor = createPart(chamber, "SubLevel1Floor", Vector3.new(width, 0.45, depth), CFrame.new(0, y + 8.2, 0), Color3.fromRGB(40, 47, 58), Enum.Material.Concrete)
+	createSurfaceText(subLevelOneFloor, "SubLevel1FloorText", "SUB LEVEL 1", Enum.NormalId.Top, Color3.fromRGB(106, 255, 196), Color3.fromRGB(40, 47, 58))
+
+	local subLevelOneSign = createPart(chamber, "SubLevel1Sign", Vector3.new(13.5, 2.1, 0.3), CFrame.new(0, y + 12, depth / 2 - 2.2), Color3.fromRGB(106, 255, 196), Enum.Material.Neon)
+	createSurfaceText(subLevelOneSign, "SubLevel1SignText", "SUB LEVEL 1\nRAIN SORTING DECK", Enum.NormalId.Front, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
+
+	local subLevelOnePad = createPart(chamber, "SubLevel1ReturnPad", Vector3.new(6.5, 0.35, 6.5), CFrame.new(-16.5, y + 8.65, 12.5), Color3.fromRGB(61, 217, 132), Enum.Material.Neon)
+	subLevelOnePad.Transparency = 0.12
+	subLevelOnePad:SetAttribute("BaseTransparency", subLevelOnePad.Transparency)
+	subLevelOnePad:SetAttribute("DestinationCFrame", CFrame.new(0, 5, 10))
+	createSurfaceText(subLevelOnePad, "SubLevel1PadText", "UP\nTO TV", Enum.NormalId.Top, Color3.fromRGB(12, 26, 24), Color3.fromRGB(61, 217, 132))
+	createPrompt(subLevelOnePad, "Return", "Sub Level 1 Elevator Pad", 0)
+	tag(subLevelOnePad, Constants.Tags.UnderfloorReturn)
 
 	local sign = createPart(chamber, "UnderfloorSign", Vector3.new(12, 2.2, 0.3), CFrame.new(0, y + 4.7, -depth / 2 + 0.55), Color3.fromRGB(106, 255, 196), Enum.Material.Neon)
-	createSurfaceText(sign, "UnderfloorSignText", "FLOOR LOST & FOUND", Enum.NormalId.Front, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
+	createSurfaceText(sign, "UnderfloorSignText", "SUB LEVEL 2\nFLOOR LOST & FOUND", Enum.NormalId.Front, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
+	createSurfaceText(sign, "UnderfloorSignBackText", "SUB LEVEL 2\nFLOOR LOST & FOUND", Enum.NormalId.Back, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
 
 	local pad = createPart(chamber, "UnderfloorReturnPad", Vector3.new(6.5, 0.35, 6.5), CFrame.new(0, y + 0.72, 5.5), Color3.fromRGB(61, 217, 132), Enum.Material.Neon)
 	pad.Transparency = 0.12
@@ -521,6 +534,14 @@ local function makeUnderfloorChamber(roomFolder, recoveryFloor)
 	light.Range = 18
 	light.Parent = pad
 	mark(light)
+
+	local subLevelOneLight = Instance.new("PointLight")
+	subLevelOneLight.Name = "SubLevel1ReturnLight"
+	subLevelOneLight.Brightness = 1.9
+	subLevelOneLight.Color = Color3.fromRGB(116, 255, 205)
+	subLevelOneLight.Range = 16
+	subLevelOneLight.Parent = subLevelOnePad
+	mark(subLevelOneLight)
 
 	local safetyFloor = createPart(chamber, "UnderfloorSafetyNet", Vector3.new(width + 10, 1, depth + 10), CFrame.new(0, y - 14, 0), Color3.fromRGB(61, 217, 132), Enum.Material.Neon)
 	safetyFloor.Transparency = 0.6

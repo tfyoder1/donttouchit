@@ -11,6 +11,10 @@ local COLORS = {
 	Color3.fromRGB(218, 108, 255),
 }
 
+local SUB_LEVEL_ONE_Y = Constants.Room.RecoveryY + 9.15
+local SUB_LEVEL_ONE_EDGE_X = (Constants.Room.Width + 14) / 2 - 3
+local SUB_LEVEL_ONE_EDGE_Z = (Constants.Room.Depth + 14) / 2 - 3
+
 local function getRootPart(player)
 	local character = player.Character
 	if not character then
@@ -81,6 +85,166 @@ local function createMovePrompt(blob, context, random)
 			random:NextNumber(-12, 12)
 		)
 	end)
+end
+
+local function clampToSubLevel(position)
+	return Vector3.new(
+		math.clamp(position.X, -SUB_LEVEL_ONE_EDGE_X, SUB_LEVEL_ONE_EDGE_X),
+		SUB_LEVEL_ONE_Y,
+		math.clamp(position.Z, -SUB_LEVEL_ONE_EDGE_Z, SUB_LEVEL_ONE_EDGE_Z)
+	)
+end
+
+local function nearestEdgeDirection(position)
+	local candidates = {
+		{ Distance = SUB_LEVEL_ONE_EDGE_X - position.X, Direction = Vector3.new(1, 0, 0) },
+		{ Distance = position.X + SUB_LEVEL_ONE_EDGE_X, Direction = Vector3.new(-1, 0, 0) },
+		{ Distance = SUB_LEVEL_ONE_EDGE_Z - position.Z, Direction = Vector3.new(0, 0, 1) },
+		{ Distance = position.Z + SUB_LEVEL_ONE_EDGE_Z, Direction = Vector3.new(0, 0, -1) },
+	}
+
+	table.sort(candidates, function(left, right)
+		return left.Distance < right.Distance
+	end)
+
+	return candidates[1].Direction
+end
+
+local function getSweepDirection(body, player)
+	local rootPart = player and getRootPart(player)
+	if rootPart then
+		local away = body.Position - rootPart.Position
+		local horizontal = Vector3.new(away.X, 0, away.Z)
+		if horizontal.Magnitude > 0.25 then
+			return horizontal.Unit
+		end
+	end
+
+	return nearestEdgeDirection(body.Position)
+end
+
+local function shoveNearbyRain(origin, direction, radius, random)
+	for _, part in ipairs(CollectionService:GetTagged(Constants.Tags.ObjectRainObject)) do
+		if part:IsA("BasePart") and part.Parent then
+			local delta = part.Position - origin
+			local horizontalDelta = Vector3.new(delta.X, 0, delta.Z)
+			if horizontalDelta.Magnitude <= radius and part.Position.Y <= Constants.Room.FloorY - 4 then
+				local projected = part.Position + direction * 8
+				local dropVelocity = if math.abs(projected.X) >= SUB_LEVEL_ONE_EDGE_X - 2 or math.abs(projected.Z) >= SUB_LEVEL_ONE_EDGE_Z - 2 then -24 else -5
+				part.AssemblyLinearVelocity = direction * 54 + Vector3.new(0, dropVelocity, 0)
+				part.AssemblyAngularVelocity = Vector3.new(
+					random:NextNumber(-13, 13),
+					random:NextNumber(-16, 16),
+					random:NextNumber(-13, 13)
+				)
+			end
+		end
+	end
+end
+
+local function createToyPart(parent, name, size, cframe, color, material, shape)
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Anchored = true
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.CanCollide = false
+	part.Size = size
+	part.CFrame = cframe
+	part.Color = color
+	part.Material = material or Enum.Material.SmoothPlastic
+	if shape then
+		part.Shape = shape
+	end
+	part.Parent = parent
+	return part
+end
+
+local function createSubLevelSweeper(folder, context, random)
+	local model = Instance.new("Model")
+	model.Name = "SubLevel1SweepToy"
+	model.Parent = folder
+	CollectionService:AddTag(model, Constants.Tags.TemporaryObject)
+
+	local startCFrame = CFrame.lookAt(Vector3.new(-21, SUB_LEVEL_ONE_Y, 17), Vector3.new(-15, SUB_LEVEL_ONE_Y, 17))
+	local body = createToyPart(model, "SweepToyBody", Vector3.new(3.35, 0.72, 3.35), startCFrame, Color3.fromRGB(54, 64, 73), Enum.Material.Metal, Enum.PartType.Cylinder)
+	body.CanCollide = false
+	local top = createToyPart(model, "SweepToyTop", Vector3.new(2.1, 0.38, 2.1), startCFrame * CFrame.new(0, 0.48, 0), Color3.fromRGB(84, 154, 255), Enum.Material.Neon, Enum.PartType.Cylinder)
+	local bumper = createToyPart(model, "SweepToyBumper", Vector3.new(3.7, 0.32, 0.42), startCFrame * CFrame.new(0, -0.06, -1.62), Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
+	local antenna = createToyPart(model, "SweepToyAntenna", Vector3.new(0.16, 1.25, 0.16), startCFrame * CFrame.new(0.55, 1.05, 0.15), Color3.fromRGB(220, 232, 240), Enum.Material.Metal, Enum.PartType.Cylinder)
+	local antennaTip = createToyPart(model, "SweepToyAntennaTip", Vector3.new(0.42, 0.42, 0.42), startCFrame * CFrame.new(0.55, 1.72, 0.15), Color3.fromRGB(255, 84, 84), Enum.Material.Neon, Enum.PartType.Ball)
+	model.PrimaryPart = body
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "SweepToyPrompt"
+	prompt.ActionText = "Sweep"
+	prompt.ObjectText = "Sub Level 1 Sweep Toy"
+	prompt.HoldDuration = 0.05
+	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
+	prompt.MaxActivationDistance = 12
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
+	prompt.Parent = body
+
+	local sweeping = false
+	local lastBroadcastAt = 0
+
+	local function sweep(player, direction)
+		if sweeping or not model.Parent or not body.Parent then
+			return
+		end
+
+		sweeping = true
+		direction = direction or nearestEdgeDirection(body.Position)
+
+		if player and context.RecordInteraction then
+			context.RecordInteraction(player)
+		end
+
+		if player and context.BroadcastMessage and os.clock() - lastBroadcastAt > 4 then
+			lastBroadcastAt = os.clock()
+			context.BroadcastMessage("Sub Level 1 sweep toy has entered appliance-with-a-purpose mode.")
+		end
+
+		for step = 1, 4 do
+			if not model.Parent or not body.Parent then
+				break
+			end
+
+			local nextPosition = clampToSubLevel(body.Position + direction * 3.6)
+			model:PivotTo(CFrame.lookAt(nextPosition, nextPosition + direction) * CFrame.Angles(0, math.rad(step * 16), 0))
+			shoveNearbyRain(body.Position, direction, 13.5, random)
+			task.wait(0.18)
+		end
+
+		sweeping = false
+	end
+
+	prompt.Triggered:Connect(function(player)
+		sweep(player, getSweepDirection(body, player))
+	end)
+
+	task.spawn(function()
+		local directions = {
+			Vector3.new(1, 0, 0),
+			Vector3.new(0, 0, -1),
+			Vector3.new(-1, 0, 0),
+			Vector3.new(0, 0, 1),
+		}
+		local index = 1
+
+		task.wait(1.6)
+		while folder.Parent and model.Parent do
+			sweep(nil, directions[index])
+			index = (index % #directions) + 1
+			task.wait(3.2)
+		end
+	end)
+
+	if context.BroadcastMessage then
+		context.BroadcastMessage("Sub Level 1 deployed a sweep toy in the corner. It looks helpfully underqualified.")
+	end
 end
 
 local function startBasementWatcher(folder, context)
@@ -173,6 +337,7 @@ return {
 			end
 		end
 
+		createSubLevelSweeper(folder, context, random)
 		startBasementWatcher(folder, context)
 		context.DiscoveryService:UnlockForAll(Constants.Discoveries.ObjectRain.Id)
 		task.wait(1)
