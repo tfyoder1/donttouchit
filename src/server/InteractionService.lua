@@ -100,6 +100,34 @@ local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(93, 217, 255),
 }
 
+local BOWLING_ADS = {
+	{
+		Text = "BLOXY COLA\nOPEN ONE IN THE SNACK LAB",
+		Background = Color3.fromRGB(218, 40, 47),
+		TextColor = Color3.fromRGB(255, 246, 220),
+	},
+	{
+		Text = "BLOXY ZIPLINE\nTREES TODAY, ISLAND TOMORROW",
+		Background = Color3.fromRGB(47, 146, 101),
+		TextColor = Color3.fromRGB(230, 255, 224),
+	},
+	{
+		Text = "BLOXY ISLAND\nSUN, SAND, AND BAD IDEAS",
+		Background = Color3.fromRGB(255, 205, 89),
+		TextColor = Color3.fromRGB(45, 61, 83),
+	},
+	{
+		Text = "BLOXY BOWLING\nTHREE LANES, MANY EXCUSES",
+		Background = Color3.fromRGB(93, 217, 255),
+		TextColor = Color3.fromRGB(18, 24, 36),
+	},
+	{
+		Text = "BLOXY SHOES\nRENTAL CONFIDENCE INCLUDED",
+		Background = Color3.fromRGB(150, 112, 255),
+		TextColor = Color3.fromRGB(255, 246, 220),
+	},
+}
+
 local SNACK_SOUND_PROFILES = {
 	CRONCH = {
 		Message = "CRONCH performs a literal structural crunch.",
@@ -392,8 +420,14 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.libraryLoftDoorState = {}
 	self.libraryBookcaseState = {}
 	self.bowlingLaneState = {}
+	self.bowlingLaneCounts = {
+		[1] = 0,
+		[2] = 0,
+		[3] = 0,
+	}
 	self.bowlingCosmicActive = false
 	self.bowlingCosmicToken = nil
+	self.bowlingAdToken = nil
 	self.treetopZiplineStateByUserId = {}
 	return self
 end
@@ -645,12 +679,15 @@ function InteractionService:Initialize()
 	end)
 
 	self:_connectTagged(Constants.Tags.BowlingBallReturn, function(instance)
-		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingBallReturn.Id, "The ball return hums like it knows where the missing balls went.")
+		self:_wireBowlingBallReturn(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.TreetopZipline, function(instance)
 		self:_wireTreetopZipline(instance)
 	end)
+
+	self:_updateBowlingScoreboards()
+	self:_startBowlingAdRotation()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
@@ -1398,6 +1435,83 @@ function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 	return ball
 end
 
+function InteractionService:_clearBowlingBalls(laneIndex)
+	for _, temporaryObject in ipairs(CollectionService:GetTagged(Constants.Tags.TemporaryObject)) do
+		if temporaryObject
+			and temporaryObject.Parent
+			and temporaryObject.Name == "BowlingBall"
+			and (not laneIndex or temporaryObject:GetAttribute("LaneIndex") == laneIndex)
+		then
+			temporaryObject:Destroy()
+		end
+	end
+end
+
+function InteractionService:_formatBowlingScoreboardText()
+	return ("LANE 1: %02d     LANE 2: %02d     LANE 3: %02d\nROLL COUNTER: TOUCHES WE CAN MEASURE"):format(
+		self.bowlingLaneCounts[1] or 0,
+		self.bowlingLaneCounts[2] or 0,
+		self.bowlingLaneCounts[3] or 0
+	)
+end
+
+function InteractionService:_updateBowlingScoreboards()
+	for _, scoreboard in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingScoreboard)) do
+		local label = scoreboard:FindFirstChild("ScoreboardText", true)
+		if label and label:IsA("TextLabel") then
+			label.Text = self:_formatBowlingScoreboardText()
+		end
+	end
+end
+
+function InteractionService:_incrementBowlingLaneCount(laneIndex)
+	if typeof(laneIndex) ~= "number" then
+		return
+	end
+
+	if laneIndex < 1 or laneIndex > 3 then
+		return
+	end
+
+	self.bowlingLaneCounts[laneIndex] = (self.bowlingLaneCounts[laneIndex] or 0) + 1
+	self:_updateBowlingScoreboards()
+end
+
+function InteractionService:_updateBowlingAds(step)
+	for _, instance in ipairs(workspace:GetDescendants()) do
+		if instance:IsA("BasePart") and instance:GetAttribute("BowlingAdScreen") then
+			local adOffset = instance:GetAttribute("BowlingAdOffset") or 1
+			local ad = BOWLING_ADS[((step + adOffset - 2) % #BOWLING_ADS) + 1]
+			local label = instance:FindFirstChild("BowlingAdText", true)
+			if label and label:IsA("TextLabel") then
+				label.Text = ad.Text
+				label.TextColor3 = ad.TextColor
+				label.BackgroundColor3 = ad.Background
+			end
+
+			instance.Color = ad.Background
+			local light = instance:FindFirstChild("BowlingAdLight", true)
+			if light and light:IsA("SurfaceLight") then
+				light.Color = ad.Background
+			end
+		end
+	end
+end
+
+function InteractionService:_startBowlingAdRotation()
+	local token = {}
+	self.bowlingAdToken = token
+
+	task.spawn(function()
+		local step = 0
+		while self.bowlingAdToken == token do
+			self:_updateBowlingAds(step)
+			step += 1
+			task.wait(4)
+		end
+	end)
+end
+
 function InteractionService:_countKnockedBowlingPins(laneIndex)
 	local knocked = 0
 
@@ -1450,6 +1564,7 @@ function InteractionService:_wireBowlingLaneButton(button)
 		end
 
 		self:_spawnBowlingBall(button, laneIndex, laneX, player)
+		self:_incrementBowlingLaneCount(laneIndex)
 		self.systemMessageRemote:FireClient(player, ("Lane %d accepts your bowling-related decision."):format(laneIndex))
 
 		task.delay(2.8, function()
@@ -1701,15 +1816,7 @@ function InteractionService:_setBowlingLanePinsAnchored(laneIndex, anchored)
 end
 
 function InteractionService:_resetBowlingPins(laneIndex)
-	for _, temporaryObject in ipairs(CollectionService:GetTagged(Constants.Tags.TemporaryObject)) do
-		if temporaryObject
-			and temporaryObject.Parent
-			and temporaryObject.Name == "BowlingBall"
-			and (not laneIndex or temporaryObject:GetAttribute("LaneIndex") == laneIndex)
-		then
-			temporaryObject:Destroy()
-		end
-	end
+	self:_clearBowlingBalls(laneIndex)
 
 	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
 		if pin:IsA("BasePart") and pin.Parent and (not laneIndex or pin:GetAttribute("LaneIndex") == laneIndex) then
@@ -1744,6 +1851,26 @@ function InteractionService:_wireBowlingResetLever(lever)
 			self.systemMessageRemote:FireClient(player, ("Lane %d pinsetter resets the pins with suspicious accuracy."):format(laneIndex))
 		else
 			self.systemMessageRemote:FireClient(player, "The pinsetter resets the pins and quietly refuses overtime.")
+		end
+	end)
+end
+
+function InteractionService:_wireBowlingBallReturn(ballReturn)
+	local prompt = getPrompt(ballReturn)
+	local laneIndex = ballReturn:GetAttribute("LaneIndex")
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingBallReturn.Id)
+		self:_clearBowlingBalls(laneIndex)
+		playSound(ballReturn, "rbxasset://sounds/button.wav", 0.45, 0.72)
+		task.delay(0.1, function()
+			playSound(ballReturn, "rbxasset://sounds/electronicpingshort.wav", 0.35, 1.45)
+		end)
+
+		if laneIndex then
+			self.systemMessageRemote:FireClient(player, ("Lane %d ball return politely removes the evidence."):format(laneIndex))
+		else
+			self.systemMessageRemote:FireClient(player, "The ball return hums like it knows where the missing balls went.")
 		end
 	end)
 end
@@ -1876,6 +2003,10 @@ function InteractionService:_afterRoomReset()
 	for _, state in pairs(self.bowlingLaneState) do
 		state.Reacting = false
 	end
+	for laneIndex = 1, 3 do
+		self.bowlingLaneCounts[laneIndex] = 0
+	end
+	self:_updateBowlingScoreboards()
 	self:_resetBowlingPins()
 
 	for fridge, state in pairs(self.fridgeState) do
@@ -3046,6 +3177,7 @@ function InteractionService:_wireSnackButton(button)
 end
 
 function InteractionService:_setFridgeOpenDetails(fridge, opened)
+	local interiorDetails = fridge:FindFirstChild("FridgeInteriorDetails", true)
 	local iceCube = fridge:FindFirstChild("ColdIdeaIceCube", true)
 	local pizzaModel = fridge:FindFirstChild("FridgePizza", true)
 	local colaModel = fridge:FindFirstChild("FridgeBloxyCola", true)
@@ -3053,6 +3185,7 @@ function InteractionService:_setFridgeOpenDetails(fridge, opened)
 	local cola = fridge:FindFirstChild("BloxyColaCan", true)
 	local secretButton = fridge:FindFirstChild("SecretFridgeButton", true)
 
+	setFridgeContentVisible(interiorDetails, opened)
 	setFridgeContentVisible(iceCube, opened)
 	setFridgeContentVisible(pizzaModel, opened)
 	setFridgeContentVisible(colaModel, opened)

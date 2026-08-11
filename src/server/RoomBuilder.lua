@@ -1164,10 +1164,63 @@ local function makeSnackFridge(objectsFolder)
 	local origin = SNACK_LAB_ORIGIN
 	local fridge = makeModel(objectsFolder, "Fridge")
 
-	local body = createPart(fridge, "FridgeBody", Vector3.new(6, 9, 4), cframeAt(origin, -13, 4.9, -9), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
-	createPart(fridge, "FridgeInterior", Vector3.new(5.2, 7.3, 0.24), cframeAt(origin, -13, 4.9, -7.18), Color3.fromRGB(55, 78, 92), Enum.Material.SmoothPlastic)
-	createPart(fridge, "FridgeShelfTop", Vector3.new(5.1, 0.18, 2.7), cframeAt(origin, -13, 6.2, -8.55), Color3.fromRGB(185, 244, 255), Enum.Material.Glass)
-	createPart(fridge, "FridgeShelfBottom", Vector3.new(5.1, 0.18, 2.7), cframeAt(origin, -13, 3.9, -8.55), Color3.fromRGB(185, 244, 255), Enum.Material.Glass)
+	local body = createPart(fridge, "FridgeBody", Vector3.new(6.4, 9.2, 0.34), cframeAt(origin, -13, 4.9, -10.92), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
+	createPart(fridge, "FridgeLeftWall", Vector3.new(0.36, 9.2, 4), cframeAt(origin, -16.02, 4.9, -8.95), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
+	createPart(fridge, "FridgeRightWall", Vector3.new(0.36, 9.2, 4), cframeAt(origin, -9.98, 4.9, -8.95), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
+	createPart(fridge, "FridgeTopCap", Vector3.new(6.4, 0.36, 4), cframeAt(origin, -13, 9.32, -8.95), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
+	createPart(fridge, "FridgeBottomCap", Vector3.new(6.4, 0.36, 4), cframeAt(origin, -13, 0.48, -8.95), Color3.fromRGB(190, 205, 208), Enum.Material.Metal)
+
+	local interior = makeModel(fridge, "FridgeInteriorDetails")
+	createPart(interior, "FridgeInteriorBack", Vector3.new(5.45, 7.65, 0.22), cframeAt(origin, -13, 4.9, -10.62), Color3.fromRGB(55, 78, 92), Enum.Material.SmoothPlastic)
+	createPart(interior, "FridgeInteriorLeft", Vector3.new(0.18, 7.65, 3.2), cframeAt(origin, -15.68, 4.9, -8.95), Color3.fromRGB(72, 95, 108), Enum.Material.SmoothPlastic)
+	createPart(interior, "FridgeInteriorRight", Vector3.new(0.18, 7.65, 3.2), cframeAt(origin, -10.32, 4.9, -8.95), Color3.fromRGB(72, 95, 108), Enum.Material.SmoothPlastic)
+	createPart(interior, "FridgeShelfTop", Vector3.new(5.1, 0.18, 2.85), cframeAt(origin, -13, 6.32, -8.95), Color3.fromRGB(185, 244, 255), Enum.Material.Glass).Transparency = 0.34
+	createPart(interior, "FridgeShelfBottom", Vector3.new(5.1, 0.18, 2.85), cframeAt(origin, -13, 4.1, -8.95), Color3.fromRGB(185, 244, 255), Enum.Material.Glass).Transparency = 0.34
+	createPart(interior, "FridgeShelfTopLip", Vector3.new(5.15, 0.24, 0.12), cframeAt(origin, -13, 6.45, -7.48), Color3.fromRGB(212, 250, 255), Enum.Material.Glass).Transparency = 0.22
+	createPart(interior, "FridgeShelfBottomLip", Vector3.new(5.15, 0.24, 0.12), cframeAt(origin, -13, 4.23, -7.48), Color3.fromRGB(212, 250, 255), Enum.Material.Glass).Transparency = 0.22
+	local crisper = createPart(interior, "FridgeCrisperDrawer", Vector3.new(4.85, 1.25, 2.65), cframeAt(origin, -13, 2.25, -8.95), Color3.fromRGB(185, 244, 255), Enum.Material.Glass)
+	crisper.Transparency = 0.55
+	local crisperFront = createPart(interior, "FridgeCrisperFront", Vector3.new(4.85, 1.12, 0.12), cframeAt(origin, -13, 2.25, -7.48), Color3.fromRGB(202, 250, 255), Enum.Material.Glass)
+	crisperFront.Transparency = 0.32
+	createSurfaceText(crisperFront, "CrisperText", "IDEAS\nCRISPER", Enum.NormalId.Front, Color3.fromRGB(36, 84, 92), Color3.fromRGB(202, 250, 255))
+	local lightPanel = createPart(interior, "FridgeLightPanel", Vector3.new(1.4, 0.22, 0.18), cframeAt(origin, -13, 8.45, -7.55), Color3.fromRGB(255, 249, 196), Enum.Material.Neon)
+	local fridgeLight = Instance.new("PointLight")
+	fridgeLight.Name = "FridgeInteriorLight"
+	fridgeLight.Brightness = 2.5
+	fridgeLight.Color = Color3.fromRGB(210, 248, 255)
+	fridgeLight.Range = 10
+	fridgeLight.Parent = lightPanel
+	mark(fridgeLight)
+
+	local milk = createPart(interior, "FridgeMilkCarton", Vector3.new(0.95, 1.8, 0.9), cframeAt(origin, -14.45, 5.15, -9.05), Color3.fromRGB(245, 248, 250), Enum.Material.SmoothPlastic)
+	createSurfaceText(milk, "MilkText", "MILK?", Enum.NormalId.Front, Color3.fromRGB(72, 118, 205), Color3.fromRGB(245, 248, 250))
+	createPart(interior, "FridgeMilkCap", Vector3.new(0.34, 0.2, 0.34), cframeAt(origin, -14.1, 6.15, -8.72), Color3.fromRGB(72, 118, 205), Enum.Material.SmoothPlastic).Shape = Enum.PartType.Cylinder
+
+	local eggTray = createPart(interior, "FridgeEggTray", Vector3.new(2.1, 0.18, 0.75), cframeAt(origin, -11.85, 6.58, -8.65), Color3.fromRGB(235, 226, 202), Enum.Material.SmoothPlastic)
+	for eggIndex = 1, 6 do
+		local egg = createPart(
+			interior,
+			"FridgeEgg" .. eggIndex,
+			Vector3.new(0.32, 0.42, 0.32),
+			eggTray.CFrame * CFrame.new(-0.85 + ((eggIndex - 1) % 3) * 0.58, 0.24, -0.18 + math.floor((eggIndex - 1) / 3) * 0.38),
+			Color3.fromRGB(250, 245, 228),
+			Enum.Material.SmoothPlastic
+		)
+		egg.Shape = Enum.PartType.Ball
+	end
+
+	for bottleIndex, bottleData in ipairs({
+		{ X = -10.95, Y = 5.08, Z = -9.4, Color = Color3.fromRGB(255, 219, 86), Label = "MUSTARD" },
+		{ X = -10.95, Y = 5.08, Z = -8.45, Color = Color3.fromRGB(221, 45, 58), Label = "KETCHUP" },
+	}) do
+		local bottle = createPart(interior, "FridgeBottle" .. bottleIndex, Vector3.new(0.5, 1.25, 0.5), cframeAt(origin, bottleData.X, bottleData.Y, bottleData.Z), bottleData.Color, Enum.Material.SmoothPlastic)
+		bottle.Shape = Enum.PartType.Cylinder
+		createPart(interior, "FridgeBottleCap" .. bottleIndex, Vector3.new(0.34, 0.18, 0.34), cframeAt(origin, bottleData.X, bottleData.Y + 0.7, bottleData.Z), Color3.fromRGB(245, 245, 242), Enum.Material.SmoothPlastic).Shape = Enum.PartType.Cylinder
+		local label = createPart(interior, "FridgeBottleLabel" .. bottleIndex, Vector3.new(0.55, 0.42, 0.08), cframeAt(origin, bottleData.X, bottleData.Y, bottleData.Z + 0.28), Color3.fromRGB(255, 255, 245), Enum.Material.SmoothPlastic)
+		createSurfaceText(label, "BottleLabelText", bottleData.Label, Enum.NormalId.Front, bottleData.Color, Color3.fromRGB(255, 255, 245))
+	end
+	hideFridgeContentAtBaseline(interior)
+
 	local iceCube = createPart(fridge, "ColdIdeaIceCube", Vector3.new(1.4, 1.4, 1.4), cframeAt(origin, -13, 5.05, -7.55), Color3.fromRGB(134, 238, 255), Enum.Material.Ice)
 	iceCube.Transparency = 0.22
 	iceCube:SetAttribute("BaseTransparency", iceCube.Transparency)
@@ -1755,6 +1808,28 @@ local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 	end
 end
 
+local function makeBowlingAdTv(parent, name, cframe, adOffset)
+	local tv = makeModel(parent, name)
+	local frame = createPart(tv, name .. "Frame", Vector3.new(8.6, 4.3, 0.42), cframe, Color3.fromRGB(12, 14, 19), Enum.Material.Metal)
+	local screen = createPart(tv, name .. "Screen", Vector3.new(7.8, 3.45, 0.18), cframe * CFrame.new(0, 0, -0.26), Color3.fromRGB(20, 28, 42), Enum.Material.Neon)
+	screen:SetAttribute("BowlingAdScreen", true)
+	screen:SetAttribute("BowlingAdOffset", adOffset)
+	local label = createSurfaceText(screen, "BowlingAdText", "BLOXY\nBOWLING", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(20, 28, 42))
+	label.Font = Enum.Font.GothamBlack
+
+	local glow = Instance.new("SurfaceLight")
+	glow.Name = "BowlingAdLight"
+	glow.Face = Enum.NormalId.Front
+	glow.Brightness = 1.25
+	glow.Range = 14
+	glow.Color = Color3.fromRGB(119, 255, 203)
+	glow.Parent = screen
+	mark(glow)
+
+	tv.PrimaryPart = frame
+	return tv
+end
+
 local function makeTreetopZiplineArea(room, bowlingOrigin)
 	local treetop = makeModel(room, "TreetopZiplineArea")
 	local platformCenter = Vector3.new(-14, 26.15, -224)
@@ -1911,9 +1986,18 @@ local function makeBowlingAlley(roomFolder)
 		Color3.fromRGB(18, 24, 36),
 		Enum.Material.Neon
 	)
-	createSurfaceText(scoreboard, "ScoreboardText", "LANE 1      LANE 2      LANE 3\nYOU: ?      ROOM: WINNING", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 24, 36))
+	createSurfaceText(scoreboard, "ScoreboardText", "LANE 1: 00     LANE 2: 00     LANE 3: 00\nROLL COUNTER: AVOIDING TOUCHES POORLY", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 24, 36))
 	createPrompt(scoreboard, "Read", "Scoreboard", 0)
 	tag(scoreboard, Constants.Tags.BowlingScoreboard)
+
+	for adIndex, laneX in ipairs({ -12, 0, 12 }) do
+		makeBowlingAdTv(
+			room,
+			"BowlingAdTV" .. adIndex,
+			CFrame.new(origin + Vector3.new(laneX, 12.8, 24), origin + Vector3.new(laneX, 8.2, 48)),
+			adIndex
+		)
+	end
 
 	local disco = createPart(room, "BowlingDiscoBall", Vector3.new(2.3, 2.3, 2.3), cframeAt(origin, 0, 13.8, 4), Color3.fromRGB(192, 222, 255), Enum.Material.Glass)
 	disco.Shape = Enum.PartType.Ball
