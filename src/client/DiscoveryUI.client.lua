@@ -17,6 +17,8 @@ local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
+local SYSTEM_MESSAGE_MIN_DURATION = 5.5
+local SYSTEM_MESSAGE_MAX_DURATION = 9
 local playerGui = player:WaitForChild("PlayerGui")
 
 local gui = Instance.new("ScreenGui")
@@ -148,16 +150,17 @@ message.BackgroundTransparency = 1
 message.BorderSizePixel = 0
 message.Font = Enum.Font.GothamSemibold
 message.Position = UDim2.new(0.5, 0, 1, -118)
-message.Size = UDim2.new(0.88, 0, 0, 44)
+message.Size = UDim2.new(0.88, 0, 0, 72)
 message.Text = ""
 message.TextColor3 = Color3.fromRGB(255, 255, 255)
 message.TextScaled = true
+message.TextWrapped = true
 message.TextTransparency = 1
 message.Parent = gui
 
 local messageSizeConstraint = Instance.new("UISizeConstraint")
-messageSizeConstraint.MaxSize = Vector2.new(520, 44)
-messageSizeConstraint.MinSize = Vector2.new(260, 36)
+messageSizeConstraint.MaxSize = Vector2.new(620, 72)
+messageSizeConstraint.MinSize = Vector2.new(280, 44)
 messageSizeConstraint.Parent = message
 
 local messageCorner = Instance.new("UICorner")
@@ -713,7 +716,8 @@ local function showSystemMessage(text)
 	message.BackgroundTransparency = 0.18
 	message.TextTransparency = 0
 
-	task.delay(2.8, function()
+	local duration = math.clamp(4.5 + #text / 35, SYSTEM_MESSAGE_MIN_DURATION, SYSTEM_MESSAGE_MAX_DURATION)
+	task.delay(duration, function()
 		if messageSequence ~= currentSequence then
 			return
 		end

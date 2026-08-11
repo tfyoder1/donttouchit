@@ -25,6 +25,21 @@ local function getCharacterParts()
 	return character:FindFirstChild("HumanoidRootPart"), character:FindFirstChildOfClass("Humanoid")
 end
 
+local function isAnyGamepadButtonDown(keyCode)
+	local gamepads = UserInputService:GetConnectedGamepads()
+	if #gamepads == 0 and UserInputService.GamepadEnabled then
+		gamepads = { Enum.UserInputType.Gamepad1 }
+	end
+
+	for _, gamepad in ipairs(gamepads) do
+		if UserInputService:IsGamepadButtonDown(gamepad, keyCode) then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function stopFlight()
 	if not activeFlight then
 		return
@@ -95,12 +110,16 @@ local function startFlight(duration, ceilingY)
 		end
 
 		local vertical = SNACK_FLIGHT_IDLE_VERTICAL
-		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space)
+			or isAnyGamepadButtonDown(Enum.KeyCode.ButtonA)
+		then
 			vertical = SNACK_FLIGHT_UP_VERTICAL
 		elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
 			or UserInputService:IsKeyDown(Enum.KeyCode.C)
+			or isAnyGamepadButtonDown(Enum.KeyCode.ButtonB)
+			or isAnyGamepadButtonDown(Enum.KeyCode.ButtonX)
 		then
 			vertical = SNACK_FLIGHT_DOWN_VERTICAL
 		end

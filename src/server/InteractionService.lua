@@ -2896,7 +2896,7 @@ function InteractionService:_triggerSnackFlight(triggeringPlayer)
 		})
 	end
 
-	self.systemMessageRemote:FireAllClients("Snack Lab flight mode is live. Space goes up, Shift or Ctrl comes down.")
+	self.systemMessageRemote:FireAllClients("Snack Lab flight mode is live. Keyboard: Space climbs, Shift/Ctrl descends. Xbox: A climbs, B or X descends; left stick steers.")
 end
 
 function InteractionService:_applySlowMotion(player, duration)
