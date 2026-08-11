@@ -1349,6 +1349,8 @@ function InteractionService:_wireLibraryBookcaseDoor(door)
 end
 
 function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
+	self:_setBowlingLanePinsAnchored(laneIndex, false)
+
 	local ball = Instance.new("Part")
 	ball.Name = "BowlingBall"
 	ball.Shape = Enum.PartType.Ball
@@ -1396,7 +1398,9 @@ function InteractionService:_countKnockedBowlingPins(laneIndex)
 		if pin:IsA("BasePart") and pin:GetAttribute("LaneIndex") == laneIndex then
 			local baseCFrame = pin:GetAttribute("BaseCFrame")
 			local moved = baseCFrame and (pin.Position - baseCFrame.Position).Magnitude > 0.75
-			local tipped = baseCFrame and math.abs(pin.CFrame.UpVector:Dot(baseCFrame.UpVector)) < 0.72
+			local pinAxis = pin:GetAttribute("BowlingPinUprightAxis") == "RightVector" and pin.CFrame.RightVector or pin.CFrame.UpVector
+			local baseAxis = baseCFrame and (pin:GetAttribute("BowlingPinUprightAxis") == "RightVector" and baseCFrame.RightVector or baseCFrame.UpVector)
+			local tipped = baseAxis and math.abs(pinAxis:Dot(baseAxis)) < 0.72
 			if moved or tipped then
 				knocked += 1
 			end
@@ -1673,6 +1677,20 @@ function InteractionService:_resetBowlingPin(pin)
 			end
 		end
 	end)
+end
+
+function InteractionService:_setBowlingLanePinsAnchored(laneIndex, anchored)
+	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
+		if pin:IsA("BasePart") and pin.Parent and pin:GetAttribute("LaneIndex") == laneIndex then
+			for _, part in ipairs(self:_getBowlingPinParts(pin)) do
+				if part.Parent then
+					part.AssemblyLinearVelocity = Vector3.zero
+					part.AssemblyAngularVelocity = Vector3.zero
+					part.Anchored = anchored
+				end
+			end
+		end
+	end
 end
 
 function InteractionService:_resetBowlingPins()

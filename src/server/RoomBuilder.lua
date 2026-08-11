@@ -1544,23 +1544,27 @@ local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 
 		local footPosition = origin + Vector3.new(laneX + offset[1], laneSurfaceY, z + offset[2])
 		local coreHeight = 2.55
+		local coreDiameter = 0.58
+		local pinCenter = footPosition + Vector3.new(0, coreHeight / 2, 0)
 		local pin = createPart(
 			pinModel,
 			("Lane%dPin%d"):format(laneIndex, index),
-			Vector3.new(0.58, coreHeight, 0.58),
-			CFrame.new(footPosition + Vector3.new(0, coreHeight / 2, 0)),
+			Vector3.new(coreHeight, coreDiameter, coreDiameter),
+			CFrame.new(pinCenter) * CFrame.Angles(0, 0, math.rad(90)),
 			Color3.fromRGB(245, 244, 232),
 			Enum.Material.SmoothPlastic
 		)
+		pin.Shape = Enum.PartType.Cylinder
 		pin.Transparency = 1
-		pin.Anchored = false
+		pin.Anchored = true
 		pin.CanCollide = true
 		pin.CustomPhysicalProperties = PhysicalProperties.new(0.8, 0.9, 0.08, 1, 1)
 		pin:SetAttribute("LaneIndex", laneIndex)
 		pin:SetAttribute("BowlingPinCore", true)
+		pin:SetAttribute("BowlingPinUprightAxis", "RightVector")
 		pin:SetAttribute("BaseTransparency", 1)
 		pin:SetAttribute("BaseCanCollide", true)
-		pin:SetAttribute("BaseAnchored", false)
+		pin:SetAttribute("BaseAnchored", true)
 		tag(pin, Constants.Tags.BowlingPin)
 		pinModel.PrimaryPart = pin
 
@@ -1574,13 +1578,13 @@ local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 				Enum.Material.SmoothPlastic
 			)
 			piece.Shape = Enum.PartType.Ball
-			piece.Anchored = false
+			piece.Anchored = true
 			piece.CanCollide = false
 			piece.Massless = true
 			piece:SetAttribute("LaneIndex", laneIndex)
 			piece:SetAttribute("BowlingPinVisual", true)
 			piece:SetAttribute("BaseCanCollide", false)
-			piece:SetAttribute("BaseAnchored", false)
+			piece:SetAttribute("BaseAnchored", true)
 
 			local weld = Instance.new("WeldConstraint")
 			weld.Name = "PinPieceWeld"
@@ -1754,16 +1758,16 @@ local function makeBowlingAlley(roomFolder)
 		createPrompt(gutter, "Inspect", "Gutter", 0)
 		tag(gutter, Constants.Tags.BowlingGutter)
 
-		local button = createPart(room, "Lane" .. laneIndex .. "BowlButton", Vector3.new(2.2, 0.55, 2.2), cframeAt(origin, laneX, 1.45, 45.5), Color3.fromRGB(255, 88, 128), Enum.Material.Neon)
+		local button = createPart(room, "Lane" .. laneIndex .. "BowlButton", Vector3.new(2.2, 0.55, 2.2), cframeAt(origin, laneX, 1.45, 35.8), Color3.fromRGB(255, 88, 128), Enum.Material.Neon)
 		button.Shape = Enum.PartType.Ball
 		button:SetAttribute("LaneIndex", laneIndex)
 		button:SetAttribute("LaneX", origin.X + laneX)
-		button:SetAttribute("BallSpawnZ", origin.Z + 44.2)
+		button:SetAttribute("BallSpawnZ", origin.Z + 31.2)
 		button:SetAttribute("BallVelocityZ", -118)
 		createPrompt(button, "Bowl", "Lane " .. laneIndex, 0)
 		tag(button, Constants.Tags.BowlingLaneButton)
 
-		local ballReturn = createPart(room, "Lane" .. laneIndex .. "BallReturn", Vector3.new(3.8, 1.6, 2.8), cframeAt(origin, laneX, 1.35, 42.8), Color3.fromRGB(58, 63, 75), Enum.Material.Metal)
+		local ballReturn = createPart(room, "Lane" .. laneIndex .. "BallReturn", Vector3.new(3.8, 1.6, 2.8), cframeAt(origin, laneX, 1.35, 42.8) * CFrame.Angles(0, math.rad(180), 0), Color3.fromRGB(58, 63, 75), Enum.Material.Metal)
 		ballReturn:SetAttribute("LaneIndex", laneIndex)
 		createSurfaceText(ballReturn, "BallReturnText", "BALL\nRETURN", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(58, 63, 75))
 		createPrompt(ballReturn, "Press", "Ball Return", 0)
