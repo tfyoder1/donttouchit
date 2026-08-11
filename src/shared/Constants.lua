@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.7"
+Constants.BuildVersion = "0.5.8"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -25,6 +25,7 @@ Constants.Remotes = {
 	SparkleHint = "SparkleHint",
 	SnackEffect = "SnackEffect",
 	FeedbackRequest = "FeedbackRequest",
+	DevTools = "DevTools",
 }
 
 Constants.Tags = {

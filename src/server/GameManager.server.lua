@@ -1,6 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local DevToolsService = require(script.Parent:WaitForChild("DevToolsService"))
 local DiscoveryService = require(script.Parent:WaitForChild("DiscoveryService"))
 local EventManager = require(script.Parent:WaitForChild("EventManager"))
 local FeedbackService = require(script.Parent:WaitForChild("FeedbackService"))
@@ -32,5 +33,8 @@ end
 local eventManager = EventManager.new(discoveryService, ResetService, roomReferences, roomProgressService)
 local interactionService = InteractionService.new(eventManager, discoveryService, ResetService, roomProgressService)
 interactionService:Initialize()
+
+local devToolsService = DevToolsService.new(discoveryService, roomProgressService, eventManager, ResetService, interactionService)
+devToolsService:Initialize()
 
 print("[DON'T TOUCH IT] Prototype initialized.")

@@ -1634,18 +1634,18 @@ function InteractionService:_wireResetRoomButton(button)
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end
 
-		self:_clearAllTelevisions()
-		for _, state in pairs(self.snackFanState) do
-			state.SpinToken = nil
-		end
-		self:_stopSnackFlightForRoom(player)
-		self.eventManager:ResetRoom(player)
-		self:_afterRoomReset()
-		for _, currentPlayer in ipairs(Players:GetPlayers()) do
-			self:_checkExitUnlock(currentPlayer)
-			self:_refreshSecretDoorsForPlayer(currentPlayer)
-		end
+		self:ResetRoomForPlayer(player)
 	end)
+end
+
+function InteractionService:ResetRoomForPlayer(player)
+	self:_clearAllTelevisions()
+	for _, state in pairs(self.snackFanState) do
+		state.SpinToken = nil
+	end
+	self:_stopSnackFlightForRoom(player)
+	self.eventManager:ResetRoom(player)
+	self:AfterRoomReset()
 end
 
 function InteractionService:_afterRoomReset()
@@ -1706,6 +1706,18 @@ function InteractionService:_afterRoomReset()
 	for _, state in pairs(self.islandColaState) do
 		state.Reacting = false
 	end
+end
+
+function InteractionService:RefreshProgressDrivenWorld()
+	for _, currentPlayer in ipairs(Players:GetPlayers()) do
+		self:_checkExitUnlock(currentPlayer)
+		self:_refreshSecretDoorsForPlayer(currentPlayer)
+	end
+end
+
+function InteractionService:AfterRoomReset()
+	self:_afterRoomReset()
+	self:RefreshProgressDrivenWorld()
 end
 
 function InteractionService:_wireAppliance(appliance)

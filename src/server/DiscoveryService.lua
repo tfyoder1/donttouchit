@@ -40,6 +40,26 @@ local function buildSecretRoomList(foundByRoomId)
 	return rooms
 end
 
+local function cloneDictionary(source)
+	local copy = {}
+
+	for key, value in pairs(source or {}) do
+		copy[key] = value
+	end
+
+	return copy
+end
+
+local function dictionaryFromList(items)
+	local dictionary = {}
+
+	for _, item in ipairs(items or {}) do
+		dictionary[item] = true
+	end
+
+	return dictionary
+end
+
 local function buildDiscoveryStateList(foundById)
 	local discoveries = {}
 
@@ -63,6 +83,7 @@ function DiscoveryService.new()
 	self.secretKeysByUserId = {}
 	self.secretDoorRevealsByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
+	self.devOverrideByUserId = {}
 	self.hasSavedDataByUserId = {}
 	self.loadedByUserId = {}
 	self.saveQueuedByUserId = {}
@@ -113,6 +134,7 @@ function DiscoveryService:Initialize()
 		self.secretKeysByUserId[player.UserId] = nil
 		self.secretDoorRevealsByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
+		self.devOverrideByUserId[player.UserId] = nil
 		self.hasSavedDataByUserId[player.UserId] = nil
 		self.loadedByUserId[player.UserId] = nil
 		self.saveQueuedByUserId[player.UserId] = nil
@@ -182,6 +204,209 @@ function DiscoveryService:_ensurePlayer(player)
 	if self.loadedByUserId[player.UserId] == nil then
 		self.loadedByUserId[player.UserId] = false
 	end
+end
+
+function DiscoveryService:_captureRuntimeState(player)
+	self:_ensurePlayer(player)
+
+	return {
+		DiscoveryById = cloneDictionary(self.discoveryByUserId[player.UserId]),
+		Hints = self.hintsByUserId[player.UserId] or 0,
+		Clues = self.cluesByUserId[player.UserId] or 0,
+		CluedDiscoveriesById = cloneDictionary(self.cluedDiscoveriesByUserId[player.UserId]),
+		RevealedDiscoveriesById = cloneDictionary(self.revealedDiscoveriesByUserId[player.UserId]),
+		SecretKeysByRoomId = cloneDictionary(self.secretKeysByUserId[player.UserId]),
+		SecretDoorRevealsByRoomId = cloneDictionary(self.secretDoorRevealsByUserId[player.UserId]),
+		LastUnlockedRoomId = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID,
+	}
+end
+
+function DiscoveryService:_applyRuntimeState(player, state)
+	self.discoveryByUserId[player.UserId] = cloneDictionary(state.DiscoveryById)
+	self.hintsByUserId[player.UserId] = state.Hints or 0
+	self.cluesByUserId[player.UserId] = state.Clues or 0
+	self.cluedDiscoveriesByUserId[player.UserId] = cloneDictionary(state.CluedDiscoveriesById)
+	self.revealedDiscoveriesByUserId[player.UserId] = cloneDictionary(state.RevealedDiscoveriesById)
+	self.secretKeysByUserId[player.UserId] = cloneDictionary(state.SecretKeysByRoomId)
+	self.secretDoorRevealsByUserId[player.UserId] = cloneDictionary(state.SecretDoorRevealsByRoomId)
+	self.lastUnlockedRoomByUserId[player.UserId] = state.LastUnlockedRoomId or DEFAULT_ROOM_ID
+end
+
+function DiscoveryService:IsDevOverrideActive(player)
+	return player ~= nil and self.devOverrideByUserId[player.UserId] ~= nil
+end
+
+function DiscoveryService:EnableDevOverride(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	if self.devOverrideByUserId[player.UserId] then
+		return true
+	end
+
+	local realState = self:_captureRuntimeState(player)
+	self.devOverrideByUserId[player.UserId] = {
+		RealState = realState,
+	}
+	self:_applyRuntimeState(player, realState)
+	self:_sendSnapshot(player)
+	return true
+end
+
+function DiscoveryService:RestoreNormalProgressState(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local override = self.devOverrideByUserId[player.UserId]
+	if not override then
+		self:_sendSnapshot(player)
+		return false
+	end
+
+	self:_applyRuntimeState(player, override.RealState)
+	self.devOverrideByUserId[player.UserId] = nil
+	self:_syncSecretKeyTools(player)
+	self:_sendSnapshot(player)
+	self._secretDoorChangedEvent:Fire(player)
+	self._unlockedEvent:Fire(player)
+	return true
+end
+
+function DiscoveryService:_getRoomDiscoverySet(roomId)
+	local room = Constants.GetRoom(roomId)
+	if not room then
+		return nil
+	end
+
+	local allowedById = {}
+	for _, discoveryId in ipairs(room.DiscoveryOrder or {}) do
+		allowedById[discoveryId] = true
+	end
+
+	for _, discoveryId in ipairs(Constants.SecretDiscoveryOrderByRoom[roomId] or {}) do
+		allowedById[discoveryId] = true
+	end
+
+	return allowedById
+end
+
+function DiscoveryService:GetDevPresetDiscoveryIds(roomId, presetName)
+	local room = Constants.GetRoom(roomId)
+	if not room then
+		return {}
+	end
+
+	local selected = {}
+	if presetName == "Fresh" then
+		return selected
+	end
+
+	local targetCount = #room.DiscoveryOrder
+	if presetName == "Midway" then
+		targetCount = math.max(1, math.floor(#room.DiscoveryOrder / 2))
+	elseif presetName ~= "Completed" then
+		return selected
+	end
+
+	for index, discoveryId in ipairs(room.DiscoveryOrder) do
+		if index > targetCount then
+			break
+		end
+		table.insert(selected, discoveryId)
+	end
+
+	return selected
+end
+
+function DiscoveryService:_finalizeDevStateChange(player, roomId)
+	self:_refreshLastUnlockedRoom(player, false)
+	self:_grantRoomCompletionSecretKeys(player)
+	self:_syncSecretKeyTools(player)
+	self:_sendSnapshot(player)
+	self._secretDoorChangedEvent:Fire(player, roomId)
+	self._unlockedEvent:Fire(player)
+end
+
+function DiscoveryService:SetDevRoomDiscoveries(player, roomId, discoveryIds)
+	if not player or not player.Parent or not Constants.GetRoom(roomId) then
+		return false
+	end
+
+	self:EnableDevOverride(player)
+	self:_ensurePlayer(player)
+
+	local selectedById = dictionaryFromList(discoveryIds)
+	local foundById = self.discoveryByUserId[player.UserId]
+	local cluedById = self.cluedDiscoveriesByUserId[player.UserId]
+	local revealedById = self.revealedDiscoveriesByUserId[player.UserId]
+	local allowedById = self:_getRoomDiscoverySet(roomId)
+
+	for discoveryId in pairs(allowedById) do
+		if selectedById[discoveryId] then
+			foundById[discoveryId] = true
+		else
+			foundById[discoveryId] = nil
+			cluedById[discoveryId] = nil
+			revealedById[discoveryId] = nil
+		end
+	end
+
+	if Constants.SecretDoors and Constants.SecretDoors[roomId] and not self:IsRoomComplete(player, roomId) then
+		self.secretKeysByUserId[player.UserId][roomId] = nil
+		self.secretDoorRevealsByUserId[player.UserId][roomId] = nil
+	end
+
+	self:_finalizeDevStateChange(player, roomId)
+	return true
+end
+
+function DiscoveryService:SetDevDiscoveryCompletion(player, roomId, discoveryId, completed)
+	local allowedById = self:_getRoomDiscoverySet(roomId)
+	if not player or not player.Parent or not allowedById or not allowedById[discoveryId] then
+		return false
+	end
+
+	self:EnableDevOverride(player)
+	self:_ensurePlayer(player)
+
+	if completed then
+		self.discoveryByUserId[player.UserId][discoveryId] = true
+	else
+		self.discoveryByUserId[player.UserId][discoveryId] = nil
+		self.cluedDiscoveriesByUserId[player.UserId][discoveryId] = nil
+		self.revealedDiscoveriesByUserId[player.UserId][discoveryId] = nil
+	end
+
+	if Constants.SecretDoors and Constants.SecretDoors[roomId] and not self:IsRoomComplete(player, roomId) then
+		self.secretKeysByUserId[player.UserId][roomId] = nil
+	end
+
+	self:_finalizeDevStateChange(player, roomId)
+	return true
+end
+
+function DiscoveryService:UnlockAllDiscoveriesForDevSession(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:EnableDevOverride(player)
+	self:_ensurePlayer(player)
+
+	for _, discovery in pairs(Constants.Discoveries) do
+		self.discoveryByUserId[player.UserId][discovery.Id] = true
+	end
+
+	for roomId in pairs(Constants.SecretDoors or {}) do
+		self.secretKeysByUserId[player.UserId][roomId] = true
+		self.secretDoorRevealsByUserId[player.UserId][roomId] = true
+	end
+
+	self:_finalizeDevStateChange(player)
+	return true
 end
 
 function DiscoveryService:_warnSaveIssue(player)
@@ -318,6 +543,10 @@ function DiscoveryService:_buildSaveData(player)
 end
 
 function DiscoveryService:_savePlayer(player)
+	if self:IsDevOverrideActive(player) then
+		return false
+	end
+
 	if not player or not self.dataStore or not self.discoveryByUserId[player.UserId] then
 		self:_warnSaveIssue(player)
 		return false
@@ -350,6 +579,10 @@ end
 
 function DiscoveryService:_queueSave(player)
 	if not player or not player.Parent or not self.dataStore then
+		return
+	end
+
+	if self:IsDevOverrideActive(player) then
 		return
 	end
 
@@ -532,6 +765,22 @@ function DiscoveryService:_syncSecretKeyTools(player)
 	if not backpack then
 		return
 	end
+
+	local function removeDevOnlyKeys(container)
+		if not container then
+			return
+		end
+
+		for _, item in ipairs(container:GetChildren()) do
+			local roomId = item:GetAttribute("SecretKeyRoomId")
+			if item:IsA("Tool") and typeof(roomId) == "string" and not self.secretKeysByUserId[player.UserId][roomId] then
+				item:Destroy()
+			end
+		end
+	end
+
+	removeDevOnlyKeys(backpack)
+	removeDevOnlyKeys(player.Character)
 
 	for roomId, config in pairs(Constants.SecretDoors or {}) do
 		if self.secretKeysByUserId[player.UserId][roomId] == true then
