@@ -32,6 +32,22 @@ Fallback path:
 3. Add the scripts from `src/server`, `src/shared`, and `src/client` into the matching services.
 4. Press Play.
 
+## Build And Publish
+
+Build the current place file:
+
+```sh
+rojo build -o build/DontTouchIt-Publish.rbxl
+```
+
+Publish through Roblox Open Cloud after `.env` is configured:
+
+```sh
+./scripts/publish-place.sh
+```
+
+See `docs/open-cloud-publishing.md` for API key, Universe ID, and Place ID setup.
+
 ## Studio Acceptance Checks
 
 - Player spawns inside the room.
