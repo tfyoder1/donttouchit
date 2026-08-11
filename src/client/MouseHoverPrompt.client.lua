@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
 local HOVER_CHECK_INTERVAL = 0.05
-local MODEL_PROMPT_MAX_TARGET_DISTANCE = 6
+local MODEL_PROMPT_MAX_TARGET_DISTANCE = 2.4
 local PROMPT_EXTRA_REACH = 1.5
 
 local gui = Instance.new("ScreenGui")
@@ -141,6 +141,10 @@ local function findHoverPrompt(target)
 
 	while current and current ~= workspace do
 		if current:IsA("Model") then
+			if current:GetAttribute("StrictPromptTargets") then
+				return nil
+			end
+
 			if targetPosition then
 				local modelPrompt = getClosestPromptInModel(current, targetPosition)
 				if modelPrompt then

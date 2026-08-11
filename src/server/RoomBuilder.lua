@@ -53,7 +53,8 @@ local function createSpawnLocation(parent, name, roomId, destinationCFrame, colo
 	spawn.BottomSurface = Enum.SurfaceType.Smooth
 	spawn.TopSurface = Enum.SurfaceType.Smooth
 	spawn.Size = Vector3.new(7, 1, 7)
-	spawn.CFrame = CFrame.new(destinationCFrame.Position - Vector3.new(0, 2.45, 0))
+	local spawnPosition = destinationCFrame.Position - Vector3.new(0, 2.45, 0)
+	spawn.CFrame = CFrame.new(spawnPosition) * (destinationCFrame - destinationCFrame.Position)
 	spawn.Color = color
 	spawn.Material = Enum.Material.Neon
 	spawn.Neutral = true
@@ -347,7 +348,8 @@ local function makeLightSwitch(parent, name, baseCFrame, options)
 
 	plate:SetAttribute("IsOn", true)
 	createSurfaceText(plate, "SwitchText", options.Label or "LIGHT", Enum.NormalId.Front, Color3.fromRGB(34, 34, 32), Color3.fromRGB(238, 238, 226))
-	createPrompt(plate, "Flip", options.PromptObjectText or "Light Switch", 0)
+	local prompt = createPrompt(plate, "Flip", options.PromptObjectText or "Light Switch", 0)
+	prompt.MaxActivationDistance = options.MaxActivationDistance or 7
 	tag(switch, Constants.Tags.LightSwitch)
 	if options.HighlightTag then
 		tag(switch, options.HighlightTag)
@@ -553,13 +555,16 @@ end
 
 local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
-local TV_SECRET_ROOM_ORIGIN = Vector3.new(-14, 0, -38)
-local TV_SECRET_ROOM_ENTRY_CFRAME = CFrame.new(-14, 3, -31.5)
+local LIBRARY_WIDTH = 36
+local LIBRARY_DEPTH = 34
+local LIBRARY_HEIGHT = 15
+local TV_SECRET_ROOM_ORIGIN = Vector3.new(-14, 0, -45)
+local TV_SECRET_ROOM_ENTRY_CFRAME = CFrame.new(-14, 3, -29)
 local TV_SECRET_ROOM_RETURN_CFRAME = CFrame.new(-14, 3, -10.5)
-local BOWLING_ALLEY_ORIGIN = Vector3.new(-14, 0, -100)
-local BOWLING_ALLEY_SPAWN_CFRAME = CFrame.new(-14, 3, -56)
-local BOWLING_ALLEY_RETURN_CFRAME = CFrame.new(-14, 3, -42)
-local BOWLING_MAINTENANCE_CFRAME = CFrame.new(-14, 3, -143)
+local BOWLING_ALLEY_ORIGIN = Vector3.new(-14, 0, -132)
+local BOWLING_ALLEY_SPAWN_CFRAME = CFrame.new(-14, 3, -84)
+local BOWLING_ALLEY_RETURN_CFRAME = CFrame.new(Vector3.new(-7, 3, -58), Vector3.new(-14, 3, -45))
+local BOWLING_MAINTENANCE_CFRAME = CFrame.new(-14, 3, -175)
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
 local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
@@ -667,7 +672,7 @@ local function makeCompactReferenceBook(parent, name, cframe, roomId, title, opt
 	screen:SetAttribute("FixtureType", "DigitalRoomLog")
 	createSurfaceText(screen, "DigitalLogText", options.Text or (title .. "\nLOG\nOPEN"), Enum.NormalId.Front, Color3.fromRGB(86, 255, 150), Color3.fromRGB(4, 10, 8))
 	local prompt = createPrompt(screen, "Open", title .. " Log", 0)
-	prompt.MaxActivationDistance = options.MaxActivationDistance or 12
+	prompt.MaxActivationDistance = options.MaxActivationDistance or 7
 	tag(screen, Constants.Tags.ReferenceBook)
 
 	log.PrimaryPart = back
@@ -697,7 +702,7 @@ local function makeCompactResetRoomButton(parent, name, cframe, promptObjectText
 
 	createSurfaceText(plate, "ResetButtonText", "RESET", Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(42, 47, 56))
 	local prompt = createPrompt(button, "Reset", promptObjectText or "Room Reset", 0.2)
-	prompt.MaxActivationDistance = 12
+	prompt.MaxActivationDistance = 7
 	tag(button, Constants.Tags.ResetRoomButton)
 
 	resetModel.PrimaryPart = plate
@@ -711,6 +716,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	local panelWidth = options.PanelWidth or (includeReset and 5.6 or 4.55)
 	local panelHeight = options.PanelHeight or (includeReset and 3.1 or 2.55)
 	local controls = makeModel(parent, name)
+	controls:SetAttribute("StrictPromptTargets", true)
 
 	local panel = createPart(
 		controls,
@@ -741,6 +747,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		{
 			Height = if includeReset then 1.66 else 1.5,
 			Text = options.LogText,
+			MaxActivationDistance = options.LogPromptDistance or 7,
 		}
 	)
 
@@ -757,6 +764,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 				HighlightTag = options.HighlightTag,
 				UnlocksGiantDiscovery = options.UnlocksGiantDiscovery,
 				Scale = options.SwitchScale or 0.58,
+				MaxActivationDistance = options.LightPromptDistance or 7,
 			}
 		)
 	end
@@ -799,7 +807,7 @@ local function makeHallway(roomFolder)
 	local label = createPart(hallway, "HallwaySign", Vector3.new(9.5, 2.2, 0.3), CFrame.new(0, 7.1, 22), Color3.fromRGB(250, 238, 111), Enum.Material.SmoothPlastic)
 	createSurfaceText(label, "HallwaySignText", "ROOMS", Enum.NormalId.Back, Color3.fromRGB(22, 22, 26), Color3.fromRGB(250, 238, 111))
 	local oceanSign = createPart(hallway, "IslandApproachSign", Vector3.new(7.2, 1.9, 0.3), CFrame.new(0, 6.4, 88), Color3.fromRGB(112, 222, 255), Enum.Material.SmoothPlastic)
-	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nTO A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
+	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nFROM A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSurfaceText(oceanSign, "IslandApproachReturnText", "THIS WAY\nTO PARADISE", Enum.NormalId.Front, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
 	makeRoomControlPanel(
@@ -1373,14 +1381,14 @@ local function makeLibraryFurnishings(room)
 		"LibraryClock",
 		"Library",
 		Vector3.new(5.4, 1.9, 0.24),
-		CFrame.new(origin + Vector3.new(5.35, 8.3, 7.39), origin + Vector3.new(0, 5, 0)),
+		CFrame.new(origin + Vector3.new(7.0, 9.2, LIBRARY_DEPTH / 2 - 0.62), origin + Vector3.new(0, 5, -2)),
 		Enum.NormalId.Front
 	)
 
 	for shelfIndex, shelf in ipairs({
-		{ Name = "LibraryLeftShelf", X = -8.25, Z = -0.8, Yaw = 90, Width = 13.5 },
-		{ Name = "LibraryRightShelf", X = 8.25, Z = -0.8, Yaw = -90, Width = 13.5 },
-		{ Name = "LibraryBackShelf", X = 0, Z = -7.25, Yaw = 0, Width = 15.6 },
+		{ Name = "LibraryLeftShelf", X = -17.25, Z = -2.2, Yaw = 90, Width = 25.5 },
+		{ Name = "LibraryRightShelf", X = 17.25, Z = -2.2, Yaw = -90, Width = 25.5 },
+		{ Name = "LibraryBackShelf", X = 0, Z = -16.25, Yaw = 0, Width = 31.2 },
 	}) do
 		local shelfModel = makeModel(room, shelf.Name)
 		local base = CFrame.new(origin + Vector3.new(shelf.X, 3.7, shelf.Z)) * CFrame.Angles(0, math.rad(shelf.Yaw), 0)
@@ -1407,18 +1415,18 @@ local function makeLibraryFurnishings(room)
 		end
 	end
 
-	local tableTop = createPart(room, "LibraryReadingTable", Vector3.new(7.8, 0.5, 3.4), cframeAt(origin, 0, 2.15, 0.5), Color3.fromRGB(94, 62, 42), Enum.Material.Wood)
-	createPart(room, "LibraryTableLegA", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, -3.2, 1.1, -0.6), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
-	createPart(room, "LibraryTableLegB", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, 3.2, 1.1, -0.6), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
-	createPart(room, "LibraryTableLegC", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, -3.2, 1.1, 1.6), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
-	createPart(room, "LibraryTableLegD", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, 3.2, 1.1, 1.6), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
+	local tableTop = createPart(room, "LibraryReadingTable", Vector3.new(9.6, 0.5, 4.2), cframeAt(origin, 0, 2.15, 3.2), Color3.fromRGB(94, 62, 42), Enum.Material.Wood)
+	createPart(room, "LibraryTableLegA", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, -4.0, 1.1, 1.8), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
+	createPart(room, "LibraryTableLegB", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, 4.0, 1.1, 1.8), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
+	createPart(room, "LibraryTableLegC", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, -4.0, 1.1, 4.6), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
+	createPart(room, "LibraryTableLegD", Vector3.new(0.45, 2.2, 0.45), cframeAt(origin, 4.0, 1.1, 4.6), Color3.fromRGB(75, 49, 35), Enum.Material.Wood)
 
-	local book = createPart(room, "ForbiddenLibraryBook", Vector3.new(2.3, 0.34, 1.55), cframeAt(origin, -1.8, 2.6, 0.35) * CFrame.Angles(0, math.rad(-8), 0), Color3.fromRGB(114, 28, 61), Enum.Material.SmoothPlastic)
+	local book = createPart(room, "ForbiddenLibraryBook", Vector3.new(2.3, 0.34, 1.55), cframeAt(origin, -2.2, 2.6, 3.0) * CFrame.Angles(0, math.rad(-8), 0), Color3.fromRGB(114, 28, 61), Enum.Material.SmoothPlastic)
 	createSurfaceText(book, "ForbiddenBookText", "DO NOT\nREAD", Enum.NormalId.Top, Color3.fromRGB(255, 235, 149), Color3.fromRGB(114, 28, 61))
 	createPrompt(book, "Read", "Book That Sighed", 0)
 	tag(book, Constants.Tags.LibraryBook)
 
-	local lamp = createPart(room, "LibraryReadingLamp", Vector3.new(0.75, 1.35, 0.75), cframeAt(origin, 2.5, 3.0, 0.4), Color3.fromRGB(255, 214, 102), Enum.Material.Metal)
+	local lamp = createPart(room, "LibraryReadingLamp", Vector3.new(0.75, 1.35, 0.75), cframeAt(origin, 3.4, 3.0, 3.35), Color3.fromRGB(255, 214, 102), Enum.Material.Metal)
 	lamp.Shape = Enum.PartType.Cylinder
 	createPrompt(lamp, "Toggle", "Reading Lamp", 0)
 	tag(lamp, Constants.Tags.LibraryLamp)
@@ -1430,35 +1438,35 @@ local function makeLibraryFurnishings(room)
 	lampLight.Parent = lamp
 	mark(lampLight)
 
-	local globe = createPart(room, "LibraryWrongGlobe", Vector3.new(1.75, 1.75, 1.75), cframeAt(origin, 1.5, 3.25, 1.2), Color3.fromRGB(91, 156, 197), Enum.Material.SmoothPlastic)
+	local globe = createPart(room, "LibraryWrongGlobe", Vector3.new(1.75, 1.75, 1.75), cframeAt(origin, -5.3, 3.25, 5.45), Color3.fromRGB(91, 156, 197), Enum.Material.SmoothPlastic)
 	globe.Shape = Enum.PartType.Ball
 	createPrompt(globe, "Spin", "Wrong Globe", 0)
 	tag(globe, Constants.Tags.LibraryGlobe)
 
-	local catalog = createPart(room, "LibraryCardCatalog", Vector3.new(3.4, 2.2, 1.5), cframeAt(origin, 5.9, 1.5, 3.2), Color3.fromRGB(115, 78, 51), Enum.Material.Wood)
+	local catalog = createPart(room, "LibraryCardCatalog", Vector3.new(3.4, 2.2, 1.5), cframeAt(origin, 12.2, 1.5, 8.0), Color3.fromRGB(115, 78, 51), Enum.Material.Wood)
 	createSurfaceText(catalog, "CatalogText", "CATALOG", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(115, 78, 51))
 	createPrompt(catalog, "Open", "Card Catalog", 0)
 	tag(catalog, Constants.Tags.LibraryCatalog)
 
-	local ladder = createPart(room, "LibraryRollingLadder", Vector3.new(1.15, 7.6, 1.15), cframeAt(origin, -7.35, 4.0, -3.6) * CFrame.Angles(0, 0, math.rad(-10)), Color3.fromRGB(181, 121, 67), Enum.Material.Wood, "TrussPart")
+	local ladder = createPart(room, "LibraryRollingLadder", Vector3.new(1.15, 7.6, 1.15), cframeAt(origin, -15.4, 4.0, -9.2) * CFrame.Angles(0, 0, math.rad(-10)), Color3.fromRGB(181, 121, 67), Enum.Material.Wood, "TrussPart")
 	createPrompt(ladder, "Roll", "Rolling Ladder", 0)
 	tag(ladder, Constants.Tags.LibraryLadder)
 
-	createPart(room, "LibraryLoftPlatform", Vector3.new(8.6, 0.45, 3.2), cframeAt(origin, -4.7, 8.05, -5.5), Color3.fromRGB(84, 57, 41), Enum.Material.Wood)
-	createPart(room, "LibraryLoftRail", Vector3.new(8.6, 1.1, 0.22), cframeAt(origin, -4.7, 8.9, -3.95), Color3.fromRGB(118, 82, 55), Enum.Material.Wood)
-	local loftDoor = createPart(room, "LibraryLoftDoor", Vector3.new(3.2, 4.1, 0.28), cframeAt(origin, -4.7, 10.2, -7.42), Color3.fromRGB(68, 88, 118), Enum.Material.Wood)
+	createPart(room, "LibraryLoftPlatform", Vector3.new(10.5, 0.45, 3.4), cframeAt(origin, -8.8, 8.05, -14.7), Color3.fromRGB(84, 57, 41), Enum.Material.Wood)
+	createPart(room, "LibraryLoftRail", Vector3.new(10.5, 1.1, 0.22), cframeAt(origin, -8.8, 8.9, -13.0), Color3.fromRGB(118, 82, 55), Enum.Material.Wood)
+	local loftDoor = createPart(room, "LibraryLoftDoor", Vector3.new(3.2, 4.1, 0.28), cframeAt(origin, -8.8, 10.2, -16.55), Color3.fromRGB(68, 88, 118), Enum.Material.Wood)
 	createSurfaceText(loftDoor, "LoftDoorText", "LOFT", Enum.NormalId.Front, Color3.fromRGB(235, 245, 255), Color3.fromRGB(68, 88, 118))
 	createPrompt(loftDoor, "Open", "Loft Door", 0)
 	tag(loftDoor, Constants.Tags.LibraryLoftDoor)
 
-	local key = createPart(room, "BowlingKeyTopShelf", Vector3.new(0.34, 0.34, 1.45), cframeAt(origin, -6.6, 9.42, -6.75) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
+	local key = createPart(room, "BowlingKeyTopShelf", Vector3.new(0.34, 0.34, 1.45), cframeAt(origin, -14.7, 9.42, -15.4) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
 	key.Shape = Enum.PartType.Cylinder
-	local keyHead = createPart(room, "BowlingKeyHead", Vector3.new(0.82, 0.18, 0.82), cframeAt(origin, -7.45, 9.42, -6.75), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
+	local keyHead = createPart(room, "BowlingKeyHead", Vector3.new(0.82, 0.18, 0.82), cframeAt(origin, -15.55, 9.42, -15.4), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
 	keyHead.Shape = Enum.PartType.Cylinder
 	createPrompt(key, "Take", "Bowling Key", 0)
 	tag(key, Constants.Tags.LibraryTopShelfKey)
 
-	local bookcaseDoor = createPart(room, "LibraryBookcaseDoor", Vector3.new(5.6, 7.6, 0.42), cframeAt(origin, 3.1, 4.0, -7.52), Color3.fromRGB(76, 48, 34), Enum.Material.Wood)
+	local bookcaseDoor = createPart(room, "LibraryBookcaseDoor", Vector3.new(5.6, 7.6, 0.42), cframeAt(origin, 7.2, 4.0, -16.55), Color3.fromRGB(76, 48, 34), Enum.Material.Wood)
 	bookcaseDoor:SetAttribute("DestinationCFrame", BOWLING_ALLEY_SPAWN_CFRAME)
 	bookcaseDoor:SetAttribute("SecretClosedCFrame", bookcaseDoor.CFrame)
 	createSurfaceText(bookcaseDoor, "BookcaseDoorText", "REFERENCE\nONLY", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(76, 48, 34))
@@ -1466,7 +1474,8 @@ local function makeLibraryFurnishings(room)
 	tag(bookcaseDoor, Constants.Tags.LibraryBookcaseDoor)
 end
 
-local function makeBowlingPins(parent, laneIndex, laneX, z)
+local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
+	origin = origin or Vector3.zero
 	local pinOffsets = {
 		{ 0, 0 },
 		{ -0.7, -1.0 },
@@ -1485,7 +1494,7 @@ local function makeBowlingPins(parent, laneIndex, laneX, z)
 			parent,
 			("Lane%dPin%d"):format(laneIndex, index),
 			Vector3.new(0.62, 1.85, 0.62),
-			CFrame.new(laneX + offset[1], 1.42, z + offset[2]),
+			CFrame.new(origin + Vector3.new(laneX + offset[1], 1.42, z + offset[2])),
 			Color3.fromRGB(245, 244, 232),
 			Enum.Material.SmoothPlastic
 		)
@@ -1500,7 +1509,7 @@ local function makeBowlingPins(parent, laneIndex, laneX, z)
 			parent,
 			("Lane%dPin%dStripe"):format(laneIndex, index),
 			Vector3.new(0.66, 0.2, 0.66),
-			CFrame.new(laneX + offset[1], 1.95, z + offset[2]),
+			CFrame.new(origin + Vector3.new(laneX + offset[1], 1.95, z + offset[2])),
 			Color3.fromRGB(220, 52, 67),
 			Enum.Material.SmoothPlastic
 		)
@@ -1567,7 +1576,14 @@ local function makeBowlingAlley(roomFolder)
 	createPrompt(switch, "Flip", "Cosmic Bowling", 0)
 	tag(switch, Constants.Tags.BowlingCosmicSwitch)
 
-	local shoeRack = createPart(room, "BowlingShoeRack", Vector3.new(5.8, 2.8, 1.5), cframeAt(origin, 14.5, 1.9, 42), Color3.fromRGB(89, 56, 48), Enum.Material.Wood)
+	local shoeRack = createPart(
+		room,
+		"BowlingShoeRack",
+		Vector3.new(5.8, 2.8, 1.5),
+		CFrame.new(origin + Vector3.new(-20.2, 1.9, 42.5), origin + Vector3.new(0, 1.9, 42.5)),
+		Color3.fromRGB(89, 56, 48),
+		Enum.Material.Wood
+	)
 	createSurfaceText(shoeRack, "ShoeRackText", "SHOES\nOPTIONAL?", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(89, 56, 48))
 	createPrompt(shoeRack, "Inspect", "Shoe Rack", 0)
 	tag(shoeRack, Constants.Tags.BowlingShoeRack)
@@ -1591,27 +1607,29 @@ local function makeBowlingAlley(roomFolder)
 
 	local laneXs = { -12, 0, 12 }
 	for laneIndex, laneX in ipairs(laneXs) do
-		local lane = createPart(room, "Lane" .. laneIndex, Vector3.new(8.2, 0.34, 74), CFrame.new(laneX, 0.72, -91), Color3.fromRGB(197, 151, 87), Enum.Material.WoodPlanks)
+		local lane = createPart(room, "Lane" .. laneIndex, Vector3.new(8.2, 0.34, 74), cframeAt(origin, laneX, 0.72, -9), Color3.fromRGB(197, 151, 87), Enum.Material.WoodPlanks)
 		lane:SetAttribute("CosmicSurface", true)
-		createPart(room, "Lane" .. laneIndex .. "LeftGutter", Vector3.new(1, 0.28, 74), CFrame.new(laneX - 4.7, 0.86, -91), Color3.fromRGB(20, 22, 28), Enum.Material.Metal)
-		local gutter = createPart(room, "Lane" .. laneIndex .. "RightGutter", Vector3.new(1, 0.28, 74), CFrame.new(laneX + 4.7, 0.86, -91), Color3.fromRGB(20, 22, 28), Enum.Material.Metal)
+		createPart(room, "Lane" .. laneIndex .. "LeftGutter", Vector3.new(1, 0.28, 74), cframeAt(origin, laneX - 4.7, 0.86, -9), Color3.fromRGB(20, 22, 28), Enum.Material.Metal)
+		local gutter = createPart(room, "Lane" .. laneIndex .. "RightGutter", Vector3.new(1, 0.28, 74), cframeAt(origin, laneX + 4.7, 0.86, -9), Color3.fromRGB(20, 22, 28), Enum.Material.Metal)
 		createPrompt(gutter, "Inspect", "Gutter", 0)
 		tag(gutter, Constants.Tags.BowlingGutter)
 
-		local button = createPart(room, "Lane" .. laneIndex .. "BowlButton", Vector3.new(2.2, 0.55, 2.2), CFrame.new(laneX, 1.45, -54.5), Color3.fromRGB(255, 88, 128), Enum.Material.Neon)
+		local button = createPart(room, "Lane" .. laneIndex .. "BowlButton", Vector3.new(2.2, 0.55, 2.2), cframeAt(origin, laneX, 1.45, 45.5), Color3.fromRGB(255, 88, 128), Enum.Material.Neon)
 		button.Shape = Enum.PartType.Ball
 		button:SetAttribute("LaneIndex", laneIndex)
-		button:SetAttribute("LaneX", laneX)
+		button:SetAttribute("LaneX", origin.X + laneX)
+		button:SetAttribute("BallSpawnZ", origin.Z + 44.2)
+		button:SetAttribute("BallVelocityZ", -118)
 		createPrompt(button, "Bowl", "Lane " .. laneIndex, 0)
 		tag(button, Constants.Tags.BowlingLaneButton)
 
-		local ballReturn = createPart(room, "Lane" .. laneIndex .. "BallReturn", Vector3.new(3.8, 1.6, 2.8), CFrame.new(laneX, 1.35, -49.2), Color3.fromRGB(58, 63, 75), Enum.Material.Metal)
+		local ballReturn = createPart(room, "Lane" .. laneIndex .. "BallReturn", Vector3.new(3.8, 1.6, 2.8), cframeAt(origin, laneX, 1.35, 42.8), Color3.fromRGB(58, 63, 75), Enum.Material.Metal)
 		ballReturn:SetAttribute("LaneIndex", laneIndex)
 		createSurfaceText(ballReturn, "BallReturnText", "BALL\nRETURN", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(58, 63, 75))
 		createPrompt(ballReturn, "Press", "Ball Return", 0)
 		tag(ballReturn, Constants.Tags.BowlingBallReturn)
 
-		makeBowlingPins(room, laneIndex, laneX, -126)
+		makeBowlingPins(room, laneIndex, laneX, -26, origin)
 	end
 
 	local machinery = createPart(room, "BowlingPinMachine", Vector3.new(36, 5, 4), CFrame.new(origin + Vector3.new(0, 3.6, -33.5)), Color3.fromRGB(48, 52, 63), Enum.Material.Metal)
@@ -1665,20 +1683,23 @@ local function makeTVSecretRoom(roomFolder)
 
 	local room = makeModel(roomFolder, "TVSecretRoom")
 	local origin = TV_SECRET_ROOM_ORIGIN
-	createPart(room, "SecretRoomFloor", Vector3.new(18, 1, 16), cframeAt(origin, 0, 0, 0), Color3.fromRGB(74, 69, 91), Enum.Material.Concrete)
-	createPart(room, "SecretRoomBackWall", Vector3.new(18, 12, 1), cframeAt(origin, 0, 6, -8), Color3.fromRGB(42, 44, 55), Enum.Material.SmoothPlastic)
-	createPart(room, "SecretRoomFrontWall", Vector3.new(18, 12, 1), cframeAt(origin, 0, 6, 8), Color3.fromRGB(42, 44, 55), Enum.Material.SmoothPlastic)
-	createPart(room, "SecretRoomLeftWall", Vector3.new(1, 12, 16), cframeAt(origin, -9, 6, 0), Color3.fromRGB(50, 48, 63), Enum.Material.SmoothPlastic)
-	createPart(room, "SecretRoomRightWall", Vector3.new(1, 12, 16), cframeAt(origin, 9, 6, 0), Color3.fromRGB(50, 48, 63), Enum.Material.SmoothPlastic)
-	createPart(room, "SecretRoomCeiling", Vector3.new(18, 1, 16), cframeAt(origin, 0, 12, 0), Color3.fromRGB(34, 36, 48), Enum.Material.Concrete)
+	local width = LIBRARY_WIDTH
+	local depth = LIBRARY_DEPTH
+	local height = LIBRARY_HEIGHT
+	createPart(room, "SecretRoomFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(74, 69, 91), Enum.Material.Concrete)
+	createPart(room, "SecretRoomBackWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, -depth / 2), Color3.fromRGB(42, 44, 55), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomFrontWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, depth / 2), Color3.fromRGB(42, 44, 55), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomLeftWall", Vector3.new(1, height, depth), cframeAt(origin, -width / 2, height / 2, 0), Color3.fromRGB(50, 48, 63), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomRightWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(50, 48, 63), Enum.Material.SmoothPlastic)
+	createPart(room, "SecretRoomCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(34, 36, 48), Enum.Material.Concrete)
 
-	local sign = createPart(room, "SecretRoomSign", Vector3.new(12.5, 2.3, 0.28), cframeAt(origin, 0, 7.8, -7.35), Color3.fromRGB(255, 226, 102), Enum.Material.SmoothPlastic)
+	local sign = createPart(room, "SecretRoomSign", Vector3.new(16, 2.3, 0.28), cframeAt(origin, 0, height - 3, -depth / 2 + 0.65), Color3.fromRGB(255, 226, 102), Enum.Material.SmoothPlastic)
 	createSurfaceText(sign, "SecretRoomSignText", "THE LIBRARY\nPLEASE TOUCH QUIETLY", Enum.NormalId.Front, Color3.fromRGB(36, 27, 42), Color3.fromRGB(255, 226, 102))
 
-	local keyhole = createPart(room, "SecretRoomKeyhole", Vector3.new(2.1, 2.1, 0.2), cframeAt(origin, 0, 4.5, -7.24), Color3.fromRGB(161, 112, 255), Enum.Material.Neon)
+	local keyhole = createPart(room, "SecretRoomKeyhole", Vector3.new(2.1, 2.1, 0.2), cframeAt(origin, 0, 4.5, -depth / 2 + 0.76), Color3.fromRGB(161, 112, 255), Enum.Material.Neon)
 	keyhole.Shape = Enum.PartType.Ball
 
-	local exitDoor = createPart(room, "SecretRoomExitDoor", Vector3.new(5.2, 7.1, 0.35), cframeAt(origin, 0, 4.25, 7.45), Color3.fromRGB(63, 84, 105), Enum.Material.Wood)
+	local exitDoor = createPart(room, "SecretRoomExitDoor", Vector3.new(5.2, 7.1, 0.35), cframeAt(origin, 0, 4.25, depth / 2 - 0.55), Color3.fromRGB(63, 84, 105), Enum.Material.Wood)
 	exitDoor:SetAttribute("DestinationCFrame", TV_SECRET_ROOM_RETURN_CFRAME)
 	exitDoor:SetAttribute("DestinationName", "the TV Room")
 	createSurfaceText(exitDoor, "SecretRoomExitText", "BACK TO\nTV ROOM", Enum.NormalId.Back, Color3.fromRGB(228, 247, 255), Color3.fromRGB(43, 57, 72))
@@ -1688,7 +1709,7 @@ local function makeTVSecretRoom(roomFolder)
 	local libraryControls = makeRoomControlPanel(
 		room,
 		"LibraryInsideControlPanel",
-		CFrame.new(origin + Vector3.new(-5.7, 4.6, 7.43), origin + Vector3.new(0, 4.6, 0)),
+		CFrame.new(origin + Vector3.new(-width / 2 + 5.4, 4.6, depth / 2 - 0.58), origin + Vector3.new(0, 4.6, 0)),
 		"Library",
 		"LIBRARY",
 		{
@@ -1824,10 +1845,23 @@ local function makeIslandRoom(roomFolder)
 		horizon:SetAttribute("BaseCanCollide", false)
 	end
 
-	local sun = createPart(room, "IslandSun", Vector3.new(7, 7, 0.35), cframeAt(origin, -30, 17, 63.5), Color3.fromRGB(255, 222, 88), Enum.Material.Neon)
+	local sunGlow = createPart(room, "IslandSunGlow", Vector3.new(18, 18, 0.18), cframeAt(origin, -24, 18, 63.35), Color3.fromRGB(255, 240, 151), Enum.Material.Neon)
+	sunGlow.Shape = Enum.PartType.Ball
+	sunGlow.Transparency = 0.58
+	sunGlow.CanCollide = false
+	sunGlow:SetAttribute("BaseTransparency", sunGlow.Transparency)
+	sunGlow:SetAttribute("BaseCanCollide", false)
+	local sun = createPart(room, "IslandSun", Vector3.new(11, 11, 0.35), cframeAt(origin, -24, 18, 63.5), Color3.fromRGB(255, 222, 88), Enum.Material.Neon)
 	sun.Shape = Enum.PartType.Ball
 	sun.CanCollide = false
 	sun:SetAttribute("BaseCanCollide", false)
+	local sunLight = Instance.new("PointLight")
+	sunLight.Name = "IslandSunLight"
+	sunLight.Brightness = 1.6
+	sunLight.Color = Color3.fromRGB(255, 230, 132)
+	sunLight.Range = 42
+	sunLight.Parent = sun
+	mark(sunLight)
 
 	for index = 1, 8 do
 		createPart(
@@ -1865,8 +1899,8 @@ local function makeIslandRoom(roomFolder)
 	local resetRoomButton = islandControls.ResetRoomButton
 	local referenceBook = islandControls.ReferenceBook
 
-	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS", -10.5, -7.5, -1, 2, Constants.Tags.IslandSharkSign)
-	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", 12.5, 12.5, 1, 5, Constants.Tags.IslandJellyfishSign)
+	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS", 12.5, -7.5, 1, 2, Constants.Tags.IslandSharkSign)
+	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", -12.5, 12.5, -1, 5, Constants.Tags.IslandJellyfishSign)
 
 	for _, data in ipairs({
 		{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, -31, 8, 5) },

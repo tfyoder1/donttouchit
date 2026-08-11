@@ -39,7 +39,7 @@ local SECRET_AREAS = {
 	{
 		Id = "Maintenance",
 		Name = "Maintenance Room",
-		CFrame = CFrame.new(-14, 3, -143),
+		CFrame = CFrame.new(-14, 3, -175),
 	},
 }
 

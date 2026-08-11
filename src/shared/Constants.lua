@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.8"
+Constants.BuildVersion = "0.5.10"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -618,7 +618,7 @@ Constants.Rooms = {
 		Name = "Island",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.Island,
 		NoTouchDiscoveryId = Constants.Discoveries.IslandNoTouch.Id,
-		SpawnCFrame = CFrame.new(0, 3, 132),
+		SpawnCFrame = CFrame.new(0, 3, 132) * CFrame.Angles(0, math.rad(180), 0),
 		Zone = {
 			Min = Vector3.new(-55, -3, 126),
 			Max = Vector3.new(55, 28, 192),
@@ -629,10 +629,10 @@ Constants.Rooms = {
 		Name = "Library",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.Library,
 		NoTouchDiscoveryId = Constants.Discoveries.LibraryNoTouch.Id,
-		SpawnCFrame = CFrame.new(-14, 3, -36),
+		SpawnCFrame = CFrame.new(-14, 3, -29),
 		Zone = {
-			Min = Vector3.new(-25, -3, -48),
-			Max = Vector3.new(-3, 18, -28),
+			Min = Vector3.new(-34, -3, -64),
+			Max = Vector3.new(6, 20, -26),
 		},
 	},
 	BowlingAlley = {
@@ -640,10 +640,10 @@ Constants.Rooms = {
 		Name = "Bowling Alley",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.BowlingAlley,
 		NoTouchDiscoveryId = Constants.Discoveries.BowlingNoTouch.Id,
-		SpawnCFrame = CFrame.new(-14, 3, -56),
+		SpawnCFrame = CFrame.new(-14, 3, -84),
 		Zone = {
-			Min = Vector3.new(-36, -3, -150),
-			Max = Vector3.new(8, 21, -48),
+			Min = Vector3.new(-36, -3, -184),
+			Max = Vector3.new(8, 21, -80),
 		},
 	},
 }

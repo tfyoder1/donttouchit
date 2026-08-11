@@ -3,6 +3,7 @@ local Debris = game:GetService("Debris")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
@@ -1335,7 +1336,9 @@ function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 	ball.CanCollide = true
 	ball.Anchored = false
 	ball.CustomPhysicalProperties = PhysicalProperties.new(4.5, 0.35, 0.35)
-	ball.CFrame = CFrame.new(laneX, 2.05, -55.8)
+	local ballSpawnZ = button:GetAttribute("BallSpawnZ") or (button.Position.Z - 1.3)
+	local ballVelocityZ = button:GetAttribute("BallVelocityZ") or -118
+	ball.CFrame = CFrame.new(laneX, 2.05, ballSpawnZ)
 	ball.Parent = workspace:FindFirstChild("InteractiveObjects") or workspace
 	CollectionService:AddTag(ball, Constants.Tags.TemporaryObject)
 
@@ -1357,7 +1360,7 @@ function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 		end
 	end)
 
-	ball.AssemblyLinearVelocity = Vector3.new(0, 0, -118)
+	ball.AssemblyLinearVelocity = Vector3.new(0, 0, ballVelocityZ)
 	ball.AssemblyAngularVelocity = Vector3.new(-28, 0, 0)
 	Debris:AddItem(ball, 14)
 
@@ -3476,7 +3479,7 @@ end
 
 function InteractionService:_spawnIslandSharkFin(source)
 	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
-	local origin = Vector3.new(sourcePosition.X, 0.22, 187)
+	local origin = Vector3.new(24, 0.22, math.clamp(sourcePosition.Z - 1.5, 137, 148))
 	local finModel = Instance.new("Model")
 	finModel.Name = "IslandSharkFinWarning"
 	finModel.Parent = workspace
@@ -3497,7 +3500,8 @@ function InteractionService:_spawnIslandSharkFin(source)
 		return part
 	end
 
-	local startCFrame = CFrame.new(origin + Vector3.new(-18, 0, 0), origin + Vector3.new(18, 0, 0))
+	local travel = Vector3.new(-20, 0, 14)
+	local startCFrame = CFrame.new(origin + Vector3.new(5, 0, -8), origin + Vector3.new(-13, 0, 8))
 	local fin = makeFinPart("WarningFin", Vector3.new(2.4, 3.6, 0.75), startCFrame * CFrame.Angles(0, 0, math.rad(-8)), Color3.fromRGB(47, 61, 73), Enum.Material.SmoothPlastic, "WedgePart")
 	local wakeA = makeFinPart("WakeA", Vector3.new(4.6, 0.16, 0.5), startCFrame * CFrame.new(-1.8, -1.0, 0.55), Color3.fromRGB(180, 242, 255), Enum.Material.Neon)
 	local wakeB = makeFinPart("WakeB", Vector3.new(4.6, 0.16, 0.5), startCFrame * CFrame.new(-1.8, -1.0, -0.55), Color3.fromRGB(180, 242, 255), Enum.Material.Neon)
@@ -3508,7 +3512,7 @@ function InteractionService:_spawnIslandSharkFin(source)
 	for _, part in ipairs(finModel:GetChildren()) do
 		if part:IsA("BasePart") then
 			tweenPart(part, 3.4, {
-				CFrame = part.CFrame + Vector3.new(36, 0, 0),
+				CFrame = part.CFrame + travel,
 			}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 		end
 	end
@@ -3524,14 +3528,15 @@ end
 
 function InteractionService:_spawnIslandJellyfishBalloon(source)
 	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
-	local start = Vector3.new(-27, 9.5, sourcePosition.Z)
-	local finish = Vector3.new(27, 12.5, sourcePosition.Z + 8)
+	local startZ = math.clamp(sourcePosition.Z + 2, 142, 164)
+	local start = Vector3.new(-27, 9.5, startZ)
+	local finish = Vector3.new(27, 12.5, startZ + 8)
 	local jellyModel = Instance.new("Model")
 	jellyModel.Name = "IslandJellyfishBalloon"
 	jellyModel.Parent = workspace
 	CollectionService:AddTag(jellyModel, Constants.Tags.TemporaryObject)
 
-	local function makeJellyPart(name, size, cframe, color, material)
+	local function makeJellyPart(name, size, cframe, color, material, shape)
 		local part = Instance.new("Part")
 		part.Name = name
 		part.Anchored = true
@@ -3542,14 +3547,34 @@ function InteractionService:_spawnIslandJellyfishBalloon(source)
 		part.CFrame = cframe
 		part.Color = color
 		part.Material = material or Enum.Material.SmoothPlastic
+		if shape then
+			part.Shape = shape
+		end
 		part.Parent = jellyModel
 		return part
 	end
 
 	local baseCFrame = CFrame.new(start, finish)
-	local bell = makeJellyPart("JellyfishBell", Vector3.new(3.1, 1.7, 3.1), baseCFrame, Color3.fromRGB(255, 142, 216), Enum.Material.Glass)
-	bell.Shape = Enum.PartType.Ball
+	local animatedParts = {}
+
+	local function track(part, offset, kind, index, segment)
+		table.insert(animatedParts, {
+			Part = part,
+			Offset = offset,
+			Kind = kind,
+			Index = index or 0,
+			Segment = segment or 0,
+		})
+	end
+
+	local bell = makeJellyPart("JellyfishBell", Vector3.new(3.1, 1.72, 3.1), baseCFrame, Color3.fromRGB(255, 142, 216), Enum.Material.Glass, Enum.PartType.Ball)
 	bell.Transparency = 0.22
+	track(bell, Vector3.new(0, 0.35, 0), "bell")
+
+	local underside = makeJellyPart("JellyfishGlowBelly", Vector3.new(2.2, 0.36, 2.2), baseCFrame * CFrame.new(0, -0.55, 0), Color3.fromRGB(255, 205, 240), Enum.Material.Neon, Enum.PartType.Ball)
+	underside.Transparency = 0.35
+	track(underside, Vector3.new(0, -0.55, 0), "bell")
+
 	local glow = Instance.new("PointLight")
 	glow.Name = "JellyfishGlow"
 	glow.Brightness = 2
@@ -3557,29 +3582,81 @@ function InteractionService:_spawnIslandJellyfishBalloon(source)
 	glow.Range = 14
 	glow.Parent = bell
 
-	for index = 1, 7 do
-		local angle = (index - 1) * math.pi * 2 / 7
-		local offset = Vector3.new(math.cos(angle) * 1.05, -1.35, math.sin(angle) * 1.05)
-		local tentacle = makeJellyPart(
-			"JellyfishTentacle" .. index,
-			Vector3.new(0.14, 2.6 + (index % 3) * 0.35, 0.14),
-			baseCFrame * CFrame.new(offset),
-			Color3.fromRGB(255, 205, 240),
-			Enum.Material.Neon
-		)
-		tentacle.Transparency = 0.1
+	local trail = Instance.new("ParticleEmitter")
+	trail.Name = "JellyfishMistTrail"
+	trail.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	trail.Rate = 18
+	trail.Lifetime = NumberRange.new(0.45, 0.9)
+	trail.Speed = NumberRange.new(0.45, 1.25)
+	trail.SpreadAngle = Vector2.new(20, 20)
+	trail.Color = ColorSequence.new(Color3.fromRGB(255, 205, 240), Color3.fromRGB(137, 225, 255))
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.18),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	trail.Parent = bell
+
+	for tentacleIndex = 1, 8 do
+		local angle = (tentacleIndex - 1) * math.pi * 2 / 8
+		local rootX = math.cos(angle) * 0.52
+		local rootZ = math.sin(angle) * 0.52
+
+		for segment = 1, 3 do
+			local length = 0.86 + segment * 0.2 + (tentacleIndex % 2) * 0.12
+			local offset = Vector3.new(rootX, -0.92 - segment * 0.62, rootZ)
+			local tentacle = makeJellyPart(
+				("JellyfishTentacle%d_%d"):format(tentacleIndex, segment),
+				Vector3.new(0.13, length, 0.13),
+				baseCFrame * CFrame.new(offset),
+				Color3.fromRGB(255, 205, 240),
+				Enum.Material.Neon
+			)
+			tentacle.Transparency = 0.08 + segment * 0.05
+			track(tentacle, offset, "tentacle", tentacleIndex, segment)
+		end
 	end
 
 	playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.65)
-	for _, part in ipairs(jellyModel:GetChildren()) do
-		if part:IsA("BasePart") then
-			local offset = part.Position - start
-			tweenPart(part, 5.2, {
-				CFrame = CFrame.new(finish + offset, finish + offset + (finish - start)),
-			}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+
+	task.spawn(function()
+		local startedAt = os.clock()
+		local duration = 5.2
+		while jellyModel.Parent do
+			local elapsed = os.clock() - startedAt
+			local alpha = math.clamp(elapsed / duration, 0, 1)
+			local easedAlpha = 0.5 - math.cos(alpha * math.pi) * 0.5
+			local position = start:Lerp(finish, easedAlpha)
+			local bob = math.sin(elapsed * 4.2) * 0.22
+			local base = CFrame.new(position + Vector3.new(0, bob, 0), position + (finish - start))
+				* CFrame.Angles(0, 0, math.sin(elapsed * 2.1) * 0.08)
+
+			for _, item in ipairs(animatedParts) do
+				local part = item.Part
+				if part and part.Parent then
+					local sway = math.sin(elapsed * (4.1 + item.Segment * 0.55) + item.Index * 0.8) * (0.1 + item.Segment * 0.1)
+					local sideSway = math.cos(elapsed * 3.2 + item.Index * 0.7) * (0.05 + item.Segment * 0.04)
+					local offset = item.Offset + Vector3.new(sway, 0, sideSway)
+					local partCFrame = base * CFrame.new(offset)
+					if item.Kind == "tentacle" then
+						partCFrame = partCFrame
+							* CFrame.Angles(math.sin(elapsed * 4 + item.Index) * 0.22, 0, math.cos(elapsed * 3.4 + item.Segment) * 0.2)
+					end
+					part.CFrame = partCFrame
+				end
+			end
+
+			if alpha >= 1 then
+				break
+			end
+
+			RunService.Heartbeat:Wait()
 		end
-	end
+	end)
+
 	task.delay(4.2, function()
+		if trail.Parent then
+			trail.Enabled = false
+		end
 		for _, part in ipairs(jellyModel:GetChildren()) do
 			if part:IsA("BasePart") then
 				tweenPart(part, 0.65, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -3600,7 +3677,6 @@ end
 
 function InteractionService:_spawnIslandShark(exitGate, player)
 	local rootPart = getRootPart(player)
-	local origin = exitGate:IsA("BasePart") and exitGate.Position or Constants.GetRoomSpawnCFrame("Island").Position
 	local sharkModel = Instance.new("Model")
 	sharkModel.Name = "IslandExitSharkAttack"
 	sharkModel.Parent = workspace
@@ -3621,7 +3697,8 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 		return part
 	end
 
-	local targetCFrame = CFrame.new(origin + Vector3.new(0, 2.0, 9.2), origin + Vector3.new(0, 2.0, -2))
+	local attackPoint = Vector3.new(20, 2.0, 142.5)
+	local targetCFrame = CFrame.new(attackPoint, Vector3.new(0, 2.0, 150))
 	local baseCFrame = targetCFrame * CFrame.new(0, -4.8, 11)
 	local body = makeSharkPart("SharkBody", "Part", Vector3.new(11.5, 3.2, 4.1), baseCFrame, Color3.fromRGB(89, 103, 116))
 	body.Shape = Enum.PartType.Ball
@@ -3672,7 +3749,7 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 	end)
 
 	if rootPart then
-		local destination = Constants.GetRoomSpawnCFrame("Island") * CFrame.new(0, 0, 22)
+		local destination = CFrame.new(Vector3.new(0, 3, 154), Vector3.new(0, 3, 166))
 		local pushDirection = (destination.Position - rootPart.Position)
 		if pushDirection.Magnitude < 1 then
 			pushDirection = Vector3.new(0, 0, 1)
