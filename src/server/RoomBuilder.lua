@@ -1848,12 +1848,17 @@ local function makeTVSecretRoom(roomFolder)
 	}
 end
 
-local function makePalmTree(parent, name, x, z, leanDegrees)
+local function makePalmTree(parent, name, x, z, leanDegrees, coconutCount, dropCoconutId)
 	local tree = makeModel(parent, name)
 	local trunkHeight = 7.2
 	local trunkDiameter = 0.8
 	local baseCFrame = cframeAt(ISLAND_ORIGIN, x, 1.02, z) * CFrame.Angles(0, 0, math.rad(leanDegrees or 0))
 	local trunk = createPart(tree, "PalmTrunk", Vector3.new(trunkDiameter, trunkHeight, trunkDiameter), baseCFrame * CFrame.new(0, trunkHeight / 2, 0), Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
+	if dropCoconutId then
+		trunk:SetAttribute("DropCoconutId", dropCoconutId)
+		createPrompt(trunk, "Shake", "Coconut Palm", 0)
+		tag(trunk, Constants.Tags.IslandCoconutTree)
+	end
 
 	for index = 1, 5 do
 		createPart(tree, "PalmTrunkBand", Vector3.new(trunkDiameter + 0.14, 0.14, trunkDiameter + 0.14), baseCFrame * CFrame.new(0, 0.9 + index * 1.05, 0), Color3.fromRGB(91, 58, 34), Enum.Material.Wood)
@@ -1872,6 +1877,23 @@ local function makePalmTree(parent, name, x, z, leanDegrees)
 			"WedgePart"
 		)
 		leaf:SetAttribute("LeafIndex", index)
+	end
+
+	for coconutIndex = 1, coconutCount or 0 do
+		local angle = math.rad(115 + coconutIndex * 72)
+		local coconut = createPart(
+			tree,
+			"PalmCoconut" .. coconutIndex,
+			Vector3.new(0.72, 0.72, 0.72),
+			crownCFrame * CFrame.new(math.cos(angle) * 0.62, -0.38 - coconutIndex * 0.08, math.sin(angle) * 0.62),
+			Color3.fromRGB(91, 54, 31),
+			Enum.Material.Wood
+		)
+		coconut.Shape = Enum.PartType.Ball
+		coconut:SetAttribute("TreeCoconutIndex", coconutIndex)
+		if dropCoconutId and coconutIndex == 1 then
+			coconut:SetAttribute("DropsWithCoconutId", dropCoconutId)
+		end
 	end
 
 	tree.PrimaryPart = trunk
@@ -1944,8 +1966,8 @@ local function makeIslandRoom(roomFolder)
 		rock.Shape = Enum.PartType.Ball
 	end
 
-	makePalmTree(room, "BentPalm", -10, 8, -9)
-	makePalmTree(room, "SmallPalm", 10, 1, 6)
+	makePalmTree(room, "BentPalm", -10, 8, -9, 1)
+	makePalmTree(room, "SmallPalm", 10, 1, 6, 2, "dropped_palm_coconut")
 
 	for _, data in ipairs({
 		{ Name = "NorthHorizon", Size = Vector3.new(150, 28, 0.4), CFrame = cframeAt(origin, 0, 13, 87), Color = Color3.fromRGB(133, 215, 255) },
@@ -2051,6 +2073,189 @@ end
 local function makeIslandObjects(objectsFolder)
 	local origin = ISLAND_ORIGIN
 	local objects = makeModel(objectsFolder, "IslandObjects")
+
+	local function makeGroundCoconut(name, localPosition, coconutId, startsCrab, hidden)
+		local coconut = createPart(
+			objects,
+			name,
+			Vector3.new(1.05, 1.05, 1.05),
+			cframeAt(origin, localPosition.X, localPosition.Y, localPosition.Z) * CFrame.Angles(math.rad(8), math.rad(25), math.rad(-11)),
+			Color3.fromRGB(94, 55, 31),
+			Enum.Material.Wood
+		)
+		coconut.Shape = Enum.PartType.Ball
+		coconut:SetAttribute("CoconutId", coconutId)
+		coconut:SetAttribute("StartsCrab", startsCrab == true)
+
+		local eyeA = createPart(objects, name .. "EyeA", Vector3.new(0.12, 0.08, 0.08), coconut.CFrame * CFrame.new(-0.18, 0.22, -0.5), Color3.fromRGB(28, 18, 12), Enum.Material.SmoothPlastic)
+		local eyeB = createPart(objects, name .. "EyeB", Vector3.new(0.12, 0.08, 0.08), coconut.CFrame * CFrame.new(0.1, 0.26, -0.52), Color3.fromRGB(28, 18, 12), Enum.Material.SmoothPlastic)
+		local eyeC = createPart(objects, name .. "EyeC", Vector3.new(0.1, 0.08, 0.08), coconut.CFrame * CFrame.new(0.26, 0.03, -0.48), Color3.fromRGB(28, 18, 12), Enum.Material.SmoothPlastic)
+		eyeA.CanCollide = false
+		eyeB.CanCollide = false
+		eyeC.CanCollide = false
+		eyeA:SetAttribute("BaseCanCollide", false)
+		eyeB:SetAttribute("BaseCanCollide", false)
+		eyeC:SetAttribute("BaseCanCollide", false)
+
+		local prompt = createPrompt(coconut, "Inspect", "Coconut", 0)
+		if hidden then
+			for _, part in ipairs({ coconut, eyeA, eyeB, eyeC }) do
+				part.Transparency = 1
+				part.CanCollide = false
+				part:SetAttribute("BaseTransparency", 1)
+				part:SetAttribute("BaseCanCollide", false)
+			end
+			prompt.Enabled = false
+			prompt:SetAttribute("BaseEnabled", false)
+		end
+		tag(coconut, Constants.Tags.IslandCoconut)
+		return coconut
+	end
+
+	makeGroundCoconut("IslandCoconutCrabShell", Vector3.new(-3.2, 1.12, 11.8), "crab_shell", true, false)
+	makeGroundCoconut("IslandQuietCoconut", Vector3.new(13.5, 1.08, -4.2), "quiet_coconut", false, false)
+	makeGroundCoconut("IslandDroppedPalmCoconut", Vector3.new(9.8, 1.08, 1.2), "dropped_palm_coconut", false, true)
+
+	for woodIndex, data in ipairs({
+		{ Position = Vector3.new(-15.2, 1.0, -4.8), Yaw = -25 },
+		{ Position = Vector3.new(14.6, 1.0, 12.4), Yaw = 18 },
+		{ Position = Vector3.new(1.8, 1.0, 17.4), Yaw = 64 },
+		{ Position = Vector3.new(-11.8, 1.0, 15.3), Yaw = -72 },
+	}) do
+		local wood = createPart(
+			objects,
+			"IslandScrapWood" .. woodIndex,
+			Vector3.new(2.8, 0.28, 0.42),
+			cframeAt(origin, data.Position.X, data.Position.Y, data.Position.Z) * CFrame.Angles(0, math.rad(data.Yaw), math.rad(5)),
+			Color3.fromRGB(126, 78, 43),
+			Enum.Material.WoodPlanks
+		)
+		wood:SetAttribute("WoodId", "scrap_" .. woodIndex)
+		createPrompt(wood, "Collect", "Scrap Wood", 0)
+		tag(wood, Constants.Tags.IslandScrapWood)
+	end
+
+	local fireRing = makeModel(objects, "IslandFireRing")
+	local fireCenter = cframeAt(origin, 0, 1.04, 4.6)
+	for rockIndex = 1, 10 do
+		local angle = (rockIndex - 1) * math.pi * 2 / 10
+		local rock = createPart(
+			fireRing,
+			"FireRingRock" .. rockIndex,
+			Vector3.new(1.05, 0.62, 0.9),
+			fireCenter * CFrame.new(math.cos(angle) * 2.45, 0, math.sin(angle) * 2.45) * CFrame.Angles(0, -angle, math.rad((rockIndex % 3 - 1) * 7)),
+			Color3.fromRGB(102, 101, 93),
+			Enum.Material.Slate
+		)
+		rock.Shape = Enum.PartType.Ball
+	end
+
+	for stickIndex = 1, 3 do
+		local stick = createPart(
+			fireRing,
+			"FireRingWoodStick" .. stickIndex,
+			Vector3.new(2.45, 0.28, 0.32),
+			fireCenter * CFrame.new(0, 0.15 + stickIndex * 0.12, 0) * CFrame.Angles(0, math.rad((stickIndex - 1) * 60), math.rad(7)),
+			Color3.fromRGB(118, 70, 36),
+			Enum.Material.Wood
+		)
+		stick.Transparency = 1
+		stick.CanCollide = false
+		stick:SetAttribute("FirewoodIndex", stickIndex)
+		stick:SetAttribute("BaseTransparency", 1)
+		stick:SetAttribute("BaseCanCollide", false)
+	end
+
+	local fireEmitter = createPart(fireRing, "IslandFireEmitter", Vector3.new(0.6, 0.6, 0.6), fireCenter * CFrame.new(0, 0.6, 0), Color3.fromRGB(255, 135, 42), Enum.Material.Neon)
+	fireEmitter.Shape = Enum.PartType.Ball
+	fireEmitter.Transparency = 1
+	fireEmitter.CanCollide = false
+	fireEmitter:SetAttribute("BaseTransparency", 1)
+	fireEmitter:SetAttribute("BaseCanCollide", false)
+
+	local function addEmitter(name, texture, rate, lifetime, speed, size, color, transparency, acceleration)
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = name
+		emitter.Texture = texture
+		emitter.Enabled = false
+		emitter.Rate = rate
+		emitter.Lifetime = lifetime
+		emitter.Speed = speed
+		emitter.Drag = 1.25
+		emitter.SpreadAngle = Vector2.new(18, 18)
+		emitter.Size = size
+		emitter.Color = color
+		emitter.Transparency = transparency
+		emitter.Acceleration = acceleration
+		emitter:SetAttribute("IslandFireEmitter", true)
+		emitter.Parent = fireEmitter
+		return emitter
+	end
+
+	addEmitter(
+		"IslandFireCore",
+		"rbxasset://textures/particles/fire_main.dds",
+		42,
+		NumberRange.new(0.35, 0.7),
+		NumberRange.new(1.2, 2.8),
+		NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1.2),
+			NumberSequenceKeypoint.new(0.45, 2.1),
+			NumberSequenceKeypoint.new(1, 0.25),
+		}),
+		ColorSequence.new(Color3.fromRGB(255, 239, 118), Color3.fromRGB(255, 78, 31)),
+		NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.08),
+			NumberSequenceKeypoint.new(0.75, 0.24),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Vector3.new(0, 3.1, 0)
+	)
+	addEmitter(
+		"IslandFireGlow",
+		"rbxasset://textures/particles/sparkles_main.dds",
+		16,
+		NumberRange.new(0.3, 0.55),
+		NumberRange.new(0.8, 1.8),
+		NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(1, 0.08),
+		}),
+		ColorSequence.new(Color3.fromRGB(255, 170, 48), Color3.fromRGB(255, 62, 36)),
+		NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.22),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Vector3.new(0, 4.2, 0)
+	)
+	addEmitter(
+		"IslandCampfireSmoke",
+		"rbxasset://textures/particles/smoke_main.dds",
+		11,
+		NumberRange.new(3.8, 6.5),
+		NumberRange.new(0.35, 0.8),
+		NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1.5),
+			NumberSequenceKeypoint.new(0.55, 4.5),
+			NumberSequenceKeypoint.new(1, 7.5),
+		}),
+		ColorSequence.new(Color3.fromRGB(99, 99, 95), Color3.fromRGB(182, 182, 174)),
+		NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.68),
+			NumberSequenceKeypoint.new(0.6, 0.82),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Vector3.new(0, 2.5, 0)
+	)
+
+	local firePromptPart = createPart(fireRing, "IslandFireRingPrompt", Vector3.new(5.2, 1.4, 5.2), fireCenter * CFrame.new(0, 0.45, 0), Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
+	firePromptPart.Transparency = 1
+	firePromptPart.CanCollide = false
+	firePromptPart:SetAttribute("BaseTransparency", 1)
+	firePromptPart:SetAttribute("BaseCanCollide", false)
+	createPrompt(firePromptPart, "Add Wood", "Rock Ring", 0)
+	tag(firePromptPart, Constants.Tags.IslandFireRing)
+	fireRing.PrimaryPart = firePromptPart
 
 	local shovel = makeModel(objects, "IslandShovel")
 	local shovelCFrame = cframeAt(origin, -8, 2.4, 1.5) * CFrame.Angles(0, 0, math.rad(-32))

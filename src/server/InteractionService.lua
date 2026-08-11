@@ -380,6 +380,11 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandShovelState = {}
 	self.islandTreasureState = {}
 	self.islandColaState = {}
+	self.islandCoconutState = {}
+	self.islandCoconutTreeState = {}
+	self.islandScrapWoodState = {}
+	self.islandWoodCountByUserId = {}
+	self.islandFireRingState = {}
 	self.secretDoorState = {}
 	self.libraryLampState = {}
 	self.libraryGlobeState = {}
@@ -418,6 +423,7 @@ function InteractionService:Initialize()
 		self.islandExitBounceAtByUserId[player.UserId] = nil
 		self.islandExitWarningsByUserId[player.UserId] = nil
 		self.islandWarningReadStateByUserId[player.UserId] = nil
+		self.islandWoodCountByUserId[player.UserId] = nil
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -550,6 +556,22 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.IslandBloxyCola, function(instance)
 		self:_wireIslandBloxyCola(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandCoconut, function(instance)
+		self:_wireIslandCoconut(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandCoconutTree, function(instance)
+		self:_wireIslandCoconutTree(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandScrapWood, function(instance)
+		self:_wireIslandScrapWood(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.IslandFireRing, function(instance)
+		self:_wireIslandFireRing(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.LibraryBook, function(instance)
@@ -1750,6 +1772,38 @@ function InteractionService:_afterRoomReset()
 
 	for _, state in pairs(self.islandColaState) do
 		state.Reacting = false
+	end
+
+	self.islandWoodCountByUserId = {}
+	for _, state in pairs(self.islandCoconutState) do
+		state.Reacting = false
+		state.CrabStarted = false
+	end
+
+	for _, state in pairs(self.islandCoconutTreeState) do
+		state.Reacting = false
+		state.Dropped = false
+	end
+
+	for _, state in pairs(self.islandScrapWoodState) do
+		state.Collected = false
+		state.Reacting = false
+	end
+
+	for fireRing, state in pairs(self.islandFireRingState) do
+		state.Deposited = 0
+		state.Burning = false
+		state.Smoking = false
+		state.Token = nil
+		if fireRing and fireRing.Parent then
+			self:_setIslandFireEmitters(fireRing, false, false)
+			self:_setIslandFireWoodVisible(fireRing, 0)
+			local prompt = getPrompt(fireRing)
+			if prompt then
+				prompt.ActionText = "Add Wood"
+				prompt.ObjectText = "Rock Ring"
+			end
+		end
 	end
 end
 
@@ -4062,6 +4116,374 @@ function InteractionService:_wireIslandBloxyCola(cola)
 		self.systemMessageRemote:FireClient(player, "The island Bloxy Cola makes the correct soda noise.")
 		task.wait(0.25)
 		state.Reacting = false
+	end)
+end
+
+function InteractionService:_getCoconutParts(coconut)
+	if not coconut or not coconut.Parent then
+		return {}
+	end
+
+	local parts = {}
+	local prefix = coconut.Name
+	for _, instance in ipairs(coconut.Parent:GetChildren()) do
+		if instance:IsA("BasePart") and (instance == coconut or instance.Name:sub(1, #prefix) == prefix) then
+			table.insert(parts, instance)
+		end
+	end
+
+	return parts
+end
+
+function InteractionService:_setCoconutVisible(coconut, visible)
+	for _, part in ipairs(self:_getCoconutParts(coconut)) do
+		part.Transparency = visible and 0 or 1
+		part.CanCollide = visible and part == coconut
+	end
+
+	setPromptEnabled(coconut, visible)
+end
+
+function InteractionService:_findIslandCoconutById(coconutId)
+	for _, coconut in ipairs(CollectionService:GetTagged(Constants.Tags.IslandCoconut)) do
+		if coconut:IsA("BasePart") and coconut:GetAttribute("CoconutId") == coconutId then
+			return coconut
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_spawnIslandCoconutCrab(coconut)
+	local start = coconut.Position + Vector3.new(0, -0.2, 0)
+	local crab = Instance.new("Model")
+	crab.Name = "IslandCoconutCrab"
+	crab.Parent = workspace
+	CollectionService:AddTag(crab, Constants.Tags.TemporaryObject)
+
+	local function makeCrabPart(name, size, cframe, color, material, shape)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Anchored = true
+		part.CanCollide = false
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.Size = size
+		part.CFrame = cframe
+		part.Color = color
+		part.Material = material or Enum.Material.SmoothPlastic
+		if shape then
+			part.Shape = shape
+		end
+		part.Parent = crab
+		return part
+	end
+
+	local baseCFrame = CFrame.new(start + Vector3.new(0, 0.08, 0), start + Vector3.new(1, 0, 0))
+	local body = makeCrabPart("CrabBody", Vector3.new(1.25, 0.45, 0.9), baseCFrame, Color3.fromRGB(181, 82, 41), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabLeftClaw", Vector3.new(0.38, 0.26, 0.52), baseCFrame * CFrame.new(0.72, 0.08, -0.42) * CFrame.Angles(0, math.rad(16), math.rad(18)), Color3.fromRGB(220, 98, 48), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabRightClaw", Vector3.new(0.38, 0.26, 0.52), baseCFrame * CFrame.new(0.72, 0.08, 0.42) * CFrame.Angles(0, math.rad(-16), math.rad(-18)), Color3.fromRGB(220, 98, 48), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabLeftEye", Vector3.new(0.16, 0.16, 0.16), baseCFrame * CFrame.new(0.34, 0.32, -0.22), Color3.fromRGB(12, 12, 14), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabRightEye", Vector3.new(0.16, 0.16, 0.16), baseCFrame * CFrame.new(0.34, 0.32, 0.22), Color3.fromRGB(12, 12, 14), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+
+	for sideIndex, sideZ in ipairs({ -0.46, -0.25, 0.25, 0.46 }) do
+		local side = sideZ < 0 and -1 or 1
+		local leg = makeCrabPart(
+			"CrabLeg" .. sideIndex,
+			Vector3.new(0.62, 0.12, 0.12),
+			baseCFrame * CFrame.new(-0.18, -0.12, sideZ) * CFrame.Angles(0, 0, math.rad(18 * side)),
+			Color3.fromRGB(194, 86, 42),
+			Enum.Material.SmoothPlastic
+		)
+		leg:SetAttribute("LegSide", side)
+	end
+
+	playSound(coconut, "rbxasset://sounds/snap.wav", 0.42, 1.35)
+	if coconut:IsA("BasePart") then
+		local base = coconut:GetAttribute("BaseCFrame") or coconut.CFrame
+		tweenPart(coconut, 0.14, {
+			CFrame = base + Vector3.new(0, 0.65, 0),
+		}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		task.delay(0.36, function()
+			if coconut.Parent then
+				tweenPart(coconut, 0.16, { CFrame = base }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end)
+	end
+
+	for step = 1, 5 do
+		task.delay((step - 1) * 0.18, function()
+			if not crab.Parent then
+				return
+			end
+
+			local offset = Vector3.new(step * 0.72, math.sin(step) * 0.05, math.sin(step * 1.7) * 0.22)
+			for _, part in ipairs(crab:GetChildren()) do
+				if part:IsA("BasePart") then
+					local legSide = part:GetAttribute("LegSide") or 0
+					tweenPart(part, 0.16, {
+						CFrame = part.CFrame + offset + Vector3.new(0, 0, legSide * 0.08 * ((step % 2 == 0) and 1 or -1)),
+					}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+				end
+			end
+		end)
+	end
+
+	task.delay(2.2, function()
+		for _, part in ipairs(crab:GetChildren()) do
+			if part:IsA("BasePart") then
+				tweenPart(part, 0.5, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end
+	end)
+	Debris:AddItem(crab, 3)
+end
+
+function InteractionService:_wireIslandCoconut(coconut)
+	local prompt = getPrompt(coconut)
+
+	self.islandCoconutState[coconut] = self.islandCoconutState[coconut] or {
+		Reacting = false,
+		CrabStarted = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandCoconutState[coconut]
+		if not state or state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		if coconut:GetAttribute("StartsCrab") and not state.CrabStarted then
+			state.CrabStarted = true
+			self.discoveryService:Unlock(player, Constants.Discoveries.IslandCoconutCrab.Id)
+			self:_spawnIslandCoconutCrab(coconut)
+			self.systemMessageRemote:FireClient(player, "The coconut was occupied. Briefly.")
+		else
+			playSound(coconut, "rbxasset://sounds/button.wav", 0.28, 0.62)
+			self.systemMessageRemote:FireClient(player, "The coconut sounds hollow, which is exactly what a coconut would say.")
+		end
+
+		task.wait(0.2)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireIslandCoconutTree(treePart)
+	local prompt = getPrompt(treePart)
+
+	self.islandCoconutTreeState[treePart] = self.islandCoconutTreeState[treePart] or {
+		Reacting = false,
+		Dropped = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandCoconutTreeState[treePart]
+		if not state or state.Reacting then
+			return
+		end
+
+		if state.Dropped then
+			self.systemMessageRemote:FireClient(player, "The palm tree has already contributed one coconut to science.")
+			return
+		end
+
+		state.Reacting = true
+		state.Dropped = true
+		local dropId = treePart:GetAttribute("DropCoconutId")
+		local droppedCoconut = dropId and self:_findIslandCoconutById(dropId)
+
+		for _, part in ipairs(treePart.Parent and treePart.Parent:GetDescendants() or {}) do
+			if part:IsA("BasePart") and part:GetAttribute("DropsWithCoconutId") == dropId then
+				tweenPart(part, 0.28, {
+					Transparency = 1,
+					CFrame = part.CFrame + Vector3.new(0, -2.2, 0),
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				part.CanCollide = false
+			end
+		end
+
+		if droppedCoconut then
+			self:_setCoconutVisible(droppedCoconut, true)
+			for _, coconutPart in ipairs(self:_getCoconutParts(droppedCoconut)) do
+				local base = coconutPart:GetAttribute("BaseCFrame") or coconutPart.CFrame
+				coconutPart.CFrame = base + Vector3.new(0, 3.2, 0)
+				tweenPart(coconutPart, 0.36, { CFrame = base }, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+			end
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.IslandDroppedCoconut.Id)
+		playSound(treePart, "rbxasset://sounds/snap.wav", 0.46, 0.74)
+		self.systemMessageRemote:FireClient(player, "A coconut drops with the confidence of gravity.")
+		task.wait(0.24)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireIslandScrapWood(wood)
+	local prompt = getPrompt(wood)
+
+	self.islandScrapWoodState[wood] = self.islandScrapWoodState[wood] or {
+		Reacting = false,
+		Collected = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandScrapWoodState[wood]
+		if not state or state.Reacting or state.Collected then
+			return
+		end
+
+		state.Reacting = true
+		state.Collected = true
+		self.islandWoodCountByUserId[player.UserId] = (self.islandWoodCountByUserId[player.UserId] or 0) + 1
+		self.discoveryService:Unlock(player, Constants.Discoveries.IslandDriftwood.Id)
+		playSound(wood, "rbxasset://sounds/button.wav", 0.33, 0.78)
+		if wood:IsA("BasePart") then
+			tweenPart(wood, 0.18, {
+				Transparency = 1,
+				CFrame = wood.CFrame + Vector3.new(0, 0.45, 0),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			wood.CanCollide = false
+		end
+		setPromptEnabled(wood, false)
+		self.systemMessageRemote:FireClient(player, ("Scrap wood collected: %d. The fire ring looks interested."):format(self.islandWoodCountByUserId[player.UserId]))
+		task.wait(0.15)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_getIslandFireRingModel(fireRingPart)
+	return fireRingPart and (fireRingPart:FindFirstAncestor("IslandFireRing") or fireRingPart.Parent)
+end
+
+function InteractionService:_setIslandFireWoodVisible(fireRingPart, depositedCount)
+	local fireRing = self:_getIslandFireRingModel(fireRingPart)
+	if not fireRing then
+		return
+	end
+
+	for _, instance in ipairs(fireRing:GetDescendants()) do
+		if instance:IsA("BasePart") and instance:GetAttribute("FirewoodIndex") then
+			local index = instance:GetAttribute("FirewoodIndex")
+			instance.Transparency = index <= depositedCount and 0 or 1
+			instance.CanCollide = false
+		end
+	end
+end
+
+function InteractionService:_setIslandFireEmitters(fireRingPart, fireActive, smokeActive)
+	local fireRing = self:_getIslandFireRingModel(fireRingPart)
+	if not fireRing then
+		return
+	end
+
+	for _, instance in ipairs(fireRing:GetDescendants()) do
+		if instance:IsA("ParticleEmitter") and instance:GetAttribute("IslandFireEmitter") then
+			if instance.Name:find("Smoke", 1, true) then
+				instance.Enabled = smokeActive
+			else
+				instance.Enabled = fireActive
+			end
+		end
+	end
+end
+
+function InteractionService:_startIslandCampfire(fireRingPart, player)
+	local state = self.islandFireRingState[fireRingPart]
+	if not state or state.Burning or state.Smoking then
+		return
+	end
+
+	state.Burning = true
+	state.Smoking = true
+	state.Token = {}
+	local token = state.Token
+	local prompt = getPrompt(fireRingPart)
+	if prompt then
+		prompt.ActionText = "Warming"
+		prompt.ObjectText = "Campfire"
+	end
+
+	self:_setIslandFireEmitters(fireRingPart, true, true)
+	self.discoveryService:Unlock(player, Constants.Discoveries.IslandCampfire.Id)
+	playSound(fireRingPart, "rbxasset://sounds/electronicpingshort.wav", 0.45, 0.48)
+	self.systemMessageRemote:FireClient(player, "The island campfire decides to be dramatically useful.")
+
+	task.delay(18, function()
+		if state.Token ~= token then
+			return
+		end
+
+		state.Burning = false
+		self:_setIslandFireEmitters(fireRingPart, false, true)
+		if prompt then
+			prompt.ActionText = "Smoking"
+		end
+		self.systemMessageRemote:FireAllClients("The campfire goes out, but keeps smoking like it has notes.")
+
+		task.delay(30, function()
+			if state.Token ~= token then
+				return
+			end
+
+			state.Smoking = false
+			self:_setIslandFireEmitters(fireRingPart, false, false)
+			if prompt then
+				prompt.ActionText = "Relight"
+				prompt.ObjectText = "Wood-Filled Ring"
+			end
+		end)
+	end)
+end
+
+function InteractionService:_wireIslandFireRing(fireRingPart)
+	local prompt = getPrompt(fireRingPart)
+
+	self.islandFireRingState[fireRingPart] = self.islandFireRingState[fireRingPart] or {
+		Deposited = 0,
+		Burning = false,
+		Smoking = false,
+		Token = nil,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandFireRingState[fireRingPart]
+		if not state then
+			return
+		end
+
+		local requiredWood = 3
+		if state.Deposited < requiredWood then
+			local heldWood = self.islandWoodCountByUserId[player.UserId] or 0
+			if heldWood <= 0 then
+				self.systemMessageRemote:FireClient(player, ("The rock ring wants %d pieces of driftwood. You are carrying none."):format(requiredWood - state.Deposited))
+				return
+			end
+
+			self.islandWoodCountByUserId[player.UserId] = heldWood - 1
+			state.Deposited += 1
+			self:_setIslandFireWoodVisible(fireRingPart, state.Deposited)
+			playSound(fireRingPart, "rbxasset://sounds/button.wav", 0.35, 0.68)
+			if prompt then
+				prompt.ActionText = state.Deposited >= requiredWood and "Light" or "Add Wood"
+				prompt.ObjectText = state.Deposited >= requiredWood and "Wood-Filled Ring" or "Rock Ring"
+			end
+			self.systemMessageRemote:FireClient(player, ("Driftwood added: %d / %d."):format(state.Deposited, requiredWood))
+			return
+		end
+
+		if state.Burning then
+			self.systemMessageRemote:FireClient(player, "The campfire is already doing fire things.")
+			return
+		end
+
+		if state.Smoking then
+			self.systemMessageRemote:FireClient(player, "The campfire is out, but still smoking for a bit.")
+			return
+		end
+
+		self:_startIslandCampfire(fireRingPart, player)
 	end)
 end
 

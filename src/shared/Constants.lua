@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.16"
+Constants.BuildVersion = "0.5.17"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -64,6 +64,10 @@ Constants.Tags = {
 	IslandShovel = "DontTouchIt_IslandShovel",
 	IslandTreasure = "DontTouchIt_IslandTreasure",
 	IslandBloxyCola = "DontTouchIt_IslandBloxyCola",
+	IslandCoconut = "DontTouchIt_IslandCoconut",
+	IslandCoconutTree = "DontTouchIt_IslandCoconutTree",
+	IslandScrapWood = "DontTouchIt_IslandScrapWood",
+	IslandFireRing = "DontTouchIt_IslandFireRing",
 	FloorSection = "DontTouchIt_FloorSection",
 	ObjectRainObject = "DontTouchIt_ObjectRainObject",
 	TemporaryObject = "DontTouchIt_TemporaryObject",
@@ -331,6 +335,26 @@ Constants.Discoveries = {
 		Name = "Found Island Bloxy Cola",
 		Hint = "Open the treasure box and try the cola.",
 	},
+	IslandCoconutCrab = {
+		Id = "island_coconut_crab",
+		Name = "Met the Coconut Crab",
+		Hint = "One coconut on the island is hiding something with tiny legs.",
+	},
+	IslandDroppedCoconut = {
+		Id = "island_dropped_coconut",
+		Name = "Convinced a Palm Tree",
+		Hint = "One palm tree has two coconuts and might respond to a shake.",
+	},
+	IslandDriftwood = {
+		Id = "island_driftwood",
+		Name = "Collected Driftwood",
+		Hint = "Look near the island edges for scraps of wood.",
+	},
+	IslandCampfire = {
+		Id = "island_campfire",
+		Name = "Lit the Campfire",
+		Hint = "Bring driftwood to the rock ring near the center of the island.",
+	},
 	IslandNoTouch = {
 		Id = "island_no_touch",
 		Name = "Left the Island Alone",
@@ -497,6 +521,10 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.DugTreasure.Id,
 		Constants.Discoveries.OpenedTreasure.Id,
 		Constants.Discoveries.IslandBloxyCola.Id,
+		Constants.Discoveries.IslandCoconutCrab.Id,
+		Constants.Discoveries.IslandDroppedCoconut.Id,
+		Constants.Discoveries.IslandDriftwood.Id,
+		Constants.Discoveries.IslandCampfire.Id,
 		Constants.Discoveries.IslandNoTouch.Id,
 	},
 	Library = {
@@ -691,6 +719,10 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.DugTreasure.Id] = Constants.Tags.IslandShovel,
 	[Constants.Discoveries.OpenedTreasure.Id] = Constants.Tags.IslandTreasure,
 	[Constants.Discoveries.IslandBloxyCola.Id] = Constants.Tags.IslandBloxyCola,
+	[Constants.Discoveries.IslandCoconutCrab.Id] = Constants.Tags.IslandCoconut,
+	[Constants.Discoveries.IslandDroppedCoconut.Id] = Constants.Tags.IslandCoconutTree,
+	[Constants.Discoveries.IslandDriftwood.Id] = Constants.Tags.IslandScrapWood,
+	[Constants.Discoveries.IslandCampfire.Id] = Constants.Tags.IslandFireRing,
 	[Constants.Discoveries.LibraryEntered.Id] = Constants.Tags.SecretRoomDoor,
 	[Constants.Discoveries.LibraryForbiddenBook.Id] = Constants.Tags.LibraryBook,
 	[Constants.Discoveries.LibraryShushedShelf.Id] = Constants.Tags.LibraryShelf,
