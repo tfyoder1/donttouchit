@@ -165,13 +165,13 @@ bookPanel.BackgroundColor3 = Color3.fromRGB(28, 30, 36)
 bookPanel.BackgroundTransparency = 0.04
 bookPanel.BorderSizePixel = 0
 bookPanel.Position = UDim2.fromScale(0.5, 0.52)
-bookPanel.Size = UDim2.new(0.94, 0, 0.9, 0)
+bookPanel.Size = UDim2.new(0.9, 0, 0.84, 0)
 bookPanel.Visible = false
 bookPanel.Active = true
 bookPanel.Parent = gui
 
 local bookPanelConstraint = Instance.new("UISizeConstraint")
-bookPanelConstraint.MaxSize = Vector2.new(680, 560)
+bookPanelConstraint.MaxSize = Vector2.new(620, 520)
 bookPanelConstraint.MinSize = Vector2.new(300, 300)
 bookPanelConstraint.Parent = bookPanel
 
