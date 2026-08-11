@@ -618,10 +618,20 @@ local activeSecretDoorAction = "RevealSecretDoor"
 local currentStatusType = nil
 local currentStatusRoomId = nil
 local pendingStartOptions = nil
+local startIntroSequence = 0
 local overlayMouseDepth = 0
 local previousMouseBehavior = nil
 local previousMouseIconEnabled = nil
 local previousSelectedObject = nil
+
+local START_INTRO_LINES = {
+	"%s, our records show you touched %d / %d things that were doing an excellent job not being touched.",
+	"Welcome back, %s. You have touched %d of %d objects that specifically requested distance.",
+	"%s has touched %d / %d suspicious objects so far. Bold. Incorrect, but bold.",
+	"Official audit: %s touched %d out of %d things they should not have touched at all.",
+	"%s, the room says you touched %d / %d forbidden things. The room is trying to stay professional.",
+	"Current evidence: %s touched %d of %d objects marked by common sense as probably a bad idea.",
+}
 
 local function tween(instance, duration, properties)
 	local tweenObject = TweenService:Create(
@@ -683,6 +693,36 @@ local function showSystemMessage(text)
 			BackgroundTransparency = 1,
 			TextTransparency = 1,
 		})
+	end)
+end
+
+local function getIntroName()
+	if player.DisplayName and player.DisplayName ~= "" then
+		return player.DisplayName
+	end
+
+	return player.Name
+end
+
+local function formatRandomStartIntro(payload)
+	local count = payload.DiscoveryCount or 0
+	local total = payload.TotalDiscoveries or Constants.TotalDiscoveries
+	local template = START_INTRO_LINES[math.random(1, #START_INTRO_LINES)]
+	return template:format(getIntroName(), count, total)
+end
+
+local function rotateStartIntro(payload)
+	startIntroSequence += 1
+	local sequence = startIntroSequence
+	startIntro.Text = formatRandomStartIntro(payload)
+
+	task.spawn(function()
+		while startOverlay.Visible and startIntroSequence == sequence do
+			task.wait(4)
+			if startOverlay.Visible and startIntroSequence == sequence then
+				startIntro.Text = formatRandomStartIntro(payload)
+			end
+		end
 	end)
 end
 
@@ -781,6 +821,7 @@ end
 
 local function sendStartChoice(action)
 	startOverlay.Visible = false
+	startIntroSequence += 1
 	continueButton.Modal = false
 	restartButton.Modal = false
 	setOverlayMouse(false)
@@ -800,7 +841,7 @@ local function renderStartOptions(payload)
 	continueButton.Modal = true
 	restartButton.Modal = true
 	setOverlayMouse(true, continueButton)
-	startIntro.Text = payload.IntroText or Constants.GameIntro
+	rotateStartIntro(payload)
 	startSubtitle.Text = ("Book: %d / %d found    Hints: %d    Clues: %d"):format(
 		payload.DiscoveryCount or 0,
 		payload.TotalDiscoveries or Constants.TotalDiscoveries,
