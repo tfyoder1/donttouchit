@@ -90,6 +90,7 @@ end
 function DiscoveryService:Initialize()
 	Players.PlayerAdded:Connect(function(player)
 		self:_loadPlayer(player)
+		self:_grantRoomCompletionSecretKeys(player)
 		self:_syncSecretKeyTools(player)
 		self:_sendSnapshot(player)
 
@@ -120,6 +121,7 @@ function DiscoveryService:Initialize()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_loadPlayer(player)
+		self:_grantRoomCompletionSecretKeys(player)
 		self:_syncSecretKeyTools(player)
 		self:_sendSnapshot(player)
 	end
@@ -571,6 +573,27 @@ function DiscoveryService:GrantSecretKey(player, roomId, messageText)
 	return true
 end
 
+function DiscoveryService:_grantRoomCompletionSecretKeys(player)
+	if not player or not player.Parent or not Constants.SecretDoors then
+		return
+	end
+
+	self:_ensurePlayer(player)
+
+	for roomId, config in pairs(Constants.SecretDoors) do
+		if config.AutoGrantOnComplete
+			and not self.secretKeysByUserId[player.UserId][roomId]
+			and self:IsRoomComplete(player, roomId)
+		then
+			self:GrantSecretKey(
+				player,
+				roomId,
+				config.AutoGrantMessage or ("%s added to your inventory."):format(config.KeyName or "Secret Key")
+			)
+		end
+	end
+end
+
 function DiscoveryService:HasSecretDoorReveal(player, roomId)
 	if not player or not player.Parent then
 		return false
@@ -729,6 +752,8 @@ function DiscoveryService:Unlock(player, discoveryId)
 		end
 	end
 
+	self:_grantRoomCompletionSecretKeys(player)
+
 	local lastUnlockedRoomId = self:GetLastUnlockedRoomId(player)
 	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
 
@@ -829,6 +854,7 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 	end
 
 	self:_ensurePlayer(player)
+	self:_grantRoomCompletionSecretKeys(player)
 
 	local room = Constants.GetRoom(roomId) or Constants.GetRoom(Constants.RoomOrder[1])
 	if not room then
