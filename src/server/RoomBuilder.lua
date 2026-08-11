@@ -299,7 +299,7 @@ local function makeTVRoomClocks(roomFolder)
 		"TVRoomPedestalClock",
 		"TVRoom",
 		Vector3.new(4.2, 1.05, 0.22),
-		CFrame.new(0, 2.75, 2.9),
+		CFrame.new(0, 2.75, 2.9) * CFrame.Angles(0, 0, math.rad(180)),
 		Enum.NormalId.Front
 	)
 end
@@ -346,8 +346,8 @@ local function makePedestal(objectsFolder)
 		local screw = createPart(
 			pedestal,
 			"BigRedButtonScrew" .. screwIndex,
-			Vector3.new(0.42, 0.12, 0.42),
-			CFrame.new(offset.X, 3.65, offset.Z),
+			Vector3.new(0.12, 0.42, 0.42),
+			CFrame.new(offset.X, 3.65, offset.Z) * CFrame.Angles(0, 0, math.rad(90)),
 			Color3.fromRGB(197, 204, 210),
 			Enum.Material.Metal
 		)
@@ -357,8 +357,8 @@ local function makePedestal(objectsFolder)
 	local buttonBase = createPart(
 		pedestal,
 		"BigRedButtonBase",
-		Vector3.new(4.25, 0.2, 4.25),
-		CFrame.new(0, 3.76, 0),
+		Vector3.new(0.22, 4.55, 4.55),
+		CFrame.new(0, 3.76, 0) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(18, 18, 22),
 		Enum.Material.SmoothPlastic,
 		"Part"
@@ -368,8 +368,8 @@ local function makePedestal(objectsFolder)
 	local redSkirt = createPart(
 		pedestal,
 		"BigRedButtonRedSkirt",
-		Vector3.new(4.1, 0.46, 4.1),
-		CFrame.new(0, 3.94, 0),
+		Vector3.new(0.42, 4.35, 4.35),
+		CFrame.new(0, 3.98, 0) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(166, 10, 20),
 		Enum.Material.SmoothPlastic,
 		"Part"
@@ -390,8 +390,8 @@ local function makePedestal(objectsFolder)
 	local groove = createPart(
 		pedestal,
 		"BigRedButtonInnerGroove",
-		Vector3.new(3.6, 0.1, 3.6),
-		CFrame.new(0, 4.28, 0),
+		Vector3.new(0.1, 3.62, 3.62),
+		CFrame.new(0, 4.28, 0) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(25, 5, 7),
 		Enum.Material.SmoothPlastic,
 		"Part"
