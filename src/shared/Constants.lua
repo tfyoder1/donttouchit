@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.1"
+Constants.BuildVersion = "0.5.2"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -270,18 +270,18 @@ Constants.Discoveries = {
 	},
 	SharkBounce = {
 		Id = "shark_bounce",
-		Name = "Met the Door Shark",
-		Hint = "Try to leave the island before finding enough island discoveries.",
+		Name = "Survived the Shark Attack",
+		Hint = "Try leaving the island three times before every island discovery is complete.",
 	},
 	ReadSharkWarning = {
 		Id = "read_shark_warning",
 		Name = "Read the Shark Warning",
-		Hint = "Read the shark warning near the island shore.",
+		Hint = "Read the shark warning near the island shore more than once.",
 	},
 	ReadJellyfishWarning = {
 		Id = "read_jellyfish_warning",
 		Name = "Read the Jellyfish Warning",
-		Hint = "Read the jellyfish warning near the island shore.",
+		Hint = "Read the jellyfish warning near the island shore more than once.",
 	},
 	DugTreasure = {
 		Id = "dug_treasure",

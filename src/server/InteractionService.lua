@@ -375,6 +375,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandExitBounceAtByUserId = {}
 	self.islandExitWarningsByUserId = {}
 	self.islandExitTouchConnections = {}
+	self.islandWarningReadStateByUserId = {}
 	self.islandShovelState = {}
 	self.islandTreasureState = {}
 	self.islandColaState = {}
@@ -410,6 +411,12 @@ function InteractionService:Initialize()
 				self:_refreshSecretDoorsForPlayer(player)
 			end
 		end)
+	end)
+
+	Players.PlayerRemoving:Connect(function(player)
+		self.islandExitBounceAtByUserId[player.UserId] = nil
+		self.islandExitWarningsByUserId[player.UserId] = nil
+		self.islandWarningReadStateByUserId[player.UserId] = nil
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -3432,8 +3439,142 @@ function InteractionService:_wireIslandWarningSign(sign, discoveryId, message)
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, discoveryId)
 		playSound(sign, "rbxasset://sounds/button.wav", 0.35, 0.82)
-		self.systemMessageRemote:FireClient(player, message)
+		local userState = self.islandWarningReadStateByUserId[player.UserId]
+		if not userState then
+			userState = {}
+			self.islandWarningReadStateByUserId[player.UserId] = userState
+		end
+
+		local readCount = (userState[discoveryId] or 0) + 1
+		userState[discoveryId] = readCount
+
+		if discoveryId == Constants.Discoveries.ReadSharkWarning.Id and readCount >= 3 then
+			userState[discoveryId] = 0
+			self:_spawnIslandSharkFin(sign)
+			self.systemMessageRemote:FireClient(player, "The shark warning proves it has supporting evidence.")
+		elseif discoveryId == Constants.Discoveries.ReadJellyfishWarning.Id and readCount >= 3 then
+			userState[discoveryId] = 0
+			self:_spawnIslandJellyfishBalloon(sign)
+			self.systemMessageRemote:FireClient(player, "The jellyfish warning floats into the minutes.")
+		else
+			self.systemMessageRemote:FireClient(player, ("%s (%d/3)"):format(message, readCount))
+		end
 	end)
+end
+
+function InteractionService:_spawnIslandSharkFin(source)
+	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
+	local origin = Vector3.new(sourcePosition.X, 0.22, 187)
+	local finModel = Instance.new("Model")
+	finModel.Name = "IslandSharkFinWarning"
+	finModel.Parent = workspace
+	CollectionService:AddTag(finModel, Constants.Tags.TemporaryObject)
+
+	local function makeFinPart(name, size, cframe, color, material, className)
+		local part = Instance.new(className or "Part")
+		part.Name = name
+		part.Anchored = true
+		part.CanCollide = false
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.Size = size
+		part.CFrame = cframe
+		part.Color = color
+		part.Material = material or Enum.Material.SmoothPlastic
+		part.Parent = finModel
+		return part
+	end
+
+	local startCFrame = CFrame.new(origin + Vector3.new(-18, 0, 0), origin + Vector3.new(18, 0, 0))
+	local fin = makeFinPart("WarningFin", Vector3.new(2.4, 3.6, 0.75), startCFrame * CFrame.Angles(0, 0, math.rad(-8)), Color3.fromRGB(47, 61, 73), Enum.Material.SmoothPlastic, "WedgePart")
+	local wakeA = makeFinPart("WakeA", Vector3.new(4.6, 0.16, 0.5), startCFrame * CFrame.new(-1.8, -1.0, 0.55), Color3.fromRGB(180, 242, 255), Enum.Material.Neon)
+	local wakeB = makeFinPart("WakeB", Vector3.new(4.6, 0.16, 0.5), startCFrame * CFrame.new(-1.8, -1.0, -0.55), Color3.fromRGB(180, 242, 255), Enum.Material.Neon)
+	wakeA.Transparency = 0.2
+	wakeB.Transparency = 0.2
+
+	playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.5, 0.36)
+	for _, part in ipairs(finModel:GetChildren()) do
+		if part:IsA("BasePart") then
+			tweenPart(part, 3.4, {
+				CFrame = part.CFrame + Vector3.new(36, 0, 0),
+			}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+		end
+	end
+	task.delay(2.65, function()
+		if fin.Parent then
+			tweenPart(fin, 0.45, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			tweenPart(wakeA, 0.45, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			tweenPart(wakeB, 0.45, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		end
+	end)
+	Debris:AddItem(finModel, 4)
+end
+
+function InteractionService:_spawnIslandJellyfishBalloon(source)
+	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
+	local start = Vector3.new(-27, 9.5, sourcePosition.Z)
+	local finish = Vector3.new(27, 12.5, sourcePosition.Z + 8)
+	local jellyModel = Instance.new("Model")
+	jellyModel.Name = "IslandJellyfishBalloon"
+	jellyModel.Parent = workspace
+	CollectionService:AddTag(jellyModel, Constants.Tags.TemporaryObject)
+
+	local function makeJellyPart(name, size, cframe, color, material)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Anchored = true
+		part.CanCollide = false
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.Size = size
+		part.CFrame = cframe
+		part.Color = color
+		part.Material = material or Enum.Material.SmoothPlastic
+		part.Parent = jellyModel
+		return part
+	end
+
+	local baseCFrame = CFrame.new(start, finish)
+	local bell = makeJellyPart("JellyfishBell", Vector3.new(3.1, 1.7, 3.1), baseCFrame, Color3.fromRGB(255, 142, 216), Enum.Material.Glass)
+	bell.Shape = Enum.PartType.Ball
+	bell.Transparency = 0.22
+	local glow = Instance.new("PointLight")
+	glow.Name = "JellyfishGlow"
+	glow.Brightness = 2
+	glow.Color = Color3.fromRGB(255, 142, 216)
+	glow.Range = 14
+	glow.Parent = bell
+
+	for index = 1, 7 do
+		local angle = (index - 1) * math.pi * 2 / 7
+		local offset = Vector3.new(math.cos(angle) * 1.05, -1.35, math.sin(angle) * 1.05)
+		local tentacle = makeJellyPart(
+			"JellyfishTentacle" .. index,
+			Vector3.new(0.14, 2.6 + (index % 3) * 0.35, 0.14),
+			baseCFrame * CFrame.new(offset),
+			Color3.fromRGB(255, 205, 240),
+			Enum.Material.Neon
+		)
+		tentacle.Transparency = 0.1
+	end
+
+	playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.65)
+	for _, part in ipairs(jellyModel:GetChildren()) do
+		if part:IsA("BasePart") then
+			local offset = part.Position - start
+			tweenPart(part, 5.2, {
+				CFrame = CFrame.new(finish + offset, finish + offset + (finish - start)),
+			}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+		end
+	end
+	task.delay(4.2, function()
+		for _, part in ipairs(jellyModel:GetChildren()) do
+			if part:IsA("BasePart") then
+				tweenPart(part, 0.65, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end
+	end)
+	Debris:AddItem(jellyModel, 6)
 end
 
 function InteractionService:_getIslandExitRequiredCount()
@@ -3449,7 +3590,7 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 	local rootPart = getRootPart(player)
 	local origin = exitGate:IsA("BasePart") and exitGate.Position or Constants.GetRoomSpawnCFrame("Island").Position
 	local sharkModel = Instance.new("Model")
-	sharkModel.Name = "IslandExitShark"
+	sharkModel.Name = "IslandExitSharkAttack"
 	sharkModel.Parent = workspace
 	CollectionService:AddTag(sharkModel, Constants.Tags.TemporaryObject)
 
@@ -3468,37 +3609,81 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 		return part
 	end
 
-	local baseCFrame = CFrame.new(origin + Vector3.new(0, -2.2, 4.2), origin)
-	local body = makeSharkPart("SharkBody", "Part", Vector3.new(6.2, 1.5, 2.2), baseCFrame, Color3.fromRGB(89, 103, 116))
+	local targetCFrame = CFrame.new(origin + Vector3.new(0, 2.0, 9.2), origin + Vector3.new(0, 2.0, -2))
+	local baseCFrame = targetCFrame * CFrame.new(0, -4.8, 11)
+	local body = makeSharkPart("SharkBody", "Part", Vector3.new(11.5, 3.2, 4.1), baseCFrame, Color3.fromRGB(89, 103, 116))
 	body.Shape = Enum.PartType.Ball
-	makeSharkPart("SharkFin", "WedgePart", Vector3.new(1.8, 2.2, 1.4), baseCFrame * CFrame.new(0, 1.15, 0), Color3.fromRGB(55, 67, 78))
-	makeSharkPart("SharkSnout", "WedgePart", Vector3.new(1.6, 1.1, 1.9), baseCFrame * CFrame.new(0, 0, -2.75), Color3.fromRGB(104, 121, 134))
-	local eye = makeSharkPart("SharkEye", "Part", Vector3.new(0.34, 0.34, 0.34), baseCFrame * CFrame.new(-0.86, 0.32, -2.0), Color3.fromRGB(255, 255, 245))
-	eye.Shape = Enum.PartType.Ball
+	makeSharkPart("SharkFin", "WedgePart", Vector3.new(2.6, 3.6, 1.6), baseCFrame * CFrame.new(0, 2.2, 0.55), Color3.fromRGB(55, 67, 78))
+	makeSharkPart("SharkTail", "WedgePart", Vector3.new(4.2, 3.4, 1.5), baseCFrame * CFrame.new(0, 0.05, 5.5) * CFrame.Angles(0, math.rad(180), 0), Color3.fromRGB(55, 67, 78))
+	makeSharkPart("SharkSnout", "WedgePart", Vector3.new(4.6, 2.1, 3.2), baseCFrame * CFrame.new(0, 0.1, -4.4), Color3.fromRGB(104, 121, 134))
+	local upperMouth = makeSharkPart("SharkUpperMouth", "WedgePart", Vector3.new(5.1, 1.05, 2.7), baseCFrame * CFrame.new(0, -0.35, -5.8) * CFrame.Angles(math.rad(180), 0, 0), Color3.fromRGB(41, 42, 47))
+	local lowerMouth = makeSharkPart("SharkLowerMouth", "WedgePart", Vector3.new(5.1, 0.85, 2.4), baseCFrame * CFrame.new(0, -1.25, -5.58), Color3.fromRGB(33, 34, 39))
+	local gum = makeSharkPart("SharkMouthGlow", "Part", Vector3.new(4.6, 0.12, 1.85), baseCFrame * CFrame.new(0, -0.95, -6.2), Color3.fromRGB(190, 41, 56))
+	gum.Material = Enum.Material.Neon
+
+	for sideIndex, sideX in ipairs({ -1.85, -1.25, -0.65, 0, 0.65, 1.25, 1.85 }) do
+		local topTooth = makeSharkPart("TopTooth" .. sideIndex, "WedgePart", Vector3.new(0.34, 0.9, 0.34), baseCFrame * CFrame.new(sideX, -0.82, -6.9) * CFrame.Angles(math.rad(180), 0, 0), Color3.fromRGB(255, 255, 239))
+		local bottomTooth = makeSharkPart("BottomTooth" .. sideIndex, "WedgePart", Vector3.new(0.34, 0.72, 0.34), baseCFrame * CFrame.new(sideX, -1.08, -6.55), Color3.fromRGB(255, 255, 239))
+		topTooth.Material = Enum.Material.SmoothPlastic
+		bottomTooth.Material = Enum.Material.SmoothPlastic
+	end
+
+	local leftEye = makeSharkPart("SharkLeftEye", "Part", Vector3.new(0.48, 0.48, 0.48), baseCFrame * CFrame.new(-1.75, 0.72, -3.95), Color3.fromRGB(255, 255, 245))
+	local rightEye = makeSharkPart("SharkRightEye", "Part", Vector3.new(0.48, 0.48, 0.48), baseCFrame * CFrame.new(1.75, 0.72, -3.95), Color3.fromRGB(255, 255, 245))
+	leftEye.Shape = Enum.PartType.Ball
+	rightEye.Shape = Enum.PartType.Ball
+	local leftPupil = makeSharkPart("LeftPupil", "Part", Vector3.new(0.18, 0.18, 0.18), baseCFrame * CFrame.new(-1.75, 0.75, -4.24), Color3.fromRGB(6, 8, 12))
+	local rightPupil = makeSharkPart("RightPupil", "Part", Vector3.new(0.18, 0.18, 0.18), baseCFrame * CFrame.new(1.75, 0.75, -4.24), Color3.fromRGB(6, 8, 12))
+	leftPupil.Shape = Enum.PartType.Ball
+	rightPupil.Shape = Enum.PartType.Ball
+	local wake = makeSharkPart("SharkWake", "Part", Vector3.new(14, 0.18, 5.8), baseCFrame * CFrame.new(0, -1.7, 1.8), Color3.fromRGB(175, 240, 255))
+	wake.Material = Enum.Material.Neon
+	wake.Transparency = 0.35
 
 	playSound(exitGate, "rbxasset://sounds/snap.wav", 0.8, 0.72)
-	playSound(exitGate, "rbxasset://sounds/electronicpingshort.wav", 0.55, 0.45)
+	playSound(exitGate, "rbxasset://sounds/electronicpingshort.wav", 0.75, 0.32)
 
 	for _, part in ipairs(sharkModel:GetChildren()) do
 		if part:IsA("BasePart") then
-			tweenPart(part, 0.18, {
-				CFrame = part.CFrame + Vector3.new(0, 2.7, 0),
+			tweenPart(part, 0.34, {
+				CFrame = targetCFrame * baseCFrame:ToObjectSpace(part.CFrame),
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end
 	end
 
+	task.delay(0.38, function()
+		if upperMouth.Parent and lowerMouth.Parent then
+			tweenPart(upperMouth, 0.16, { CFrame = upperMouth.CFrame * CFrame.Angles(math.rad(-15), 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			tweenPart(lowerMouth, 0.16, { CFrame = lowerMouth.CFrame * CFrame.Angles(math.rad(13), 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			playSound(exitGate, "rbxasset://sounds/snap.wav", 0.95, 0.48)
+		end
+	end)
+
 	if rootPart then
-		rootPart.AssemblyLinearVelocity = Vector3.new(0, 42, 74)
+		local destination = Constants.GetRoomSpawnCFrame("Island") * CFrame.new(0, 0, 22)
+		local pushDirection = (destination.Position - rootPart.Position)
+		if pushDirection.Magnitude < 1 then
+			pushDirection = Vector3.new(0, 0, 1)
+		else
+			pushDirection = pushDirection.Unit
+		end
+		rootPart.AssemblyLinearVelocity = pushDirection * 88 + Vector3.new(0, 38, 0)
 		task.delay(0.28, function()
 			if rootPart.Parent then
-				local destination = Constants.GetRoomSpawnCFrame("Island")
 				rootPart.CFrame = destination
-				rootPart.AssemblyLinearVelocity = Vector3.new(0, 28, 34)
+				rootPart.AssemblyLinearVelocity = Vector3.new(0, 18, 0)
 			end
 		end)
 	end
 
-	Debris:AddItem(sharkModel, 3.2)
+	task.delay(1.6, function()
+		for _, part in ipairs(sharkModel:GetChildren()) do
+			if part:IsA("BasePart") then
+				tweenPart(part, 0.65, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end
+	end)
+	Debris:AddItem(sharkModel, 2.6)
 end
 
 function InteractionService:_wireIslandExit(exitGate)
