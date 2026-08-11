@@ -3571,8 +3571,8 @@ end
 function InteractionService:_spawnIslandJellyfishBalloon(source)
 	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
 	local startZ = math.clamp(sourcePosition.Z + 2, 142, 164)
-	local start = Vector3.new(-27, 9.5, startZ)
-	local finish = Vector3.new(27, 12.5, startZ + 8)
+	local start = Vector3.new(27, 12.5, startZ + 8)
+	local finish = Vector3.new(-27, 9.5, startZ)
 	local jellyModel = Instance.new("Model")
 	jellyModel.Name = "IslandJellyfishBalloon"
 	jellyModel.Parent = workspace
