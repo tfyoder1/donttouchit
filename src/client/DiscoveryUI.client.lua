@@ -141,7 +141,7 @@ message.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 message.BackgroundTransparency = 1
 message.BorderSizePixel = 0
 message.Font = Enum.Font.GothamSemibold
-message.Position = UDim2.new(0.5, 0, 1, -36)
+message.Position = UDim2.new(0.5, 0, 1, -118)
 message.Size = UDim2.new(0.88, 0, 0, 44)
 message.Text = ""
 message.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -157,6 +157,29 @@ messageSizeConstraint.Parent = message
 local messageCorner = Instance.new("UICorner")
 messageCorner.CornerRadius = UDim.new(0, 6)
 messageCorner.Parent = message
+
+local function updateMessagePosition()
+	local bottomOffset = 118
+	if UserInputService.TouchEnabled then
+		bottomOffset = 152
+	elseif UserInputService.GamepadEnabled then
+		bottomOffset = 132
+	end
+
+	local camera = workspace.CurrentCamera
+	if camera and camera.ViewportSize.Y < 560 then
+		bottomOffset = math.max(96, bottomOffset - 22)
+	end
+
+	message.Position = UDim2.new(0.5, 0, 1, -bottomOffset)
+end
+
+updateMessagePosition()
+UserInputService.LastInputTypeChanged:Connect(updateMessagePosition)
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateMessagePosition)
+if workspace.CurrentCamera then
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateMessagePosition)
+end
 
 local bookPanel = Instance.new("Frame")
 bookPanel.Name = "ReferenceBook"
