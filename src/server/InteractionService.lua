@@ -1435,6 +1435,41 @@ function InteractionService:_wireBowlingLaneButton(button)
 	end)
 end
 
+function InteractionService:_setBowlingCosmicFog(active)
+	for _, instance in ipairs(workspace:GetDescendants()) do
+		if instance:IsA("ParticleEmitter") and instance:GetAttribute("CosmicFog") then
+			instance.Enabled = active
+		end
+	end
+end
+
+function InteractionService:_updateBowlingLaserBeams(step, active)
+	for _, instance in ipairs(workspace:GetDescendants()) do
+		if instance:IsA("BasePart") and instance:GetAttribute("CosmicLaser") then
+			if not active then
+				instance.Transparency = instance:GetAttribute("BaseTransparency") or 1
+				instance.CFrame = instance:GetAttribute("BaseCFrame") or instance.CFrame
+				continue
+			end
+
+			local laserIndex = instance:GetAttribute("LaserIndex") or 1
+			local laserLength = instance:GetAttribute("LaserLength") or instance.Size.Z
+			local originCFrame = instance:GetAttribute("LaserOriginCFrame") or CFrame.new(instance.Position)
+			local angleOffset = instance:GetAttribute("LaserAngleOffset") or 0
+			local pitchDegrees = instance:GetAttribute("LaserPitchDegrees") or -5
+			local color = BOWLING_COSMIC_COLORS[((step + laserIndex - 2) % #BOWLING_COSMIC_COLORS) + 1]
+
+			instance.Material = Enum.Material.Neon
+			instance.Color = color
+			instance.Transparency = laserIndex % 2 == 0 and 0.34 or 0.22
+			instance.CFrame = originCFrame
+				* CFrame.Angles(0, math.rad(angleOffset + step * 18), 0)
+				* CFrame.Angles(math.rad(pitchDegrees), 0, 0)
+				* CFrame.new(0, 0, -laserLength / 2)
+		end
+	end
+end
+
 function InteractionService:_setBowlingCosmic(active, source)
 	self.bowlingCosmicActive = active
 	local token = {}
@@ -1466,6 +1501,9 @@ function InteractionService:_setBowlingCosmic(active, source)
 			end
 		end
 	end
+
+	self:_setBowlingCosmicFog(active)
+	self:_updateBowlingLaserBeams(0, active)
 
 	for _, disco in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingDiscoBall)) do
 		if disco:IsA("BasePart") then
@@ -1517,6 +1555,8 @@ function InteractionService:_setBowlingCosmic(active, source)
 					light.Color = color
 				end
 			end
+
+			self:_updateBowlingLaserBeams(step, true)
 
 			task.wait(0.28)
 		end
@@ -1654,6 +1694,8 @@ end
 function InteractionService:_afterRoomReset()
 	self.bowlingCosmicActive = false
 	self.bowlingCosmicToken = {}
+	self:_setBowlingCosmicFog(false)
+	self:_updateBowlingLaserBeams(0, false)
 
 	for _, state in pairs(self.libraryLampState) do
 		state.On = false

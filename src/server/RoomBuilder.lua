@@ -7,6 +7,13 @@ local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomBuilder = {}
 
 local ROOM_ATTRIBUTE = "DontTouchItGenerated"
+local BOWLING_COSMIC_COLORS = {
+	Color3.fromRGB(119, 255, 203),
+	Color3.fromRGB(255, 88, 128),
+	Color3.fromRGB(150, 112, 255),
+	Color3.fromRGB(255, 232, 92),
+	Color3.fromRGB(93, 217, 255),
+}
 
 local function tag(instance, tagName)
 	CollectionService:AddTag(instance, tagName)
@@ -1628,8 +1635,15 @@ local function makeBowlingAlley(roomFolder)
 	createPrompt(shoeRack, "Inspect", "Shoe Rack", 0)
 	tag(shoeRack, Constants.Tags.BowlingShoeRack)
 
-	local scoreboard = createPart(room, "BowlingScoreboard", Vector3.new(21, 4.2, 0.35), cframeAt(origin, 0, 11.5, 34), Color3.fromRGB(18, 24, 36), Enum.Material.Neon)
-	createSurfaceText(scoreboard, "ScoreboardText", "LANE 1   LANE 2   LANE 3\nYOU: ?   ROOM: WINNING", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 24, 36))
+	local scoreboard = createPart(
+		room,
+		"BowlingScoreboard",
+		Vector3.new(30, 4.2, 0.35),
+		CFrame.new(origin + Vector3.new(0, 11.5, 34), origin + Vector3.new(0, 9.4, 48)),
+		Color3.fromRGB(18, 24, 36),
+		Enum.Material.Neon
+	)
+	createSurfaceText(scoreboard, "ScoreboardText", "LANE 1      LANE 2      LANE 3\nYOU: ?      ROOM: WINNING", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 24, 36))
 	createPrompt(scoreboard, "Read", "Scoreboard", 0)
 	tag(scoreboard, Constants.Tags.BowlingScoreboard)
 
@@ -1645,8 +1659,69 @@ local function makeBowlingAlley(roomFolder)
 	discoLight.Parent = disco
 	mark(discoLight)
 
+	local laserLength = 48
+	for laserIndex = 1, 6 do
+		local laser = createPart(
+			room,
+			"BowlingCosmicLaser" .. laserIndex,
+			Vector3.new(if laserIndex % 2 == 0 then 0.14 else 0.2, 0.16, laserLength),
+			disco.CFrame * CFrame.Angles(math.rad(-5), math.rad((laserIndex - 1) * 60), 0) * CFrame.new(0, 0, -laserLength / 2),
+			BOWLING_COSMIC_COLORS[((laserIndex - 1) % #BOWLING_COSMIC_COLORS) + 1],
+			Enum.Material.Neon
+		)
+		laser.CanCollide = false
+		laser.Transparency = 1
+		laser:SetAttribute("BaseCanCollide", false)
+		laser:SetAttribute("BaseTransparency", 1)
+		laser:SetAttribute("CosmicLaser", true)
+		laser:SetAttribute("LaserIndex", laserIndex)
+		laser:SetAttribute("LaserLength", laserLength)
+		laser:SetAttribute("LaserOriginCFrame", disco.CFrame)
+		laser:SetAttribute("LaserAngleOffset", (laserIndex - 1) * 60)
+		laser:SetAttribute("LaserPitchDegrees", -5 - (laserIndex % 2) * 3)
+	end
+
+	local fogVolume = createPart(room, "BowlingCosmicFogVolume", Vector3.new(38, 0.2, 76), cframeAt(origin, 0, 1.2, -2), Color3.fromRGB(155, 205, 255), Enum.Material.SmoothPlastic)
+	fogVolume.CanCollide = false
+	fogVolume.Transparency = 1
+	fogVolume:SetAttribute("BaseCanCollide", false)
+	fogVolume:SetAttribute("BaseTransparency", 1)
+	local fog = Instance.new("ParticleEmitter")
+	fog.Name = "BowlingCosmicFog"
+	fog.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	fog.Enabled = false
+	fog.Rate = 22
+	fog.Lifetime = NumberRange.new(3.5, 6)
+	fog.Speed = NumberRange.new(0.15, 0.55)
+	fog.Drag = 1.5
+	fog.SpreadAngle = Vector2.new(12, 12)
+	fog.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 3.5),
+		NumberSequenceKeypoint.new(0.55, 7),
+		NumberSequenceKeypoint.new(1, 10),
+	})
+	fog.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.86),
+		NumberSequenceKeypoint.new(0.45, 0.68),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	fog.Color = ColorSequence.new(Color3.fromRGB(116, 232, 255), Color3.fromRGB(255, 118, 218))
+	fog:SetAttribute("CosmicFog", true)
+	fog.Parent = fogVolume
+
 	local laneXs = { -12, 0, 12 }
 	for laneIndex, laneX in ipairs(laneXs) do
+		local laneLabel = createPart(
+			room,
+			"Lane" .. laneIndex .. "OverheadSign",
+			Vector3.new(6.4, 1.3, 0.22),
+			CFrame.new(origin + Vector3.new(laneX, 9.2, 38.8), origin + Vector3.new(laneX, 7.6, 48)),
+			Color3.fromRGB(25, 31, 45),
+			Enum.Material.Neon
+		)
+		createSurfaceText(laneLabel, "Lane" .. laneIndex .. "OverheadText", "LANE " .. laneIndex, Enum.NormalId.Front, BOWLING_COSMIC_COLORS[((laneIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Color3.fromRGB(25, 31, 45))
+		laneLabel:SetAttribute("CosmicSurface", true)
+
 		local lane = createPart(room, "Lane" .. laneIndex, Vector3.new(8.2, 0.34, 74), cframeAt(origin, laneX, 0.72, -9), Color3.fromRGB(197, 151, 87), Enum.Material.WoodPlanks)
 		lane:SetAttribute("CosmicSurface", true)
 		createPart(room, "Lane" .. laneIndex .. "LeftGutter", Vector3.new(1, 0.28, 74), cframeAt(origin, laneX - 4.7, 0.86, -9), Color3.fromRGB(20, 22, 28), Enum.Material.Metal)
