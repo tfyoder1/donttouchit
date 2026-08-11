@@ -394,6 +394,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.bowlingLaneState = {}
 	self.bowlingCosmicActive = false
 	self.bowlingCosmicToken = nil
+	self.treetopZiplineStateByUserId = {}
 	return self
 end
 
@@ -424,6 +425,7 @@ function InteractionService:Initialize()
 		self.islandExitWarningsByUserId[player.UserId] = nil
 		self.islandWarningReadStateByUserId[player.UserId] = nil
 		self.islandWoodCountByUserId[player.UserId] = nil
+		self.treetopZiplineStateByUserId[player.UserId] = nil
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -644,6 +646,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.BowlingBallReturn, function(instance)
 		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.BowlingBallReturn.Id, "The ball return hums like it knows where the missing balls went.")
+	end)
+
+	self:_connectTagged(Constants.Tags.TreetopZipline, function(instance)
+		self:_wireTreetopZipline(instance)
 	end)
 
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -1253,9 +1259,9 @@ function InteractionService:_wireLibraryLoftDoor(door)
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLoft.Id)
 		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.42, 1.35)
-		self.systemMessageRemote:FireClient(player, "The loft door opens onto a very selective reading nook.")
+		self.systemMessageRemote:FireClient(player, "The loft door opens onto a very selective reading nook above the Library.")
 
-		local destination = CFrame.new(-18.7, 10.6, -43.4)
+		local destination = door:GetAttribute("DestinationCFrame") or CFrame.new(-14, 17.6, -45)
 		teleportPlayer(player, destination)
 		task.wait(0.25)
 		state.Reacting = false
@@ -1360,6 +1366,7 @@ function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 	ball.CanCollide = true
 	ball.Anchored = false
 	ball.CustomPhysicalProperties = PhysicalProperties.new(4.5, 0.35, 0.35)
+	ball:SetAttribute("LaneIndex", laneIndex)
 	local ballSpawnZ = button:GetAttribute("BallSpawnZ") or (button.Position.Z - 1.3)
 	local ballVelocityZ = button:GetAttribute("BallVelocityZ") or -118
 	ball.CFrame = CFrame.new(laneX, 2.05, ballSpawnZ)
@@ -1693,15 +1700,19 @@ function InteractionService:_setBowlingLanePinsAnchored(laneIndex, anchored)
 	end
 end
 
-function InteractionService:_resetBowlingPins()
+function InteractionService:_resetBowlingPins(laneIndex)
 	for _, temporaryObject in ipairs(CollectionService:GetTagged(Constants.Tags.TemporaryObject)) do
-		if temporaryObject and temporaryObject.Parent and temporaryObject.Name == "BowlingBall" then
+		if temporaryObject
+			and temporaryObject.Parent
+			and temporaryObject.Name == "BowlingBall"
+			and (not laneIndex or temporaryObject:GetAttribute("LaneIndex") == laneIndex)
+		then
 			temporaryObject:Destroy()
 		end
 	end
 
 	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
-		if pin:IsA("BasePart") and pin.Parent then
+		if pin:IsA("BasePart") and pin.Parent and (not laneIndex or pin:GetAttribute("LaneIndex") == laneIndex) then
 			self:_resetBowlingPin(pin)
 		end
 	end
@@ -1712,7 +1723,8 @@ function InteractionService:_wireBowlingResetLever(lever)
 
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingResetLever.Id)
-		self:_resetBowlingPins()
+		local laneIndex = lever:GetAttribute("LaneIndex")
+		self:_resetBowlingPins(laneIndex)
 		playSound(lever, "rbxasset://sounds/button.wav", 0.5, 0.58)
 
 		if lever:IsA("BasePart") then
@@ -1728,7 +1740,76 @@ function InteractionService:_wireBowlingResetLever(lever)
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end
 
-		self.systemMessageRemote:FireClient(player, "The pinsetter resets the pins and quietly refuses overtime.")
+		if laneIndex then
+			self.systemMessageRemote:FireClient(player, ("Lane %d pinsetter resets the pins with suspicious accuracy."):format(laneIndex))
+		else
+			self.systemMessageRemote:FireClient(player, "The pinsetter resets the pins and quietly refuses overtime.")
+		end
+	end)
+end
+
+function InteractionService:_wireTreetopZipline(zipline)
+	local prompt = getPrompt(zipline)
+
+	self:_connectPrompt(prompt, function(player)
+		if self.treetopZiplineStateByUserId[player.UserId] then
+			return
+		end
+
+		local rootPart = getRootPart(player)
+		if not rootPart then
+			return
+		end
+
+		self.treetopZiplineStateByUserId[player.UserId] = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
+		self.systemMessageRemote:FireClient(player, "The zipline accepts your island-bound paperwork.")
+		playSound(zipline, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.35)
+
+		local humanoid = getHumanoid(player)
+		local previousAutoRotate = humanoid and humanoid.AutoRotate
+		local previousAnchored = rootPart.Anchored
+		local startCFrame = zipline:GetAttribute("StartCFrame")
+		local endCFrame = zipline:GetAttribute("EndCFrame")
+		local startPosition = (typeof(startCFrame) == "CFrame" and startCFrame.Position) or rootPart.Position
+		local endPosition = (typeof(endCFrame) == "CFrame" and endCFrame.Position) or Constants.GetRoomSpawnCFrame("Island").Position
+		local finalCFrame = typeof(endCFrame) == "CFrame" and endCFrame or Constants.GetRoomSpawnCFrame("Island")
+
+		if humanoid then
+			humanoid.AutoRotate = false
+		end
+		rootPart.AssemblyLinearVelocity = Vector3.zero
+		rootPart.AssemblyAngularVelocity = Vector3.zero
+		rootPart.Anchored = true
+
+		for step = 0, 66 do
+			if not player.Parent or not rootPart.Parent then
+				break
+			end
+
+			local alpha = step / 66
+			local eased = 1 - (1 - alpha) * (1 - alpha)
+			local arc = math.sin(math.pi * alpha) * 5
+			local position = startPosition:Lerp(endPosition, eased) + Vector3.new(0, arc, 0)
+			rootPart.CFrame = CFrame.new(position, endPosition)
+			task.wait(1 / 30)
+		end
+
+		if rootPart.Parent then
+			rootPart.Anchored = previousAnchored
+			rootPart.AssemblyLinearVelocity = Vector3.zero
+			rootPart.AssemblyAngularVelocity = Vector3.zero
+			teleportPlayer(player, finalCFrame)
+		end
+
+		if humanoid and humanoid.Parent then
+			humanoid.AutoRotate = previousAutoRotate
+		end
+
+		self.systemMessageRemote:FireClient(player, "The island receives you with unnecessary confidence.")
+		task.delay(1.2, function()
+			self.treetopZiplineStateByUserId[player.UserId] = nil
+		end)
 	end)
 end
 

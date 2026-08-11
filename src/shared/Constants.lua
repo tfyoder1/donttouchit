@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.23"
+Constants.BuildVersion = "0.5.24"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.EventDuration = 10
@@ -90,6 +90,7 @@ Constants.Tags = {
 	BowlingScoreboard = "DontTouchIt_BowlingScoreboard",
 	BowlingGutter = "DontTouchIt_BowlingGutter",
 	BowlingBallReturn = "DontTouchIt_BowlingBallReturn",
+	TreetopZipline = "DontTouchIt_TreetopZipline",
 }
 
 Constants.Hallway = {
@@ -657,10 +658,10 @@ Constants.Rooms = {
 		Name = "Library",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.Library,
 		NoTouchDiscoveryId = Constants.Discoveries.LibraryNoTouch.Id,
-		SpawnCFrame = CFrame.new(-14, 3, -29),
+		SpawnCFrame = CFrame.new(-14, 3, -29) * CFrame.Angles(0, math.rad(180), 0),
 		Zone = {
 			Min = Vector3.new(-34, -3, -64),
-			Max = Vector3.new(6, 20, -26),
+			Max = Vector3.new(6, 30, -26),
 		},
 	},
 	BowlingAlley = {
@@ -670,8 +671,8 @@ Constants.Rooms = {
 		NoTouchDiscoveryId = Constants.Discoveries.BowlingNoTouch.Id,
 		SpawnCFrame = CFrame.new(-14, 3, -84),
 		Zone = {
-			Min = Vector3.new(-36, -3, -184),
-			Max = Vector3.new(8, 21, -80),
+			Min = Vector3.new(-36, -3, -252),
+			Max = Vector3.new(8, 42, -80),
 		},
 	},
 }
