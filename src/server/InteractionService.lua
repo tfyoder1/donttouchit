@@ -35,6 +35,14 @@ local SWITCH_ON_COLORS = {
 	Color3.fromRGB(255, 144, 177),
 }
 
+local CAVE_LIGHT_COLORS = {
+	Color3.fromRGB(255, 224, 145),
+	Color3.fromRGB(255, 92, 124),
+	Color3.fromRGB(119, 255, 203),
+	Color3.fromRGB(150, 112, 255),
+	Color3.fromRGB(255, 232, 92),
+}
+
 local ROOM_MOODS = {
 	{
 		Label = "laundromat birthday",
@@ -464,6 +472,9 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.treetopZiplineStateByUserId = {}
 	self.voidGravityTokensByUserId = {}
 	self.voidChillTokensByHumanoid = {}
+	self.caveLightState = {}
+	self.caveEntranceSealed = false
+	self.caveAlarmActive = false
 	return self
 end
 
@@ -801,6 +812,18 @@ function InteractionService:Initialize()
 		self:_wireSpaceStationEscapePod(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.CaveLight, function(instance)
+		self:_wireCaveLight(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.CaveExitKey, function(instance)
+		self:_wireCaveExitKey(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.CaveKeyDoor, function(instance)
+		self:_wireCaveKeyDoor(instance)
+	end)
+
 	self:_updateBowlingScoreboards()
 	self:_startBowlingAdRotation()
 	self:_startBowlingMaintenanceMotion()
@@ -861,6 +884,183 @@ function InteractionService:_wireDiscoveryPrompt(instance, discoveryId, message)
 		if message then
 			self.systemMessageRemote:FireClient(player, message)
 		end
+	end)
+end
+
+function InteractionService:_setCaveEntranceSealed()
+	if self.caveEntranceSealed then
+		return
+	end
+
+	self.caveEntranceSealed = true
+	for _, seal in ipairs(CollectionService:GetTagged(Constants.Tags.CaveEntranceSeal)) do
+		for _, instance in ipairs(getInstanceAndDescendants(seal)) do
+			if instance:IsA("BasePart") then
+				local closedTransparency = instance:GetAttribute("ClosedTransparency")
+				local closedCanCollide = instance:GetAttribute("ClosedCanCollide")
+				instance.Transparency = if closedTransparency ~= nil then closedTransparency else 0.1
+				instance.CanCollide = closedCanCollide == true
+			end
+		end
+		self:_persistResetBaseline(seal)
+	end
+end
+
+function InteractionService:_cycleCaveLight(light)
+	local colorIndex = ((light:GetAttribute("CaveLightColorIndex") or 1) % #CAVE_LIGHT_COLORS) + 1
+	local color = CAVE_LIGHT_COLORS[colorIndex]
+	light:SetAttribute("CaveLightColorIndex", colorIndex)
+
+	if light:IsA("BasePart") then
+		tweenPart(light, 0.18, {
+			Color = color,
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+
+	for _, descendant in ipairs(light:GetDescendants()) do
+		if descendant:IsA("PointLight") then
+			descendant.Color = color
+			descendant.Brightness = math.max(descendant.Brightness, 2.1)
+		end
+	end
+end
+
+function InteractionService:_wireCaveLight(light)
+	local prompt = getPrompt(light)
+
+	self:_connectPrompt(prompt, function(player)
+		self:_cycleCaveLight(light)
+		playSound(light, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.25)
+
+		local lightIndex = light:GetAttribute("CaveLightIndex") or 0
+		if lightIndex == 1 then
+			local alreadyFound = self.discoveryService:HasDiscovery(player, Constants.Discoveries.CaveFirstLight.Id)
+			self.discoveryService:Unlock(player, Constants.Discoveries.CaveFirstLight.Id)
+			self:_setCaveEntranceSealed()
+			self.systemMessageRemote:FireClient(
+				player,
+				if alreadyFound
+					then "The first cave light changes color again. The cave remains committed to being closed."
+					else "Oops. You touched something. But it was just 1 thing. Hopefully nobody notices."
+			)
+			return
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.CaveChangedLights.Id)
+		self.systemMessageRemote:FireClient(player, "The cave light changes color. This feels like exactly the sort of thing the sign mentioned.")
+	end)
+end
+
+function InteractionService:_triggerCaveAlarm(source)
+	if self.caveAlarmActive then
+		return
+	end
+
+	self.caveAlarmActive = true
+	task.spawn(function()
+		local alarms = CollectionService:GetTagged(Constants.Tags.CaveAlarmLight)
+		for pulse = 1, 12 do
+			local color = if pulse % 2 == 0 then Color3.fromRGB(255, 38, 58) else Color3.fromRGB(72, 156, 255)
+			for _, alarm in ipairs(alarms) do
+				if alarm:IsA("BasePart") then
+					alarm.Transparency = 0.08
+					alarm.Material = Enum.Material.Neon
+					alarm.Color = color
+					alarm.CFrame *= CFrame.Angles(0, math.rad(38), 0)
+					for _, descendant in ipairs(alarm:GetDescendants()) do
+						if descendant:IsA("PointLight") then
+							descendant.Enabled = true
+							descendant.Brightness = if pulse % 2 == 0 then 6 else 3.5
+							descendant.Color = color
+						end
+					end
+				end
+			end
+
+			playSound(source, "rbxasset://sounds/electronicpingshort.wav", 1.15, if pulse % 2 == 0 then 0.55 else 0.75)
+			task.wait(0.24)
+		end
+
+		for _, alarm in ipairs(alarms) do
+			if alarm:IsA("BasePart") then
+				alarm.Transparency = 0.34
+				alarm.Color = Color3.fromRGB(255, 128, 72)
+				for _, descendant in ipairs(alarm:GetDescendants()) do
+					if descendant:IsA("PointLight") then
+						descendant.Enabled = true
+						descendant.Brightness = 1.7
+						descendant.Color = Color3.fromRGB(255, 170, 92)
+					end
+				end
+			end
+		end
+
+		for _, caveLight in ipairs(CollectionService:GetTagged(Constants.Tags.CaveLight)) do
+			if caveLight:IsA("BasePart") then
+				caveLight.Color = Color3.fromRGB(255, 200, 118)
+				for _, descendant in ipairs(caveLight:GetDescendants()) do
+					if descendant:IsA("PointLight") then
+						descendant.Enabled = true
+						descendant.Brightness = math.max(descendant.Brightness, 2.4)
+						descendant.Color = caveLight.Color
+					end
+				end
+			end
+		end
+
+		self.caveAlarmActive = false
+	end)
+end
+
+function InteractionService:_wireCaveExitKey(keyPart)
+	local prompt = getPrompt(keyPart)
+
+	self:_connectPrompt(prompt, function(player)
+		if self.discoveryService:HasDiscovery(player, Constants.Discoveries.CaveExitKey.Id) then
+			self.systemMessageRemote:FireClient(player, "You already took the exit key. It is doing key things now.")
+			return
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.CaveExitKey.Id)
+		self:_triggerCaveAlarm(keyPart)
+		playSound(keyPart, "rbxasset://sounds/button.wav", 0.8, 0.75)
+		self.systemMessageRemote:FireClient(player, "The exit key is yours. The cave responds with a very mature alarm system.")
+	end)
+end
+
+function InteractionService:_wireCaveKeyDoor(door)
+	local prompt = getPrompt(door)
+
+	self:_connectPrompt(prompt, function(player)
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.CaveExitKey.Id) then
+			playSound(door, "rbxasset://sounds/snap.wav", 0.5, 0.45)
+			self.systemMessageRemote:FireClient(player, "The door has the same key shape, and it is waiting for the actual key.")
+			return
+		end
+
+		local destinationCFrame = door:GetAttribute("DestinationCFrame")
+		if typeof(destinationCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "The cave door forgot where the hallway is.")
+			return
+		end
+
+		if not self:_canUseTeleport(player) then
+			return
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.CaveOpenedDoor.Id)
+		playSound(door, "rbxasset://sounds/button.wav", 0.75, 0.62)
+		if door:IsA("BasePart") then
+			tweenPart(door, 0.24, {
+				Color = Color3.fromRGB(119, 255, 203),
+				Transparency = 0.32,
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+
+		task.delay(0.18, function()
+			teleportPlayer(player, destinationCFrame)
+			self.systemMessageRemote:FireClient(player, "The cave door opens into the hallway. Only the TV Room looks ready to admit anything.")
+		end)
 	end)
 end
 

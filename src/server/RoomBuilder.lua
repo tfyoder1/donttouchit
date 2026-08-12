@@ -820,6 +820,8 @@ end
 
 local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
+local CAVE_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("CaveEntrance")
+local CAVE_HALLWAY_RETURN_CFRAME = CFrame.new(Vector3.new(-3.2, 3, 45), Vector3.new(3.2, 3, 45))
 local LIBRARY_WIDTH = 36
 local LIBRARY_DEPTH = 34
 local LIBRARY_HEIGHT = 15
@@ -865,6 +867,92 @@ local ISLAND_RETURN_CFRAME = CFrame.new(Vector3.new(0, 3, 103), Vector3.new(0, 3
 local SPACE_STATION_ORIGIN = Vector3.new(92, 80, 150)
 local SPACE_STATION_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("SpaceStation")
 local ISLAND_SPACE_BLOCK_ID = "bent_palm_orbit_block"
+
+local function setCaveSealBaseline(part, closedTransparency, closedCanCollide)
+	part.Transparency = 1
+	part.CanCollide = false
+	part:SetAttribute("BaseTransparency", 1)
+	part:SetAttribute("BaseCanCollide", false)
+	part:SetAttribute("ClosedTransparency", closedTransparency or 0.1)
+	part:SetAttribute("ClosedCanCollide", closedCanCollide == true)
+end
+
+local function makeCaveElectricLight(parent, name, position, index)
+	local lightModel = makeModel(parent, name)
+	local cable = createPart(lightModel, name .. "Cable", Vector3.new(0.12, 1.5, 0.12), CFrame.new(position + Vector3.new(0, 0.95, 0)), Color3.fromRGB(24, 24, 28), Enum.Material.Metal)
+	local shade = createPart(lightModel, name .. "Shade", Vector3.new(1.8, 0.35, 1.8), CFrame.new(position + Vector3.new(0, 0.2, 0)), Color3.fromRGB(52, 56, 61), Enum.Material.Metal)
+	shade.Shape = Enum.PartType.Cylinder
+	local bulb = createPart(lightModel, name .. "Bulb", Vector3.new(0.95, 0.95, 0.95), CFrame.new(position + Vector3.new(0, -0.28, 0)), Color3.fromRGB(255, 224, 145), Enum.Material.Neon)
+	bulb.Shape = Enum.PartType.Ball
+	bulb:SetAttribute("CaveLightIndex", index)
+	bulb:SetAttribute("CaveLightColorIndex", 1)
+	local pointLight = Instance.new("PointLight")
+	pointLight.Name = "CaveBulbLight"
+	pointLight.Brightness = if index == 1 then 2.8 else 1.8
+	pointLight.Color = bulb.Color
+	pointLight.Range = if index == 1 then 18 else 13
+	pointLight.Parent = bulb
+	mark(pointLight)
+	local prompt = createPrompt(bulb, "Touch", if index == 1 then "First Electric Cave Light" else "Electric Cave Light", 0)
+	prompt.MaxActivationDistance = 12
+	tag(bulb, Constants.Tags.CaveLight)
+	lightModel.PrimaryPart = bulb
+	return lightModel
+end
+
+local function makeCaveSpike(parent, name, position, height, diameter, hangsDown)
+	local spike = makeModel(parent, name)
+	local direction = if hangsDown then -1 else 1
+	local rootY = position.Y
+
+	for segmentIndex = 1, 3 do
+		local segmentHeight = height * (0.42 - (segmentIndex - 1) * 0.08)
+		local segmentDiameter = diameter * (1.05 - (segmentIndex - 1) * 0.26)
+		local offset = (segmentIndex - 0.5) * height / 4
+		local part = createPart(
+			spike,
+			name .. "Segment" .. segmentIndex,
+			Vector3.new(segmentDiameter, segmentHeight, segmentDiameter),
+			CFrame.new(position.X, rootY + direction * offset, position.Z),
+			Color3.fromRGB(81, 78, 73),
+			Enum.Material.Slate
+		)
+		part.Shape = Enum.PartType.Cylinder
+	end
+
+	local tip = createPart(
+		spike,
+		name .. "Tip",
+		Vector3.new(diameter * 0.42, diameter * 0.42, diameter * 0.42),
+		CFrame.new(position.X, rootY + direction * (height * 0.72), position.Z),
+		Color3.fromRGB(100, 96, 89),
+		Enum.Material.Slate
+	)
+	tip.Shape = Enum.PartType.Ball
+	spike.PrimaryPart = tip
+	return spike
+end
+
+local function makeCaveKeyShape(parent, name, cframe, scale, color, material)
+	local key = makeModel(parent, name)
+	scale = scale or 1
+	color = color or Color3.fromRGB(255, 221, 84)
+	material = material or Enum.Material.Neon
+
+	local head = createPart(key, name .. "Head", Vector3.new(0.2 * scale, 1.65 * scale, 1.65 * scale), cframe * CFrame.new(0, 0, -1.45 * scale), color, material)
+	head.Shape = Enum.PartType.Ball
+	local shaft = createPart(key, name .. "Shaft", Vector3.new(0.18 * scale, 0.24 * scale, 3.2 * scale), cframe * CFrame.new(0, 0, 0.35 * scale), color, material)
+	local toothA = createPart(key, name .. "ToothA", Vector3.new(0.18 * scale, 0.85 * scale, 0.24 * scale), cframe * CFrame.new(0, -0.48 * scale, 1.72 * scale), color, material)
+	local toothB = createPart(key, name .. "ToothB", Vector3.new(0.18 * scale, 0.62 * scale, 0.24 * scale), cframe * CFrame.new(0, 0.42 * scale, 1.38 * scale), color, material)
+
+	for _, part in ipairs({ head, shaft, toothA, toothB }) do
+		part.CanCollide = false
+		part:SetAttribute("BaseCanCollide", false)
+	end
+
+	key.PrimaryPart = shaft
+	return key
+end
 
 local function makeSnackCeilingFan(objectsFolder)
 	local fan = makeModel(objectsFolder, "SnackCeilingFan")
@@ -1145,6 +1233,195 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	}
 end
 
+local function makeCaveEntranceArea(roomFolder)
+	local cave = makeModel(roomFolder, "CaveEntranceArea")
+
+	local forestFloor = createPart(cave, "ForestFloor", Vector3.new(40, 1, 38), CFrame.new(-54, -0.25, 45), Color3.fromRGB(35, 64, 43), Enum.Material.Grass)
+	forestFloor:SetAttribute("BaseCanCollide", true)
+	createSpawnLocation(cave, "CaveEntranceSpawn", "CaveEntrance", CAVE_SPAWN_CFRAME, Color3.fromRGB(82, 156, 88), false)
+
+	for treeIndex, treeData in ipairs({
+		{ X = -44, Z = 29, Height = 13 },
+		{ X = -50, Z = 62, Height = 16 },
+		{ X = -62, Z = 28, Height = 15 },
+		{ X = -66, Z = 61, Height = 12 },
+		{ X = -38, Z = 51, Height = 14 },
+	}) do
+		local trunk = createPart(cave, "CaveForestTreeTrunk" .. treeIndex, Vector3.new(1.2, treeData.Height, 1.2), CFrame.new(treeData.X, treeData.Height / 2 - 0.25, treeData.Z), Color3.fromRGB(82, 51, 31), Enum.Material.Wood)
+		trunk.Shape = Enum.PartType.Cylinder
+		local canopy = createPart(cave, "CaveForestCanopy" .. treeIndex, Vector3.new(8.4, 6.2, 8.4), CFrame.new(treeData.X, treeData.Height + 2.2, treeData.Z), Color3.fromRGB(26, 86, 48), Enum.Material.Grass)
+		canopy.Shape = Enum.PartType.Ball
+		canopy.CanCollide = false
+		canopy:SetAttribute("BaseCanCollide", false)
+	end
+
+	createPart(cave, "CaveMouthLeftRock", Vector3.new(3.2, 9.5, 8.4), CFrame.new(-70, 4.2, 36.2), Color3.fromRGB(72, 72, 68), Enum.Material.Slate)
+	createPart(cave, "CaveMouthRightRock", Vector3.new(3.2, 9.5, 8.4), CFrame.new(-70, 4.2, 53.8), Color3.fromRGB(72, 72, 68), Enum.Material.Slate)
+	createPart(cave, "CaveMouthTopRock", Vector3.new(3.5, 4.2, 18.8), CFrame.new(-70, 9.1, 45), Color3.fromRGB(64, 64, 61), Enum.Material.Slate)
+
+	local seal = makeModel(cave, "CaveEntranceRockfallSeal")
+	local sealBlock = createPart(seal, "RockfallBlocker", Vector3.new(0.9, 8.8, 13.2), CFrame.new(-68.3, 4.1, 45), Color3.fromRGB(55, 55, 52), Enum.Material.Slate)
+	setCaveSealBaseline(sealBlock, 0.08, true)
+	for rockIndex, rockData in ipairs({
+		{ Y = 1.7, Z = 40.2, Size = Vector3.new(1.2, 2.6, 3.6) },
+		{ Y = 3.6, Z = 45.2, Size = Vector3.new(1.25, 3.4, 4.4) },
+		{ Y = 6.0, Z = 49.8, Size = Vector3.new(1.15, 2.7, 3.8) },
+	}) do
+		local rock = createPart(seal, "RockfallChunk" .. rockIndex, rockData.Size, CFrame.new(-67.7, rockData.Y, rockData.Z), Color3.fromRGB(68, 67, 62), Enum.Material.Slate)
+		rock.Shape = Enum.PartType.Ball
+		setCaveSealBaseline(rock, 0.02, true)
+	end
+	local sealKey = makeCaveKeyShape(seal, "RockfallExitKeyOutline", CFrame.new(-67.15, 5.1, 45) * CFrame.Angles(0, math.rad(90), 0), 1.08, Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
+	for _, part in ipairs(sealKey:GetDescendants()) do
+		if part:IsA("BasePart") then
+			setCaveSealBaseline(part, 0.05, false)
+		end
+	end
+	tag(seal, Constants.Tags.CaveEntranceSeal)
+	seal.PrimaryPart = sealBlock
+
+	createPart(cave, "CaveEntryFloor", Vector3.new(28, 1, 13), CFrame.new(-82, -0.8, 45), Color3.fromRGB(54, 54, 51), Enum.Material.Slate)
+	createPart(cave, "CaveEntryLeftWall", Vector3.new(30, 8.5, 1), CFrame.new(-83, 3.4, 38.2), Color3.fromRGB(42, 43, 42), Enum.Material.Slate)
+	createPart(cave, "CaveEntryRightWall", Vector3.new(30, 8.5, 1), CFrame.new(-83, 3.4, 51.8), Color3.fromRGB(42, 43, 42), Enum.Material.Slate)
+	createPart(cave, "CaveEntryCeiling", Vector3.new(30, 1, 14), CFrame.new(-83, 8.25, 45), Color3.fromRGB(35, 36, 35), Enum.Material.Slate)
+
+	local warningSign = createPart(cave, "CaveFirstWarningSign", Vector3.new(8.8, 2.4, 0.26), CFrame.new(-78, 3.7, 51.18), Color3.fromRGB(251, 232, 113), Enum.Material.SmoothPlastic)
+	createSurfaceText(warningSign, "CaveWarningText", "FEEL FREE TO LOOK AROUND,\nBUT TOUCH NOTHING.", Enum.NormalId.Front, Color3.fromRGB(29, 26, 20), Color3.fromRGB(251, 232, 113))
+
+	createPart(cave, "CaveSlopeFloorA", Vector3.new(25, 1, 11), CFrame.new(-96, -3.1, 45) * CFrame.Angles(0, 0, math.rad(8)), Color3.fromRGB(48, 48, 46), Enum.Material.Slate)
+	createPart(cave, "CaveSlopeWallALeft", Vector3.new(25, 8, 1), CFrame.new(-96, 0.7, 38.9) * CFrame.Angles(0, 0, math.rad(8)), Color3.fromRGB(36, 36, 36), Enum.Material.Slate)
+	createPart(cave, "CaveSlopeWallARight", Vector3.new(25, 8, 1), CFrame.new(-96, 0.7, 51.1) * CFrame.Angles(0, 0, math.rad(8)), Color3.fromRGB(36, 36, 36), Enum.Material.Slate)
+	createPart(cave, "CaveTurnFloor", Vector3.new(12, 1, 28), CFrame.new(-112, -6.9, 34), Color3.fromRGB(48, 48, 46), Enum.Material.Slate)
+	createPart(cave, "CaveTurnWallLeft", Vector3.new(1, 8, 30), CFrame.new(-118.2, -3.0, 34), Color3.fromRGB(37, 37, 36), Enum.Material.Slate)
+	createPart(cave, "CaveTurnWallRight", Vector3.new(1, 8, 30), CFrame.new(-105.8, -3.0, 34), Color3.fromRGB(37, 37, 36), Enum.Material.Slate)
+	createPart(cave, "CaveTurnCeiling", Vector3.new(13, 1, 30), CFrame.new(-112, 2.1, 34), Color3.fromRGB(32, 32, 32), Enum.Material.Slate)
+
+	for lightIndex, position in ipairs({
+		Vector3.new(-76, 5.6, 45),
+		Vector3.new(-91, 2.6, 45),
+		Vector3.new(-108, -1.1, 39.6),
+		Vector3.new(-118, -4.8, 23.8),
+		Vector3.new(-124, -5.2, -28),
+		Vector3.new(-124, -5.2, -74),
+	}) do
+		makeCaveElectricLight(cave, "CaveElectricLight" .. lightIndex, position, lightIndex)
+	end
+
+	local cavernCenter = Vector3.new(-124, -9.75, 15)
+	createPart(cave, "CavernFloor", Vector3.new(48, 1, 38), CFrame.new(cavernCenter), Color3.fromRGB(50, 50, 47), Enum.Material.Slate)
+	createPart(cave, "CavernBackWall", Vector3.new(48, 16, 1), CFrame.new(cavernCenter + Vector3.new(0, 8, -19)), Color3.fromRGB(35, 35, 34), Enum.Material.Slate)
+	createPart(cave, "CavernFrontWall", Vector3.new(48, 16, 1), CFrame.new(cavernCenter + Vector3.new(0, 8, 19)), Color3.fromRGB(35, 35, 34), Enum.Material.Slate)
+	createPart(cave, "CavernLeftWall", Vector3.new(1, 16, 38), CFrame.new(cavernCenter + Vector3.new(-24, 8, 0)), Color3.fromRGB(36, 36, 35), Enum.Material.Slate)
+	createPart(cave, "CavernRightWall", Vector3.new(1, 16, 38), CFrame.new(cavernCenter + Vector3.new(24, 8, 0)), Color3.fromRGB(36, 36, 35), Enum.Material.Slate)
+	createPart(cave, "CavernCeiling", Vector3.new(48, 1, 38), CFrame.new(cavernCenter + Vector3.new(0, 16, 0)), Color3.fromRGB(27, 28, 28), Enum.Material.Slate)
+
+	for spikeIndex, spikeData in ipairs({
+		{ X = -139, Z = 1, H = 5.4, D = 1.1, Down = false },
+		{ X = -132, Z = 27, H = 4.4, D = 0.9, Down = false },
+		{ X = -111, Z = 3, H = 5.8, D = 1.2, Down = false },
+		{ X = -104, Z = 25, H = 3.8, D = 0.85, Down = false },
+		{ X = -141, Z = 20, H = 5.6, D = 1.0, Down = true },
+		{ X = -119, Z = -1, H = 4.8, D = 0.9, Down = true },
+		{ X = -108, Z = 13, H = 6.2, D = 1.15, Down = true },
+	}) do
+		local y = if spikeData.Down then cavernCenter.Y + 15.5 else cavernCenter.Y + 0.55
+		makeCaveSpike(cave, "CaveSpike" .. spikeIndex, Vector3.new(spikeData.X, y, spikeData.Z), spikeData.H, spikeData.D, spikeData.Down)
+	end
+
+	local stream = createPart(cave, "CavernRunningWater", Vector3.new(4.4, 0.18, 28), CFrame.new(-145.5, -9.05, 13), Color3.fromRGB(78, 174, 222), Enum.Material.Glass)
+	stream.Transparency = 0.34
+	stream:SetAttribute("BaseTransparency", stream.Transparency)
+	local waterLight = Instance.new("PointLight")
+	waterLight.Name = "CavernWaterGlow"
+	waterLight.Brightness = 0.75
+	waterLight.Color = Color3.fromRGB(94, 205, 255)
+	waterLight.Range = 18
+	waterLight.Parent = stream
+	mark(waterLight)
+	for rippleIndex = 1, 6 do
+		local ripple = createPart(cave, "CavernWaterRipple" .. rippleIndex, Vector3.new(3.4, 0.05, 0.22), CFrame.new(-145.5, -8.9, 0.5 + rippleIndex * 4), Color3.fromRGB(170, 233, 255), Enum.Material.Neon)
+		ripple.Transparency = 0.36
+		ripple.CanCollide = false
+		ripple:SetAttribute("BaseCanCollide", false)
+		ripple:SetAttribute("BaseTransparency", ripple.Transparency)
+	end
+
+	local deskModel = makeModel(cave, "CaveStrangeDesk")
+	local deskTop = createPart(deskModel, "CaveDeskTop", Vector3.new(8.5, 0.5, 4), CFrame.new(-118, -7.15, 13), Color3.fromRGB(86, 54, 34), Enum.Material.Wood)
+	createPart(deskModel, "CaveDeskLegA", Vector3.new(0.45, 2.5, 0.45), CFrame.new(-121.5, -8.45, 11.45), Color3.fromRGB(66, 39, 25), Enum.Material.Wood)
+	createPart(deskModel, "CaveDeskLegB", Vector3.new(0.45, 2.5, 0.45), CFrame.new(-114.5, -8.45, 11.45), Color3.fromRGB(66, 39, 25), Enum.Material.Wood)
+	createPart(deskModel, "CaveDeskLegC", Vector3.new(0.45, 2.5, 0.45), CFrame.new(-121.5, -8.45, 14.55), Color3.fromRGB(66, 39, 25), Enum.Material.Wood)
+	createPart(deskModel, "CaveDeskLegD", Vector3.new(0.45, 2.5, 0.45), CFrame.new(-114.5, -8.45, 14.55), Color3.fromRGB(66, 39, 25), Enum.Material.Wood)
+	local deskSign = createPart(deskModel, "CaveDeskDoNotTouchSign", Vector3.new(5.8, 1.8, 0.24), CFrame.new(-118, -5.55, 10.75), Color3.fromRGB(251, 232, 113), Enum.Material.SmoothPlastic)
+	createSurfaceText(deskSign, "CaveDeskSignText", "DON'T\nTOUCH", Enum.NormalId.Front, Color3.fromRGB(29, 26, 20), Color3.fromRGB(251, 232, 113))
+	makeCaveKeyShape(deskModel, "CaveExitKeyVisual", CFrame.new(-118, -6.72, 13) * CFrame.Angles(0, math.rad(90), 0), 0.62, Color3.fromRGB(255, 221, 84), Enum.Material.Metal)
+	local keyHitbox = createPart(deskModel, "CaveExitKey", Vector3.new(4.2, 0.35, 2.2), CFrame.new(-118, -6.65, 13), Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
+	keyHitbox.Transparency = 1
+	keyHitbox.CanCollide = false
+	keyHitbox:SetAttribute("BaseTransparency", 1)
+	keyHitbox:SetAttribute("BaseCanCollide", false)
+	createPrompt(keyHitbox, "Take", "Exit Key", 0)
+	tag(keyHitbox, Constants.Tags.CaveExitKey)
+	deskModel.PrimaryPart = deskTop
+
+	local spotlightAnchor = createPart(cave, "CaveDeskSpotlight", Vector3.new(1.1, 0.35, 1.1), CFrame.new(-118, 3.0, 13), Color3.fromRGB(255, 238, 158), Enum.Material.Neon)
+	spotlightAnchor.Shape = Enum.PartType.Cylinder
+	local spot = Instance.new("SpotLight")
+	spot.Name = "DeskSpotlight"
+	spot.Angle = 46
+	spot.Brightness = 5
+	spot.Color = Color3.fromRGB(255, 236, 166)
+	spot.Range = 32
+	spot.Face = Enum.NormalId.Bottom
+	spot.Parent = spotlightAnchor
+	mark(spot)
+
+	for alarmIndex, position in ipairs({
+		Vector3.new(-136, -1.4, 29),
+		Vector3.new(-112, -1.4, 29),
+		Vector3.new(-124, -3.1, -36),
+		Vector3.new(-124, -3.1, -88),
+	}) do
+		local alarm = createPart(cave, "CavePoliceRotaryLight" .. alarmIndex, Vector3.new(1.55, 0.9, 1.55), CFrame.new(position), Color3.fromRGB(130, 8, 18), Enum.Material.Glass)
+		alarm.Shape = Enum.PartType.Ball
+		alarm.Transparency = 0.82
+		alarm:SetAttribute("BaseTransparency", alarm.Transparency)
+		alarm:SetAttribute("AlarmIndex", alarmIndex)
+		local alarmLight = Instance.new("PointLight")
+		alarmLight.Name = "CaveAlarmPointLight"
+		alarmLight.Enabled = false
+		alarmLight.Brightness = 0
+		alarmLight.Color = Color3.fromRGB(255, 32, 50)
+		alarmLight.Range = 22
+		alarmLight.Parent = alarm
+		mark(alarmLight)
+		tag(alarm, Constants.Tags.CaveAlarmLight)
+	end
+
+	createPart(cave, "CaveLongTunnelFloor", Vector3.new(11, 1, 116), CFrame.new(-124, -10.7, -54), Color3.fromRGB(42, 42, 41), Enum.Material.Slate)
+	createPart(cave, "CaveLongTunnelLeftWall", Vector3.new(1, 9, 118), CFrame.new(-130, -6.25, -54), Color3.fromRGB(30, 31, 31), Enum.Material.Slate)
+	createPart(cave, "CaveLongTunnelRightWall", Vector3.new(1, 9, 118), CFrame.new(-118, -6.25, -54), Color3.fromRGB(30, 31, 31), Enum.Material.Slate)
+	createPart(cave, "CaveLongTunnelCeiling", Vector3.new(12, 1, 118), CFrame.new(-124, -1.35, -54), Color3.fromRGB(24, 24, 25), Enum.Material.Slate)
+
+	for tickIndex = 1, 9 do
+		local tick = createPart(cave, "CaveLongTunnelDistanceMarker" .. tickIndex, Vector3.new(0.1, 0.16, 2.4), CFrame.new(-117.4, -2.4, 0 - tickIndex * 12), Color3.fromRGB(92, 82, 68), Enum.Material.Neon)
+		tick.Transparency = 0.28
+		tick.CanCollide = false
+		tick:SetAttribute("BaseCanCollide", false)
+		tick:SetAttribute("BaseTransparency", tick.Transparency)
+	end
+
+	local keyDoor = createPart(cave, "CaveKeyDoor", Vector3.new(13.6, 10, 0.55), CFrame.new(-124, -5.65, -113.5), Color3.fromRGB(58, 45, 36), Enum.Material.Metal)
+	keyDoor:SetAttribute("DestinationCFrame", CAVE_HALLWAY_RETURN_CFRAME)
+	createSurfaceText(keyDoor, "CaveKeyDoorText", "EXIT KEY\nREQUIRED", Enum.NormalId.Back, Color3.fromRGB(255, 221, 84), Color3.fromRGB(58, 45, 36))
+	makeCaveKeyShape(cave, "CaveDoorKeyOutline", CFrame.new(-124, -5.7, -113.1) * CFrame.Angles(0, math.rad(180), 0), 1.15, Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
+	createPrompt(keyDoor, "Unlock", "Huge Cave Door", 0.15)
+	tag(keyDoor, Constants.Tags.CaveKeyDoor)
+
+	cave.PrimaryPart = forestFloor
+	return cave
+end
+
 local function makeHallway(roomFolder)
 	local hallway = makeModel(roomFolder, "DoorHallway")
 
@@ -1230,13 +1507,12 @@ local function makeHallway(roomFolder)
 
 	makeHallDoor(
 		hallway,
-		"UnderConstructionDoor",
+		"CaveEntranceDoor",
 		Vector3.new(0.45, 8.5, 6.5),
 		CFrame.new(-5.95, 4.75, 45),
 		Enum.NormalId.Right,
-		"???",
-		nil,
-		"Something behind this door is still rehearsing."
+		"CAVE\nENTRANCE",
+		CAVE_SPAWN_CFRAME
 	)
 
 		local islandDoor = makeHallDoor(
@@ -3677,6 +3953,7 @@ function RoomBuilder.Build()
 	makeAtomicStarburst(roomFolder, "TVRoomAtomicStarburst", CFrame.new(13.2, 13.6, -Constants.Room.Depth / 2 + 0.62), 0.92, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Orange)
 	makeAtomicBoomerang(roomFolder, "TVRoomLeftWallAtomicBoomerang", CFrame.new(-Constants.Room.Width / 2 + 0.58, 10.6, -3.2) * CFrame.Angles(0, math.rad(90), 0), 0.9, ATOMIC_COLORS.Orange)
 	makeAtomicDiamondCluster(roomFolder, "TVRoomRightWallAtomicDiamonds", CFrame.new(Constants.Room.Width / 2 - 0.58, 11.5, -6.8) * CFrame.Angles(0, math.rad(-90), 0), 0.68)
+	local caveEntrance = makeCaveEntranceArea(roomFolder)
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
 	local islandRoom = makeIslandRoom(roomFolder)
@@ -3719,6 +3996,7 @@ function RoomBuilder.Build()
 		RecoveryFloor = recoveryFloor,
 		UnderfloorChamber = underfloorChamber,
 		ExitDoor = exitDoor,
+		CaveEntrance = caveEntrance,
 		ResetRoomButton = resetRoomButton,
 		TVInsideLog = tvInsideLog,
 		Hallway = hallway,

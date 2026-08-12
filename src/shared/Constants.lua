@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.53"
+Constants.BuildVersion = "0.5.54"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -113,6 +113,11 @@ Constants.Tags = {
 	SpaceStationPlantPod = "DontTouchIt_SpaceStationPlantPod",
 	SpaceStationMeteorButton = "DontTouchIt_SpaceStationMeteorButton",
 	SpaceStationEscapePod = "DontTouchIt_SpaceStationEscapePod",
+	CaveLight = "DontTouchIt_CaveLight",
+	CaveEntranceSeal = "DontTouchIt_CaveEntranceSeal",
+	CaveExitKey = "DontTouchIt_CaveExitKey",
+	CaveKeyDoor = "DontTouchIt_CaveKeyDoor",
+	CaveAlarmLight = "DontTouchIt_CaveAlarmLight",
 }
 
 Constants.Hallway = {
@@ -608,9 +613,35 @@ Constants.Discoveries = {
 		Name = "Left the Void Alone",
 		Hint = "Stand in the Void for two minutes without interacting with anything. The Void takes this personally.",
 	},
+	CaveFirstLight = {
+		Id = "cave_first_light",
+		Name = "Touched the First Cave Light",
+		Hint = "The first electric light inside the cave seems unusually important.",
+	},
+	CaveChangedLights = {
+		Id = "cave_changed_lights",
+		Name = "Changed the Cave Lights",
+		Hint = "The cave lights are absolutely interactive, which is not comforting.",
+	},
+	CaveExitKey = {
+		Id = "cave_exit_key",
+		Name = "Took the Exit Key",
+		Hint = "The desk in the cavern has a key under a very unambiguous sign.",
+	},
+	CaveOpenedDoor = {
+		Id = "cave_opened_door",
+		Name = "Opened the Cave Door",
+		Hint = "The long tunnel ends at a door shaped like the key from the desk.",
+	},
 }
 
 Constants.RoomDiscoveryOrder = {
+	CaveEntrance = {
+		Constants.Discoveries.CaveFirstLight.Id,
+		Constants.Discoveries.CaveChangedLights.Id,
+		Constants.Discoveries.CaveExitKey.Id,
+		Constants.Discoveries.CaveOpenedDoor.Id,
+	},
 	TVRoom = {
 		Constants.Discoveries.PressedButton.Id,
 		Constants.Discoveries.LowGravity.Id,
@@ -761,6 +792,7 @@ Constants.RoomOrder = {
 }
 
 Constants.DiscoveryRoomOrder = {
+	"CaveEntrance",
 	"TVRoom",
 	"SnackLab",
 	"Island",
@@ -772,6 +804,7 @@ Constants.DiscoveryRoomOrder = {
 }
 
 Constants.RoomDetectionOrder = {
+	"CaveEntrance",
 	"TVRoom",
 	"SnackLab",
 	"Island",
@@ -783,6 +816,7 @@ Constants.RoomDetectionOrder = {
 }
 
 Constants.RoomResumeDiscoveries = {
+	CaveEntrance = Constants.Discoveries.CaveFirstLight.Id,
 	Library = Constants.Discoveries.LibraryEntered.Id,
 	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
 	TreetopZipline = Constants.Discoveries.TreetopZiplineEntered.Id,
@@ -791,6 +825,16 @@ Constants.RoomResumeDiscoveries = {
 }
 
 Constants.Rooms = {
+	CaveEntrance = {
+		Id = "CaveEntrance",
+		Name = "Cave Entrance",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.CaveEntrance,
+		SpawnCFrame = CFrame.new(Vector3.new(-55, 3, 45), Vector3.new(-82, 3, 45)),
+		Zone = {
+			Min = Vector3.new(-155, -28, -155),
+			Max = Vector3.new(-42, 18, 70),
+		},
+	},
 	TVRoom = {
 		Id = "TVRoom",
 		Name = "TV Room",
@@ -967,6 +1011,10 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.VoidGravityFlip.Id] = Constants.Tags.VoidGravityOrb,
 	[Constants.Discoveries.VoidEcho.Id] = Constants.Tags.VoidEchoButton,
 	[Constants.Discoveries.VoidFreezeRay.Id] = Constants.Tags.VoidFreezeRay,
+	[Constants.Discoveries.CaveFirstLight.Id] = Constants.Tags.CaveLight,
+	[Constants.Discoveries.CaveChangedLights.Id] = Constants.Tags.CaveLight,
+	[Constants.Discoveries.CaveExitKey.Id] = Constants.Tags.CaveExitKey,
+	[Constants.Discoveries.CaveOpenedDoor.Id] = Constants.Tags.CaveKeyDoor,
 }
 
 Constants.NoTouch = {
