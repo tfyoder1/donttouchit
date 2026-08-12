@@ -1615,6 +1615,14 @@ function InteractionService:_formatBowlingScoreboardText()
 	)
 end
 
+function InteractionService:_formatBowlingAdScoreText()
+	return ("LANE SCORES\n1: %02d   2: %02d   3: %02d"):format(
+		self.bowlingLaneCounts[1] or 0,
+		self.bowlingLaneCounts[2] or 0,
+		self.bowlingLaneCounts[3] or 0
+	)
+end
+
 function InteractionService:_updateBowlingScoreboards()
 	for _, scoreboard in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingScoreboard)) do
 		local label = scoreboard:FindFirstChild("ScoreboardText", true)
@@ -1635,13 +1643,30 @@ function InteractionService:_incrementBowlingLaneCount(laneIndex)
 
 	self.bowlingLaneCounts[laneIndex] = (self.bowlingLaneCounts[laneIndex] or 0) + 1
 	self:_updateBowlingScoreboards()
+	if self.bowlingAdStep and self.bowlingAdStep % 3 == 2 then
+		self:_updateBowlingAds(self.bowlingAdStep)
+	end
 end
 
 function InteractionService:_updateBowlingAds(step)
+	self.bowlingAdStep = step
+	local showScores = step % 3 == 2
+	local adStep = math.floor(step / 3) * 2 + (step % 3)
+
 	for _, instance in ipairs(workspace:GetDescendants()) do
 		if instance:IsA("BasePart") and instance:GetAttribute("BowlingAdScreen") then
-			local adOffset = instance:GetAttribute("BowlingAdOffset") or 1
-			local ad = BOWLING_ADS[((step + adOffset - 2) % #BOWLING_ADS) + 1]
+			local ad
+			if showScores then
+				ad = {
+					Text = self:_formatBowlingAdScoreText(),
+					Background = Color3.fromRGB(18, 24, 36),
+					TextColor = Color3.fromRGB(119, 255, 203),
+				}
+			else
+				local adOffset = instance:GetAttribute("BowlingAdOffset") or 1
+				ad = BOWLING_ADS[((adStep + adOffset - 1) % #BOWLING_ADS) + 1]
+			end
+
 			local label = instance:FindFirstChild("BowlingAdText", true)
 			if label and label:IsA("TextLabel") then
 				label.Text = ad.Text

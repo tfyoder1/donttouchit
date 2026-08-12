@@ -1857,7 +1857,7 @@ local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 	end
 end
 
-local function makeBowlingAdTv(parent, name, cframe, adOffset)
+local function makeBowlingAdTv(parent, name, cframe, adOffset, laneIndex)
 	local tv = makeModel(parent, name)
 	local frame = createPart(tv, name .. "Frame", Vector3.new(8.6, 4.3, 0.42), cframe, Color3.fromRGB(12, 14, 19), Enum.Material.Metal)
 	local screen = createPart(tv, name .. "Screen", Vector3.new(7.8, 3.45, 0.18), cframe * CFrame.new(0, 0, -0.26), Color3.fromRGB(20, 28, 42), Enum.Material.Neon)
@@ -1874,6 +1874,12 @@ local function makeBowlingAdTv(parent, name, cframe, adOffset)
 	glow.Color = Color3.fromRGB(119, 255, 203)
 	glow.Parent = screen
 	mark(glow)
+
+	if laneIndex then
+		local sign = createPart(tv, name .. "LaneSign", Vector3.new(7.4, 0.9, 0.18), cframe * CFrame.new(0, -2.85, -0.25), Color3.fromRGB(25, 31, 45), Enum.Material.Neon)
+		createSurfaceText(sign, "LaneSignText", "LANE " .. laneIndex, Enum.NormalId.Front, BOWLING_COSMIC_COLORS[((laneIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Color3.fromRGB(25, 31, 45))
+		sign:SetAttribute("CosmicSurface", true)
+	end
 
 	tv.PrimaryPart = frame
 	return tv
@@ -2044,6 +2050,7 @@ local function makeBowlingAlley(roomFolder)
 			room,
 			"BowlingAdTV" .. adIndex,
 			CFrame.new(origin + Vector3.new(laneX, 12.8, 24), origin + Vector3.new(laneX, 8.2, 48)),
+			adIndex,
 			adIndex
 		)
 	end
@@ -2112,17 +2119,6 @@ local function makeBowlingAlley(roomFolder)
 
 	local laneXs = { -12, 0, 12 }
 	for laneIndex, laneX in ipairs(laneXs) do
-		local laneLabel = createPart(
-			room,
-			"Lane" .. laneIndex .. "OverheadSign",
-			Vector3.new(6.4, 1.3, 0.22),
-			CFrame.new(origin + Vector3.new(laneX, 9.2, 38.8), origin + Vector3.new(laneX, 7.6, 48)),
-			Color3.fromRGB(25, 31, 45),
-			Enum.Material.Neon
-		)
-		createSurfaceText(laneLabel, "Lane" .. laneIndex .. "OverheadText", "LANE " .. laneIndex, Enum.NormalId.Front, BOWLING_COSMIC_COLORS[((laneIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Color3.fromRGB(25, 31, 45))
-		laneLabel:SetAttribute("CosmicSurface", true)
-
 		local lane = createPart(room, "Lane" .. laneIndex, Vector3.new(8.2, 0.34, 74), cframeAt(origin, laneX, 0.72, -9), Color3.fromRGB(197, 151, 87), Enum.Material.WoodPlanks)
 		lane:SetAttribute("CosmicSurface", true)
 		createPart(room, "Lane" .. laneIndex .. "LeftGutter", Vector3.new(1, 0.28, 74), cframeAt(origin, laneX - 4.7, 0.86, -9), Color3.fromRGB(20, 22, 28), Enum.Material.Metal)
