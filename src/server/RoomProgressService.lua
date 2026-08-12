@@ -209,12 +209,27 @@ function RoomProgressService:_sendStartOptions(player)
 	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
 	local hintCount = self.discoveryService:GetHintCount(player)
 	local clueCount = self.discoveryService:GetClueCount(player)
+	local unlockedRooms = {}
+
+	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
+		if self.discoveryService:IsRoomUnlocked(player, roomId) then
+			local room = Constants.GetRoom(roomId)
+			if room then
+				table.insert(unlockedRooms, {
+					RoomId = roomId,
+					Name = room.Name,
+					IsResumeRoom = roomId == resumeRoomId,
+				})
+			end
+		end
+	end
 
 	self.sessionStartRemote:FireClient(player, {
 		Action = "Show",
 		HasProgress = discoveryCount > 0 or hintCount > 0 or clueCount > 0 or resumeRoomId ~= Constants.RoomOrder[1],
 		ResumeRoomId = resumeRoomId,
 		ResumeRoomName = resumeRoom and resumeRoom.Name or "TV Room",
+		UnlockedRooms = unlockedRooms,
 		DiscoveryCount = discoveryCount,
 		TotalDiscoveries = Constants.TotalDiscoveries,
 		Hints = hintCount,
@@ -237,6 +252,23 @@ function RoomProgressService:_handleSessionStart(player, payload)
 		roomId = self.discoveryService:GetLastUnlockedRoomId(player)
 		local room = Constants.GetRoom(roomId)
 		message = ("Returning to %s. Try to look innocent."):format(room and room.Name or "the room")
+	elseif action == "Room" then
+		local requestedRoomId = payload.RoomId
+		if typeof(requestedRoomId) ~= "string" or not Constants.GetRoom(requestedRoomId) then
+			return
+		end
+
+		if not self.discoveryService:IsRoomUnlocked(player, requestedRoomId) then
+			self.systemMessageRemote:FireClient(player, "That room is still locked. The start screen refuses to pretend otherwise.")
+			local state = self:_getState(player)
+			state.StartOptionsSent = false
+			self:_sendStartOptions(player)
+			return
+		end
+
+		roomId = requestedRoomId
+		local room = Constants.GetRoom(roomId)
+		message = ("Starting in %s. Please continue not touching things there."):format(room and room.Name or "the room")
 	elseif action ~= "Restart" then
 		return
 	end

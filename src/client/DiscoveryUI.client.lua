@@ -597,13 +597,13 @@ startPanel.BackgroundColor3 = Color3.fromRGB(24, 27, 34)
 startPanel.BackgroundTransparency = 0.04
 startPanel.BorderSizePixel = 0
 startPanel.Position = UDim2.fromScale(0.5, 0.52)
-startPanel.Size = UDim2.new(0.9, 0, 0.78, 0)
+startPanel.Size = UDim2.new(0.92, 0, 0.84, 0)
 startPanel.ZIndex = 21
 startPanel.Parent = startOverlay
 
 local startPanelConstraint = Instance.new("UISizeConstraint")
-startPanelConstraint.MaxSize = Vector2.new(460, 312)
-startPanelConstraint.MinSize = Vector2.new(300, 270)
+startPanelConstraint.MaxSize = Vector2.new(520, 520)
+startPanelConstraint.MinSize = Vector2.new(320, 390)
 startPanelConstraint.Parent = startPanel
 
 local startCorner = Instance.new("UICorner")
@@ -627,7 +627,7 @@ startIntro.Name = "StartIntro"
 startIntro.BackgroundTransparency = 1
 startIntro.Font = Enum.Font.GothamSemibold
 startIntro.Position = UDim2.fromOffset(24, 62)
-startIntro.Size = UDim2.new(1, -48, 0, 74)
+startIntro.Size = UDim2.new(1, -48, 0, 66)
 startIntro.Text = Constants.GameIntro
 startIntro.TextColor3 = Color3.fromRGB(224, 236, 245)
 startIntro.TextScaled = true
@@ -639,14 +639,60 @@ local startSubtitle = Instance.new("TextLabel")
 startSubtitle.Name = "StartSubtitle"
 startSubtitle.BackgroundTransparency = 1
 startSubtitle.Font = Enum.Font.GothamSemibold
-startSubtitle.Position = UDim2.fromOffset(24, 142)
-startSubtitle.Size = UDim2.new(1, -48, 0, 42)
+startSubtitle.Position = UDim2.fromOffset(24, 132)
+startSubtitle.Size = UDim2.new(1, -48, 0, 38)
 startSubtitle.Text = ""
 startSubtitle.TextColor3 = Color3.fromRGB(224, 236, 245)
 startSubtitle.TextScaled = true
 startSubtitle.TextWrapped = true
 startSubtitle.ZIndex = 22
 startSubtitle.Parent = startPanel
+
+local startRoomTitle = Instance.new("TextLabel")
+startRoomTitle.Name = "StartRoomTitle"
+startRoomTitle.BackgroundTransparency = 1
+startRoomTitle.Font = Enum.Font.GothamBlack
+startRoomTitle.Position = UDim2.fromOffset(24, 178)
+startRoomTitle.Size = UDim2.new(1, -48, 0, 22)
+startRoomTitle.Text = "Choose Unlocked Room"
+startRoomTitle.TextColor3 = Color3.fromRGB(255, 242, 181)
+startRoomTitle.TextScaled = true
+startRoomTitle.TextXAlignment = Enum.TextXAlignment.Left
+startRoomTitle.ZIndex = 22
+startRoomTitle.Parent = startPanel
+
+local startRoomList = Instance.new("ScrollingFrame")
+startRoomList.Name = "StartRoomList"
+startRoomList.BackgroundColor3 = Color3.fromRGB(16, 19, 26)
+startRoomList.BackgroundTransparency = 0.1
+startRoomList.BorderSizePixel = 0
+startRoomList.Position = UDim2.fromOffset(24, 204)
+startRoomList.Size = UDim2.new(1, -48, 1, -326)
+startRoomList.CanvasSize = UDim2.fromOffset(0, 0)
+startRoomList.ScrollBarThickness = 6
+startRoomList.ScrollingDirection = Enum.ScrollingDirection.Y
+startRoomList.ZIndex = 22
+startRoomList.Parent = startPanel
+
+local startRoomListCorner = Instance.new("UICorner")
+startRoomListCorner.CornerRadius = UDim.new(0, 6)
+startRoomListCorner.Parent = startRoomList
+
+local startRoomPadding = Instance.new("UIPadding")
+startRoomPadding.PaddingTop = UDim.new(0, 8)
+startRoomPadding.PaddingBottom = UDim.new(0, 8)
+startRoomPadding.PaddingLeft = UDim.new(0, 8)
+startRoomPadding.PaddingRight = UDim.new(0, 8)
+startRoomPadding.Parent = startRoomList
+
+local startRoomLayout = Instance.new("UIListLayout")
+startRoomLayout.Padding = UDim.new(0, 6)
+startRoomLayout.SortOrder = Enum.SortOrder.LayoutOrder
+startRoomLayout.Parent = startRoomList
+
+startRoomLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	startRoomList.CanvasSize = UDim2.fromOffset(0, startRoomLayout.AbsoluteContentSize.Y + 16)
+end)
 
 local startVersion = Instance.new("TextLabel")
 startVersion.Name = "Version"
@@ -667,8 +713,8 @@ continueButton.Name = "ContinueButton"
 continueButton.BackgroundColor3 = Color3.fromRGB(61, 217, 132)
 continueButton.BorderSizePixel = 0
 continueButton.Font = Enum.Font.GothamBlack
-continueButton.Position = UDim2.new(0, 24, 1, -112)
-continueButton.Size = UDim2.new(1, -48, 0, 42)
+continueButton.Position = UDim2.new(0, 24, 1, -104)
+continueButton.Size = UDim2.new(1, -48, 0, 38)
 continueButton.Text = "Continue"
 continueButton.TextColor3 = Color3.fromRGB(14, 40, 24)
 continueButton.TextScaled = true
@@ -685,7 +731,7 @@ restartButton.Name = "RestartButton"
 restartButton.BackgroundColor3 = Color3.fromRGB(84, 154, 255)
 restartButton.BorderSizePixel = 0
 restartButton.Font = Enum.Font.GothamBlack
-restartButton.Position = UDim2.new(0, 24, 1, -62)
+restartButton.Position = UDim2.new(0, 24, 1, -58)
 restartButton.Size = UDim2.new(1, -48, 0, 34)
 restartButton.Text = "Start Over"
 restartButton.TextColor3 = Color3.fromRGB(14, 27, 46)
@@ -708,6 +754,7 @@ local currentStatusType = nil
 local currentStatusRoomId = nil
 local pendingStartOptions = nil
 local sessionStartIntroText = nil
+local startRoomButtons = {}
 local overlayMouseDepth = 0
 local previousMouseBehavior = nil
 local previousMouseIconEnabled = nil
@@ -902,15 +949,76 @@ local function closeReferenceBook()
 	setOverlayMouse(false)
 end
 
-local function sendStartChoice(action)
+local function sendStartChoice(action, roomId)
 	startOverlay.Visible = false
 	continueButton.Modal = false
 	restartButton.Modal = false
 	setOverlayMouse(false)
 	pendingStartOptions = nil
-	sessionStartRemote:FireServer({
+	local request = {
 		Action = action,
-	})
+	}
+
+	if roomId then
+		request.RoomId = roomId
+	end
+
+	sessionStartRemote:FireServer(request)
+end
+
+local function clearStartRoomChoices()
+	for _, button in ipairs(startRoomButtons) do
+		button:Destroy()
+	end
+
+	startRoomButtons = {}
+end
+
+local function renderStartRoomChoices(payload)
+	clearStartRoomChoices()
+
+	local rooms = payload.UnlockedRooms
+	if typeof(rooms) ~= "table" or #rooms == 0 then
+		startRoomTitle.Visible = false
+		startRoomList.Visible = false
+		return
+	end
+
+	startRoomTitle.Visible = true
+	startRoomList.Visible = true
+
+	for index, room in ipairs(rooms) do
+		if typeof(room) ~= "table" or typeof(room.RoomId) ~= "string" then
+			continue
+		end
+
+		local roomButton = Instance.new("TextButton")
+		roomButton.Name = "StartRoomButton"
+		roomButton.BackgroundColor3 = room.IsResumeRoom and Color3.fromRGB(61, 217, 132) or Color3.fromRGB(40, 45, 56)
+		roomButton.BorderSizePixel = 0
+		roomButton.Font = Enum.Font.GothamBlack
+		roomButton.LayoutOrder = index
+		roomButton.Size = UDim2.new(1, 0, 0, 36)
+		roomButton.Text = room.IsResumeRoom and ("%s  |  Last"):format(room.Name or "Room") or (room.Name or "Room")
+		roomButton.TextColor3 = room.IsResumeRoom and Color3.fromRGB(14, 40, 24) or Color3.fromRGB(224, 236, 245)
+		roomButton.TextScaled = true
+		roomButton.TextWrapped = true
+		roomButton.ZIndex = 23
+		roomButton.Parent = startRoomList
+
+		local roomCorner = Instance.new("UICorner")
+		roomCorner.CornerRadius = UDim.new(0, 5)
+		roomCorner.Parent = roomButton
+
+		local targetRoomId = room.RoomId
+		roomButton.MouseButton1Click:Connect(function()
+			sendStartChoice("Room", targetRoomId)
+		end)
+
+		table.insert(startRoomButtons, roomButton)
+	end
+
+	startRoomList.CanvasSize = UDim2.fromOffset(0, startRoomLayout.AbsoluteContentSize.Y + 16)
 end
 
 local function renderStartOptions(payload)
@@ -940,6 +1048,7 @@ local function renderStartOptions(payload)
 		payload.Clues or 0
 	)
 	startVersion.Text = "v" .. tostring(payload.BuildVersion or Constants.BuildVersion or "dev")
+	renderStartRoomChoices(payload)
 
 	if payload.HasProgress then
 		continueButton.Text = ("Continue: %s"):format(payload.ResumeRoomName or "TV Room")
@@ -1285,6 +1394,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			closeReferenceBook()
 		end
 	elseif startOverlay.Visible and input.KeyCode == Enum.KeyCode.ButtonA then
+		if GuiService.SelectedObject and GuiService.SelectedObject ~= continueButton then
+			return
+		end
+
 		sendStartChoice("Resume")
 	end
 end)
