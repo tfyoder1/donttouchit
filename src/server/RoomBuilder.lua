@@ -3048,7 +3048,7 @@ local function makeIslandObjects(objectsFolder)
 		rock.Shape = Enum.PartType.Ball
 	end
 
-	for stickIndex = 1, 3 do
+	for stickIndex = 1, 4 do
 		local stick = createPart(
 			fireRing,
 			"FireRingWoodStick" .. stickIndex,
@@ -3070,6 +3070,16 @@ local function makeIslandObjects(objectsFolder)
 	fireEmitter.CanCollide = false
 	fireEmitter:SetAttribute("BaseTransparency", 1)
 	fireEmitter:SetAttribute("BaseCanCollide", false)
+	local fireLight = Instance.new("PointLight")
+	fireLight.Name = "IslandCampfireLight"
+	fireLight.Brightness = 0
+	fireLight.Color = Color3.fromRGB(255, 150, 72)
+	fireLight.Enabled = false
+	fireLight.Range = 0
+	fireLight.Shadows = true
+	fireLight:SetAttribute("IslandFireLight", true)
+	fireLight.Parent = fireEmitter
+	mark(fireLight)
 
 	local function addEmitter(name, texture, rate, lifetime, speed, size, color, transparency, acceleration)
 		local emitter = Instance.new("ParticleEmitter")

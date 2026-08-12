@@ -2852,6 +2852,7 @@ function InteractionService:_afterRoomReset()
 		state.Burning = false
 		state.Smoking = false
 		state.Token = nil
+		state.BurnEndsAt = 0
 		if fireRing and fireRing.Parent then
 			self:_setIslandFireEmitters(fireRing, false, false)
 			self:_setIslandFireWoodVisible(fireRing, 0)
@@ -6004,15 +6005,107 @@ function InteractionService:_setIslandFireEmitters(fireRingPart, fireActive, smo
 		return
 	end
 
+	local state = self.islandFireRingState[fireRingPart]
+	local requiredWood = state and state.RequiredWood or 3
+	local deposited = state and state.Deposited or requiredWood
+	local intensity = math.clamp(1 + math.max(0, deposited - requiredWood), 1, 3)
+
 	for _, instance in ipairs(fireRing:GetDescendants()) do
 		if instance:IsA("ParticleEmitter") and instance:GetAttribute("IslandFireEmitter") then
 			if instance.Name:find("Smoke", 1, true) then
 				instance.Enabled = smokeActive
+				instance.Rate = if fireActive then 9 + intensity * 6 else 7 + intensity * 4
+				instance.Speed = NumberRange.new(0.28 + intensity * 0.08, 0.68 + intensity * 0.18)
+				instance.Size = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 1.2 + intensity * 0.35),
+					NumberSequenceKeypoint.new(0.55, 3.8 + intensity * 0.85),
+					NumberSequenceKeypoint.new(1, 6.5 + intensity * 1.15),
+				})
+			elseif instance.Name:find("Glow", 1, true) then
+				instance.Enabled = fireActive
+				instance.Rate = 12 + intensity * 11
+				instance.Speed = NumberRange.new(0.75 + intensity * 0.22, 1.55 + intensity * 0.38)
+				instance.Size = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 0.38 + intensity * 0.18),
+					NumberSequenceKeypoint.new(1, 0.08),
+				})
 			else
 				instance.Enabled = fireActive
+				instance.Rate = 30 + intensity * 26
+				instance.Speed = NumberRange.new(1 + intensity * 0.35, 2.35 + intensity * 0.62)
+				instance.Size = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 0.9 + intensity * 0.38),
+					NumberSequenceKeypoint.new(0.45, 1.55 + intensity * 0.58),
+					NumberSequenceKeypoint.new(1, 0.18 + intensity * 0.08),
+				})
 			end
+		elseif instance:IsA("PointLight") and instance:GetAttribute("IslandFireLight") then
+			instance.Enabled = fireActive or smokeActive
+			instance.Brightness = fireActive and (1.6 + intensity * 1.1) or (smokeActive and 0.3 or 0)
+			instance.Range = fireActive and (12 + intensity * 5) or (smokeActive and 7 or 0)
 		end
 	end
+end
+
+function InteractionService:_updateIslandFirePrompt(fireRingPart)
+	local state = self.islandFireRingState[fireRingPart]
+	local prompt = getPrompt(fireRingPart)
+	if not state or not prompt then
+		return
+	end
+
+	local requiredWood = state.RequiredWood or 3
+	local maxWood = state.MaxWood or 4
+	if state.Deposited < requiredWood then
+		prompt.ActionText = "Add Wood"
+		prompt.ObjectText = "Rock Ring"
+	elseif state.Burning then
+		prompt.ActionText = state.Deposited < maxWood and "Feed Fire" or "Roaring"
+		prompt.ObjectText = "Campfire"
+	elseif state.Smoking then
+		prompt.ActionText = "Smoking"
+		prompt.ObjectText = "Campfire"
+	else
+		prompt.ActionText = "Light"
+		prompt.ObjectText = "Wood-Filled Ring"
+	end
+end
+
+function InteractionService:_addIslandFirewood(fireRingPart, player)
+	local state = self.islandFireRingState[fireRingPart]
+	if not state then
+		return false
+	end
+
+	local requiredWood = state.RequiredWood or 3
+	local maxWood = state.MaxWood or 4
+	if state.Deposited >= maxWood then
+		self.systemMessageRemote:FireClient(player, "The campfire is fully stocked. More wood would be just showing off.")
+		return false
+	end
+
+	local heldWood = self.islandWoodCountByUserId[player.UserId] or 0
+	if heldWood <= 0 then
+		local needed = math.max(1, math.min(requiredWood, maxWood) - state.Deposited)
+		self.systemMessageRemote:FireClient(player, ("The rock ring wants %d more piece%s of driftwood. You are carrying none."):format(needed, needed == 1 and "" or "s"))
+		return false
+	end
+
+	self.islandWoodCountByUserId[player.UserId] = heldWood - 1
+	state.Deposited += 1
+	self:_setIslandFireWoodVisible(fireRingPart, state.Deposited)
+	self:_setIslandFireEmitters(fireRingPart, state.Burning, state.Smoking)
+	self:_updateIslandFirePrompt(fireRingPart)
+	playSound(fireRingPart, "rbxasset://sounds/button.wav", 0.35, 0.68)
+
+	if state.Burning then
+		state.BurnEndsAt = math.max(state.BurnEndsAt or 0, os.clock()) + 12
+		self.systemMessageRemote:FireClient(player, ("More driftwood added: %d / %d. The fire gets bigger."):format(state.Deposited, maxWood))
+	else
+		self.systemMessageRemote:FireClient(player, ("Driftwood added: %d / %d."):format(state.Deposited, requiredWood))
+	end
+
+	return true
 end
 
 function InteractionService:_startIslandCampfire(fireRingPart, player)
@@ -6024,28 +6117,44 @@ function InteractionService:_startIslandCampfire(fireRingPart, player)
 	state.Burning = true
 	state.Smoking = true
 	state.Token = {}
+	state.BurnEndsAt = os.clock() + 18 + math.max(0, state.Deposited - (state.RequiredWood or 3)) * 12
 	local token = state.Token
-	local prompt = getPrompt(fireRingPart)
-	if prompt then
-		prompt.ActionText = "Warming"
-		prompt.ObjectText = "Campfire"
-	end
+	self:_updateIslandFirePrompt(fireRingPart)
 
 	self:_setIslandFireEmitters(fireRingPart, true, true)
 	self.discoveryService:Unlock(player, Constants.Discoveries.IslandCampfire.Id)
 	playSound(fireRingPart, "rbxasset://sounds/electronicpingshort.wav", 0.45, 0.48)
 	self.systemMessageRemote:FireClient(player, "The island campfire decides to be dramatically useful.")
 
-	task.delay(18, function()
-		if state.Token ~= token then
+	task.spawn(function()
+		while state.Token == token and state.Burning do
+			local fireRing = self:_getIslandFireRingModel(fireRingPart)
+			if fireRing then
+				local requiredWood = state.RequiredWood or 3
+				local intensity = math.clamp(1 + math.max(0, state.Deposited - requiredWood), 1, 3)
+				local flicker = math.noise(os.clock() * 3.4, state.Deposited, 0) * 0.45
+				for _, instance in ipairs(fireRing:GetDescendants()) do
+					if instance:IsA("PointLight") and instance:GetAttribute("IslandFireLight") then
+						instance.Brightness = math.max(0.25, 1.6 + intensity * 1.1 + flicker)
+						instance.Range = 12 + intensity * 5 + math.abs(flicker) * 3
+					end
+				end
+			end
+
+			if os.clock() >= (state.BurnEndsAt or 0) then
+				break
+			end
+
+			task.wait(0.12)
+		end
+
+		if state.Token ~= token or not state.Burning then
 			return
 		end
 
 		state.Burning = false
 		self:_setIslandFireEmitters(fireRingPart, false, true)
-		if prompt then
-			prompt.ActionText = "Smoking"
-		end
+		self:_updateIslandFirePrompt(fireRingPart)
 		self.systemMessageRemote:FireAllClients("The campfire goes out, but keeps smoking like it has notes.")
 
 		task.delay(30, function()
@@ -6055,10 +6164,8 @@ function InteractionService:_startIslandCampfire(fireRingPart, player)
 
 			state.Smoking = false
 			self:_setIslandFireEmitters(fireRingPart, false, false)
-			if prompt then
-				prompt.ActionText = "Relight"
-				prompt.ObjectText = "Wood-Filled Ring"
-			end
+			state.BurnEndsAt = 0
+			self:_updateIslandFirePrompt(fireRingPart)
 		end)
 	end)
 end
@@ -6068,9 +6175,12 @@ function InteractionService:_wireIslandFireRing(fireRingPart)
 
 	self.islandFireRingState[fireRingPart] = self.islandFireRingState[fireRingPart] or {
 		Deposited = 0,
+		RequiredWood = 3,
+		MaxWood = 4,
 		Burning = false,
 		Smoking = false,
 		Token = nil,
+		BurnEndsAt = 0,
 	}
 
 	self:_connectPrompt(prompt, function(player)
@@ -6079,28 +6189,14 @@ function InteractionService:_wireIslandFireRing(fireRingPart)
 			return
 		end
 
-		local requiredWood = 3
+		local requiredWood = state.RequiredWood or 3
 		if state.Deposited < requiredWood then
-			local heldWood = self.islandWoodCountByUserId[player.UserId] or 0
-			if heldWood <= 0 then
-				self.systemMessageRemote:FireClient(player, ("The rock ring wants %d pieces of driftwood. You are carrying none."):format(requiredWood - state.Deposited))
-				return
-			end
-
-			self.islandWoodCountByUserId[player.UserId] = heldWood - 1
-			state.Deposited += 1
-			self:_setIslandFireWoodVisible(fireRingPart, state.Deposited)
-			playSound(fireRingPart, "rbxasset://sounds/button.wav", 0.35, 0.68)
-			if prompt then
-				prompt.ActionText = state.Deposited >= requiredWood and "Light" or "Add Wood"
-				prompt.ObjectText = state.Deposited >= requiredWood and "Wood-Filled Ring" or "Rock Ring"
-			end
-			self.systemMessageRemote:FireClient(player, ("Driftwood added: %d / %d."):format(state.Deposited, requiredWood))
+			self:_addIslandFirewood(fireRingPart, player)
 			return
 		end
 
 		if state.Burning then
-			self.systemMessageRemote:FireClient(player, "The campfire is already doing fire things.")
+			self:_addIslandFirewood(fireRingPart, player)
 			return
 		end
 
