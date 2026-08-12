@@ -403,14 +403,15 @@ local function makePedestal(objectsFolder)
 	local button = createPart(
 		pedestal,
 		"BigRedButton",
-		Vector3.new(3.45, 1.12, 3.45),
-		CFrame.new(0, 4.48, 0),
+		Vector3.new(3.55, 0.62, 3.55),
+		CFrame.new(0, 4.44, 0),
 		Color3.fromRGB(242, 17, 28),
 		Enum.Material.SmoothPlastic,
 		"Part"
 	)
 	button.Shape = Enum.PartType.Ball
-	button:SetAttribute("PressedCFrame", CFrame.new(0, 4.18, 0))
+	button:SetAttribute("PressedCFrame", CFrame.new(0, 4.2, 0))
+	button:SetAttribute("ButtonVisualGroup", "TVMainButtonCap")
 
 	local ringShine = createPart(
 		pedestal,
@@ -430,8 +431,8 @@ local function makePedestal(objectsFolder)
 	local shine = createPart(
 		pedestal,
 		"BigRedButtonShine",
-		Vector3.new(1.1, 0.12, 0.48),
-		CFrame.new(0.76, 5.05, -0.64) * CFrame.Angles(0, 0, math.rad(16)),
+		Vector3.new(1.05, 0.08, 0.42),
+		CFrame.new(0.76, 4.79, -0.62) * CFrame.Angles(0, 0, math.rad(16)),
 		Color3.fromRGB(255, 190, 196),
 		Enum.Material.Neon,
 		"Part"
@@ -440,9 +441,11 @@ local function makePedestal(objectsFolder)
 	shine.CanCollide = false
 	shine.Transparency = 0.12
 	shine:SetAttribute("BaseCanCollide", false)
+	shine:SetAttribute("ButtonVisualGroup", "TVMainButtonCap")
 	mark(shine)
 
-	createPrompt(button, "Press", "Absolutely Do Not Touch", 0.15)
+	local buttonPrompt = createPrompt(button, "Press", "Absolutely Do Not Touch", 0.15)
+	buttonPrompt.GamepadKeyCode = Enum.KeyCode.ButtonB
 	tag(button, Constants.Tags.MainButton)
 
 	local sign = createPart(

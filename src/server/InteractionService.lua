@@ -866,43 +866,70 @@ function InteractionService:_cycleRoomMood(roomId)
 end
 
 function InteractionService:_pressButtonVisual(button)
-	local visualParts = { button }
-	local shine = button.Parent and button.Parent:FindFirstChild("BigRedButtonShine")
-	if shine and shine:IsA("BasePart") then
-		table.insert(visualParts, shine)
+	local visualParts = {}
+	local visualGroup = button:GetAttribute("ButtonVisualGroup")
+
+	if visualGroup and button.Parent then
+		for _, child in ipairs(button.Parent:GetChildren()) do
+			if child:IsA("BasePart") and child:GetAttribute("ButtonVisualGroup") == visualGroup then
+				table.insert(visualParts, child)
+			end
+		end
+	else
+		table.insert(visualParts, button)
+		local shine = button.Parent and button.Parent:FindFirstChild("BigRedButtonShine")
+		if shine and shine:IsA("BasePart") then
+			table.insert(visualParts, shine)
+		end
+	end
+
+	if #visualParts == 0 then
+		return
+	end
+
+	local baseCFrames = {}
+	for _, part in ipairs(visualParts) do
+		baseCFrames[part] = part:GetAttribute("BaseCFrame") or part.CFrame
 	end
 
 	local baseColor = button:GetAttribute("BaseColor") or button.Color
 
 	playSound(button, "rbxasset://sounds/button.wav", 0.45, 0.9)
 
-	local downTween = nil
-	for _, part in ipairs(visualParts) do
-		local properties = {
-			CFrame = (part:GetAttribute("BaseCFrame") or part.CFrame) + Vector3.new(0, -0.28, 0),
-		}
-		if part == button then
-			properties.Color = Color3.fromRGB(165, 12, 23)
+	local motion = Instance.new("Vector3Value")
+	motion.Value = Vector3.zero
+	local motionConnection = motion:GetPropertyChangedSignal("Value"):Connect(function()
+		for _, part in ipairs(visualParts) do
+			if part.Parent then
+				part.CFrame = baseCFrames[part] + motion.Value
+			end
 		end
+	end)
 
-		downTween = tweenPart(part, 0.1, properties, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	end
-
+	local downTween = TweenService:Create(
+		motion,
+		TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Value = Vector3.new(0, -0.24, 0) }
+	)
+	tweenPart(button, 0.1, {
+		Color = Color3.fromRGB(165, 12, 23),
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	downTween:Play()
 	downTween.Completed:Wait()
 
-	local upTween = nil
-	for _, part in ipairs(visualParts) do
-		local properties = {
-			CFrame = part:GetAttribute("BaseCFrame") or part.CFrame,
-		}
-		if part == button then
-			properties.Color = baseColor
-		end
-
-		upTween = tweenPart(part, 0.18, properties, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	end
-
+	local upTween = TweenService:Create(
+		motion,
+		TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{ Value = Vector3.zero }
+	)
+	tweenPart(button, 0.18, {
+		Color = baseColor,
+	}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	upTween:Play()
 	upTween.Completed:Wait()
+
+	motionConnection:Disconnect()
+	motion:Destroy()
 end
 
 function InteractionService:_wireFloorSection(floorSection)
