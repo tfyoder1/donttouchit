@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.44"
+Constants.BuildVersion = "0.5.45"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -27,6 +27,7 @@ Constants.Remotes = {
 	SnackEffect = "SnackEffect",
 	FeedbackRequest = "FeedbackRequest",
 	DevTools = "DevTools",
+	VoidEffect = "VoidEffect",
 }
 
 Constants.Tags = {
@@ -94,6 +95,10 @@ Constants.Tags = {
 	BowlingGutter = "DontTouchIt_BowlingGutter",
 	BowlingBallReturn = "DontTouchIt_BowlingBallReturn",
 	TreetopZipline = "DontTouchIt_TreetopZipline",
+	VoidReverseConsole = "DontTouchIt_VoidReverseConsole",
+	VoidGravityOrb = "DontTouchIt_VoidGravityOrb",
+	VoidEchoButton = "DontTouchIt_VoidEchoButton",
+	VoidFreezeRay = "DontTouchIt_VoidFreezeRay",
 	SpaceStationAirlock = "DontTouchIt_SpaceStationAirlock",
 	SpaceStationGravityDial = "DontTouchIt_SpaceStationGravityDial",
 	SpaceStationObservationWindow = "DontTouchIt_SpaceStationObservationWindow",
@@ -559,6 +564,36 @@ Constants.Discoveries = {
 		Name = "Left the Bowling Alley Alone",
 		Hint = "Stand in the Bowling Alley for two minutes without interacting with anything.",
 	},
+	VoidEntered = {
+		Id = "void_entered",
+		Name = "Stopped in the Void",
+		Hint = "Ride the treetop zipline. It has started making unscheduled stops.",
+	},
+	VoidReverseControls = {
+		Id = "void_reverse_controls",
+		Name = "Walked Wrong on Purpose",
+		Hint = "The Void has a console that disagrees with directions.",
+	},
+	VoidGravityFlip = {
+		Id = "void_gravity_flip",
+		Name = "Flipped Void Gravity",
+		Hint = "Touch the floating gravity orb in the Void.",
+	},
+	VoidEcho = {
+		Id = "void_echo",
+		Name = "Heard the Void Answer",
+		Hint = "Press the button that looks like it is listening.",
+	},
+	VoidFreezeRay = {
+		Id = "void_freeze_ray",
+		Name = "Claimed the Freeze Ray",
+		Hint = "The Void keeps one questionable prize near the exit.",
+	},
+	VoidNoTouch = {
+		Id = "void_no_touch",
+		Name = "Left the Void Alone",
+		Hint = "Stand in the Void for two minutes without interacting with anything. The Void takes this personally.",
+	},
 }
 
 Constants.RoomDiscoveryOrder = {
@@ -648,6 +683,14 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.BowlingBallReturn.Id,
 		Constants.Discoveries.BowlingNoTouch.Id,
 	},
+	Void = {
+		Constants.Discoveries.VoidEntered.Id,
+		Constants.Discoveries.VoidReverseControls.Id,
+		Constants.Discoveries.VoidGravityFlip.Id,
+		Constants.Discoveries.VoidEcho.Id,
+		Constants.Discoveries.VoidFreezeRay.Id,
+		Constants.Discoveries.VoidNoTouch.Id,
+	},
 }
 
 Constants.SecretDiscoveries = {
@@ -705,12 +748,14 @@ Constants.DiscoveryRoomOrder = {
 	"Island",
 	"Library",
 	"BowlingAlley",
+	"Void",
 	"SpaceStation",
 }
 
 Constants.RoomResumeDiscoveries = {
 	Library = Constants.Discoveries.LibraryEntered.Id,
 	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
+	Void = Constants.Discoveries.VoidEntered.Id,
 	SpaceStation = Constants.Discoveries.SpaceStationEntered.Id,
 }
 
@@ -779,6 +824,17 @@ Constants.Rooms = {
 		Zone = {
 			Min = Vector3.new(-36, -3, -252),
 			Max = Vector3.new(8, 42, -80),
+		},
+	},
+	Void = {
+		Id = "Void",
+		Name = "The Void",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.Void,
+		NoTouchDiscoveryId = Constants.Discoveries.VoidNoTouch.Id,
+		SpawnCFrame = CFrame.new(Vector3.new(-92, 47, -28), Vector3.new(-92, 47, -42)),
+		Zone = {
+			Min = Vector3.new(-120, 32, -58),
+			Max = Vector3.new(-64, 74, 2),
 		},
 	},
 }
@@ -863,6 +919,11 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.BowlingShoes.Id] = Constants.Tags.BowlingShoeRack,
 	[Constants.Discoveries.BowlingScoreboard.Id] = Constants.Tags.BowlingScoreboard,
 	[Constants.Discoveries.BowlingBallReturn.Id] = Constants.Tags.BowlingBallReturn,
+	[Constants.Discoveries.VoidEntered.Id] = Constants.Tags.TreetopZipline,
+	[Constants.Discoveries.VoidReverseControls.Id] = Constants.Tags.VoidReverseConsole,
+	[Constants.Discoveries.VoidGravityFlip.Id] = Constants.Tags.VoidGravityOrb,
+	[Constants.Discoveries.VoidEcho.Id] = Constants.Tags.VoidEchoButton,
+	[Constants.Discoveries.VoidFreezeRay.Id] = Constants.Tags.VoidFreezeRay,
 }
 
 Constants.NoTouch = {

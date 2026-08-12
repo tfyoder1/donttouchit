@@ -397,6 +397,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.roomProgressService = roomProgressService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.snackEffectRemote = RemoteService.GetRemote(Constants.Remotes.SnackEffect)
+	self.voidEffectRemote = RemoteService.GetRemote(Constants.Remotes.VoidEffect)
 	self.connectedPrompts = {}
 	self.snackButtonRandom = Random.new()
 	self.couchState = {}
@@ -460,6 +461,8 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.bowlingCosmicToken = nil
 	self.bowlingAdToken = nil
 	self.treetopZiplineStateByUserId = {}
+	self.voidGravityTokensByUserId = {}
+	self.voidChillTokensByHumanoid = {}
 	return self
 end
 
@@ -481,6 +484,9 @@ function InteractionService:Initialize()
 		task.delay(1.5, function()
 			if player.Parent then
 				self:_refreshSecretDoorsForPlayer(player)
+				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id) then
+					self:_grantFreezeRay(player)
+				end
 			end
 		end)
 	end)
@@ -491,6 +497,7 @@ function InteractionService:Initialize()
 		self.islandWarningReadStateByUserId[player.UserId] = nil
 		self.islandWoodCountByUserId[player.UserId] = nil
 		self.treetopZiplineStateByUserId[player.UserId] = nil
+		self.voidGravityTokensByUserId[player.UserId] = nil
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -725,6 +732,22 @@ function InteractionService:Initialize()
 		self:_wireTreetopZipline(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.VoidReverseConsole, function(instance)
+		self:_wireVoidReverseConsole(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.VoidGravityOrb, function(instance)
+		self:_wireVoidGravityOrb(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.VoidEchoButton, function(instance)
+		self:_wireVoidEchoButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.VoidFreezeRay, function(instance)
+		self:_wireVoidFreezeRay(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SpaceStationAirlock, function(instance)
 		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SpaceStationAirlock.Id, "The airlock confirms that outside is still extremely outside.")
 	end)
@@ -767,10 +790,14 @@ function InteractionService:Initialize()
 
 	self:_updateBowlingScoreboards()
 	self:_startBowlingAdRotation()
+	self:_startVoidAmbientMotion()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
 		self:_refreshSecretDoorsForPlayer(player)
+		if self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id) then
+			self:_grantFreezeRay(player)
+		end
 	end
 end
 
@@ -2082,6 +2109,90 @@ function InteractionService:_wireBowlingBallReturn(ballReturn)
 	end)
 end
 
+function InteractionService:_spawnZiplineRideSpark(position, lookPosition, index)
+	local direction = lookPosition - position
+	if direction.Magnitude < 0.05 then
+		direction = Vector3.new(0, 0, 1)
+	else
+		direction = direction.Unit
+	end
+
+	local side = direction:Cross(Vector3.yAxis)
+	if side.Magnitude < 0.05 then
+		side = Vector3.xAxis
+	else
+		side = side.Unit
+	end
+
+	local color = BOWLING_COSMIC_COLORS[((index - 1) % #BOWLING_COSMIC_COLORS) + 1]
+	local spark = Instance.new("Part")
+	spark.Name = "ZiplineRideSpark"
+	spark.Anchored = true
+	spark.CanCollide = false
+	spark.CastShadow = false
+	spark.Material = Enum.Material.Neon
+	spark.Color = color
+	spark.Transparency = 0.12
+	spark.Size = Vector3.new(0.16, 0.16, 3.6)
+	spark.CFrame = CFrame.lookAt(
+		position + side * (((index % 5) - 2) * 0.85) + Vector3.new(0, ((index % 4) - 1.5) * 0.45, 0),
+		position + direction
+	)
+	spark.Parent = workspace
+	CollectionService:AddTag(spark, Constants.Tags.TemporaryObject)
+	tweenPart(spark, 0.42, {
+		CFrame = spark.CFrame + direction * 8,
+		Transparency = 1,
+	}, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+	Debris:AddItem(spark, 0.7)
+end
+
+function InteractionService:_startVoidAmbientMotion()
+	if self.voidAmbientMotionStarted then
+		return
+	end
+
+	self.voidAmbientMotionStarted = true
+	local movingParts = {}
+	local room = workspace:FindFirstChild("Room")
+	if not room then
+		return
+	end
+
+	for _, instance in ipairs(room:GetDescendants()) do
+		if instance:IsA("BasePart") and (instance:GetAttribute("VoidDriftDot") == true or instance.Name:find("VoidMotionRing")) then
+			table.insert(movingParts, {
+				Part = instance,
+				BaseCFrame = instance:GetAttribute("BaseCFrame") or instance.CFrame,
+				Phase = #movingParts * 0.47,
+				IsDot = instance:GetAttribute("VoidDriftDot") == true,
+			})
+		end
+	end
+
+	task.spawn(function()
+		while self.voidAmbientMotionStarted do
+			local now = os.clock()
+			for _, record in ipairs(movingParts) do
+				local part = record.Part
+				if part.Parent then
+					if record.IsDot then
+						part.CFrame = record.BaseCFrame
+							* CFrame.new(
+								math.sin(now * 0.9 + record.Phase) * 1.2,
+								math.cos(now * 0.72 + record.Phase) * 0.8,
+								math.sin(now * 0.55 + record.Phase) * 1.0
+							)
+					else
+						part.CFrame = record.BaseCFrame * CFrame.Angles(0, 0, math.sin(now * 0.42 + record.Phase) * 0.22)
+					end
+				end
+			end
+			task.wait(0.08)
+		end
+	end)
+end
+
 function InteractionService:_wireTreetopZipline(zipline)
 	local prompt = getPrompt(zipline)
 
@@ -2096,8 +2207,9 @@ function InteractionService:_wireTreetopZipline(zipline)
 		end
 
 		self.treetopZiplineStateByUserId[player.UserId] = true
-		self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
-		self.systemMessageRemote:FireClient(player, "The zipline accepts your island-bound paperwork.")
+		local awardsIsland = zipline:GetAttribute("AwardsIsland") ~= false
+		local awardsVoid = zipline:GetAttribute("AwardsVoid") == true
+		self.systemMessageRemote:FireClient(player, zipline:GetAttribute("RideMessage") or "The zipline accepts your island-bound paperwork.")
 		playSound(zipline, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.35)
 
 		local humanoid = getHumanoid(player)
@@ -2122,6 +2234,13 @@ function InteractionService:_wireTreetopZipline(zipline)
 		if #pathPoints < 2 then
 			pathPoints = { startPosition, endPosition }
 		end
+
+		local pathDistance = 0
+		for index = 1, #pathPoints - 1 do
+			pathDistance += (pathPoints[index + 1] - pathPoints[index]).Magnitude
+		end
+		local stepCount = math.clamp(math.floor(pathDistance / 2.2), 150, 330)
+		local rideDuration = stepCount / 30
 
 		local function getPathPosition(alpha)
 			alpha = math.clamp(alpha, 0, 1)
@@ -2164,7 +2283,7 @@ function InteractionService:_wireTreetopZipline(zipline)
 			NumberSequenceKeypoint.new(1, 1),
 		})
 		warpEmitter.Parent = rootPart
-		Debris:AddItem(warpEmitter, 6)
+		Debris:AddItem(warpEmitter, rideDuration + 2)
 
 		local warpLight = Instance.new("PointLight")
 		warpLight.Name = "ZiplineTimeWarpLight"
@@ -2172,14 +2291,14 @@ function InteractionService:_wireTreetopZipline(zipline)
 		warpLight.Brightness = 2.6
 		warpLight.Range = 16
 		warpLight.Parent = rootPart
-		Debris:AddItem(warpLight, 6)
+		Debris:AddItem(warpLight, rideDuration + 2)
 
-		for step = 0, 96 do
+		for step = 0, stepCount do
 			if not player.Parent or not rootPart.Parent then
 				break
 			end
 
-			local alpha = step / 96
+			local alpha = step / stepCount
 			local position = getPathPosition(alpha)
 			local lookPosition = getPathPosition(math.min(1, alpha + 0.018))
 			if (lookPosition - position).Magnitude < 0.05 then
@@ -2198,6 +2317,9 @@ function InteractionService:_wireTreetopZipline(zipline)
 			end
 
 			rootPart.CFrame = CFrame.new(position, lookPosition) * CFrame.Angles(0, 0, roll)
+			if step % 5 == 0 then
+				self:_spawnZiplineRideSpark(position, lookPosition, step + 1)
+			end
 			task.wait(1 / 30)
 		end
 
@@ -2215,14 +2337,333 @@ function InteractionService:_wireTreetopZipline(zipline)
 			teleportPlayer(player, finalCFrame)
 		end
 
+		if awardsVoid then
+			self.discoveryService:Unlock(player, Constants.Discoveries.VoidEntered.Id)
+		end
+		if awardsIsland then
+			self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
+		end
+
 		if humanoid and humanoid.Parent then
 			humanoid.AutoRotate = previousAutoRotate
 		end
 
-		self.systemMessageRemote:FireClient(player, "The island receives you with unnecessary confidence.")
+		self.systemMessageRemote:FireClient(player, zipline:GetAttribute("ArrivalMessage") or "The island receives you with unnecessary confidence.")
 		task.delay(1.2, function()
 			self.treetopZiplineStateByUserId[player.UserId] = nil
 		end)
+	end)
+end
+
+function InteractionService:_wireVoidReverseConsole(console)
+	local prompt = getPrompt(console)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.VoidReverseControls.Id)
+		self.voidEffectRemote:FireClient(player, {
+			Action = "ReverseControls",
+			Duration = 12,
+		})
+		playSound(console, "rbxasset://sounds/electronicpingshort.wav", 0.5, 0.42)
+		self.systemMessageRemote:FireClient(player, "The Void reverses your controls for a few seconds. It insists this is navigation.")
+
+		if console:IsA("BasePart") then
+			local baseColor = console:GetAttribute("BaseColor") or console.Color
+			tweenPart(console, 0.16, {
+				Color = Color3.fromRGB(119, 255, 203),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			task.delay(0.28, function()
+				if console.Parent then
+					tweenPart(console, 0.22, {
+						Color = baseColor,
+					}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				end
+			end)
+		end
+	end)
+end
+
+function InteractionService:_wireVoidGravityOrb(orb)
+	local prompt = getPrompt(orb)
+
+	self:_connectPrompt(prompt, function(player)
+		local rootPart = getRootPart(player)
+		if not rootPart then
+			return
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.VoidGravityFlip.Id)
+		playSound(orb, "rbxasset://sounds/electronicpingshort.wav", 0.58, 1.95)
+		self.systemMessageRemote:FireClient(player, "The Void flips gravity. The ceiling has been promoted.")
+
+		local token = {}
+		self.voidGravityTokensByUserId[player.UserId] = token
+		local attachment = Instance.new("Attachment")
+		attachment.Name = "VoidGravityAttachment"
+		attachment.Parent = rootPart
+
+		local force = Instance.new("VectorForce")
+		force.Name = "VoidGravityFlipForce"
+		force.Attachment0 = attachment
+		force.RelativeTo = Enum.ActuatorRelativeTo.World
+		force.Force = Vector3.new(0, rootPart.AssemblyMass * workspace.Gravity * 2.15, 0)
+		force.Parent = rootPart
+
+		rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, 76, 0)
+		Debris:AddItem(force, 7)
+		Debris:AddItem(attachment, 7)
+
+		if orb:IsA("BasePart") then
+			local baseCFrame = orb:GetAttribute("BaseCFrame") or orb.CFrame
+			tweenPart(orb, 0.28, {
+				CFrame = baseCFrame * CFrame.Angles(math.rad(180), 0, math.rad(180)),
+				Color = Color3.fromRGB(255, 88, 128),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			task.delay(0.5, function()
+				if orb.Parent then
+					tweenPart(orb, 0.36, {
+						CFrame = baseCFrame,
+						Color = orb:GetAttribute("BaseColor") or Color3.fromRGB(119, 255, 203),
+					}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				end
+			end)
+		end
+
+		task.delay(7, function()
+			if self.voidGravityTokensByUserId[player.UserId] == token then
+				self.voidGravityTokensByUserId[player.UserId] = nil
+			end
+		end)
+	end)
+end
+
+function InteractionService:_spawnVoidEchoPulse(origin, index)
+	local pulse = Instance.new("Part")
+	pulse.Name = "VoidEchoPulse"
+	pulse.Anchored = true
+	pulse.CanCollide = false
+	pulse.CastShadow = false
+	pulse.Shape = Enum.PartType.Ball
+	pulse.Size = Vector3.new(1, 1, 1)
+	pulse.CFrame = CFrame.new(origin)
+	pulse.Material = Enum.Material.Neon
+	pulse.Color = BOWLING_COSMIC_COLORS[((index - 1) % #BOWLING_COSMIC_COLORS) + 1]
+	pulse.Transparency = 0.45
+	pulse.Parent = workspace
+	CollectionService:AddTag(pulse, Constants.Tags.TemporaryObject)
+	tweenPart(pulse, 1.15, {
+		Size = Vector3.new(14 + index * 5, 14 + index * 5, 14 + index * 5),
+		Transparency = 1,
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	Debris:AddItem(pulse, 1.35)
+end
+
+function InteractionService:_wireVoidEchoButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.VoidEcho.Id)
+		playSound(button, "rbxasset://sounds/button.wav", 0.45, 0.65)
+		task.delay(0.16, function()
+			playSound(button, "rbxasset://sounds/electronicpingshort.wav", 0.45, 0.36)
+		end)
+		self.systemMessageRemote:FireClient(player, "The Void answers from every direction except the useful one.")
+
+		local origin = button:IsA("BasePart") and button.Position or Constants.GetRoomSpawnCFrame("Void").Position
+		for index = 1, 5 do
+			task.delay((index - 1) * 0.18, function()
+				self:_spawnVoidEchoPulse(origin, index)
+			end)
+		end
+	end)
+end
+
+function InteractionService:_hasFreezeRay(player)
+	local function containerHasTool(container)
+		if not container then
+			return false
+		end
+
+		for _, item in ipairs(container:GetChildren()) do
+			if item:IsA("Tool") and item:GetAttribute("VoidFreezeRay") == true then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	return containerHasTool(player:FindFirstChildOfClass("Backpack")) or containerHasTool(player.Character)
+end
+
+function InteractionService:_spawnFreezeBeam(origin, targetPosition)
+	local midpoint = (origin + targetPosition) / 2
+	local distance = (targetPosition - origin).Magnitude
+	if distance < 0.1 then
+		return
+	end
+
+	local beam = Instance.new("Part")
+	beam.Name = "VoidFreezeBeam"
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CastShadow = false
+	beam.Material = Enum.Material.Neon
+	beam.Color = Color3.fromRGB(152, 238, 255)
+	beam.Transparency = 0.1
+	beam.Size = Vector3.new(0.18, 0.18, distance)
+	beam.CFrame = CFrame.new(midpoint, targetPosition)
+	beam.Parent = workspace
+	CollectionService:AddTag(beam, Constants.Tags.TemporaryObject)
+	tweenPart(beam, 0.28, {
+		Transparency = 1,
+		Size = Vector3.new(0.42, 0.42, distance),
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	Debris:AddItem(beam, 0.42)
+end
+
+function InteractionService:_chillPlayer(targetPlayer)
+	local humanoid = getHumanoid(targetPlayer)
+	local rootPart = getRootPart(targetPlayer)
+	if not humanoid or not rootPart then
+		return
+	end
+
+	local token = {}
+	self.voidChillTokensByHumanoid[humanoid] = token
+	local baseWalkSpeed = humanoid.WalkSpeed
+	local baseJumpPower = humanoid.JumpPower
+	local baseJumpHeight = humanoid.JumpHeight
+	humanoid.WalkSpeed = math.max(6, baseWalkSpeed * 0.55)
+	if humanoid.UseJumpPower then
+		humanoid.JumpPower = math.max(18, baseJumpPower * 0.62)
+	else
+		humanoid.JumpHeight = math.max(2.5, baseJumpHeight * 0.62)
+	end
+	rootPart.AssemblyLinearVelocity *= 0.35
+
+	task.delay(1.7, function()
+		if self.voidChillTokensByHumanoid[humanoid] ~= token or not humanoid.Parent then
+			return
+		end
+
+		humanoid.WalkSpeed = baseWalkSpeed
+		if humanoid.UseJumpPower then
+			humanoid.JumpPower = baseJumpPower
+		else
+			humanoid.JumpHeight = baseJumpHeight
+		end
+		self.voidChillTokensByHumanoid[humanoid] = nil
+	end)
+end
+
+function InteractionService:_freezeRayPart(part)
+	if not part or not part.Parent or not part:IsA("BasePart") then
+		return false
+	end
+
+	local canFreezeStatic = CollectionService:HasTag(part, Constants.Tags.TemporaryObject)
+		or CollectionService:HasTag(part, Constants.Tags.ObjectRainObject)
+		or CollectionService:HasTag(part, Constants.Tags.LooseFruit)
+		or CollectionService:HasTag(part, Constants.Tags.BowlingPin)
+
+	if part.Anchored and not canFreezeStatic then
+		return false
+	end
+
+	local baseAnchored = part.Anchored
+	local baseColor = part.Color
+	local baseMaterial = part.Material
+	local baseTransparency = part.Transparency
+	part.Anchored = true
+	part.Material = Enum.Material.Ice
+	part.Color = Color3.fromRGB(185, 245, 255)
+	part.Transparency = math.min(0.35, baseTransparency + 0.12)
+
+	task.delay(4, function()
+		if not part.Parent then
+			return
+		end
+
+		part.Anchored = baseAnchored
+		part.Material = baseMaterial
+		part.Color = baseColor
+		part.Transparency = baseTransparency
+	end)
+
+	return true
+end
+
+function InteractionService:_fireFreezeRay(player)
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return
+	end
+
+	local origin = rootPart.Position + Vector3.new(0, 1.15, 0)
+	local direction = rootPart.CFrame.LookVector * 60
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	raycastParams.FilterDescendantsInstances = { player.Character }
+
+	local result = workspace:Raycast(origin, direction, raycastParams)
+	local targetPosition = result and result.Position or (origin + direction)
+	self:_spawnFreezeBeam(origin, targetPosition)
+	playSound(rootPart, "rbxasset://sounds/electronicpingshort.wav", 0.35, 2.2)
+
+	if not result or not result.Instance then
+		self.systemMessageRemote:FireClient(player, "The freeze ray cools several inches of empty air.")
+		return
+	end
+
+	local hit = result.Instance
+	local character = hit:FindFirstAncestorOfClass("Model")
+	local targetPlayer = character and Players:GetPlayerFromCharacter(character)
+	if targetPlayer and targetPlayer ~= player then
+		self:_chillPlayer(targetPlayer)
+		self.systemMessageRemote:FireClient(player, ("The freeze ray politely chills %s for a moment."):format(targetPlayer.DisplayName or targetPlayer.Name))
+		return
+	end
+
+	if self:_freezeRayPart(hit) then
+		self.systemMessageRemote:FireClient(player, "The freeze ray freezes one object just long enough to be irresponsible.")
+	else
+		self.systemMessageRemote:FireClient(player, "The freeze ray refuses to freeze important architecture. Good boundary.")
+	end
+end
+
+function InteractionService:_grantFreezeRay(player)
+	if self:_hasFreezeRay(player) then
+		return
+	end
+
+	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 2)
+	if not backpack then
+		return
+	end
+
+	local tool = Instance.new("Tool")
+	tool.Name = "Void Freeze Ray"
+	tool.ToolTip = "Briefly chills players and freezes loose objects."
+	tool.RequiresHandle = false
+	tool.CanBeDropped = false
+	tool:SetAttribute("VoidFreezeRay", true)
+	tool.Activated:Connect(function()
+		if player.Parent then
+			self:_fireFreezeRay(player)
+		end
+	end)
+	tool.Parent = backpack
+end
+
+function InteractionService:_wireVoidFreezeRay(ray)
+	local prompt = getPrompt(ray)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.VoidFreezeRay.Id)
+		self:_grantFreezeRay(player)
+		playSound(ray, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.7)
+		self.systemMessageRemote:FireClient(player, "Void prize unlocked: Freeze Ray. It freezes objects and only mildly inconveniences players.")
 	end)
 end
 

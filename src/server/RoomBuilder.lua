@@ -720,12 +720,26 @@ local LIBRARY_LOFT_SPAWN_CFRAME = CFrame.new(Vector3.new(-14, 17.6, -45), Vector
 local LIBRARY_LOFT_RETURN_CFRAME = CFrame.new(Vector3.new(-8.8, 10.6, -13.0), Vector3.new(-8.8, 9.8, -16.55))
 local TREETOP_ENTRY_CFRAME = CFrame.new(Vector3.new(-14, 29, -220), Vector3.new(-7, 29, -240))
 local TREETOP_ZIPLINE_END_CFRAME = CFrame.new(Vector3.new(0, 5.8, 132), Vector3.new(0, 4, 154))
+local VOID_ORIGIN = Vector3.new(-92, 44, -28)
+local VOID_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Void")
 local TREETOP_ZIPLINE_PATH_POINTS = {
 	Vector3.new(-14, 32, -229),
-	Vector3.new(16, 44, -156),
-	Vector3.new(16, 52, -48),
-	Vector3.new(-24, 46, 58),
-	Vector3.new(-10, 28, 108),
+	Vector3.new(8, 47, -192),
+	Vector3.new(38, 53, -142),
+	Vector3.new(4, 61, -98),
+	Vector3.new(-46, 56, -78),
+	Vector3.new(-85, 52, -58),
+	Vector3.new(-108, 49, -40),
+	VOID_SPAWN_CFRAME.Position + Vector3.new(0, 5, 16),
+}
+local VOID_ZIPLINE_PATH_POINTS = {
+	VOID_SPAWN_CFRAME.Position + Vector3.new(0, 5, -16),
+	Vector3.new(-116, 64, -2),
+	Vector3.new(-72, 70, 42),
+	Vector3.new(22, 66, 46),
+	Vector3.new(44, 58, 92),
+	Vector3.new(-28, 44, 112),
+	Vector3.new(-10, 28, 124),
 	TREETOP_ZIPLINE_END_CFRAME.Position + Vector3.new(0, 5, 0),
 }
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
@@ -2052,12 +2066,16 @@ local function makeTreetopZiplineArea(room, bowlingOrigin)
 		Enum.Material.Metal
 	)
 	zipHandle:SetAttribute("StartCFrame", CFrame.new(ziplineStart + Vector3.new(0, -3, 3), ziplineEnd))
-	zipHandle:SetAttribute("EndCFrame", TREETOP_ZIPLINE_END_CFRAME)
+	zipHandle:SetAttribute("EndCFrame", VOID_SPAWN_CFRAME)
+	zipHandle:SetAttribute("AwardsIsland", false)
+	zipHandle:SetAttribute("AwardsVoid", true)
+	zipHandle:SetAttribute("RideMessage", "The zipline accepts your paperwork, then immediately loses it.")
+	zipHandle:SetAttribute("ArrivalMessage", "Temporary stop: The Void. Please remain alarmed.")
 	zipHandle:SetAttribute("PathPointCount", #ziplinePath)
 	for index, point in ipairs(ziplinePath) do
 		zipHandle:SetAttribute("PathPoint" .. index, point)
 	end
-	createPrompt(zipHandle, "Ride", "Zipline to Island", 0.2)
+	createPrompt(zipHandle, "Ride", "Zipline to The Void", 0.2)
 	tag(zipHandle, Constants.Tags.TreetopZipline)
 
 	local returnDoor = createPart(treetop, "TreetopReturnDoor", Vector3.new(5.4, 6.4, 0.32), CFrame.new(platformCenter + Vector3.new(-8.8, 3.5, 7.65)), Color3.fromRGB(73, 91, 122), Enum.Material.Wood)
@@ -2069,6 +2087,139 @@ local function makeTreetopZiplineArea(room, bowlingOrigin)
 
 	treetop.PrimaryPart = platform
 	return treetop
+end
+
+local function makeVoidRoom(roomFolder)
+	local room = makeModel(roomFolder, "VoidRoom")
+	local origin = VOID_ORIGIN
+	local width = 46
+	local depth = 48
+	local height = 24
+
+	createPart(room, "VoidFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(13, 11, 25), Enum.Material.SmoothPlastic)
+	createPart(room, "VoidCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(8, 6, 18), Enum.Material.SmoothPlastic)
+	createPart(room, "VoidBackWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, -depth / 2), Color3.fromRGB(11, 9, 24), Enum.Material.SmoothPlastic)
+	createPart(room, "VoidFrontWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, depth / 2), Color3.fromRGB(11, 9, 24), Enum.Material.SmoothPlastic)
+	createPart(room, "VoidLeftWall", Vector3.new(1, height, depth), cframeAt(origin, -width / 2, height / 2, 0), Color3.fromRGB(10, 8, 22), Enum.Material.SmoothPlastic)
+	createPart(room, "VoidRightWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(10, 8, 22), Enum.Material.SmoothPlastic)
+
+	createSpawnLocation(room, "VoidSpawn", "Void", VOID_SPAWN_CFRAME, Color3.fromRGB(150, 112, 255), false)
+
+	local controls = makeRoomControlPanel(
+		room,
+		"VoidInsideControlPanel",
+		CFrame.new(origin + Vector3.new(-13.6, 5.4, 23.3), origin + Vector3.new(-13.6, 5.4, 0)),
+		"Void",
+		"VOID",
+		{
+			IncludeReset = true,
+			PanelLabel = "VOID CONTROLS",
+			LightPromptObjectText = "Void Light Switch",
+			LogText = "VOID\nLOG\nOPEN",
+		}
+	)
+
+	createNoTouchClock(
+		room,
+		"VoidClock",
+		"Void",
+		Vector3.new(7.2, 2.2, 0.28),
+		CFrame.new(origin + Vector3.new(13.5, 8.8, 23.25), origin + Vector3.new(13.5, 6, 0)),
+		Enum.NormalId.Front
+	)
+
+	local title = createPart(room, "VoidTitleSign", Vector3.new(16, 3.1, 0.28), cframeAt(origin, 0, 13.4, -23.25), Color3.fromRGB(29, 20, 60), Enum.Material.Neon)
+	createSurfaceText(title, "VoidTitleText", "THE VOID\nTEMPORARY STOP?", Enum.NormalId.Front, Color3.fromRGB(203, 255, 255), Color3.fromRGB(29, 20, 60))
+
+	for ringIndex = 1, 7 do
+		local ringColor = BOWLING_COSMIC_COLORS[((ringIndex - 1) % #BOWLING_COSMIC_COLORS) + 1]
+		local ringCenter = origin + Vector3.new(0, 7 + ringIndex * 1.15, -16 + ringIndex * 4.8)
+		local ringCFrame = CFrame.new(ringCenter, ringCenter + Vector3.new(math.sin(ringIndex) * 0.8, 0.2, 1))
+			* CFrame.Angles(0, 0, math.rad(ringIndex * 18))
+		createZiplineFrame(room, "VoidMotionRing" .. ringIndex, ringCFrame, 13 + ringIndex * 2.4, 8 + ringIndex * 1.2, ringColor)
+	end
+
+	for dotIndex = 1, 22 do
+		local angle = math.rad(dotIndex * 47)
+		local radius = 10 + (dotIndex % 5) * 2.2
+		local dot = createPart(
+			room,
+			"VoidDriftDot" .. dotIndex,
+			Vector3.new(0.55 + (dotIndex % 3) * 0.18, 0.55 + (dotIndex % 3) * 0.18, 0.55 + (dotIndex % 3) * 0.18),
+			cframeAt(origin, math.cos(angle) * radius, 6 + (dotIndex % 8) * 1.7, math.sin(angle) * radius),
+			BOWLING_COSMIC_COLORS[((dotIndex - 1) % #BOWLING_COSMIC_COLORS) + 1],
+			Enum.Material.Neon
+		)
+		dot.Shape = Enum.PartType.Ball
+		dot.CanCollide = false
+		dot:SetAttribute("BaseCanCollide", false)
+		dot:SetAttribute("VoidDriftDot", true)
+	end
+
+	local reverseConsole = createPart(room, "VoidReverseConsole", Vector3.new(6.6, 3.2, 0.45), cframeAt(origin, -15.5, 4.2, -13.5) * CFrame.Angles(0, math.rad(24), 0), Color3.fromRGB(44, 23, 84), Enum.Material.Metal)
+	createSurfaceText(reverseConsole, "VoidReverseText", "REVERSE\nDIRECTIONS", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(44, 23, 84))
+	createPrompt(reverseConsole, "Reverse", "Direction Disagreement Console", 0)
+	tag(reverseConsole, Constants.Tags.VoidReverseConsole)
+
+	local gravityOrb = createPart(room, "VoidGravityOrb", Vector3.new(3.5, 3.5, 3.5), cframeAt(origin, 0, 7.3, -4), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	gravityOrb.Shape = Enum.PartType.Ball
+	createPrompt(gravityOrb, "Flip", "Gravity That Changed Its Mind", 0)
+	tag(gravityOrb, Constants.Tags.VoidGravityOrb)
+
+	local echoButton = createPart(room, "VoidEchoButton", Vector3.new(2.8, 0.75, 2.8), cframeAt(origin, 10.5, 3.1, -11.5), Color3.fromRGB(255, 88, 128), Enum.Material.Neon)
+	echoButton.Shape = Enum.PartType.Ball
+	createPrompt(echoButton, "Press", "Listening Button", 0)
+	tag(echoButton, Constants.Tags.VoidEchoButton)
+
+	local rayPedestal = createPart(room, "VoidFreezeRayPedestal", Vector3.new(5, 1.2, 3.4), cframeAt(origin, 12.5, 1.1, 9.5), Color3.fromRGB(34, 45, 68), Enum.Material.Metal)
+	createSurfaceText(rayPedestal, "VoidPrizeText", "PRIZE\nMAY CHILL", Enum.NormalId.Front, Color3.fromRGB(203, 255, 255), Color3.fromRGB(34, 45, 68))
+	local freezeRay = createPart(room, "VoidFreezeRay", Vector3.new(3.2, 0.42, 0.42), cframeAt(origin, 12.5, 2.3, 9.5) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(108, 231, 255), Enum.Material.Neon)
+	freezeRay.Shape = Enum.PartType.Cylinder
+	local freezeTip = createPart(room, "VoidFreezeRayTip", Vector3.new(0.8, 0.8, 0.8), cframeAt(origin, 12.5, 2.3, 7.75), Color3.fromRGB(230, 255, 255), Enum.Material.Neon)
+	freezeTip.Shape = Enum.PartType.Ball
+	createBeamBetween(room, "VoidFreezeRayHandle", freezeRay.Position + Vector3.new(0, -0.55, 0.2), freezeRay.Position + Vector3.new(0, -1.05, 0.2), 0.24, Color3.fromRGB(26, 32, 46), Enum.Material.Metal)
+	createPrompt(freezeRay, "Take", "Freeze Ray Prototype", 0)
+	tag(freezeRay, Constants.Tags.VoidFreezeRay)
+
+	local ziplinePath = VOID_ZIPLINE_PATH_POINTS
+	local ziplineStart = ziplinePath[1]
+	local ziplineEnd = ziplinePath[#ziplinePath]
+	createZiplineWarpCorridor(room, ziplinePath)
+	for segmentIndex = 1, #ziplinePath - 1 do
+		local startPoint = ziplinePath[segmentIndex]
+		local endPoint = ziplinePath[segmentIndex + 1]
+		createBeamBetween(room, "VoidZiplineCable" .. segmentIndex, startPoint, endPoint, 0.22, Color3.fromRGB(24, 27, 34), Enum.Material.Metal)
+		createBeamBetween(room, "VoidZiplineGlow" .. segmentIndex, startPoint + Vector3.new(0, -0.34, 0), endPoint + Vector3.new(0, -0.34, 0), 0.08, BOWLING_COSMIC_COLORS[((segmentIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Enum.Material.Neon)
+	end
+
+	local continueHandle = createPart(room, "VoidZiplineHandle", Vector3.new(2.2, 0.42, 1.1), CFrame.new(ziplineStart + Vector3.new(0, -1.6, 0), ziplineEnd), Color3.fromRGB(255, 214, 96), Enum.Material.Metal)
+	continueHandle:SetAttribute("StartCFrame", CFrame.new(ziplineStart + Vector3.new(0, -3, 3), ziplineEnd))
+	continueHandle:SetAttribute("EndCFrame", TREETOP_ZIPLINE_END_CFRAME)
+	continueHandle:SetAttribute("AwardsIsland", true)
+	continueHandle:SetAttribute("AwardsVoid", false)
+	continueHandle:SetAttribute("RideMessage", "The Void resumes the zipline like nothing unusual happened.")
+	continueHandle:SetAttribute("ArrivalMessage", "The island receives you after a completely normal detour.")
+	continueHandle:SetAttribute("PathPointCount", #ziplinePath)
+	for index, point in ipairs(ziplinePath) do
+		continueHandle:SetAttribute("PathPoint" .. index, point)
+	end
+	createPrompt(continueHandle, "Ride", "Zipline to Island", 0.2)
+	tag(continueHandle, Constants.Tags.TreetopZipline)
+
+	local returnDoor = createPart(room, "VoidBowlingReturnDoor", Vector3.new(5.8, 7.2, 0.34), cframeAt(origin, -18, 4.2, 22.75), Color3.fromRGB(73, 91, 122), Enum.Material.Wood)
+	returnDoor:SetAttribute("DestinationCFrame", BOWLING_MAINTENANCE_CFRAME)
+	returnDoor:SetAttribute("DestinationName", "the bowling alley")
+	createSurfaceText(returnDoor, "VoidReturnText", "BACK TO\nBOWLING", Enum.NormalId.Front, Color3.fromRGB(235, 245, 255), Color3.fromRGB(73, 91, 122))
+	createPrompt(returnDoor, "Exit", "Bowling Alley", 0)
+	tag(returnDoor, Constants.Tags.SecretRoomExit)
+
+	room.PrimaryPart = gravityOrb
+	return {
+		Model = room,
+		LightSwitch = controls.LightSwitch,
+		ResetRoomButton = controls.ResetRoomButton,
+		ReferenceBook = controls.ReferenceBook,
+	}
 end
 
 local function makeBowlingAlley(roomFolder)
@@ -3161,6 +3312,7 @@ function RoomBuilder.Build()
 	local islandRoom = makeIslandRoom(roomFolder)
 	local tvSecretRoom = makeTVSecretRoom(roomFolder)
 	local bowlingAlley = makeBowlingAlley(roomFolder)
+	local voidRoom = makeVoidRoom(roomFolder)
 	local spaceStation = makeSpaceStationRoom(roomFolder)
 	createNoTouchClock(
 		snackLab.Model,

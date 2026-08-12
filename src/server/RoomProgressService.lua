@@ -322,6 +322,8 @@ function RoomProgressService:_tickPlayer(player, now)
 			self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
 		elseif roomId == "SpaceStation" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationEntered.Id)
+		elseif roomId == "Void" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.VoidEntered.Id)
 		end
 	else
 		local delta = math.max(0, now - (state.LastRoomTickAt or now))
