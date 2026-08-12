@@ -107,14 +107,24 @@ local BOWLING_ADS = {
 		TextColor = Color3.fromRGB(255, 246, 220),
 	},
 	{
+		Text = "VISIT THE SNACK LAB\nFRIDGE IDEAS SERVED COLD",
+		Background = Color3.fromRGB(91, 188, 124),
+		TextColor = Color3.fromRGB(245, 255, 235),
+	},
+	{
 		Text = "BLOXY ZIPLINE\nTREES TODAY, ISLAND TOMORROW",
 		Background = Color3.fromRGB(47, 146, 101),
 		TextColor = Color3.fromRGB(230, 255, 224),
 	},
 	{
-		Text = "BLOXY ISLAND\nSUN, SAND, AND BAD IDEAS",
+		Text = "BLOXY ISLAND\nSUN, SAND, AND GOOD TIMES",
 		Background = Color3.fromRGB(255, 205, 89),
 		TextColor = Color3.fromRGB(45, 61, 83),
+	},
+	{
+		Text = "THE LIBRARY\nQUIETLY HIDING BOWLING KEYS",
+		Background = Color3.fromRGB(116, 75, 45),
+		TextColor = Color3.fromRGB(255, 235, 149),
 	},
 	{
 		Text = "BLOXY BOWLING\nTHREE LANES, MANY EXCUSES",
@@ -122,9 +132,19 @@ local BOWLING_ADS = {
 		TextColor = Color3.fromRGB(18, 24, 36),
 	},
 	{
+		Text = "COSMIC BOWLING\nNOW WITH FLOOR CONFIDENCE",
+		Background = Color3.fromRGB(42, 18, 80),
+		TextColor = Color3.fromRGB(119, 255, 203),
+	},
+	{
 		Text = "BLOXY SHOES\nRENTAL CONFIDENCE INCLUDED",
 		Background = Color3.fromRGB(150, 112, 255),
 		TextColor = Color3.fromRGB(255, 246, 220),
+	},
+	{
+		Text = "TV ROOM\nDO NOT PRESS THE OBVIOUS BUTTON",
+		Background = Color3.fromRGB(255, 226, 102),
+		TextColor = Color3.fromRGB(36, 27, 42),
 	},
 }
 
@@ -2001,16 +2021,31 @@ function InteractionService:_wireBowlingBallReturn(ballReturn)
 
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingBallReturn.Id)
-		self:_clearBowlingBalls(laneIndex)
+		self:_resetBowlingPins(laneIndex)
+		self:_incrementBowlingLaneCount(laneIndex)
 		playSound(ballReturn, "rbxasset://sounds/button.wav", 0.45, 0.72)
 		task.delay(0.1, function()
 			playSound(ballReturn, "rbxasset://sounds/electronicpingshort.wav", 0.35, 1.45)
 		end)
 
+		if ballReturn:IsA("BasePart") then
+			local baseCFrame = ballReturn:GetAttribute("BaseCFrame") or ballReturn.CFrame
+			local baseColor = ballReturn:GetAttribute("BaseColor") or ballReturn.Color
+			local pressTween = tweenPart(ballReturn, 0.1, {
+				CFrame = baseCFrame + Vector3.new(0, -0.08, 0),
+				Color = Color3.fromRGB(255, 214, 96),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			pressTween.Completed:Wait()
+			tweenPart(ballReturn, 0.18, {
+				CFrame = baseCFrame,
+				Color = baseColor,
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		end
+
 		if laneIndex then
-			self.systemMessageRemote:FireClient(player, ("Lane %d ball return politely removes the evidence."):format(laneIndex))
+			self.systemMessageRemote:FireClient(player, ("Lane %d resets the ball and pins. The scoreboard counts the paperwork."):format(laneIndex))
 		else
-			self.systemMessageRemote:FireClient(player, "The ball return hums like it knows where the missing balls went.")
+			self.systemMessageRemote:FireClient(player, "The lane resets the balls, pins, and most of its dignity.")
 		end
 	end)
 end

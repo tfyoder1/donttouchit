@@ -2141,9 +2141,9 @@ local function makeBowlingAlley(roomFolder)
 
 		local ballReturn = createPart(room, "Lane" .. laneIndex .. "BallReturn", Vector3.new(3.8, 1.6, 2.8), cframeAt(origin, laneX, 1.35, 42.8) * CFrame.Angles(0, math.rad(180), 0), Color3.fromRGB(58, 63, 75), Enum.Material.Metal)
 		ballReturn:SetAttribute("LaneIndex", laneIndex)
-		createSurfaceText(ballReturn, "BallReturnText", "BALL\nRETURN", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(58, 63, 75))
-		createSurfaceText(ballReturn, "BallReturnBackText", "BALL\nRETURN", Enum.NormalId.Back, Color3.fromRGB(255, 235, 149), Color3.fromRGB(58, 63, 75))
-		createPrompt(ballReturn, "Press", "Ball Return", 0)
+		createSurfaceText(ballReturn, "BallReturnText", "RESET\nLANE", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(58, 63, 75))
+		createSurfaceText(ballReturn, "BallReturnBackText", "RESET\nLANE", Enum.NormalId.Back, Color3.fromRGB(255, 235, 149), Color3.fromRGB(58, 63, 75))
+		createPrompt(ballReturn, "Reset", "Lane " .. laneIndex, 0)
 		tag(ballReturn, Constants.Tags.BowlingBallReturn)
 
 		local pinResetter = createPart(
@@ -2156,8 +2156,6 @@ local function makeBowlingAlley(roomFolder)
 		)
 		pinResetter.Shape = Enum.PartType.Cylinder
 		pinResetter:SetAttribute("LaneIndex", laneIndex)
-		createPrompt(pinResetter, "Reset", "Lane " .. laneIndex .. " Pins", 0.1)
-		tag(pinResetter, Constants.Tags.BowlingResetLever)
 
 		makeBowlingPins(room, laneIndex, laneX, -26, origin)
 	end
