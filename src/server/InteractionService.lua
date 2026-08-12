@@ -1336,19 +1336,47 @@ function InteractionService:_wireLibraryGlobe(globe)
 		playSound(globe, "rbxasset://sounds/button.wav", 0.34, 1.25)
 
 		local baseCFrame = globe:GetAttribute("BaseCFrame") or globe.CFrame
-		for step = 1, 14 do
+		local center = baseCFrame.Position
+		local visualParts = {}
+		local visualGroup = globe:GetAttribute("LibraryGlobeVisualGroup")
+		if visualGroup and globe.Parent then
+			for _, child in ipairs(globe.Parent:GetChildren()) do
+				if child:IsA("BasePart") and child:GetAttribute("LibraryGlobeVisualGroup") == visualGroup then
+					table.insert(visualParts, child)
+				end
+			end
+		end
+		if #visualParts == 0 then
+			table.insert(visualParts, globe)
+		end
+
+		local baseCFrames = {}
+		for _, part in ipairs(visualParts) do
+			baseCFrames[part] = part:GetAttribute("BaseCFrame") or part.CFrame
+		end
+
+		for step = 1, 24 do
 			if not globe.Parent then
 				break
 			end
 
-			globe.CFrame = baseCFrame * CFrame.Angles(0, math.rad(step * 42), 0)
+			local rotation = CFrame.new(center) * CFrame.Angles(0, math.rad(step * 36), 0) * CFrame.new(-center)
+			for _, part in ipairs(visualParts) do
+				if part.Parent then
+					part.CFrame = rotation * baseCFrames[part]
+				end
+			end
 			task.wait(0.035)
 		end
 
 		if globe.Parent then
-			tweenPart(globe, 0.18, {
-				CFrame = baseCFrame,
-			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			for _, part in ipairs(visualParts) do
+				if part.Parent then
+					tweenPart(part, 0.18, {
+						CFrame = baseCFrames[part],
+					}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				end
+			end
 		end
 		state.Reacting = false
 	end)

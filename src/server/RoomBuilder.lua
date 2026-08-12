@@ -1700,8 +1700,45 @@ local function makeLibraryFurnishings(room)
 	lampLight.Parent = lamp
 	mark(lampLight)
 
-	local globe = createPart(room, "LibraryWrongGlobe", Vector3.new(1.75, 1.75, 1.75), cframeAt(origin, -5.3, 3.25, 5.45), Color3.fromRGB(91, 156, 197), Enum.Material.SmoothPlastic)
+	local globeStand = makeModel(room, "LibraryGlobeStand")
+	local globeCenter = Vector3.new(-5.3, 3.25, 5.45)
+	local globeVisualGroup = "LibraryWrongGlobeVisual"
+	local globeWood = Color3.fromRGB(116, 75, 45)
+	local globeBase = createPart(globeStand, "GlobePedestalBase", Vector3.new(0.34, 2.8, 2.8), cframeAt(origin, globeCenter.X, 1.08, globeCenter.Z) * CFrame.Angles(0, 0, math.rad(90)), globeWood, Enum.Material.Wood)
+	globeBase.Shape = Enum.PartType.Cylinder
+	local globeStem = createPart(globeStand, "GlobePedestalStem", Vector3.new(0.36, 2.18, 0.36), cframeAt(origin, globeCenter.X, 2.1, globeCenter.Z), globeWood, Enum.Material.Wood)
+	globeStem.Shape = Enum.PartType.Cylinder
+	local leftYoke = createPart(globeStand, "GlobeLeftYoke", Vector3.new(0.32, 2.25, 0.32), cframeAt(origin, globeCenter.X - 1.05, 2.92, globeCenter.Z) * CFrame.Angles(0, 0, math.rad(-16)), globeWood, Enum.Material.Wood)
+	leftYoke.Shape = Enum.PartType.Cylinder
+	local rightYoke = createPart(globeStand, "GlobeRightYoke", Vector3.new(0.32, 2.25, 0.32), cframeAt(origin, globeCenter.X + 1.05, 2.92, globeCenter.Z) * CFrame.Angles(0, 0, math.rad(16)), globeWood, Enum.Material.Wood)
+	rightYoke.Shape = Enum.PartType.Cylinder
+	local axle = createPart(globeStand, "GlobeAxle", Vector3.new(0.18, 2.55, 0.18), cframeAt(origin, globeCenter.X, globeCenter.Y, globeCenter.Z) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(171, 118, 65), Enum.Material.Wood)
+	axle.Shape = Enum.PartType.Cylinder
+
+	local globe = createPart(globeStand, "LibraryWrongGlobe", Vector3.new(1.75, 1.75, 1.75), cframeAt(origin, globeCenter.X, globeCenter.Y, globeCenter.Z), Color3.fromRGB(91, 156, 197), Enum.Material.SmoothPlastic)
 	globe.Shape = Enum.PartType.Ball
+	globe:SetAttribute("LibraryGlobeVisualGroup", globeVisualGroup)
+
+	local function addGlobePatch(name, size, offset, rotation)
+		local patch = createPart(
+			globeStand,
+			name,
+			size,
+			cframeAt(origin, globeCenter.X, globeCenter.Y, globeCenter.Z) * CFrame.new(offset) * rotation,
+			Color3.fromRGB(64, 143, 76),
+			Enum.Material.SmoothPlastic
+		)
+		patch.Shape = Enum.PartType.Ball
+		patch.CanCollide = false
+		patch:SetAttribute("BaseCanCollide", false)
+		patch:SetAttribute("LibraryGlobeVisualGroup", globeVisualGroup)
+	end
+
+	addGlobePatch("GlobePatchNorth", Vector3.new(0.58, 0.08, 0.34), Vector3.new(-0.45, 0.36, -0.73), CFrame.Angles(math.rad(8), math.rad(-18), math.rad(20)))
+	addGlobePatch("GlobePatchMain", Vector3.new(0.76, 0.08, 0.5), Vector3.new(0.34, -0.08, -0.8), CFrame.Angles(math.rad(-10), math.rad(18), math.rad(-8)))
+	addGlobePatch("GlobePatchEast", Vector3.new(0.36, 0.08, 0.62), Vector3.new(0.79, 0.2, 0.12), CFrame.Angles(math.rad(14), math.rad(86), math.rad(12)))
+	addGlobePatch("GlobePatchSouth", Vector3.new(0.42, 0.07, 0.3), Vector3.new(-0.1, -0.58, 0.68), CFrame.Angles(math.rad(-10), math.rad(24), math.rad(18)))
+
 	createPrompt(globe, "Spin", "Wrong Globe", 0)
 	tag(globe, Constants.Tags.LibraryGlobe)
 
