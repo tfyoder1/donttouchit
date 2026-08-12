@@ -14,6 +14,13 @@ local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(255, 232, 92),
 	Color3.fromRGB(93, 217, 255),
 }
+local ATOMIC_COLORS = {
+	Pink = Color3.fromRGB(255, 102, 176),
+	Orange = Color3.fromRGB(255, 134, 58),
+	Brown = Color3.fromRGB(121, 72, 45),
+	Cream = Color3.fromRGB(255, 229, 161),
+	NeonPink = Color3.fromRGB(255, 72, 158),
+}
 
 local function tag(instance, tagName)
 	CollectionService:AddTag(instance, tagName)
@@ -190,6 +197,113 @@ end
 
 local function cframeAt(origin, x, y, z)
 	return CFrame.new(origin + Vector3.new(x, y, z))
+end
+
+local function makeDecorPart(parent, name, size, cframe, color, material, className)
+	local part = createPart(parent, name, size, cframe, color, material, className)
+	part.CanCollide = false
+	part.CastShadow = false
+	part:SetAttribute("BaseCanCollide", false)
+	return part
+end
+
+local function makeAtomicStarburst(parent, name, centerCFrame, scale, colorA, colorB)
+	scale = scale or 1
+	colorA = colorA or ATOMIC_COLORS.NeonPink
+	colorB = colorB or ATOMIC_COLORS.Orange
+
+	local burst = makeModel(parent, name)
+	local core = makeDecorPart(
+		burst,
+		"Core",
+		Vector3.new(0.5 * scale, 0.5 * scale, 0.5 * scale),
+		centerCFrame,
+		colorA,
+		Enum.Material.Neon
+	)
+	core.Shape = Enum.PartType.Ball
+
+	for spokeIndex = 1, 8 do
+		local angle = math.rad((spokeIndex - 1) * 45)
+		local length = (if spokeIndex % 2 == 0 then 2.15 else 3.15) * scale
+		local spoke = makeDecorPart(
+			burst,
+			"Spoke" .. spokeIndex,
+			Vector3.new(length, 0.09 * scale, 0.09 * scale),
+			centerCFrame * CFrame.Angles(0, 0, angle) * CFrame.new(length / 2 + 0.32 * scale, 0, 0),
+			if spokeIndex % 2 == 0 then colorB else colorA,
+			Enum.Material.Neon
+		)
+		spoke:SetAttribute("AtomicDecor", true)
+	end
+
+	burst.PrimaryPart = core
+	return burst
+end
+
+local function makeAtomicBoomerang(parent, name, centerCFrame, scale, color)
+	scale = scale or 1
+	color = color or ATOMIC_COLORS.Orange
+
+	local boomerang = makeModel(parent, name)
+	for armIndex, angle in ipairs({ 28, -28 }) do
+		local arm = makeDecorPart(
+			boomerang,
+			"Arm" .. armIndex,
+			Vector3.new(2.45 * scale, 0.24 * scale, 0.12 * scale),
+			centerCFrame * CFrame.Angles(0, 0, math.rad(angle)) * CFrame.new(0.92 * scale, 0, 0),
+			color,
+			Enum.Material.Neon
+		)
+		arm:SetAttribute("AtomicDecor", true)
+		if armIndex == 1 then
+			boomerang.PrimaryPart = arm
+		end
+	end
+
+	local hinge = makeDecorPart(
+		boomerang,
+		"HingeDot",
+		Vector3.new(0.34 * scale, 0.34 * scale, 0.34 * scale),
+		centerCFrame,
+		ATOMIC_COLORS.Cream,
+		Enum.Material.Neon
+	)
+	hinge.Shape = Enum.PartType.Ball
+	return boomerang
+end
+
+local function makeAtomicDiamondCluster(parent, name, centerCFrame, scale)
+	scale = scale or 1
+
+	local cluster = makeModel(parent, name)
+	local diamond = makeDecorPart(
+		cluster,
+		"Diamond",
+		Vector3.new(1.12 * scale, 1.12 * scale, 0.12 * scale),
+		centerCFrame * CFrame.Angles(0, 0, math.rad(45)),
+		ATOMIC_COLORS.Cream,
+		Enum.Material.Neon
+	)
+	cluster.PrimaryPart = diamond
+
+	for dotIndex, data in ipairs({
+		{ Offset = Vector3.new(-1.25, 0.75, 0), Color = ATOMIC_COLORS.Brown, Size = 0.32 },
+		{ Offset = Vector3.new(1.35, -0.72, 0), Color = ATOMIC_COLORS.Pink, Size = 0.38 },
+		{ Offset = Vector3.new(0.35, 1.55, 0), Color = ATOMIC_COLORS.Orange, Size = 0.26 },
+	}) do
+		local dot = makeDecorPart(
+			cluster,
+			"SatelliteDot" .. dotIndex,
+			Vector3.new(data.Size * scale, data.Size * scale, data.Size * scale),
+			centerCFrame * CFrame.new(data.Offset * scale),
+			data.Color,
+			Enum.Material.Neon
+		)
+		dot.Shape = Enum.PartType.Ball
+	end
+
+	return cluster
 end
 
 local function createBeamBetween(parent, name, startPosition, endPosition, thickness, color, material)
@@ -1053,6 +1167,9 @@ local function makeHallway(roomFolder)
 	oceanSign:SetAttribute("BaseCanCollide", false)
 	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nFROM A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSurfaceText(oceanSign, "IslandApproachReturnText", "THIS WAY\nTO PARADISE", Enum.NormalId.Front, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
+	makeAtomicStarburst(hallway, "HallwayTVAtomicStarburst", CFrame.new(-5.95, 6.7, 30.4) * CFrame.Angles(0, math.rad(90), 0), 0.68, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Orange)
+	makeAtomicBoomerang(hallway, "HallwaySnackAtomicBoomerang", CFrame.new(5.95, 6.1, 34.8) * CFrame.Angles(0, math.rad(-90), 0), 0.72, ATOMIC_COLORS.Orange)
+	makeAtomicDiamondCluster(hallway, "HallwayTinyAtomicDiamonds", CFrame.new(-5.95, 6.2, 53.5) * CFrame.Angles(0, math.rad(90), 0), 0.58)
 	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
 	makeRoomControlPanel(
 		hallway,
@@ -1196,6 +1313,9 @@ local function makeSnackLabShell(roomFolder)
 	local lightSwitch = snackControls.LightSwitch
 	local referenceBook = snackControls.ReferenceBook
 	createSpawnLocation(room, "SnackLabSpawn", "SnackLab", Constants.GetRoomSpawnCFrame("SnackLab"), Color3.fromRGB(91, 188, 124), false)
+	makeAtomicStarburst(room, "SnackLabAtomicStarburst", cframeAt(origin, 12.5, 8.5, -depth / 2 + 0.62), 0.78, ATOMIC_COLORS.NeonPink, ATOMIC_COLORS.Orange)
+	makeAtomicBoomerang(room, "SnackLabAtomicBoomerang", cframeAt(origin, width / 2 - 0.58, 7.4, 8.2) * CFrame.Angles(0, math.rad(-90), 0), 0.82, ATOMIC_COLORS.Pink)
+	makeAtomicDiamondCluster(room, "SnackLabAtomicDiamonds", cframeAt(origin, -7.2, 7.0, depth / 2 - 0.62) * CFrame.Angles(0, math.rad(180), 0), 0.62)
 
 	return {
 		Model = room,
@@ -1875,6 +1995,9 @@ local function makeLibraryFurnishings(room)
 	createPrompt(bookcaseDoor, "Inspect", "Reference Bookcase", 0)
 	tag(bookcaseDoor, Constants.Tags.LibraryBookcaseDoor)
 
+	makeAtomicBoomerang(room, "LibraryBackWallAtomicBoomerang", cframeAt(origin, -10.8, 11.2, -LIBRARY_DEPTH / 2 + 0.62), 0.78, ATOMIC_COLORS.Orange)
+	makeAtomicStarburst(room, "LibraryRightWallAtomicStarburst", cframeAt(origin, LIBRARY_WIDTH / 2 - 0.58, 10.4, 8.8) * CFrame.Angles(0, math.rad(-90), 0), 0.68, ATOMIC_COLORS.Cream, ATOMIC_COLORS.Pink)
+	makeAtomicDiamondCluster(room, "LibraryLoftAtomicDiamonds", cframeAt(origin, -2.8, 10.8, LIBRARY_DEPTH / 2 - 0.62) * CFrame.Angles(0, math.rad(180), 0), 0.56)
 	makeLibraryLoftRoom(room)
 end
 
@@ -2148,6 +2271,8 @@ local function makeTreetopZiplineArea(room, bowlingOrigin)
 
 	local sign = createPart(treetop, "TreetopZiplineSign", Vector3.new(9, 3, 0.28), CFrame.new(platformCenter + Vector3.new(0, 4.6, 7.5)), Color3.fromRGB(255, 232, 112), Enum.Material.Wood)
 	createSurfaceText(sign, "TreetopSignText", "ABOVE THE TREES\nISLAND ZIPLINE", Enum.NormalId.Front, Color3.fromRGB(42, 38, 24), Color3.fromRGB(255, 232, 112))
+	makeAtomicStarburst(treetop, "TreetopLaunchAtomicStarburst", CFrame.new(platformCenter + Vector3.new(8.8, 5.7, 7.35)), 0.64, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Cream)
+	makeAtomicBoomerang(treetop, "TreetopLaunchAtomicBoomerang", CFrame.new(platformCenter + Vector3.new(-9.0, 5.0, 7.35)), 0.68, ATOMIC_COLORS.Orange)
 
 	for treeIndex, data in ipairs({
 		{ X = -27, Z = -237, Height = 24 },
@@ -2263,6 +2388,8 @@ local function makeVoidRoom(roomFolder)
 
 	local title = createPart(room, "VoidTitleSign", Vector3.new(16, 3.1, 0.28), cframeAt(origin, 0, 13.4, -23.25), Color3.fromRGB(29, 20, 60), Enum.Material.Neon)
 	createSurfaceText(title, "VoidTitleText", "THE VOID\nTEMPORARY STOP?", Enum.NormalId.Front, Color3.fromRGB(203, 255, 255), Color3.fromRGB(29, 20, 60))
+	makeAtomicBoomerang(room, "VoidLeftWallAtomicBoomerang", cframeAt(origin, -width / 2 + 0.58, 12.6, 1.5) * CFrame.Angles(0, math.rad(90), 0), 1.0, ATOMIC_COLORS.NeonPink)
+	makeAtomicDiamondCluster(room, "VoidRightWallAtomicDiamonds", cframeAt(origin, width / 2 - 0.58, 10.8, 9.0) * CFrame.Angles(0, math.rad(-90), 0), 0.9)
 
 	for ringIndex = 1, 7 do
 		local ringColor = BOWLING_COSMIC_COLORS[((ringIndex - 1) % #BOWLING_COSMIC_COLORS) + 1]
@@ -2458,6 +2585,8 @@ local function makeBowlingAlley(roomFolder)
 			adIndex
 		)
 	end
+	makeAtomicStarburst(room, "BowlingLeftWallAtomicStarburst", cframeAt(origin, -width / 2 + 0.58, 10.8, 8.0) * CFrame.Angles(0, math.rad(90), 0), 0.82, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Orange)
+	makeAtomicBoomerang(room, "BowlingRightWallAtomicBoomerang", cframeAt(origin, width / 2 - 0.58, 9.8, -10.8) * CFrame.Angles(0, math.rad(-90), 0), 0.82, ATOMIC_COLORS.Orange)
 
 	local disco = createPart(room, "BowlingDiscoBall", Vector3.new(2.3, 2.3, 2.3), cframeAt(origin, 0, 13.8, 4), Color3.fromRGB(192, 222, 255), Enum.Material.Glass)
 	disco.Shape = Enum.PartType.Ball
@@ -2610,6 +2739,7 @@ local function makeBowlingAlley(roomFolder)
 
 	local roomSign = createPart(room, "MaintenanceRoomSign", Vector3.new(10, 1.7, 0.24), maintenanceCFrame(0, 9.4, maintenanceDepth / 2 - 0.92), Color3.fromRGB(255, 235, 149), Enum.Material.Neon)
 	createSurfaceText(roomSign, "MaintenanceRoomSignText", "PIN WORKSHOP\nAUTHORIZED TOUCHING?", Enum.NormalId.Front, Color3.fromRGB(34, 34, 40), Color3.fromRGB(255, 235, 149))
+	makeAtomicDiamondCluster(room, "MaintenanceAtomicDiamonds", maintenanceCFrame(-maintenanceWidth / 2 + 0.58, 8.1, 5.3) * CFrame.Angles(0, math.rad(90), 0), 0.58)
 
 	local conveyor = createPart(room, "MaintenanceConveyor", Vector3.new(15.8, 0.34, 2.3), maintenanceCFrame(0, 1.2, -1.8), Color3.fromRGB(34, 38, 48), Enum.Material.Metal)
 	conveyor:SetAttribute("CosmicSurface", true)
@@ -3337,6 +3467,8 @@ local function makeSpaceStationRoom(roomFolder)
 		local z = -depth / 2 + ribIndex * (depth / 6)
 		createPart(room, "SpaceStationCeilingRib" .. ribIndex, Vector3.new(width - 3, 0.28, 0.28), cframeAt(origin, 0, height - 0.72, z), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
 	end
+	makeAtomicStarburst(room, "SpaceStationAtomicStarburst", cframeAt(origin, -width / 2 + 0.58, 11.2, 5.8) * CFrame.Angles(0, math.rad(90), 0), 0.68, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Cream)
+	makeAtomicBoomerang(room, "SpaceStationAtomicBoomerang", cframeAt(origin, width / 2 - 0.58, 12.1, -1.2) * CFrame.Angles(0, math.rad(-90), 0), 0.7, ATOMIC_COLORS.Orange)
 
 	local returnDoor = createPart(room, "SpaceStationReturnDoor", Vector3.new(6.6, 7.4, 0.36), cframeAt(origin, 0, 4.2, depth / 2 - 0.55), Color3.fromRGB(67, 92, 126), Enum.Material.Metal)
 	returnDoor:SetAttribute("DestinationCFrame", ISLAND_SPAWN_CFRAME)
@@ -3542,6 +3674,9 @@ function RoomBuilder.Build()
 	makeTVRoomClocks(roomFolder)
 	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
+	makeAtomicStarburst(roomFolder, "TVRoomAtomicStarburst", CFrame.new(13.2, 13.6, -Constants.Room.Depth / 2 + 0.62), 0.92, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Orange)
+	makeAtomicBoomerang(roomFolder, "TVRoomLeftWallAtomicBoomerang", CFrame.new(-Constants.Room.Width / 2 + 0.58, 10.6, -3.2) * CFrame.Angles(0, math.rad(90), 0), 0.9, ATOMIC_COLORS.Orange)
+	makeAtomicDiamondCluster(roomFolder, "TVRoomRightWallAtomicDiamonds", CFrame.new(Constants.Room.Width / 2 - 0.58, 11.5, -6.8) * CFrame.Angles(0, math.rad(-90), 0), 0.68)
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
 	local islandRoom = makeIslandRoom(roomFolder)
