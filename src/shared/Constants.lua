@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.47"
+Constants.BuildVersion = "0.5.48"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -42,6 +42,8 @@ Constants.Tags = {
 	ExitDoor = "DontTouchIt_ExitDoor",
 	HallDoor = "DontTouchIt_HallDoor",
 	ReferenceBook = "DontTouchIt_ReferenceBook",
+	StoreButton = "DontTouchIt_StoreButton",
+	TeleportButton = "DontTouchIt_TeleportButton",
 	SecretRoomDoor = "DontTouchIt_SecretRoomDoor",
 	SecretRoomExit = "DontTouchIt_SecretRoomExit",
 	ResetRoomButton = "DontTouchIt_ResetRoomButton",
@@ -82,6 +84,7 @@ Constants.Tags = {
 	LibraryCatalog = "DontTouchIt_LibraryCatalog",
 	LibraryLadder = "DontTouchIt_LibraryLadder",
 	LibraryLoftDoor = "DontTouchIt_LibraryLoftDoor",
+	LibraryTeleportKey = "DontTouchIt_LibraryTeleportKey",
 	LibraryTopShelfKey = "DontTouchIt_LibraryTopShelfKey",
 	LibraryBookcaseDoor = "DontTouchIt_LibraryBookcaseDoor",
 	BowlingLaneButton = "DontTouchIt_BowlingLaneButton",
@@ -485,6 +488,11 @@ Constants.Discoveries = {
 		Name = "Reached the Loft Door",
 		Hint = "The loft door is visible above the Library, but the ladder makes it reachable.",
 	},
+	LibraryTeleportKey = {
+		Id = "library_teleport_key",
+		Name = "Found the Teleport Key",
+		Hint = "Search the Library loft shelves for a key that prefers fast travel.",
+	},
 	LibraryBowlingKey = {
 		Id = "library_bowling_key",
 		Name = "Found the Bowling Key",
@@ -665,6 +673,7 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.LibraryCatalog.Id,
 		Constants.Discoveries.LibraryLadder.Id,
 		Constants.Discoveries.LibraryLoft.Id,
+		Constants.Discoveries.LibraryTeleportKey.Id,
 		Constants.Discoveries.LibraryBowlingKey.Id,
 		Constants.Discoveries.LibraryBookcaseDoor.Id,
 		Constants.Discoveries.LibraryNoTouch.Id,
@@ -799,7 +808,7 @@ Constants.Rooms = {
 		Name = "Space Station",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.SpaceStation,
 		NoTouchDiscoveryId = Constants.Discoveries.SpaceStationNoTouch.Id,
-		SpawnCFrame = CFrame.new(Vector3.new(92, 83, 164), Vector3.new(92, 83, 150)),
+		SpawnCFrame = CFrame.new(Vector3.new(92, 83, 156), Vector3.new(92, 83, 145)),
 		Zone = {
 			Min = Vector3.new(66, 76, 126),
 			Max = Vector3.new(118, 106, 176),
@@ -906,6 +915,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.LibraryCatalog.Id] = Constants.Tags.LibraryCatalog,
 	[Constants.Discoveries.LibraryLadder.Id] = Constants.Tags.LibraryLadder,
 	[Constants.Discoveries.LibraryLoft.Id] = Constants.Tags.LibraryLoftDoor,
+	[Constants.Discoveries.LibraryTeleportKey.Id] = Constants.Tags.LibraryTeleportKey,
 	[Constants.Discoveries.LibraryBowlingKey.Id] = Constants.Tags.LibraryTopShelfKey,
 	[Constants.Discoveries.LibraryBookcaseDoor.Id] = Constants.Tags.LibraryBookcaseDoor,
 	[Constants.Discoveries.BowlingEntered.Id] = Constants.Tags.LibraryBookcaseDoor,
@@ -946,6 +956,8 @@ Constants.NoTouch = {
 	RevealRobux = 3,
 	RevealProductId = 0,
 	SecretKeyClueCost = 3,
+	TeleportKeyClueCost = 3,
+	TeleportKeyRobux = 5,
 }
 
 Constants.DiscoveryOrder = {}

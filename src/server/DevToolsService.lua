@@ -223,6 +223,7 @@ function DevToolsService:_sendState(player, stateType, roomId)
 			Fly = movementState.Fly == true,
 			Noclip = movementState.Noclip == true,
 		},
+		StorePrices = self.roomProgressService and self.roomProgressService:GetStorePrices() or Constants.NoTouch,
 		RoomSnapshot = self.discoveryService:GetRoomSnapshot(player, currentRoomId),
 	})
 end
@@ -379,6 +380,19 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 	elseif action == "SetDiscovery" then
 		if self:_setDiscoveryCompletion(player, payload) then
 			self:_sendState(player, "State", payload.RoomId)
+		end
+	elseif action == "AdjustStorePrice" then
+		local key = payload.Key
+		local delta = payload.Delta
+		if self.roomProgressService and typeof(key) == "string" and self.roomProgressService:AdjustStorePrice(key, delta) then
+			self:_sendMessage(player, "Dev store price updated for this server session.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		end
+	elseif action == "ResetStorePrices" then
+		if self.roomProgressService then
+			self.roomProgressService:ResetStorePrices()
+			self:_sendMessage(player, "Dev store prices reset to defaults.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
 		end
 	end
 end

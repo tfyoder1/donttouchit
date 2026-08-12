@@ -9,6 +9,17 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local RoomProgressService = {}
 RoomProgressService.__index = RoomProgressService
 
+local STORE_PRICE_KEYS = {
+	HintPackRobux = true,
+	ClueRobux = true,
+	RevealRobux = true,
+	ClueHintCost = true,
+	RevealClueCost = true,
+	SecretKeyClueCost = true,
+	TeleportKeyClueCost = true,
+	TeleportKeyRobux = true,
+}
+
 local function getRootPart(player)
 	local character = player.Character
 	if not character then
@@ -59,6 +70,7 @@ function RoomProgressService.new(discoveryService)
 	self.sparkleRemote = RemoteService.GetRemote(Constants.Remotes.SparkleHint)
 	self.stateByUserId = {}
 	self.pendingHintPurchaseByUserId = {}
+	self.storePriceOverrides = {}
 	return self
 end
 
@@ -172,10 +184,58 @@ function RoomProgressService:RecordInteraction(player)
 	state.TimerStartedAt = os.clock()
 end
 
+function RoomProgressService:GetStorePrices()
+	return {
+		HintPackSize = Constants.NoTouch.HintPackSize,
+		HintPackRobux = self.storePriceOverrides.HintPackRobux or Constants.NoTouch.HintPackRobux or 0,
+		HintPackProductId = Constants.NoTouch.HintPackProductId or 0,
+		ClueRobux = self.storePriceOverrides.ClueRobux or Constants.NoTouch.ClueRobux or 0,
+		ClueProductId = Constants.NoTouch.ClueProductId or Constants.NoTouch.PaidHintProductId or 0,
+		ClueHintCost = self.storePriceOverrides.ClueHintCost or Constants.NoTouch.ClueHintCost or 5,
+		RevealRobux = self.storePriceOverrides.RevealRobux or Constants.NoTouch.RevealRobux or Constants.NoTouch.FullRevealRobux or 0,
+		RevealProductId = Constants.NoTouch.RevealProductId or Constants.NoTouch.FullRevealProductId or 0,
+		RevealClueCost = self.storePriceOverrides.RevealClueCost or Constants.NoTouch.RevealClueCost or 3,
+		SecretKeyClueCost = self.storePriceOverrides.SecretKeyClueCost or Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3,
+		TeleportKeyClueCost = self.storePriceOverrides.TeleportKeyClueCost or Constants.NoTouch.TeleportKeyClueCost or Constants.NoTouch.RevealClueCost or 3,
+		TeleportKeyRobux = self.storePriceOverrides.TeleportKeyRobux or Constants.NoTouch.TeleportKeyRobux or 5,
+	}
+end
+
+function RoomProgressService:GetStorePrice(key)
+	return self:GetStorePrices()[key]
+end
+
+function RoomProgressService:AdjustStorePrice(key, delta)
+	if not STORE_PRICE_KEYS[key] then
+		return false
+	end
+
+	local amount = math.floor(tonumber(delta) or 0)
+	if amount == 0 then
+		return false
+	end
+
+	local current = self:GetStorePrice(key) or 0
+	self.storePriceOverrides[key] = math.clamp(current + amount, 0, 999)
+	return true
+end
+
+function RoomProgressService:ResetStorePrices()
+	self.storePriceOverrides = {}
+end
+
 function RoomProgressService:ShowReferenceBook(player, roomId, extra)
 	local snapshot = self.discoveryService:GetRoomSnapshot(player, roomId)
 	if not snapshot then
 		return
+	end
+
+	local storePrices = self:GetStorePrices()
+	snapshot.StorePrices = storePrices
+	snapshot.ClueHintCost = storePrices.ClueHintCost
+	snapshot.RevealClueCost = storePrices.RevealClueCost
+	if snapshot.SecretDoor then
+		snapshot.SecretDoor.KeyClueCost = storePrices.SecretKeyClueCost
 	end
 
 	if extra then
@@ -185,6 +245,45 @@ function RoomProgressService:ShowReferenceBook(player, roomId, extra)
 	end
 
 	self.referenceBookRemote:FireClient(player, snapshot)
+end
+
+function RoomProgressService:_buildUnlockedTeleportRooms(player)
+	local rooms = {}
+
+	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
+		if self.discoveryService:IsRoomUnlocked(player, roomId) then
+			local room = Constants.GetRoom(roomId)
+			if room then
+				table.insert(rooms, {
+					RoomId = roomId,
+					Name = room.Name,
+				})
+			end
+		end
+	end
+
+	return rooms
+end
+
+function RoomProgressService:ShowStore(player, roomId)
+	self:ShowReferenceBook(player, roomId, {
+		Mode = "Store",
+		StatusText = "Everything here can be earned through play time or bought if you are in a hurry.",
+		StorePrices = self:GetStorePrices(),
+	})
+end
+
+function RoomProgressService:ShowTeleportMenu(player, roomId)
+	if not self.discoveryService:HasTeleportKey(player) then
+		self.systemMessageRemote:FireClient(player, "The controls notice you do not have the Teleport Key yet.")
+		return
+	end
+
+	self:ShowReferenceBook(player, roomId, {
+		Mode = "Teleport",
+		StatusText = "Teleport Key active. Pick any room you have already opened.",
+		TeleportRooms = self:_buildUnlockedTeleportRooms(player),
+	})
 end
 
 function RoomProgressService:_sendStartOptions(player)
@@ -509,6 +608,10 @@ function RoomProgressService:_handleHintRequest(player, payload)
 		self:_requestSecretDoorReveal(player, roomId)
 	elseif action == "BuySecretKey" then
 		self:_requestSecretKey(player, roomId)
+	elseif action == "BuyTeleportKey" then
+		self:_requestTeleportKey(player, roomId)
+	elseif action == "TeleportRoom" then
+		self:_requestTeleportRoom(player, roomId, payload.TargetRoomId)
 	end
 end
 
@@ -550,7 +653,7 @@ function RoomProgressService:_requestClue(player, roomId)
 		return
 	end
 
-	local hintText, errorText = self.discoveryService:UseClue(player, roomId, Constants.NoTouch.ClueHintCost)
+	local hintText, errorText = self.discoveryService:UseClue(player, roomId, self:GetStorePrice("ClueHintCost"))
 	self:_showHintResult(player, roomId, hintText, errorText)
 end
 
@@ -585,7 +688,7 @@ function RoomProgressService:_requestDiscoveryReveal(player, roomId)
 		return
 	end
 
-	local revealText, targetTag, errorText = self.discoveryService:UseLocationReveal(player, roomId, Constants.NoTouch.RevealClueCost)
+	local revealText, targetTag, errorText = self.discoveryService:UseLocationReveal(player, roomId, self:GetStorePrice("RevealClueCost"))
 	self:_showHintResult(player, roomId, revealText, errorText)
 
 	if revealText and targetTag then
@@ -643,11 +746,13 @@ function RoomProgressService:_requestHintPack(player, roomId)
 		return
 	end
 
-	self.discoveryService:GrantHints(player, Constants.NoTouch.HintPackSize)
+	local packSize = self:GetStorePrice("HintPackSize") or Constants.NoTouch.HintPackSize or 10
+	self.discoveryService:GrantHints(player, packSize)
 	self:ShowReferenceBook(player, roomId, {
-		StatusText = ("Prototype hint pack added: %d hints. Currently free; no Robux charged."):format(Constants.NoTouch.HintPackSize),
+		Mode = "Store",
+		StatusText = ("Prototype hint pack added: %d hints. Currently free; no Robux charged."):format(packSize),
 	})
-	self.systemMessageRemote:FireClient(player, "Prototype hint pack added: 10 hints. Currently free; no Robux charged.")
+	self.systemMessageRemote:FireClient(player, ("Prototype hint pack added: %d hints. Currently free; no Robux charged."):format(packSize))
 end
 
 function RoomProgressService:_requestSecretDoorReveal(player, roomId)
@@ -703,7 +808,7 @@ function RoomProgressService:_requestSecretKey(player, roomId)
 		return
 	end
 
-	local cost = math.max(0, Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3)
+	local cost = math.max(0, self:GetStorePrice("SecretKeyClueCost") or Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3)
 	local ok = self.discoveryService:SpendClues(player, cost)
 	if not ok then
 		self:_showHintResult(player, roomId, nil, ("Library Key rush needs %d clues."):format(cost))
@@ -714,6 +819,52 @@ function RoomProgressService:_requestSecretKey(player, roomId)
 	self:ShowReferenceBook(player, roomId, {
 		StatusText = ("Library Key purchased for %d clues."):format(cost),
 	})
+end
+
+function RoomProgressService:_requestTeleportKey(player, roomId)
+	if self.discoveryService:HasTeleportKey(player) then
+		self:_showHintResult(player, roomId, nil, "You already have the Teleport Key.")
+		return
+	end
+
+	if not self.discoveryService:IsRoomUnlocked(player, "Library") then
+		self:_showHintResult(player, roomId, nil, "Teleport Key rush unlocks after you open the Library.")
+		return
+	end
+
+	local cost = math.max(0, self:GetStorePrice("TeleportKeyClueCost") or Constants.NoTouch.TeleportKeyClueCost or 3)
+	local ok = self.discoveryService:SpendClues(player, cost)
+	if not ok then
+		self:_showHintResult(player, roomId, nil, ("Teleport Key rush needs %d clues."):format(cost))
+		return
+	end
+
+	self.discoveryService:GrantTeleportKey(player, "Teleport Key purchased. Controls can now jump to opened rooms.")
+	self:ShowReferenceBook(player, roomId, {
+		Mode = "Store",
+		StatusText = ("Teleport Key purchased for %d clues."):format(cost),
+	})
+end
+
+function RoomProgressService:_requestTeleportRoom(player, sourceRoomId, targetRoomId)
+	if typeof(targetRoomId) ~= "string" or not Constants.GetRoom(targetRoomId) then
+		self:_showHintResult(player, sourceRoomId, nil, "That teleport destination does not exist.")
+		return
+	end
+
+	if not self.discoveryService:HasTeleportKey(player) then
+		self:_showHintResult(player, sourceRoomId, nil, "The Teleport Key is still missing from your inventory.")
+		return
+	end
+
+	if not self.discoveryService:IsRoomUnlocked(player, targetRoomId) then
+		self:_showHintResult(player, sourceRoomId, nil, "Teleport only accepts rooms you have already opened.")
+		return
+	end
+
+	local room = Constants.GetRoom(targetRoomId)
+	teleportPlayer(player, Constants.GetRoomSpawnCFrame(targetRoomId))
+	self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(room and room.Name or "the room"))
 end
 
 function RoomProgressService:_installReceiptHandler()
@@ -752,8 +903,9 @@ function RoomProgressService:_installReceiptHandler()
 				return Enum.ProductPurchaseDecision.NotProcessedYet
 			end
 
-			self.discoveryService:GrantHints(player, Constants.NoTouch.HintPackSize)
-			self.systemMessageRemote:FireClient(player, "Hint pack added: 10 hints.")
+			local packSize = self:GetStorePrice("HintPackSize") or Constants.NoTouch.HintPackSize or 10
+			self.discoveryService:GrantHints(player, packSize)
+			self.systemMessageRemote:FireClient(player, ("Hint pack added: %d hints."):format(packSize))
 			return Enum.ProductPurchaseDecision.PurchaseGranted
 		end
 

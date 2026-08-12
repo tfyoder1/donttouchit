@@ -890,12 +890,47 @@ local function makeCompactResetRoomButton(parent, name, cframe, promptObjectText
 	return resetModel
 end
 
+local function makeCompactPanelButton(parent, name, cframe, labelText, actionText, objectText, color, tagName)
+	local buttonModel = makeModel(parent, name)
+	local plate = createPart(
+		buttonModel,
+		"PanelButtonPlate",
+		Vector3.new(1.15, 0.76, 0.12),
+		cframe,
+		Color3.fromRGB(42, 47, 56),
+		Enum.Material.Metal
+	)
+	local button = createPart(
+		buttonModel,
+		"PanelButton",
+		Vector3.new(0.66, 0.18, 0.66),
+		cframe * CFrame.new(0, -0.02, -0.15) * CFrame.Angles(math.rad(90), 0, 0),
+		color or Color3.fromRGB(119, 255, 203),
+		Enum.Material.Neon
+	)
+	button.Shape = Enum.PartType.Cylinder
+
+	createSurfaceText(plate, name .. "Text", labelText, Enum.NormalId.Front, color or Color3.fromRGB(119, 255, 203), Color3.fromRGB(42, 47, 56))
+	local prompt = createPrompt(button, actionText, objectText, 0.2)
+	prompt.MaxActivationDistance = 7
+	if tagName then
+		tag(button, tagName)
+	end
+
+	buttonModel.PrimaryPart = plate
+	return buttonModel, button
+end
+
 local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, options)
 	options = options or {}
 	local includeReset = options.IncludeReset == true
 	local includeLightSwitch = options.IncludeLightSwitch ~= false
-	local panelWidth = options.PanelWidth or (includeReset and 5.6 or 4.55)
-	local panelHeight = options.PanelHeight or (includeReset and 3.1 or 2.55)
+	local panelWidth = options.PanelWidth or (includeReset and 6.35 or 5.7)
+	local panelHeight = options.PanelHeight or (includeReset and 3.8 or 3.45)
+	local panelLabel = options.PanelLabel or "CONTROLS"
+	if string.find(panelLabel, "CONTROLS") then
+		panelLabel = "CONTROLS"
+	end
 	local controls = makeModel(parent, name)
 	controls:SetAttribute("StrictPromptTargets", true)
 
@@ -915,10 +950,10 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		Color3.fromRGB(62, 69, 82),
 		Enum.Material.SmoothPlastic
 	)
-	createSurfaceText(titleStrip, "ControlPanelTitle", options.PanelLabel or (title .. " CONTROLS"), Enum.NormalId.Front, Color3.fromRGB(236, 245, 255), Color3.fromRGB(62, 69, 82))
+	createSurfaceText(titleStrip, "ControlPanelTitle", panelLabel, Enum.NormalId.Front, Color3.fromRGB(236, 245, 255), Color3.fromRGB(62, 69, 82))
 
-	local logX = if includeReset then -1.45 else -0.85
-	local logY = if includeReset then -0.24 else -0.18
+	local logX = if includeReset then -1.72 else -1.18
+	local logY = if includeReset then 0.06 else 0.18
 	local referenceBook = makeCompactReferenceBook(
 		controls,
 		name .. "Log",
@@ -926,7 +961,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		roomId,
 		title,
 		{
-			Height = if includeReset then 1.66 else 1.5,
+			Height = if includeReset then 1.5 else 1.35,
 			Text = options.LogText,
 			MaxActivationDistance = options.LogPromptDistance or 7,
 		}
@@ -937,7 +972,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		lightSwitch = makeLightSwitch(
 			controls,
 			name .. "LightSwitch",
-			panelCFrame * CFrame.new(if includeReset then 1.55 else 1.38, if includeReset then 0.48 else -0.16, -0.22),
+			panelCFrame * CFrame.new(if includeReset then 1.82 else 1.56, if includeReset then 0.66 else 0.4, -0.22),
 			{
 				RoomId = roomId,
 				Label = options.SwitchLabel or "LIGHT",
@@ -955,10 +990,34 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		resetRoomButton = makeCompactResetRoomButton(
 			controls,
 			name .. "ResetRoomButton",
-			panelCFrame * CFrame.new(1.55, -0.78, -0.22),
+			panelCFrame * CFrame.new(1.82, -0.42, -0.22),
 			options.ResetPromptObjectText or "Room Reset"
 		)
 	end
+
+	local storeButtonModel, storeButton = makeCompactPanelButton(
+		controls,
+		name .. "StoreButton",
+		panelCFrame * CFrame.new(if includeReset then -1.72 else -1.18, if includeReset then -1.28 else -1.12, -0.22),
+		"STORE",
+		"Open",
+		"Store",
+		Color3.fromRGB(255, 221, 84),
+		Constants.Tags.StoreButton
+	)
+	storeButton:SetAttribute("RoomId", roomId)
+
+	local teleportButtonModel, teleportButton = makeCompactPanelButton(
+		controls,
+		name .. "TeleportButton",
+		panelCFrame * CFrame.new(if includeReset then 0.1 else 1.42, if includeReset then -1.28 else -1.12, -0.22),
+		"TELE",
+		"Open",
+		"Teleport",
+		Color3.fromRGB(119, 255, 203),
+		Constants.Tags.TeleportButton
+	)
+	teleportButton:SetAttribute("RoomId", roomId)
 
 	controls.PrimaryPart = panel
 	return {
@@ -967,6 +1026,8 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		ReferenceBook = referenceBook,
 		LightSwitch = lightSwitch,
 		ResetRoomButton = resetRoomButton,
+		StoreButton = storeButtonModel,
+		TeleportButton = teleportButtonModel,
 	}
 end
 
@@ -1642,6 +1703,24 @@ local function makeLibraryLoftRoom(room)
 			)
 		end
 	end
+
+	local keyCFrame = CFrame.new(center + Vector3.new(5.7, 18.85, 5.38)) * CFrame.Angles(0, math.rad(90), math.rad(90))
+	local teleportKeyShaft = createPart(
+		loft,
+		"LibraryTeleportKey",
+		Vector3.new(0.24, 1.7, 0.24),
+		keyCFrame,
+		Color3.fromRGB(119, 255, 203),
+		Enum.Material.Neon
+	)
+	teleportKeyShaft.Shape = Enum.PartType.Cylinder
+	teleportKeyShaft.CanCollide = false
+	teleportKeyShaft:SetAttribute("BaseCanCollide", false)
+	createPart(loft, "LibraryTeleportKeyHead", Vector3.new(0.8, 0.14, 0.8), keyCFrame * CFrame.new(0, -0.95, 0), Color3.fromRGB(255, 221, 84), Enum.Material.Neon).CanCollide = false
+	createPart(loft, "LibraryTeleportKeyToothA", Vector3.new(0.18, 0.48, 0.18), keyCFrame * CFrame.new(0.28, 0.72, 0), Color3.fromRGB(255, 221, 84), Enum.Material.Neon).CanCollide = false
+	createPart(loft, "LibraryTeleportKeyToothB", Vector3.new(0.18, 0.32, 0.18), keyCFrame * CFrame.new(-0.22, 0.83, 0), Color3.fromRGB(255, 221, 84), Enum.Material.Neon).CanCollide = false
+	createPrompt(teleportKeyShaft, "Take", "Teleport Key", 0)
+	tag(teleportKeyShaft, Constants.Tags.LibraryTeleportKey)
 
 	local rug = createPart(loft, "LoftReadingRug", Vector3.new(8.5, 0.08, 5.4), CFrame.new(center + Vector3.new(0, 15.04, -0.5)), Color3.fromRGB(122, 49, 85), Enum.Material.Fabric)
 	rug:SetAttribute("BaseCanCollide", false)

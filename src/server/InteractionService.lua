@@ -545,6 +545,14 @@ function InteractionService:Initialize()
 		self:_wireReferenceBook(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.StoreButton, function(instance)
+		self:_wireStoreButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TeleportButton, function(instance)
+		self:_wireTeleportButton(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SecretRoomDoor, function(instance)
 		self:_wireSecretRoomDoor(instance)
 	end)
@@ -683,6 +691,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.LibraryLoftDoor, function(instance)
 		self:_wireLibraryLoftDoor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryTeleportKey, function(instance)
+		self:_wireLibraryTeleportKey(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.LibraryTopShelfKey, function(instance)
@@ -1148,6 +1160,34 @@ function InteractionService:_wireReferenceBook(bookPart)
 	end)
 end
 
+function InteractionService:_wireStoreButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
+		if self.roomProgressService then
+			self.roomProgressService:ShowStore(player, roomId)
+		end
+	end)
+end
+
+function InteractionService:_wireTeleportButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
+		if not self.discoveryService:HasTeleportKey(player) then
+			self.systemMessageRemote:FireClient(player, "The Teleport control blinks: key required.")
+			playSound(button, "rbxasset://sounds/snap.wav", 0.32, 0.7)
+			return
+		end
+
+		if self.roomProgressService then
+			self.roomProgressService:ShowTeleportMenu(player, roomId)
+		end
+	end)
+end
+
 function InteractionService:_getSecretDoorRoot(door)
 	if not door then
 		return nil
@@ -1498,6 +1538,35 @@ function InteractionService:_wireLibraryLoftDoor(door)
 		teleportPlayer(player, destination)
 		task.wait(0.25)
 		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireLibraryTeleportKey(key)
+	local prompt = getPrompt(key)
+
+	self:_connectPrompt(prompt, function(player)
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLoft.Id) then
+			self.systemMessageRemote:FireClient(player, "The Teleport Key hums from the loft. The Library wants you to reach the room properly first.")
+			playSound(key, "rbxasset://sounds/snap.wav", 0.35, 0.55)
+			return
+		end
+
+		local unlocked = self.discoveryService:Unlock(player, Constants.Discoveries.LibraryTeleportKey.Id)
+		local granted = self.discoveryService:GrantTeleportKey(player, "Teleport Key added. Room controls can now jump to opened rooms.")
+		if not unlocked and not granted then
+			self.systemMessageRemote:FireClient(player, "You already have the Teleport Key.")
+		end
+
+		playSound(key, "rbxasset://sounds/electronicpingshort.wav", 0.5, 1.9)
+		local root = key.Parent
+		if root then
+			for _, instance in ipairs(getInstanceAndDescendants(root)) do
+				if instance:IsA("BasePart") and string.sub(instance.Name, 1, #"LibraryTeleportKey") == "LibraryTeleportKey" then
+					instance.Transparency = 0.62
+					instance.CanCollide = false
+				end
+			end
+		end
 	end)
 end
 

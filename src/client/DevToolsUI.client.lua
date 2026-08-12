@@ -18,6 +18,7 @@ local roomList = nil
 local presetList = nil
 local eventList = nil
 local areaList = nil
+local storeList = nil
 local discoveryList = nil
 local selectedRoomId = nil
 local latestState = nil
@@ -323,6 +324,74 @@ local function rebuildDiscoveries()
 	end
 end
 
+local function rebuildStorePrices()
+	clearList(storeList)
+
+	if not storeList or not latestState then
+		return
+	end
+
+	local prices = latestState.StorePrices or Constants.NoTouch
+	local priceRows = {
+		{
+			Key = "HintPackRobux",
+			Label = "Hint Pack R$",
+		},
+		{
+			Key = "ClueRobux",
+			Label = "Clue R$",
+		},
+		{
+			Key = "RevealRobux",
+			Label = "Reveal R$",
+		},
+		{
+			Key = "ClueHintCost",
+			Label = "Clue hint cost",
+		},
+		{
+			Key = "RevealClueCost",
+			Label = "Reveal clue cost",
+		},
+		{
+			Key = "SecretKeyClueCost",
+			Label = "Secret key clue cost",
+		},
+		{
+			Key = "TeleportKeyClueCost",
+			Label = "Teleport key clue cost",
+		},
+		{
+			Key = "TeleportKeyRobux",
+			Label = "Teleport key R$",
+		},
+	}
+
+	makeSection(storeList, "Store Prices")
+	for _, row in ipairs(priceRows) do
+		local value = prices[row.Key] or 0
+		makeButton(storeList, ("%s: %d  +"):format(row.Label, value), Color3.fromRGB(52, 83, 70), function()
+			send({
+				Action = "AdjustStorePrice",
+				Key = row.Key,
+				Delta = 1,
+			})
+		end)
+		makeButton(storeList, ("%s: %d  -"):format(row.Label, value), Color3.fromRGB(82, 61, 55), function()
+			send({
+				Action = "AdjustStorePrice",
+				Key = row.Key,
+				Delta = -1,
+			})
+		end)
+	end
+	makeButton(storeList, "Reset Store Prices", Color3.fromRGB(116, 48, 52), function()
+		send({
+			Action = "ResetStorePrices",
+		})
+	end)
+end
+
 local function rebuildPanel()
 	if not latestState or not gui then
 		return
@@ -334,6 +403,7 @@ local function rebuildPanel()
 	clearList(presetList)
 	clearList(eventList)
 	clearList(areaList)
+	clearList(storeList)
 
 	makeSection(roomList, "Jump To Room")
 	for _, room in ipairs(latestState.Rooms or {}) do
@@ -417,6 +487,7 @@ local function rebuildPanel()
 		})
 	end)
 
+	rebuildStorePrices()
 	rebuildDiscoveries()
 	updateStatus()
 end
@@ -523,6 +594,7 @@ local function buildGui()
 	presetList = makeList(scroll, 246)
 	eventList = makeList(scroll, 330)
 	areaList = makeList(scroll, 365)
+	storeList = makeList(scroll, 525)
 	discoveryList = makeList(scroll, 620)
 
 	toggleButton.Activated:Connect(function()

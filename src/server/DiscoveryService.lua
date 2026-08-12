@@ -81,6 +81,7 @@ function DiscoveryService.new()
 	self.cluedDiscoveriesByUserId = {}
 	self.revealedDiscoveriesByUserId = {}
 	self.secretKeysByUserId = {}
+	self.teleportKeyByUserId = {}
 	self.secretDoorRevealsByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
 	self.devOverrideByUserId = {}
@@ -132,6 +133,7 @@ function DiscoveryService:Initialize()
 		self.cluedDiscoveriesByUserId[player.UserId] = nil
 		self.revealedDiscoveriesByUserId[player.UserId] = nil
 		self.secretKeysByUserId[player.UserId] = nil
+		self.teleportKeyByUserId[player.UserId] = nil
 		self.secretDoorRevealsByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
 		self.devOverrideByUserId[player.UserId] = nil
@@ -189,6 +191,10 @@ function DiscoveryService:_ensurePlayer(player)
 		self.secretKeysByUserId[player.UserId] = {}
 	end
 
+	if self.teleportKeyByUserId[player.UserId] == nil then
+		self.teleportKeyByUserId[player.UserId] = false
+	end
+
 	if not self.secretDoorRevealsByUserId[player.UserId] then
 		self.secretDoorRevealsByUserId[player.UserId] = {}
 	end
@@ -216,6 +222,7 @@ function DiscoveryService:_captureRuntimeState(player)
 		CluedDiscoveriesById = cloneDictionary(self.cluedDiscoveriesByUserId[player.UserId]),
 		RevealedDiscoveriesById = cloneDictionary(self.revealedDiscoveriesByUserId[player.UserId]),
 		SecretKeysByRoomId = cloneDictionary(self.secretKeysByUserId[player.UserId]),
+		HasTeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 		SecretDoorRevealsByRoomId = cloneDictionary(self.secretDoorRevealsByUserId[player.UserId]),
 		LastUnlockedRoomId = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID,
 	}
@@ -228,6 +235,7 @@ function DiscoveryService:_applyRuntimeState(player, state)
 	self.cluedDiscoveriesByUserId[player.UserId] = cloneDictionary(state.CluedDiscoveriesById)
 	self.revealedDiscoveriesByUserId[player.UserId] = cloneDictionary(state.RevealedDiscoveriesById)
 	self.secretKeysByUserId[player.UserId] = cloneDictionary(state.SecretKeysByRoomId)
+	self.teleportKeyByUserId[player.UserId] = state.HasTeleportKey == true
 	self.secretDoorRevealsByUserId[player.UserId] = cloneDictionary(state.SecretDoorRevealsByRoomId)
 	self.lastUnlockedRoomByUserId[player.UserId] = state.LastUnlockedRoomId or DEFAULT_ROOM_ID
 end
@@ -354,6 +362,10 @@ function DiscoveryService:SetDevRoomDiscoveries(player, roomId, discoveryIds)
 		end
 	end
 
+	if roomId == "Library" and Constants.Discoveries.LibraryTeleportKey then
+		self.teleportKeyByUserId[player.UserId] = selectedById[Constants.Discoveries.LibraryTeleportKey.Id] == true
+	end
+
 	if Constants.SecretDoors and Constants.SecretDoors[roomId] and not self:IsRoomComplete(player, roomId) then
 		self.secretKeysByUserId[player.UserId][roomId] = nil
 		self.secretDoorRevealsByUserId[player.UserId][roomId] = nil
@@ -380,6 +392,10 @@ function DiscoveryService:SetDevDiscoveryCompletion(player, roomId, discoveryId,
 		self.revealedDiscoveriesByUserId[player.UserId][discoveryId] = nil
 	end
 
+	if discoveryId == Constants.Discoveries.LibraryTeleportKey.Id then
+		self.teleportKeyByUserId[player.UserId] = completed == true
+	end
+
 	if Constants.SecretDoors and Constants.SecretDoors[roomId] and not self:IsRoomComplete(player, roomId) then
 		self.secretKeysByUserId[player.UserId][roomId] = nil
 	end
@@ -404,6 +420,7 @@ function DiscoveryService:UnlockAllDiscoveriesForDevSession(player)
 		self.secretKeysByUserId[player.UserId][roomId] = true
 		self.secretDoorRevealsByUserId[player.UserId][roomId] = true
 	end
+	self.teleportKeyByUserId[player.UserId] = true
 
 	self:_finalizeDevStateChange(player)
 	return true
@@ -428,6 +445,7 @@ function DiscoveryService:_loadPlayer(player)
 	self.cluedDiscoveriesByUserId[player.UserId] = {}
 	self.revealedDiscoveriesByUserId[player.UserId] = {}
 	self.secretKeysByUserId[player.UserId] = {}
+	self.teleportKeyByUserId[player.UserId] = false
 	self.secretDoorRevealsByUserId[player.UserId] = {}
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	self.hasSavedDataByUserId[player.UserId] = false
@@ -502,6 +520,10 @@ function DiscoveryService:_loadPlayer(player)
 			end
 		end
 
+		if data.Inventory.TeleportKey == true or data.Inventory.HasTeleportKey == true then
+			self.teleportKeyByUserId[player.UserId] = true
+		end
+
 		if typeof(data.Inventory.SecretDoorReveals) == "table" then
 			for _, roomId in ipairs(data.Inventory.SecretDoorReveals) do
 				if Constants.SecretDoors and Constants.SecretDoors[roomId] then
@@ -513,6 +535,10 @@ function DiscoveryService:_loadPlayer(player)
 
 	if typeof(data.LastUnlockedRoomId) == "string" and Constants.GetRoom(data.LastUnlockedRoomId) then
 		self.lastUnlockedRoomByUserId[player.UserId] = data.LastUnlockedRoomId
+	end
+
+	if Constants.Discoveries.LibraryTeleportKey and self.discoveryByUserId[player.UserId][Constants.Discoveries.LibraryTeleportKey.Id] then
+		self.teleportKeyByUserId[player.UserId] = true
 	end
 
 	self:_refreshLastUnlockedRoom(player, false)
@@ -536,6 +562,7 @@ function DiscoveryService:_buildSaveData(player)
 			CluedDiscoveries = buildDiscoveryStateList(self.cluedDiscoveriesByUserId[player.UserId]),
 			RevealedDiscoveries = buildDiscoveryStateList(self.revealedDiscoveriesByUserId[player.UserId]),
 			SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
+			TeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 			SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		},
 		LastUnlockedRoomId = self:GetLastUnlockedRoomId(player),
@@ -775,6 +802,8 @@ function DiscoveryService:_syncSecretKeyTools(player)
 			local roomId = item:GetAttribute("SecretKeyRoomId")
 			if item:IsA("Tool") and typeof(roomId) == "string" and not self.secretKeysByUserId[player.UserId][roomId] then
 				item:Destroy()
+			elseif item:IsA("Tool") and item:GetAttribute("TeleportKey") == true and self.teleportKeyByUserId[player.UserId] ~= true then
+				item:Destroy()
 			end
 		end
 	end
@@ -798,6 +827,50 @@ function DiscoveryService:_syncSecretKeyTools(player)
 			end
 		end
 	end
+
+	if self.teleportKeyByUserId[player.UserId] == true then
+		local character = player.Character
+		local existing = backpack:FindFirstChild("Teleport Key") or (character and character:FindFirstChild("Teleport Key"))
+		if not existing then
+			local teleportTool = Instance.new("Tool")
+			teleportTool.Name = "Teleport Key"
+			teleportTool.ToolTip = "Adds teleport controls to room panels."
+			teleportTool.RequiresHandle = false
+			teleportTool.CanBeDropped = false
+			teleportTool:SetAttribute("TeleportKey", true)
+			teleportTool.Parent = backpack
+		end
+	end
+end
+
+function DiscoveryService:HasTeleportKey(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	return self.teleportKeyByUserId[player.UserId] == true
+end
+
+function DiscoveryService:GrantTeleportKey(player, messageText)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	if self.teleportKeyByUserId[player.UserId] then
+		return false
+	end
+
+	self.teleportKeyByUserId[player.UserId] = true
+	self:_syncSecretKeyTools(player)
+	if messageText then
+		self.systemMessageRemote:FireClient(player, messageText)
+	end
+
+	self:_sendSnapshot(player)
+	self:_queueSave(player)
+	return true
 end
 
 function DiscoveryService:GrantSecretKey(player, roomId, messageText)
@@ -981,6 +1054,7 @@ function DiscoveryService:_sendSnapshot(player)
 		Hints = self:GetHintCount(player),
 		Clues = self:GetClueCount(player),
 		SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
+		HasTeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 		SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		HasSavedData = self.hasSavedDataByUserId[player.UserId] == true,
 		LastUnlockedRoomId = lastUnlockedRoomId,
@@ -1039,6 +1113,7 @@ function DiscoveryService:Unlock(player, discoveryId)
 		Hints = self:GetHintCount(player),
 		Clues = self:GetClueCount(player),
 		SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
+		HasTeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 		SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		HasSavedData = true,
 		LastUnlockedRoomId = lastUnlockedRoomId,
@@ -1178,6 +1253,7 @@ function DiscoveryService:GetRoomSnapshot(player, roomId)
 		SecretCount = secretCount,
 		Hints = self:GetHintCount(player),
 		Clues = self:GetClueCount(player),
+		HasTeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 		ClueHintCost = Constants.NoTouch.ClueHintCost,
 		RevealClueCost = Constants.NoTouch.RevealClueCost,
 		SecretDoor = self:GetSecretDoorSnapshot(player, room.Id),

@@ -1312,10 +1312,49 @@ end
 
 local function clearBookList()
 	for _, child in ipairs(bookList:GetChildren()) do
-		if child:IsA("TextLabel") then
+		if child:IsA("GuiObject") then
 			child:Destroy()
 		end
 	end
+end
+
+local function makeBookRow(rowType, text, rowBackground, rowTextColor, layoutOrder, onClick)
+	local row
+	if rowType == "Button" then
+		row = Instance.new("TextButton")
+		row.AutoButtonColor = true
+	else
+		row = Instance.new("TextLabel")
+	end
+
+	row.Name = rowType == "Button" and "BookButtonRow" or "DiscoveryRow"
+	row.BackgroundColor3 = rowBackground
+	row.BackgroundTransparency = 0.08
+	row.BorderSizePixel = 0
+	row.Font = Enum.Font.GothamBold
+	row.LayoutOrder = layoutOrder or 1
+	row.Size = UDim2.new(1, 0, 0, rowType == "Button" and 46 or 38)
+	row.Text = text
+	row.TextColor3 = rowTextColor
+	row.TextScaled = true
+	row.TextWrapped = true
+	row.TextXAlignment = Enum.TextXAlignment.Left
+	row.Parent = bookList
+
+	local rowPadding = Instance.new("UIPadding")
+	rowPadding.PaddingLeft = UDim.new(0, 8)
+	rowPadding.PaddingRight = UDim.new(0, 8)
+	rowPadding.Parent = row
+
+	local rowCorner = Instance.new("UICorner")
+	rowCorner.CornerRadius = UDim.new(0, 5)
+	rowCorner.Parent = row
+
+	if rowType == "Button" and onClick then
+		row.Activated:Connect(onClick)
+	end
+
+	return row
 end
 
 local function renderReferenceBook(payload)
@@ -1325,18 +1364,42 @@ local function renderReferenceBook(payload)
 
 	local wasVisible = bookPanel.Visible
 	activeBookRoomId = payload.RoomId
+	local mode = payload.Mode or "Log"
+	local storePrices = payload.StorePrices or {}
 	bookPanel.Visible = true
 	feedbackPanel.Visible = false
 	if not wasVisible then
 		closeBookButton.Modal = true
 		setOverlayMouse(true, closeBookButton)
 	end
-	bookTitle.Text = (payload.RoomName or "Room") .. " Log"
-	bookCount.Text = ("%d / %d found"):format(payload.Count or 0, payload.Total or 0)
+
+	hintTray.Visible = mode ~= "Teleport"
+	if mode == "Teleport" then
+		bookList.Position = UDim2.fromOffset(18, 84)
+		bookList.Size = UDim2.new(1, -36, 1, -104)
+	else
+		bookList.Position = UDim2.fromOffset(18, 334)
+		bookList.Size = UDim2.new(1, -36, 1, -352)
+	end
+
+	if mode == "Store" then
+		bookTitle.Text = (payload.RoomName or "Room") .. " Store"
+		bookCount.Text = "Earn it, trade it, or rush it"
+	elseif mode == "Teleport" then
+		bookTitle.Text = "Teleport Key"
+		bookCount.Text = "Choose any opened room"
+	else
+		bookTitle.Text = (payload.RoomName or "Room") .. " Log"
+		bookCount.Text = ("%d / %d found"):format(payload.Count or 0, payload.Total or 0)
+	end
+
 	local secretDoor = payload.SecretDoor
 	local keyText = ""
 	if secretDoor then
 		keyText = secretDoor.HasKey and (" | Key: %s"):format(secretDoor.KeyName or "yes") or " | Key: no"
+	end
+	if payload.HasTeleportKey then
+		keyText ..= " | Teleport: yes"
 	end
 	hintCount.Text = ("Hints: %d | Clues: %d%s"):format(payload.Hints or 0, payload.Clues or 0, keyText)
 	hintText.Text = payload.HintText
@@ -1345,22 +1408,22 @@ local function renderReferenceBook(payload)
 	hintText.Visible = true
 	buyHintButton.Text = "Free\nHint"
 	if (Constants.NoTouch.ClueProductId or 0) > 0 then
-		buyClueButton.Text = ("Buy Clue\n%d R$"):format(Constants.NoTouch.ClueRobux or 0)
+		buyClueButton.Text = ("Buy Clue\n%d R$"):format(storePrices.ClueRobux or Constants.NoTouch.ClueRobux or 0)
 	else
-		buyClueButton.Text = "Buy Clue\nFree"
+		buyClueButton.Text = ("Test Buy\n%d R$"):format(storePrices.ClueRobux or Constants.NoTouch.ClueRobux or 0)
 	end
-	useHintButton.Text = ("Trade\n%d hints"):format(payload.ClueHintCost or Constants.NoTouch.ClueHintCost or 5)
+	useHintButton.Text = ("Trade\n%d hints"):format(payload.ClueHintCost or storePrices.ClueHintCost or Constants.NoTouch.ClueHintCost or 5)
 	if (Constants.NoTouch.HintPackProductId or 0) > 0 then
-		buyPackButton.Text = ("Buy Hints\n%d R$"):format(Constants.NoTouch.HintPackRobux or 0)
+		buyPackButton.Text = ("Buy Hints\n%d R$"):format(storePrices.HintPackRobux or Constants.NoTouch.HintPackRobux or 0)
 	else
-		buyPackButton.Text = "Buy Hints\nFree"
+		buyPackButton.Text = ("Test Buy\n%d R$"):format(storePrices.HintPackRobux or Constants.NoTouch.HintPackRobux or 0)
 	end
 	if (Constants.NoTouch.RevealProductId or 0) > 0 then
-		buyRevealButton.Text = ("Buy Reveal\n%d R$"):format(Constants.NoTouch.RevealRobux or 0)
+		buyRevealButton.Text = ("Buy Reveal\n%d R$"):format(storePrices.RevealRobux or Constants.NoTouch.RevealRobux or 0)
 	else
-		buyRevealButton.Text = "Buy Reveal\nFree"
+		buyRevealButton.Text = ("Test Buy\n%d R$"):format(storePrices.RevealRobux or Constants.NoTouch.RevealRobux or 0)
 	end
-	revealHintButton.Text = ("Trade\n%d clues"):format(payload.RevealClueCost or Constants.NoTouch.RevealClueCost or 3)
+	revealHintButton.Text = ("Trade\n%d clues"):format(payload.RevealClueCost or storePrices.RevealClueCost or Constants.NoTouch.RevealClueCost or 3)
 	secretDoorButton.Visible = secretDoor ~= nil
 	feedbackButton.Size = secretDoor and UDim2.new(0.5, -15, 0, 36) or UDim2.new(1, -20, 0, 36)
 	if secretDoor then
@@ -1371,7 +1434,7 @@ local function renderReferenceBook(payload)
 			secretDoorButton.TextColor3 = Color3.fromRGB(14, 40, 24)
 		elseif secretDoor.RoomComplete and secretDoor.HasKey == false then
 			activeSecretDoorAction = "BuySecretKey"
-			secretDoorButton.Text = ("Key\n%d clues"):format(secretDoor.KeyClueCost or Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3)
+			secretDoorButton.Text = ("Key\n%d clues"):format(secretDoor.KeyClueCost or storePrices.SecretKeyClueCost or Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3)
 			secretDoorButton.BackgroundColor3 = Color3.fromRGB(255, 198, 82)
 			secretDoorButton.TextColor3 = Color3.fromRGB(57, 38, 4)
 		elseif secretDoor.Visible then
@@ -1390,6 +1453,42 @@ local function renderReferenceBook(payload)
 	end
 
 	clearBookList()
+
+	if mode == "Store" then
+		local packSize = storePrices.HintPackSize or Constants.NoTouch.HintPackSize or 10
+		makeBookRow("Label", ("Hint Pack: %d hints | %d R$ target"):format(packSize, storePrices.HintPackRobux or Constants.NoTouch.HintPackRobux or 0), Color3.fromRGB(40, 58, 48), Color3.fromRGB(205, 255, 218), 1)
+		makeBookRow("Label", ("Clue: %d hints or %d R$ target"):format(storePrices.ClueHintCost or Constants.NoTouch.ClueHintCost or 5, storePrices.ClueRobux or Constants.NoTouch.ClueRobux or 0), Color3.fromRGB(36, 58, 76), Color3.fromRGB(190, 226, 255), 2)
+		makeBookRow("Label", ("Reveal: %d clues or %d R$ target"):format(storePrices.RevealClueCost or Constants.NoTouch.RevealClueCost or 3, storePrices.RevealRobux or Constants.NoTouch.RevealRobux or 0), Color3.fromRGB(88, 66, 24), Color3.fromRGB(255, 232, 143), 3)
+		makeBookRow("Label", ("Library Key rush: %d clues after the room is complete"):format(storePrices.SecretKeyClueCost or Constants.NoTouch.SecretKeyClueCost or 3), Color3.fromRGB(65, 50, 83), Color3.fromRGB(232, 216, 255), 4)
+		makeBookRow("Button", ("Teleport Key: find in loft, or rush for %d clues / %d R$ target"):format(storePrices.TeleportKeyClueCost or Constants.NoTouch.TeleportKeyClueCost or 3, storePrices.TeleportKeyRobux or Constants.NoTouch.TeleportKeyRobux or 5), Color3.fromRGB(32, 70, 72), Color3.fromRGB(194, 255, 246), 5, function()
+			if activeBookRoomId then
+				hintPackRemote:FireServer({
+					Action = "BuyTeleportKey",
+					RoomId = activeBookRoomId,
+				})
+			end
+		end)
+		bookList.CanvasSize = UDim2.fromOffset(0, listLayout.AbsoluteContentSize.Y + 16)
+		return
+	elseif mode == "Teleport" then
+		for index, room in ipairs(payload.TeleportRooms or {}) do
+			makeBookRow("Button", room.Name or room.RoomId or "Room", Color3.fromRGB(32, 76, 68), Color3.fromRGB(205, 255, 238), index, function()
+				if activeBookRoomId and room.RoomId then
+					hintPackRemote:FireServer({
+						Action = "TeleportRoom",
+						RoomId = activeBookRoomId,
+						TargetRoomId = room.RoomId,
+					})
+					closeReferenceBook()
+				end
+			end)
+		end
+		if #(payload.TeleportRooms or {}) == 0 then
+			makeBookRow("Label", "No opened rooms yet.", Color3.fromRGB(40, 43, 50), Color3.fromRGB(225, 230, 238), 1)
+		end
+		bookList.CanvasSize = UDim2.fromOffset(0, listLayout.AbsoluteContentSize.Y + 16)
+		return
+	end
 
 	for index, entry in ipairs(payload.Discoveries or {}) do
 		local isSecret = entry.Secret == true
@@ -1417,28 +1516,7 @@ local function renderReferenceBook(payload)
 			rowTextColor = Color3.fromRGB(190, 226, 255)
 		end
 
-		local row = Instance.new("TextLabel")
-		row.Name = "DiscoveryRow"
-		row.BackgroundColor3 = rowBackground
-		row.BackgroundTransparency = 0.08
-		row.BorderSizePixel = 0
-		row.Font = Enum.Font.GothamBold
-		row.LayoutOrder = index
-		row.Size = UDim2.new(1, 0, 0, 38)
-		row.Text = rowText
-		row.TextColor3 = rowTextColor
-		row.TextScaled = true
-		row.TextXAlignment = Enum.TextXAlignment.Left
-		row.Parent = bookList
-
-		local rowPadding = Instance.new("UIPadding")
-		rowPadding.PaddingLeft = UDim.new(0, 8)
-		rowPadding.PaddingRight = UDim.new(0, 8)
-		rowPadding.Parent = row
-
-		local rowCorner = Instance.new("UICorner")
-		rowCorner.CornerRadius = UDim.new(0, 5)
-		rowCorner.Parent = row
+		makeBookRow("Label", rowText, rowBackground, rowTextColor, index)
 	end
 
 	bookList.CanvasSize = UDim2.fromOffset(0, listLayout.AbsoluteContentSize.Y + 16)
