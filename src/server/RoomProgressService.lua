@@ -152,7 +152,7 @@ function RoomProgressService:GetRoomForPlayer(player)
 		return nil
 	end
 
-	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
+	for _, roomId in ipairs(Constants.RoomDetectionOrder or Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 		local room = Constants.GetRoom(roomId)
 		if room and positionInZone(rootPart.Position, room.Zone) then
 			return roomId
@@ -419,6 +419,8 @@ function RoomProgressService:_tickPlayer(player, now)
 
 		if roomId == "Island" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
+		elseif roomId == "TreetopZipline" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.TreetopZiplineEntered.Id)
 		elseif roomId == "SpaceStation" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationEntered.Id)
 		elseif roomId == "Void" then

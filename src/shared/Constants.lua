@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.50"
+Constants.BuildVersion = "0.5.51"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -573,6 +573,11 @@ Constants.Discoveries = {
 		Name = "Left the Bowling Alley Alone",
 		Hint = "Stand in the Bowling Alley for two minutes without interacting with anything.",
 	},
+	TreetopZiplineEntered = {
+		Id = "treetop_zipline_entered",
+		Name = "Reached the Treetop Zipline",
+		Hint = "Look behind the bowling pin machinery for a very vertical shortcut.",
+	},
 	VoidEntered = {
 		Id = "void_entered",
 		Name = "Stopped in the Void",
@@ -693,6 +698,9 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.BowlingBallReturn.Id,
 		Constants.Discoveries.BowlingNoTouch.Id,
 	},
+	TreetopZipline = {
+		Constants.Discoveries.TreetopZiplineEntered.Id,
+	},
 	Void = {
 		Constants.Discoveries.VoidEntered.Id,
 		Constants.Discoveries.VoidReverseControls.Id,
@@ -758,6 +766,18 @@ Constants.DiscoveryRoomOrder = {
 	"Island",
 	"Library",
 	"BowlingAlley",
+	"TreetopZipline",
+	"Void",
+	"SpaceStation",
+}
+
+Constants.RoomDetectionOrder = {
+	"TVRoom",
+	"SnackLab",
+	"Island",
+	"Library",
+	"TreetopZipline",
+	"BowlingAlley",
 	"Void",
 	"SpaceStation",
 }
@@ -765,6 +785,7 @@ Constants.DiscoveryRoomOrder = {
 Constants.RoomResumeDiscoveries = {
 	Library = Constants.Discoveries.LibraryEntered.Id,
 	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
+	TreetopZipline = Constants.Discoveries.TreetopZiplineEntered.Id,
 	Void = Constants.Discoveries.VoidEntered.Id,
 	SpaceStation = Constants.Discoveries.SpaceStationEntered.Id,
 }
@@ -834,6 +855,16 @@ Constants.Rooms = {
 		Zone = {
 			Min = Vector3.new(-36, -3, -252),
 			Max = Vector3.new(8, 42, -80),
+		},
+	},
+	TreetopZipline = {
+		Id = "TreetopZipline",
+		Name = "Treetop Zipline",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.TreetopZipline,
+		SpawnCFrame = CFrame.new(Vector3.new(-14, 29, -220), Vector3.new(-7, 29, -240)),
+		Zone = {
+			Min = Vector3.new(-40, 20, -250),
+			Max = Vector3.new(12, 80, -190),
 		},
 	},
 	Void = {
@@ -930,6 +961,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.BowlingShoes.Id] = Constants.Tags.BowlingShoeRack,
 	[Constants.Discoveries.BowlingScoreboard.Id] = Constants.Tags.BowlingScoreboard,
 	[Constants.Discoveries.BowlingBallReturn.Id] = Constants.Tags.BowlingBallReturn,
+	[Constants.Discoveries.TreetopZiplineEntered.Id] = Constants.Tags.SecretRoomExit,
 	[Constants.Discoveries.VoidEntered.Id] = Constants.Tags.TreetopZipline,
 	[Constants.Discoveries.VoidReverseControls.Id] = Constants.Tags.VoidReverseConsole,
 	[Constants.Discoveries.VoidGravityFlip.Id] = Constants.Tags.VoidGravityOrb,

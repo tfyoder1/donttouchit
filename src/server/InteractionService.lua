@@ -1379,8 +1379,13 @@ function InteractionService:_wireSecretRoomExit(exitDoor)
 		end
 
 		teleportPlayer(player, destinationCFrame)
+		local unlockDiscoveryId = exitDoor:GetAttribute("UnlockDiscoveryId")
+		if typeof(unlockDiscoveryId) == "string" then
+			self.discoveryService:Unlock(player, unlockDiscoveryId)
+		end
 		local destinationName = exitDoor:GetAttribute("DestinationName") or "the TV Room"
-		self.systemMessageRemote:FireClient(player, ("Back to %s. Act natural."):format(destinationName))
+		local travelMessage = exitDoor:GetAttribute("TravelMessage")
+		self.systemMessageRemote:FireClient(player, typeof(travelMessage) == "string" and travelMessage or ("Back to %s. Act natural."):format(destinationName))
 	end)
 end
 
