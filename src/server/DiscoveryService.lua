@@ -1273,11 +1273,44 @@ function DiscoveryService:GetFreeHint(player, roomId)
 		targetText = "the floor"
 	elseif targetTag == Constants.Tags.ReferenceBook then
 		targetText = "the room log"
+	elseif targetTag == Constants.Tags.LightSwitch or targetTag == Constants.Tags.TVLightSwitch then
+		targetText = "the light switch"
+	elseif targetTag == Constants.Tags.IslandExit then
+		targetText = "the water edge, not the hallway door"
+	elseif targetTag == Constants.Tags.IslandSharkSign then
+		targetText = "the shark warning sign"
+	elseif targetTag == Constants.Tags.IslandJellyfishSign then
+		targetText = "the jellyfish warning sign"
+	elseif targetTag == Constants.Tags.IslandShovel then
+		targetText = "the shovel"
+	elseif targetTag == Constants.Tags.IslandTreasure then
+		targetText = "the treasure box"
+	elseif targetTag == Constants.Tags.IslandBloxyCola then
+		targetText = "the cola in the treasure box"
+	elseif targetTag == Constants.Tags.IslandCoconut then
+		targetText = "one of the coconuts"
+	elseif targetTag == Constants.Tags.IslandCoconutTree then
+		targetText = "one of the palm trees"
+	elseif targetTag == Constants.Tags.IslandScrapWood then
+		targetText = "the scrap wood near the shore"
+	elseif targetTag == Constants.Tags.IslandFireRing then
+		targetText = "the rock ring near the island center"
+	elseif targetTag == Constants.Tags.SpaceStationAirlock then
+		targetText = "the airlock"
+	elseif targetTag == Constants.Tags.SpaceStationGravityDial then
+		targetText = "the gravity dial"
+	elseif targetTag == Constants.Tags.SpaceStationObservationWindow then
+		targetText = "the observation window"
+	elseif targetTag == Constants.Tags.SpaceStationFoodPrinter then
+		targetText = "the food printer"
+	elseif targetTag == Constants.Tags.SpaceStationStarMap then
+		targetText = "the star map controls"
 	elseif targetTag then
 		targetText = "one suspicious object"
 	end
 
-	return ("Free hint: %s still has something left to give."):format(targetText), nil
+	local hint = nextDiscovery.Hint or "It still has something left to give."
+	return ("Free hint: Try %s. %s"):format(targetText, hint), nil
 end
 
 function DiscoveryService:GetPaidHintText(player, roomId)

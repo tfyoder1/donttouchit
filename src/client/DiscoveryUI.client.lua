@@ -260,8 +260,8 @@ bookList.BackgroundTransparency = 0.16
 bookList.BorderSizePixel = 0
 bookList.CanvasSize = UDim2.fromOffset(0, 0)
 bookList.ScrollBarThickness = 6
-bookList.Position = UDim2.fromOffset(18, 294)
-bookList.Size = UDim2.new(1, -36, 1, -312)
+bookList.Position = UDim2.fromOffset(18, 334)
+bookList.Size = UDim2.new(1, -36, 1, -352)
 bookList.Parent = bookPanel
 
 local listCorner = Instance.new("UICorner")
@@ -286,7 +286,7 @@ hintTray.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 hintTray.BackgroundTransparency = 0.08
 hintTray.BorderSizePixel = 0
 hintTray.Position = UDim2.fromOffset(18, 84)
-hintTray.Size = UDim2.new(1, -36, 0, 198)
+hintTray.Size = UDim2.new(1, -36, 0, 238)
 hintTray.Parent = bookPanel
 
 local hintTrayCorner = Instance.new("UICorner")
@@ -352,7 +352,7 @@ useHintButton.Name = "Clue"
 useHintButton.BackgroundColor3 = Color3.fromRGB(84, 154, 255)
 useHintButton.BorderSizePixel = 0
 useHintButton.Font = Enum.Font.GothamBlack
-useHintButton.Position = UDim2.new(0.5, 5, 0, 70)
+useHintButton.Position = UDim2.new(0, 10, 0, 112)
 useHintButton.Size = UDim2.new(0.5, -15, 0, 36)
 useHintButton.Text = if Constants.NoTouch.ClueProductId > 0
 	then ("Clue\n%d R$"):format(Constants.NoTouch.ClueRobux)
@@ -366,12 +366,31 @@ local useCorner = Instance.new("UICorner")
 useCorner.CornerRadius = UDim.new(0, 6)
 useCorner.Parent = useHintButton
 
+local buyPackButton = Instance.new("TextButton")
+buyPackButton.Name = "BuyPack"
+buyPackButton.BackgroundColor3 = Color3.fromRGB(35, 93, 58)
+buyPackButton.BorderSizePixel = 0
+buyPackButton.Font = Enum.Font.GothamBlack
+buyPackButton.Position = UDim2.new(0.5, 5, 0, 70)
+buyPackButton.Size = UDim2.new(0.5, -15, 0, 36)
+buyPackButton.Text = if Constants.NoTouch.HintPackProductId > 0
+	then ("Buy Hints\n%d R$"):format(Constants.NoTouch.HintPackRobux)
+	else "Buy Hints\nFree"
+buyPackButton.TextColor3 = Color3.fromRGB(214, 255, 226)
+buyPackButton.TextScaled = true
+buyPackButton.TextWrapped = true
+buyPackButton.Parent = hintTray
+
+local buyPackCorner = Instance.new("UICorner")
+buyPackCorner.CornerRadius = UDim.new(0, 6)
+buyPackCorner.Parent = buyPackButton
+
 local revealHintButton = Instance.new("TextButton")
 revealHintButton.Name = "Reveal"
 revealHintButton.BackgroundColor3 = Color3.fromRGB(255, 198, 82)
 revealHintButton.BorderSizePixel = 0
 revealHintButton.Font = Enum.Font.GothamBlack
-revealHintButton.Position = UDim2.new(0, 10, 0, 112)
+revealHintButton.Position = UDim2.new(0, 10, 0, 154)
 revealHintButton.Size = UDim2.new(0.5, -15, 0, 36)
 revealHintButton.Text = if Constants.NoTouch.RevealProductId > 0
 	then ("Reveal\n%d R$"):format(Constants.NoTouch.RevealRobux)
@@ -385,12 +404,50 @@ local revealCorner = Instance.new("UICorner")
 revealCorner.CornerRadius = UDim.new(0, 6)
 revealCorner.Parent = revealHintButton
 
+local buyClueButton = Instance.new("TextButton")
+buyClueButton.Name = "BuyClue"
+buyClueButton.BackgroundColor3 = Color3.fromRGB(38, 78, 133)
+buyClueButton.BorderSizePixel = 0
+buyClueButton.Font = Enum.Font.GothamBlack
+buyClueButton.Position = UDim2.new(0.5, 5, 0, 112)
+buyClueButton.Size = UDim2.new(0.5, -15, 0, 36)
+buyClueButton.Text = if Constants.NoTouch.ClueProductId > 0
+	then ("Buy Clue\n%d R$"):format(Constants.NoTouch.ClueRobux)
+	else "Buy Clue\nFree"
+buyClueButton.TextColor3 = Color3.fromRGB(218, 236, 255)
+buyClueButton.TextScaled = true
+buyClueButton.TextWrapped = true
+buyClueButton.Parent = hintTray
+
+local buyClueCorner = Instance.new("UICorner")
+buyClueCorner.CornerRadius = UDim.new(0, 6)
+buyClueCorner.Parent = buyClueButton
+
+local buyRevealButton = Instance.new("TextButton")
+buyRevealButton.Name = "BuyReveal"
+buyRevealButton.BackgroundColor3 = Color3.fromRGB(124, 87, 32)
+buyRevealButton.BorderSizePixel = 0
+buyRevealButton.Font = Enum.Font.GothamBlack
+buyRevealButton.Position = UDim2.new(0.5, 5, 0, 154)
+buyRevealButton.Size = UDim2.new(0.5, -15, 0, 36)
+buyRevealButton.Text = if Constants.NoTouch.RevealProductId > 0
+	then ("Buy Reveal\n%d R$"):format(Constants.NoTouch.RevealRobux)
+	else "Buy Reveal\nFree"
+buyRevealButton.TextColor3 = Color3.fromRGB(255, 238, 196)
+buyRevealButton.TextScaled = true
+buyRevealButton.TextWrapped = true
+buyRevealButton.Parent = hintTray
+
+local buyRevealCorner = Instance.new("UICorner")
+buyRevealCorner.CornerRadius = UDim.new(0, 6)
+buyRevealCorner.Parent = buyRevealButton
+
 local secretDoorButton = Instance.new("TextButton")
 secretDoorButton.Name = "SecretDoorReveal"
 secretDoorButton.BackgroundColor3 = Color3.fromRGB(150, 112, 255)
 secretDoorButton.BorderSizePixel = 0
 secretDoorButton.Font = Enum.Font.GothamBlack
-secretDoorButton.Position = UDim2.new(0.5, 5, 0, 112)
+secretDoorButton.Position = UDim2.new(0.5, 5, 0, 196)
 secretDoorButton.Size = UDim2.new(0.5, -15, 0, 36)
 secretDoorButton.Text = "Secret\nDoor"
 secretDoorButton.TextColor3 = Color3.fromRGB(242, 236, 255)
@@ -408,8 +465,8 @@ feedbackButton.Name = "Feedback"
 feedbackButton.BackgroundColor3 = Color3.fromRGB(15, 52, 34)
 feedbackButton.BorderSizePixel = 0
 feedbackButton.Font = Enum.Font.GothamBlack
-feedbackButton.Position = UDim2.new(0, 10, 0, 154)
-feedbackButton.Size = UDim2.new(1, -20, 0, 34)
+feedbackButton.Position = UDim2.new(0, 10, 0, 196)
+feedbackButton.Size = UDim2.new(0.5, -15, 0, 36)
 feedbackButton.Text = "Feedback / Request"
 feedbackButton.TextColor3 = Color3.fromRGB(136, 255, 178)
 feedbackButton.TextScaled = true
@@ -1009,17 +1066,26 @@ local function renderReferenceBook(payload)
 		or payload.StatusText
 		or "Free hint, trade 5 hints for a clue, or trade 3 clues for a reveal."
 	hintText.Visible = true
+	buyHintButton.Text = "Free\nHint"
 	if (Constants.NoTouch.ClueProductId or 0) > 0 then
-		useHintButton.Text = ("Clue\n%d R$"):format(Constants.NoTouch.ClueRobux or 0)
+		buyClueButton.Text = ("Buy Clue\n%d R$"):format(Constants.NoTouch.ClueRobux or 0)
 	else
-		useHintButton.Text = ("Clue\n%d hints"):format(payload.ClueHintCost or Constants.NoTouch.ClueHintCost or 5)
+		buyClueButton.Text = "Buy Clue\nFree"
+	end
+	useHintButton.Text = ("Trade\n%d hints"):format(payload.ClueHintCost or Constants.NoTouch.ClueHintCost or 5)
+	if (Constants.NoTouch.HintPackProductId or 0) > 0 then
+		buyPackButton.Text = ("Buy Hints\n%d R$"):format(Constants.NoTouch.HintPackRobux or 0)
+	else
+		buyPackButton.Text = "Buy Hints\nFree"
 	end
 	if (Constants.NoTouch.RevealProductId or 0) > 0 then
-		revealHintButton.Text = ("Reveal\n%d R$"):format(Constants.NoTouch.RevealRobux or 0)
+		buyRevealButton.Text = ("Buy Reveal\n%d R$"):format(Constants.NoTouch.RevealRobux or 0)
 	else
-		revealHintButton.Text = ("Reveal\n%d clues"):format(payload.RevealClueCost or Constants.NoTouch.RevealClueCost or 3)
+		buyRevealButton.Text = "Buy Reveal\nFree"
 	end
+	revealHintButton.Text = ("Trade\n%d clues"):format(payload.RevealClueCost or Constants.NoTouch.RevealClueCost or 3)
 	secretDoorButton.Visible = secretDoor ~= nil
+	feedbackButton.Size = secretDoor and UDim2.new(0.5, -15, 0, 36) or UDim2.new(1, -20, 0, 36)
 	if secretDoor then
 		activeSecretDoorAction = "RevealSecretDoor"
 		if secretDoor.CanOpen then
@@ -1124,6 +1190,15 @@ buyHintButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+buyPackButton.MouseButton1Click:Connect(function()
+	if activeBookRoomId then
+		hintPackRemote:FireServer({
+			Action = "BuyPack",
+			RoomId = activeBookRoomId,
+		})
+	end
+end)
+
 useHintButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
@@ -1133,10 +1208,28 @@ useHintButton.MouseButton1Click:Connect(function()
 	end
 end)
 
+buyClueButton.MouseButton1Click:Connect(function()
+	if activeBookRoomId then
+		hintPackRemote:FireServer({
+			Action = "BuyClue",
+			RoomId = activeBookRoomId,
+		})
+	end
+end)
+
 revealHintButton.MouseButton1Click:Connect(function()
 	if activeBookRoomId then
 		hintPackRemote:FireServer({
 			Action = "Reveal",
+			RoomId = activeBookRoomId,
+		})
+	end
+end)
+
+buyRevealButton.MouseButton1Click:Connect(function()
+	if activeBookRoomId then
+		hintPackRemote:FireServer({
+			Action = "BuyReveal",
 			RoomId = activeBookRoomId,
 		})
 	end

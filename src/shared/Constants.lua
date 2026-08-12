@@ -1,8 +1,9 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.32"
+Constants.BuildVersion = "0.5.33"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
+Constants.SpaceStationGravity = 24
 Constants.EventDuration = 10
 Constants.EventCooldown = 2.5
 
@@ -321,7 +322,7 @@ Constants.Discoveries = {
 	SharkBounce = {
 		Id = "shark_bounce",
 		Name = "Survived the Shark Attack",
-		Hint = "Try leaving the island three times before every island discovery is complete.",
+		Hint = "Walk toward the ocean edge three times. The hallway door is not the dangerous exit.",
 	},
 	ReadSharkWarning = {
 		Id = "read_shark_warning",
@@ -351,7 +352,7 @@ Constants.Discoveries = {
 	IslandCoconutCrab = {
 		Id = "island_coconut_crab",
 		Name = "Met the Coconut Crab",
-		Hint = "One coconut on the island is hiding something with tiny legs.",
+		Hint = "Inspect the ground coconut near the back-left side of the island.",
 	},
 	IslandDroppedCoconut = {
 		Id = "island_dropped_coconut",
@@ -371,7 +372,7 @@ Constants.Discoveries = {
 	IslandSeagulls = {
 		Id = "island_seagulls",
 		Name = "Summoned Seagulls",
-		Hint = "One ground coconut has nothing inside, but plenty to say to the sky.",
+		Hint = "Inspect the quieter ground coconut near the right side of the island.",
 	},
 	IslandNoTouch = {
 		Id = "island_no_touch",
@@ -381,7 +382,7 @@ Constants.Discoveries = {
 	SpaceStationEntered = {
 		Id = "space_station_entered",
 		Name = "Reached the Space Station",
-		Hint = "The island has a hidden way upward.",
+		Hint = "Climb a palm tree, bonk the hidden block above it, then use the ladder upward.",
 	},
 	SpaceStationAirlock = {
 		Id = "space_station_airlock",
@@ -396,7 +397,7 @@ Constants.Discoveries = {
 	SpaceStationObservationWindow = {
 		Id = "space_station_observation_window",
 		Name = "Stared Into Space",
-		Hint = "The big window is showing off.",
+		Hint = "Look through the big station window and let the star field drift.",
 	},
 	SpaceStationCommsPanel = {
 		Id = "space_station_comms_panel",
@@ -406,7 +407,7 @@ Constants.Discoveries = {
 	SpaceStationFoodPrinter = {
 		Id = "space_station_food_printer",
 		Name = "Printed Space Food",
-		Hint = "The food printer is making lunch out of geometry.",
+		Hint = "Use the food printer and watch the tray on top.",
 	},
 	SpaceStationSuit = {
 		Id = "space_station_suit",
@@ -416,7 +417,7 @@ Constants.Discoveries = {
 	SpaceStationStarMap = {
 		Id = "space_station_star_map",
 		Name = "Rearranged the Star Map",
-		Hint = "The glowing star map is not nailed down emotionally.",
+		Hint = "Use the control panel below the floating star map.",
 	},
 	SpaceStationPlantPod = {
 		Id = "space_station_plant_pod",

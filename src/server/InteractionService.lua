@@ -706,7 +706,7 @@ function InteractionService:Initialize()
 	end)
 
 	self:_connectTagged(Constants.Tags.SpaceStationObservationWindow, function(instance)
-		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SpaceStationObservationWindow.Id, "Space stares back, then politely blinks never.")
+		self:_wireSpaceStationObservationWindow(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.SpaceStationCommsPanel, function(instance)
@@ -3984,8 +3984,8 @@ end
 function InteractionService:_spawnIslandJellyfishBalloon(source)
 	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
 	local startZ = math.clamp(sourcePosition.Z + 2, 142, 164)
-	local start = Vector3.new(27, 12.5, startZ + 8)
-	local finish = Vector3.new(-27, 9.5, startZ)
+	local start = Vector3.new(29, 12.5, startZ + 8)
+	local finish = Vector3.new(-29, 9.5, startZ)
 	local jellyModel = Instance.new("Model")
 	jellyModel.Name = "IslandJellyfishBalloon"
 	jellyModel.Parent = workspace
@@ -4053,8 +4053,8 @@ function InteractionService:_spawnIslandJellyfishBalloon(source)
 
 	for tentacleIndex = 1, 8 do
 		local angle = (tentacleIndex - 1) * math.pi * 2 / 8
-		local rootX = math.cos(angle) * 0.52
-		local rootZ = math.sin(angle) * 0.52
+		local rootX = math.cos(angle) * 0.34
+		local rootZ = math.sin(angle) * 0.34
 
 		for segment = 1, 3 do
 			local length = 0.86 + segment * 0.2 + (tentacleIndex % 2) * 0.12
@@ -4153,7 +4153,7 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 	end
 
 	local attackPoint = Vector3.new(20, 2.0, 142.5)
-	local targetCFrame = CFrame.new(attackPoint, Vector3.new(0, 2.0, 150))
+	local targetCFrame = CFrame.new(attackPoint, Vector3.new(0, 2.0, 150)) * CFrame.Angles(0, math.rad(90), 0)
 	local baseCFrame = targetCFrame * CFrame.new(0, -4.8, 11)
 	local body = makeSharkPart("SharkBody", "Part", Vector3.new(4.1, 3.2, 11.5), baseCFrame, Color3.fromRGB(89, 103, 116))
 	body.Shape = Enum.PartType.Ball
@@ -4232,46 +4232,10 @@ end
 
 function InteractionService:_wireIslandExit(exitGate)
 	local prompt = getPrompt(exitGate)
+	local exitMode = exitGate:GetAttribute("ExitMode") or "Ocean"
 
-	local function attemptLeave(player)
+	local function returnToHallway(player)
 		if not player or not player.Parent then
-			return
-		end
-
-		local requiredCount = self:_getIslandExitRequiredCount()
-		local currentCount = self.discoveryService:GetRoomDiscoveryCount(player, "Island")
-
-		if currentCount < requiredCount then
-			local now = os.clock()
-			if now - (self.islandExitBounceAtByUserId[player.UserId] or 0) < 0.8 then
-				return
-			end
-
-			self.islandExitBounceAtByUserId[player.UserId] = now
-			local warningCount = (self.islandExitWarningsByUserId[player.UserId] or 0) + 1
-			self.islandExitWarningsByUserId[player.UserId] = warningCount
-
-			if warningCount < 3 then
-				local remainingWarnings = 3 - warningCount
-				self.systemMessageRemote:FireClient(
-					player,
-					("Warning %d/3: something large is objecting to early checkout. Find %d island discoveries first. You have %d."):format(
-						warningCount,
-						requiredCount,
-						currentCount
-					)
-				)
-				if remainingWarnings == 1 then
-					playSound(exitGate, "rbxasset://sounds/electronicpingshort.wav", 0.55, 0.45)
-				else
-					playSound(exitGate, "rbxasset://sounds/button.wav", 0.45, 0.6)
-				end
-			else
-				self.islandExitWarningsByUserId[player.UserId] = 0
-				self.discoveryService:Unlock(player, Constants.Discoveries.SharkBounce.Id)
-				self:_spawnIslandShark(exitGate, player)
-				self.systemMessageRemote:FireClient(player, "Third warning: the exit shark has filed a physical complaint.")
-			end
 			return
 		end
 
@@ -4281,14 +4245,57 @@ function InteractionService:_wireIslandExit(exitGate)
 		self.systemMessageRemote:FireClient(player, "The island lets you return to the hallway.")
 	end
 
-	self:_connectPrompt(prompt, attemptLeave)
+	local function attemptOceanExit(player)
+		if not player or not player.Parent then
+			return
+		end
+
+		local now = os.clock()
+		if now - (self.islandExitBounceAtByUserId[player.UserId] or 0) < 0.8 then
+			return
+		end
+
+		self.islandExitBounceAtByUserId[player.UserId] = now
+		local warningCount = (self.islandExitWarningsByUserId[player.UserId] or 0) + 1
+		self.islandExitWarningsByUserId[player.UserId] = warningCount
+		local requiredCount = self:_getIslandExitRequiredCount()
+		local currentCount = self.discoveryService:GetRoomDiscoveryCount(player, "Island")
+
+		if warningCount < 3 then
+			local remainingWarnings = 3 - warningCount
+			self.systemMessageRemote:FireClient(
+				player,
+				("Ocean warning %d/3: swim lessons are not included. Island discoveries: %d / %d."):format(
+					warningCount,
+					currentCount,
+					requiredCount
+				)
+			)
+			if remainingWarnings == 1 then
+				playSound(exitGate, "rbxasset://sounds/electronicpingshort.wav", 0.55, 0.45)
+			else
+				playSound(exitGate, "rbxasset://sounds/button.wav", 0.45, 0.6)
+			end
+			return
+		end
+
+		self.islandExitWarningsByUserId[player.UserId] = 0
+		self.discoveryService:Unlock(player, Constants.Discoveries.SharkBounce.Id)
+		self:_spawnIslandShark(exitGate, player)
+		self.systemMessageRemote:FireClient(player, "Third ocean warning: the land shark disagrees with your travel plan.")
+	end
+
+	if exitMode == "Door" then
+		self:_connectPrompt(prompt, returnToHallway)
+		return
+	end
 
 	if exitGate:IsA("BasePart") and not self.islandExitTouchConnections[exitGate] then
 		self.islandExitTouchConnections[exitGate] = exitGate.Touched:Connect(function(hit)
 			local character = hit:FindFirstAncestorOfClass("Model")
 			local player = character and Players:GetPlayerFromCharacter(character)
 			if player then
-				attemptLeave(player)
+				attemptOceanExit(player)
 			end
 		end)
 	end
@@ -4514,7 +4521,9 @@ function InteractionService:_findIslandCoconutById(coconutId)
 end
 
 function InteractionService:_spawnIslandCoconutCrab(coconut)
-	local start = coconut.Position + Vector3.new(0, -0.2, 0)
+	local start = coconut.Position + Vector3.new(0, -0.16, 0)
+	local targetCoconut = self:_findIslandCoconutById("quiet_coconut") or self:_findIslandCoconutById("dropped_palm_coconut")
+	local finish = targetCoconut and targetCoconut.Position + Vector3.new(0, -0.2, 0) or (start + Vector3.new(4.5, 0, 0.6))
 	local crab = Instance.new("Model")
 	crab.Name = "IslandCoconutCrab"
 	crab.Parent = workspace
@@ -4538,19 +4547,29 @@ function InteractionService:_spawnIslandCoconutCrab(coconut)
 		return part
 	end
 
-	local baseCFrame = CFrame.new(start + Vector3.new(0, 0.08, 0), start + Vector3.new(1, 0, 0))
-	local body = makeCrabPart("CrabBody", Vector3.new(1.25, 0.45, 0.9), baseCFrame, Color3.fromRGB(181, 82, 41), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-	makeCrabPart("CrabLeftClaw", Vector3.new(0.38, 0.26, 0.52), baseCFrame * CFrame.new(0.72, 0.08, -0.42) * CFrame.Angles(0, math.rad(16), math.rad(18)), Color3.fromRGB(220, 98, 48), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-	makeCrabPart("CrabRightClaw", Vector3.new(0.38, 0.26, 0.52), baseCFrame * CFrame.new(0.72, 0.08, 0.42) * CFrame.Angles(0, math.rad(-16), math.rad(-18)), Color3.fromRGB(220, 98, 48), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-	makeCrabPart("CrabLeftEye", Vector3.new(0.16, 0.16, 0.16), baseCFrame * CFrame.new(0.34, 0.32, -0.22), Color3.fromRGB(12, 12, 14), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-	makeCrabPart("CrabRightEye", Vector3.new(0.16, 0.16, 0.16), baseCFrame * CFrame.new(0.34, 0.32, 0.22), Color3.fromRGB(12, 12, 14), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	local direction = finish - start
+	if direction.Magnitude < 1 then
+		direction = Vector3.new(1, 0, 0)
+	end
+
+	local baseCFrame = CFrame.new(start + Vector3.new(0, 0.24, 0), start + direction)
+	local body = makeCrabPart("CrabBody", Vector3.new(1.35, 0.48, 0.96), baseCFrame, Color3.fromRGB(181, 82, 41), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	body:SetAttribute("CrabOffset", body.CFrame)
+	crab.PrimaryPart = body
+	makeCrabPart("CrabFrontShell", Vector3.new(0.64, 0.32, 0.72), baseCFrame * CFrame.new(0.48, 0.02, 0), Color3.fromRGB(220, 104, 52), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabLeftClaw", Vector3.new(0.46, 0.3, 0.58), baseCFrame * CFrame.new(0.88, 0.04, -0.48) * CFrame.Angles(0, math.rad(16), math.rad(18)), Color3.fromRGB(225, 105, 50), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabRightClaw", Vector3.new(0.46, 0.3, 0.58), baseCFrame * CFrame.new(0.88, 0.04, 0.48) * CFrame.Angles(0, math.rad(-16), math.rad(-18)), Color3.fromRGB(225, 105, 50), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabLeftEyeStem", Vector3.new(0.08, 0.28, 0.08), baseCFrame * CFrame.new(0.35, 0.34, -0.22), Color3.fromRGB(120, 48, 28), Enum.Material.SmoothPlastic)
+	makeCrabPart("CrabRightEyeStem", Vector3.new(0.08, 0.28, 0.08), baseCFrame * CFrame.new(0.35, 0.34, 0.22), Color3.fromRGB(120, 48, 28), Enum.Material.SmoothPlastic)
+	makeCrabPart("CrabLeftEye", Vector3.new(0.17, 0.17, 0.17), baseCFrame * CFrame.new(0.35, 0.52, -0.22), Color3.fromRGB(12, 12, 14), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+	makeCrabPart("CrabRightEye", Vector3.new(0.17, 0.17, 0.17), baseCFrame * CFrame.new(0.35, 0.52, 0.22), Color3.fromRGB(12, 12, 14), Enum.Material.SmoothPlastic, Enum.PartType.Ball)
 
 	for sideIndex, sideZ in ipairs({ -0.46, -0.25, 0.25, 0.46 }) do
 		local side = sideZ < 0 and -1 or 1
 		local leg = makeCrabPart(
 			"CrabLeg" .. sideIndex,
-			Vector3.new(0.62, 0.12, 0.12),
-			baseCFrame * CFrame.new(-0.18, -0.12, sideZ) * CFrame.Angles(0, 0, math.rad(18 * side)),
+			Vector3.new(0.72, 0.12, 0.12),
+			baseCFrame * CFrame.new(-0.12, -0.1, sideZ) * CFrame.Angles(0, 0, math.rad(20 * side)),
 			Color3.fromRGB(194, 86, 42),
 			Enum.Material.SmoothPlastic
 		)
@@ -4567,35 +4586,49 @@ function InteractionService:_spawnIslandCoconutCrab(coconut)
 			if coconut.Parent then
 				tweenPart(coconut, 0.16, { CFrame = base }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 			end
-		end)
-	end
+			end)
+		end
 
-	for step = 1, 5 do
-		task.delay((step - 1) * 0.18, function()
+	task.spawn(function()
+		for step = 1, 4 do
 			if not crab.Parent then
 				return
 			end
 
-			local offset = Vector3.new(step * 0.72, math.sin(step) * 0.05, math.sin(step * 1.7) * 0.22)
+			local alpha = step / 4
+			local stepPosition = start:Lerp(finish, alpha) + Vector3.new(0, math.sin(step * math.pi) * 0.18, math.sin(step * 1.3) * 0.35)
+			local nextPosition = start:Lerp(finish, math.min(1, alpha + 0.16))
+			local stepCFrame = CFrame.new(stepPosition + Vector3.new(0, 0.24, 0), nextPosition + Vector3.new(0, 0.24, 0))
 			for _, part in ipairs(crab:GetChildren()) do
-				if part:IsA("BasePart") then
-					local legSide = part:GetAttribute("LegSide") or 0
-					tweenPart(part, 0.16, {
-						CFrame = part.CFrame + offset + Vector3.new(0, 0, legSide * 0.08 * ((step % 2 == 0) and 1 or -1)),
+				if part:IsA("BasePart") and part:GetAttribute("LegSide") then
+					local legSide = part:GetAttribute("LegSide")
+					tweenPart(part, 0.12, {
+						CFrame = part.CFrame * CFrame.Angles(0, 0, math.rad(18 * legSide * ((step % 2 == 0) and 1 or -1))),
 					}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 				end
 			end
-		end)
-	end
+			tweenModel(crab, stepCFrame, 0.24)
+		end
 
-	task.delay(2.2, function()
+		if targetCoconut and targetCoconut.Parent then
+			local targetBase = targetCoconut:GetAttribute("BaseCFrame") or targetCoconut.CFrame
+			tweenPart(targetCoconut, 0.14, {
+				CFrame = targetBase + Vector3.new(0, 0.48, 0),
+			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			task.delay(0.28, function()
+				if targetCoconut.Parent then
+					tweenPart(targetCoconut, 0.16, { CFrame = targetBase }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				end
+			end)
+		end
+
 		for _, part in ipairs(crab:GetChildren()) do
 			if part:IsA("BasePart") then
-				tweenPart(part, 0.5, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				tweenPart(part, 0.42, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 			end
 		end
 	end)
-	Debris:AddItem(crab, 3)
+	Debris:AddItem(crab, 3.2)
 end
 
 function InteractionService:_spawnIslandSeagulls(source)
@@ -5112,6 +5145,98 @@ function InteractionService:_wireSpaceStationGravityDial(dial)
 	end)
 end
 
+function InteractionService:_wireSpaceStationObservationWindow(window)
+	local prompt = getPrompt(window)
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self:_getSpaceStationState(window)
+		if state.Reacting then
+			return
+		end
+
+		state.Reacting = true
+		state.Count += 1
+		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationObservationWindow.Id)
+		playSound(window, "rbxasset://sounds/electronicpingshort.wav", 0.42, 0.55)
+
+		local starField = Instance.new("Model")
+		starField.Name = "SpaceStationParallaxStarField"
+		starField.Parent = workspace
+		CollectionService:AddTag(starField, Constants.Tags.TemporaryObject)
+
+		local random = Random.new(math.floor(os.clock() * 1000) % 100000)
+		local animatedStars = {}
+		for layerIndex = 1, 3 do
+			for starIndex = 1, 14 do
+				local star = Instance.new("Part")
+				star.Name = ("SpaceParallaxStar%d_%d"):format(layerIndex, starIndex)
+				star.Anchored = true
+				star.CanCollide = false
+				star.BottomSurface = Enum.SurfaceType.Smooth
+				star.TopSurface = Enum.SurfaceType.Smooth
+				star.Shape = Enum.PartType.Ball
+				star.Size = Vector3.new(0.12 + layerIndex * 0.04, 0.12 + layerIndex * 0.04, 0.12 + layerIndex * 0.04)
+				star.Color = layerIndex == 1 and Color3.fromRGB(158, 210, 255) or Color3.fromRGB(235, 246, 255)
+				star.Material = Enum.Material.Neon
+				star.Parent = starField
+
+				local baseCFrame = window.CFrame
+					* CFrame.new(
+						random:NextNumber(-8.4, 8.4),
+						random:NextNumber(-3.0, 3.0),
+						-0.75 - layerIndex * 0.9
+					)
+				star.CFrame = baseCFrame
+				table.insert(animatedStars, {
+					Part = star,
+					BaseCFrame = baseCFrame,
+					Layer = layerIndex,
+					Phase = random:NextNumber(0, math.pi * 2),
+				})
+			end
+		end
+
+		task.spawn(function()
+			local startedAt = os.clock()
+			local duration = 6.4
+			while starField.Parent do
+				local elapsed = os.clock() - startedAt
+				local alpha = math.clamp(elapsed / duration, 0, 1)
+				for _, item in ipairs(animatedStars) do
+					if item.Part and item.Part.Parent then
+						local layerSpeed = 0.25 + item.Layer * 0.22
+						item.Part.CFrame = item.BaseCFrame
+							* CFrame.new(
+								math.sin(elapsed * layerSpeed + item.Phase) * item.Layer * 0.55,
+								math.cos(elapsed * (layerSpeed + 0.12) + item.Phase) * item.Layer * 0.24,
+								-alpha * item.Layer * 0.75
+							)
+					end
+				end
+
+				if alpha >= 1 then
+					break
+				end
+				RunService.Heartbeat:Wait()
+			end
+		end)
+
+		task.delay(5.4, function()
+			for _, part in ipairs(starField:GetChildren()) do
+				if part:IsA("BasePart") then
+					tweenPart(part, 0.55, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				end
+			end
+		end)
+
+		Debris:AddItem(starField, 6.8)
+		self.systemMessageRemote:FireClient(player, "Space drifts past the window in layers. It is showing off correctly now.")
+		task.delay(0.55, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
 function InteractionService:_wireSpaceStationFoodPrinter(printer)
 	local prompt = getPrompt(printer)
 
@@ -5124,18 +5249,27 @@ function InteractionService:_wireSpaceStationFoodPrinter(printer)
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationFoodPrinter.Id)
 		playSound(printer, "rbxasset://sounds/button.wav", 0.45, 1.55)
-		local cube = printer.Parent and printer.Parent:FindFirstChild("SpaceFoodCube")
-		if cube and cube:IsA("BasePart") then
-			local baseCFrame = cube:GetAttribute("BaseCFrame") or cube.CFrame
-			cube.Color = Color3.fromRGB(255, 186, 88)
-			tweenPart(cube, 0.16, { CFrame = baseCFrame + Vector3.new(0, 0.75, 0) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-			task.delay(0.22, function()
-				if cube.Parent then
-					tweenPart(cube, 0.18, { CFrame = baseCFrame }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		for _, part in ipairs(printer.Parent and printer.Parent:GetChildren() or {}) do
+			if part:IsA("BasePart") and part:GetAttribute("FoodOutput") == true then
+				local baseCFrame = part:GetAttribute("BaseCFrame") or part.CFrame
+				local lift = 0.32
+				if part.Name:find("Drumstick", 1, true) then
+					lift = 0.62
+				elseif part.Name:find("Tube", 1, true) then
+					lift = 0.46
 				end
-			end)
+
+				tweenPart(part, 0.18, {
+					CFrame = baseCFrame + Vector3.new(0, lift, -0.22),
+				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				task.delay(0.42, function()
+					if part.Parent then
+						tweenPart(part, 0.2, { CFrame = baseCFrame }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+					end
+				end)
+			end
 		end
-		self.systemMessageRemote:FireClient(player, "The food printer produces one perfectly edible cube of uncertainty.")
+		self.systemMessageRemote:FireClient(player, "The food printer produces a tray with a suspiciously recognizable drumstick.")
 		task.delay(0.35, function()
 			state.Reacting = false
 		end)
@@ -5158,12 +5292,23 @@ function InteractionService:_wireSpaceStationStarMap(starMap)
 		for _, dot in ipairs(starMap.Parent and starMap.Parent:GetChildren() or {}) do
 			if dot:IsA("BasePart") and dot.Name:find("StarMapDot", 1, true) then
 				local baseCFrame = dot:GetAttribute("BaseCFrame") or dot.CFrame
-				local offset = Vector3.new(math.sin(state.Count + #dot.Name) * 0.45, math.cos(state.Count + #dot.Name) * 0.35, 0)
-				tweenPart(dot, 0.2, { CFrame = baseCFrame + offset }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+				local seed = state.Count + #dot.Name
+				local offset = Vector3.new(math.sin(seed) * 0.55, math.cos(seed * 0.8) * 0.42, math.sin(seed * 0.5) * 0.55)
+				tweenPart(dot, 0.22, { CFrame = baseCFrame + offset }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+				task.delay(0.42, function()
+					if dot.Parent then
+						tweenPart(dot, 0.28, { CFrame = baseCFrame }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+					end
+				end)
+			elseif dot:IsA("BasePart") and dot.Name:find("StarMapRing", 1, true) then
+				local baseCFrame = dot:GetAttribute("BaseCFrame") or dot.CFrame
+				tweenPart(dot, 0.3, {
+					CFrame = baseCFrame * CFrame.Angles(0, math.rad(22 + state.Count * 7), 0),
+				}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 			end
 		end
-		self.systemMessageRemote:FireClient(player, "The star map rearranges itself into a shape labeled probably not legal.")
-		task.delay(0.35, function()
+		self.systemMessageRemote:FireClient(player, "The floating star map rearranges itself into an argument with astronomy.")
+		task.delay(0.5, function()
 			state.Reacting = false
 		end)
 	end)

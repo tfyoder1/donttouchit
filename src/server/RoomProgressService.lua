@@ -250,8 +250,19 @@ function RoomProgressService:_handleSessionStart(player, payload)
 end
 
 function RoomProgressService:_tick(now)
+	local spaceStationOccupied = false
+
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_tickPlayer(player, now)
+		if self:GetRoomForPlayer(player) == "SpaceStation" then
+			spaceStationOccupied = true
+		end
+	end
+
+	if spaceStationOccupied then
+		workspace.Gravity = Constants.SpaceStationGravity or 24
+	elseif workspace.Gravity == (Constants.SpaceStationGravity or 24) then
+		workspace.Gravity = Constants.NormalGravity
 	end
 end
 
@@ -452,8 +463,12 @@ function RoomProgressService:_handleHintRequest(player, payload)
 	elseif action == "FreeHint" then
 		local hintText, errorText = self.discoveryService:GetFreeHint(player, roomId)
 		self:_showHintResult(player, roomId, hintText, errorText)
+	elseif action == "BuyClue" then
+		self:_requestCluePurchase(player, roomId)
 	elseif action == "Clue" or action == "PaidHint" or action == "UseHint" then
 		self:_requestClue(player, roomId)
+	elseif action == "BuyReveal" then
+		self:_requestDiscoveryRevealPurchase(player, roomId)
 	elseif action == "Reveal" or action == "FullReveal" then
 		self:_requestDiscoveryReveal(player, roomId)
 	elseif action == "RevealSecretDoor" then
@@ -505,6 +520,26 @@ function RoomProgressService:_requestClue(player, roomId)
 	self:_showHintResult(player, roomId, hintText, errorText)
 end
 
+function RoomProgressService:_requestCluePurchase(player, roomId)
+	local productId = Constants.NoTouch.ClueProductId
+	if not productId or productId <= 0 then
+		productId = Constants.NoTouch.PaidHintProductId
+	end
+
+	if productId and productId > 0 then
+		self:_promptHintProduct(player, roomId, productId, "Clue")
+		return
+	end
+
+	local hintText, errorText = self.discoveryService:UseClue(player, roomId, 0, true)
+	self:_showHintResult(
+		player,
+		roomId,
+		hintText,
+		errorText or "Prototype clue purchase added. Currently free; no Robux charged."
+	)
+end
+
 function RoomProgressService:_requestDiscoveryReveal(player, roomId)
 	local productId = Constants.NoTouch.RevealProductId
 	if not productId or productId <= 0 then
@@ -518,6 +553,36 @@ function RoomProgressService:_requestDiscoveryReveal(player, roomId)
 
 	local revealText, targetTag, errorText = self.discoveryService:UseLocationReveal(player, roomId, Constants.NoTouch.RevealClueCost)
 	self:_showHintResult(player, roomId, revealText, errorText)
+
+	if revealText and targetTag then
+		local target = self:_findHighlightTarget(targetTag)
+		if target then
+			self.sparkleRemote:FireClient(player, {
+				Target = target,
+				Duration = math.max(Constants.Sparkle.DurationSeconds, 8),
+			})
+		end
+	end
+end
+
+function RoomProgressService:_requestDiscoveryRevealPurchase(player, roomId)
+	local productId = Constants.NoTouch.RevealProductId
+	if not productId or productId <= 0 then
+		productId = Constants.NoTouch.FullRevealProductId
+	end
+
+	if productId and productId > 0 then
+		self:_promptHintProduct(player, roomId, productId, "Reveal")
+		return
+	end
+
+	local revealText, targetTag, errorText = self.discoveryService:UseLocationReveal(player, roomId, 0, true)
+	self:_showHintResult(
+		player,
+		roomId,
+		revealText,
+		errorText or "Prototype reveal purchase added. Currently free; no Robux charged."
+	)
 
 	if revealText and targetTag then
 		local target = self:_findHighlightTarget(targetTag)

@@ -2407,29 +2407,67 @@ local function makeIslandRoom(roomFolder)
 	makePalmTree(room, "SmallPalm", 10, 1, 6, 2, "dropped_palm_coconut")
 	makeIslandSpaceLadderSecret(room)
 
-	for _, data in ipairs({
-		{ Name = "NorthHorizon", Size = Vector3.new(150, 28, 0.4), CFrame = cframeAt(origin, 0, 13, 87), Color = Color3.fromRGB(133, 215, 255) },
-		{ Name = "SouthHorizon", Size = Vector3.new(150, 28, 0.4), CFrame = cframeAt(origin, 0, 13, -28), Color = Color3.fromRGB(118, 197, 238) },
-		{ Name = "WestHorizon", Size = Vector3.new(0.4, 28, 112), CFrame = cframeAt(origin, -75, 13, 31), Color = Color3.fromRGB(109, 192, 238) },
-		{ Name = "EastHorizon", Size = Vector3.new(0.4, 28, 112), CFrame = cframeAt(origin, 75, 13, 31), Color = Color3.fromRGB(109, 192, 238) },
-	}) do
-		local horizon = createPart(room, data.Name, data.Size, data.CFrame, data.Color, Enum.Material.SmoothPlastic)
-		horizon.Transparency = 0.22
-		horizon.CanCollide = false
-		horizon:SetAttribute("BaseTransparency", horizon.Transparency)
-		horizon:SetAttribute("BaseCanCollide", false)
-	end
+		local function makeIslandBackdrop(name, size, cframe, color, transparency)
+			local layer = createPart(room, name, size, cframe, color, Enum.Material.SmoothPlastic)
+			layer.Transparency = transparency
+			layer.CanCollide = false
+			layer:SetAttribute("BaseTransparency", layer.Transparency)
+			layer:SetAttribute("BaseCanCollide", false)
+			return layer
+		end
 
-	local sunGlow = createPart(room, "IslandSunGlow", Vector3.new(18, 18, 0.18), cframeAt(origin, -24, 18, 63.35), Color3.fromRGB(255, 240, 151), Enum.Material.Neon)
-	sunGlow.Shape = Enum.PartType.Ball
-	sunGlow.Transparency = 0.58
-	sunGlow.CanCollide = false
-	sunGlow:SetAttribute("BaseTransparency", sunGlow.Transparency)
-	sunGlow:SetAttribute("BaseCanCollide", false)
-	local sun = createPart(room, "IslandSun", Vector3.new(11, 11, 0.35), cframeAt(origin, -24, 18, 63.5), Color3.fromRGB(255, 222, 88), Enum.Material.Neon)
-	sun.Shape = Enum.PartType.Ball
-	sun.CanCollide = false
-	sun:SetAttribute("BaseCanCollide", false)
+		for _, data in ipairs({
+			{ Name = "NorthSkyParallaxFar", Size = Vector3.new(170, 30, 0.34), CFrame = cframeAt(origin, 0, 14, 88), Color = Color3.fromRGB(132, 213, 255), Transparency = 0.54 },
+			{ Name = "NorthOceanParallaxMid", Size = Vector3.new(170, 8, 0.3), CFrame = cframeAt(origin, 0, 5.5, 86.6), Color = Color3.fromRGB(40, 149, 213), Transparency = 0.18 },
+			{ Name = "NorthCloudParallaxNear", Size = Vector3.new(44, 2.8, 0.24), CFrame = cframeAt(origin, -28, 20.5, 85.8), Color = Color3.fromRGB(235, 248, 255), Transparency = 0.34 },
+			{ Name = "NorthCloudParallaxWide", Size = Vector3.new(34, 2.4, 0.24), CFrame = cframeAt(origin, 31, 18.4, 85.6), Color = Color3.fromRGB(229, 244, 255), Transparency = 0.42 },
+			{ Name = "SouthSkyParallaxFar", Size = Vector3.new(170, 30, 0.34), CFrame = cframeAt(origin, 0, 14, -29), Color = Color3.fromRGB(118, 197, 238), Transparency = 0.62 },
+			{ Name = "SouthOceanParallaxMid", Size = Vector3.new(170, 7, 0.3), CFrame = cframeAt(origin, 0, 5.0, -27.8), Color = Color3.fromRGB(37, 137, 202), Transparency = 0.28 },
+			{ Name = "WestSkyParallaxFar", Size = Vector3.new(0.34, 30, 122), CFrame = cframeAt(origin, -76, 14, 31), Color = Color3.fromRGB(109, 192, 238), Transparency = 0.62 },
+			{ Name = "WestOceanParallaxMid", Size = Vector3.new(0.3, 7, 122), CFrame = cframeAt(origin, -74.6, 5.0, 31), Color = Color3.fromRGB(40, 148, 213), Transparency = 0.26 },
+			{ Name = "EastSkyParallaxFar", Size = Vector3.new(0.34, 30, 122), CFrame = cframeAt(origin, 76, 14, 31), Color = Color3.fromRGB(109, 192, 238), Transparency = 0.62 },
+			{ Name = "EastOceanParallaxMid", Size = Vector3.new(0.3, 7, 122), CFrame = cframeAt(origin, 74.6, 5.0, 31), Color = Color3.fromRGB(40, 148, 213), Transparency = 0.26 },
+		}) do
+			makeIslandBackdrop(data.Name, data.Size, data.CFrame, data.Color, data.Transparency)
+		end
+
+		for waveIndex = 1, 7 do
+			local z = 43 + waveIndex * 5.3
+			local wave = createPart(
+				room,
+				"IslandParallaxWave" .. waveIndex,
+				Vector3.new(112 - waveIndex * 5, 0.16, 0.32),
+				cframeAt(origin, (waveIndex % 2 == 0) and -8 or 9, 0.55 + waveIndex * 0.04, z),
+				Color3.fromRGB(176, 236, 255),
+				Enum.Material.Neon
+			)
+			wave.Transparency = 0.36 + waveIndex * 0.045
+			wave.CanCollide = false
+			wave:SetAttribute("BaseTransparency", wave.Transparency)
+			wave:SetAttribute("BaseCanCollide", false)
+		end
+
+		for _, data in ipairs({
+			{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, -31, 8, 5) },
+			{ Name = "IslandBoundaryRight", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, 31, 8, 5) },
+			{ Name = "IslandBoundaryBack", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, 34) },
+			{ Name = "IslandBoundaryFront", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, -25) },
+		}) do
+			local boundary = createPart(room, data.Name, data.Size, data.CFrame, Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
+			boundary.Transparency = 1
+			boundary:SetAttribute("BaseTransparency", boundary.Transparency)
+		end
+
+		local sunGlow = createPart(room, "IslandSunGlow", Vector3.new(34, 34, 0.18), cframeAt(origin, 28, 20, 83.8), Color3.fromRGB(255, 240, 151), Enum.Material.Neon)
+		sunGlow.Shape = Enum.PartType.Ball
+		sunGlow.Transparency = 0.72
+		sunGlow.CanCollide = false
+		sunGlow:SetAttribute("BaseTransparency", sunGlow.Transparency)
+		sunGlow:SetAttribute("BaseCanCollide", false)
+		local sun = createPart(room, "IslandSun", Vector3.new(20, 20, 0.35), cframeAt(origin, 28, 20, 84), Color3.fromRGB(255, 222, 88), Enum.Material.Neon)
+		sun.Shape = Enum.PartType.Ball
+		sun.CanCollide = false
+		sun:SetAttribute("BaseCanCollide", false)
 	local sunLight = Instance.new("PointLight")
 	sunLight.Name = "IslandSunLight"
 	sunLight.Brightness = 1.6
@@ -2451,12 +2489,31 @@ local function makeIslandRoom(roomFolder)
 	createPart(room, "DockLeftRail", Vector3.new(0.28, 2.1, 15), cframeAt(origin, -3.3, 2.15, -14.8), Color3.fromRGB(98, 61, 37), Enum.Material.Wood)
 	createPart(room, "DockRightRail", Vector3.new(0.28, 2.1, 15), cframeAt(origin, 3.3, 2.15, -14.8), Color3.fromRGB(98, 61, 37), Enum.Material.Wood)
 
-	local exitGate = createPart(room, "IslandExitGate", Vector3.new(8.2, 6.4, 0.62), cframeAt(origin, 0, 3.2, -23.4), Color3.fromRGB(67, 93, 112), Enum.Material.Metal)
-	exitGate:SetAttribute("DestinationCFrame", ISLAND_RETURN_CFRAME)
-	exitGate:SetAttribute("RoomId", "Island")
-	createSurfaceText(exitGate, "IslandExitText", "HALLWAY", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(35, 55, 70))
-	createPrompt(exitGate, "Leave", "Hallway", 0)
-	tag(exitGate, Constants.Tags.IslandExit)
+		local exitGate = createPart(room, "IslandExitGate", Vector3.new(8.2, 6.4, 0.62), cframeAt(origin, 0, 3.2, -23.4), Color3.fromRGB(67, 93, 112), Enum.Material.Metal)
+		exitGate:SetAttribute("DestinationCFrame", ISLAND_RETURN_CFRAME)
+		exitGate:SetAttribute("RoomId", "Island")
+		exitGate:SetAttribute("ExitMode", "Door")
+		createSurfaceText(exitGate, "IslandExitText", "HALLWAY", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(35, 55, 70))
+		createPrompt(exitGate, "Leave", "Hallway", 0)
+		tag(exitGate, Constants.Tags.IslandExit)
+
+		for _, data in ipairs({
+			{ Name = "IslandOceanExitLeft", Size = Vector3.new(1.8, 8, 52), CFrame = cframeAt(origin, -25.4, 4, 7.8) },
+			{ Name = "IslandOceanExitRight", Size = Vector3.new(1.8, 8, 52), CFrame = cframeAt(origin, 25.4, 4, 7.8) },
+			{ Name = "IslandOceanExitBack", Size = Vector3.new(50, 8, 1.8), CFrame = cframeAt(origin, 0, 4, 28.4) },
+			{ Name = "IslandOceanExitFrontLeft", Size = Vector3.new(20, 8, 1.8), CFrame = cframeAt(origin, -16, 4, -16.4) },
+			{ Name = "IslandOceanExitFrontRight", Size = Vector3.new(20, 8, 1.8), CFrame = cframeAt(origin, 16, 4, -16.4) },
+		}) do
+			local oceanExit = createPart(room, data.Name, data.Size, data.CFrame, Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
+			oceanExit.Transparency = 1
+			oceanExit.CanCollide = false
+			oceanExit.CanTouch = true
+			oceanExit:SetAttribute("BaseTransparency", 1)
+			oceanExit:SetAttribute("BaseCanCollide", false)
+			oceanExit:SetAttribute("RoomId", "Island")
+			oceanExit:SetAttribute("ExitMode", "Ocean")
+			tag(oceanExit, Constants.Tags.IslandExit)
+		end
 
 	local islandControls = makeRoomControlPanel(
 		room,
@@ -2477,18 +2534,7 @@ local function makeIslandRoom(roomFolder)
 	makeIslandWarningSign(room, "IslandSharkWarningSign", "BEWARE\nOF SHARKS\nWATCH OUT FOR\nLAND SHARKS!", 12.5, -7.5, 1, 2, Constants.Tags.IslandSharkSign)
 	makeIslandWarningSign(room, "IslandJellyfishWarningSign", "BEWARE\nOF JELLYFISH", -12.5, 12.5, -1, 5, Constants.Tags.IslandJellyfishSign)
 
-	for _, data in ipairs({
-		{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, -31, 8, 5) },
-		{ Name = "IslandBoundaryRight", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, 31, 8, 5) },
-		{ Name = "IslandBoundaryBack", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, 34) },
-		{ Name = "IslandBoundaryFront", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, -25) },
-	}) do
-		local boundary = createPart(room, data.Name, data.Size, data.CFrame, Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
-		boundary.Transparency = 1
-		boundary:SetAttribute("BaseTransparency", 1)
-	end
-
-	createNoTouchClock(
+		createNoTouchClock(
 		room,
 		"IslandClock",
 		"Island",
@@ -2697,13 +2743,13 @@ local function makeIslandObjects(objectsFolder)
 	fireRing.PrimaryPart = firePromptPart
 
 	local shovel = makeModel(objects, "IslandShovel")
-	local shovelCFrame = cframeAt(origin, -8, 2.4, 1.5) * CFrame.Angles(0, 0, math.rad(-32))
-	local handle = createPart(shovel, "ShovelHandle", Vector3.new(0.28, 4.6, 0.28), shovelCFrame, Color3.fromRGB(113, 71, 39), Enum.Material.Wood)
-	handle.Shape = Enum.PartType.Cylinder
-	createPart(shovel, "ShovelGrip", Vector3.new(1.5, 0.22, 0.22), shovelCFrame * CFrame.new(0, 2.42, 0), Color3.fromRGB(84, 51, 30), Enum.Material.Wood)
-	local collar = createPart(shovel, "ShovelBladeCollar", Vector3.new(0.62, 0.34, 0.34), shovelCFrame * CFrame.new(0, -2.18, 0), Color3.fromRGB(137, 143, 148), Enum.Material.Metal)
-	collar.Shape = Enum.PartType.Cylinder
-	createPart(shovel, "ShovelBlade", Vector3.new(1.2, 1.5, 0.24), shovelCFrame * CFrame.new(0, -2.82, 0), Color3.fromRGB(191, 197, 201), Enum.Material.Metal, "WedgePart")
+	local shovelCFrame = cframeAt(origin, -8, 2.35, 1.5) * CFrame.Angles(math.rad(-4), math.rad(18), math.rad(-34))
+	local handle = createPart(shovel, "ShovelHandle", Vector3.new(0.24, 4.55, 0.24), shovelCFrame, Color3.fromRGB(113, 71, 39), Enum.Material.Wood)
+	createPart(shovel, "ShovelGrip", Vector3.new(1.42, 0.22, 0.28), shovelCFrame * CFrame.new(0, 2.42, 0), Color3.fromRGB(84, 51, 30), Enum.Material.Wood)
+	createPart(shovel, "ShovelGripBack", Vector3.new(0.26, 0.62, 0.26), shovelCFrame * CFrame.new(0, 2.12, 0), Color3.fromRGB(84, 51, 30), Enum.Material.Wood)
+	createPart(shovel, "ShovelBladeCollar", Vector3.new(0.7, 0.32, 0.34), shovelCFrame * CFrame.new(0, -2.18, 0), Color3.fromRGB(137, 143, 148), Enum.Material.Metal)
+	createPart(shovel, "ShovelBladeNeck", Vector3.new(0.36, 0.58, 0.3), shovelCFrame * CFrame.new(0, -2.55, 0), Color3.fromRGB(163, 169, 174), Enum.Material.Metal)
+	createPart(shovel, "ShovelBlade", Vector3.new(1.35, 1.52, 0.24), shovelCFrame * CFrame.new(0, -3.08, 0), Color3.fromRGB(191, 197, 201), Enum.Material.Metal, "WedgePart")
 	createPrompt(handle, "Dig", "Shovel", 0)
 	tag(handle, Constants.Tags.IslandShovel)
 	shovel.PrimaryPart = handle
@@ -2720,13 +2766,15 @@ local function makeIslandObjects(objectsFolder)
 	treasurePrompt:SetAttribute("BaseEnabled", false)
 	tag(base, Constants.Tags.IslandTreasure)
 
-	local colaCan = createPart(treasure, "IslandBloxyColaCan", Vector3.new(0.82, 1.55, 0.82), cframeAt(origin, 5.5, 2.3, 8.25), Color3.fromRGB(220, 38, 47), Enum.Material.Metal)
+	local colaCFrame = cframeAt(origin, 5.5, 2.3, 8.25) * CFrame.Angles(0, 0, math.rad(90))
+	local colaCan = createPart(treasure, "IslandBloxyColaCan", Vector3.new(1.55, 0.82, 0.82), colaCFrame, Color3.fromRGB(220, 38, 47), Enum.Material.Metal)
 	colaCan.Shape = Enum.PartType.Cylinder
 	colaCan:SetAttribute("TreasureLayer", "Cola")
-	local colaTop = createPart(treasure, "IslandBloxyColaTop", Vector3.new(0.7, 0.08, 0.7), cframeAt(origin, 5.5, 3.11, 8.25), Color3.fromRGB(238, 238, 232), Enum.Material.Metal)
-	colaTop.Shape = Enum.PartType.Cylinder
+	local colaTop = createPart(treasure, "IslandBloxyColaTop", Vector3.new(0.78, 0.08, 0.78), cframeAt(origin, 5.5, 3.1, 8.25), Color3.fromRGB(238, 238, 232), Enum.Material.Metal)
 	colaTop:SetAttribute("TreasureLayer", "Cola")
-	local colaLabel = createPart(treasure, "IslandBloxyColaLabel", Vector3.new(0.92, 0.68, 0.08), cframeAt(origin, 5.5, 2.3, 7.79), Color3.fromRGB(245, 245, 242), Enum.Material.SmoothPlastic)
+	local colaBottom = createPart(treasure, "IslandBloxyColaBottom", Vector3.new(0.78, 0.08, 0.78), cframeAt(origin, 5.5, 1.5, 8.25), Color3.fromRGB(196, 203, 207), Enum.Material.Metal)
+	colaBottom:SetAttribute("TreasureLayer", "Cola")
+	local colaLabel = createPart(treasure, "IslandBloxyColaLabel", Vector3.new(0.94, 0.76, 0.08), cframeAt(origin, 5.5, 2.32, 7.78), Color3.fromRGB(245, 245, 242), Enum.Material.SmoothPlastic)
 	colaLabel:SetAttribute("TreasureLayer", "Cola")
 	createSurfaceText(colaLabel, "IslandBloxyColaText", "BLOXY\nCOLA", Enum.NormalId.Front, Color3.fromRGB(220, 38, 47), Color3.fromRGB(245, 245, 242))
 	local colaPrompt = createPrompt(colaCan, "Sip", "Bloxy Cola", 0)
@@ -2766,8 +2814,8 @@ local function makeSpaceStationRoom(roomFolder)
 	local returnDoor = createPart(room, "SpaceStationReturnDoor", Vector3.new(6.6, 7.4, 0.36), cframeAt(origin, 0, 4.2, depth / 2 - 0.55), Color3.fromRGB(67, 92, 126), Enum.Material.Metal)
 	returnDoor:SetAttribute("DestinationCFrame", ISLAND_SPAWN_CFRAME)
 	returnDoor:SetAttribute("DestinationName", "the island")
-	createSurfaceText(returnDoor, "SpaceStationReturnText", "BACK TO\nISLAND", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(67, 92, 126))
-	createPrompt(returnDoor, "Exit", "Island", 0)
+	createSurfaceText(returnDoor, "SpaceStationReturnText", "AIRLOCK\nTO ISLAND", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(67, 92, 126))
+	createPrompt(returnDoor, "Cycle", "Airlock to Island", 0)
 	tag(returnDoor, Constants.Tags.SecretRoomExit)
 
 	local controls = makeRoomControlPanel(
@@ -2826,8 +2874,15 @@ local function makeSpaceStationRoom(roomFolder)
 
 	local foodPrinter = createPart(room, "SpaceStationFoodPrinter", Vector3.new(5.4, 2.2, 3.1), cframeAt(origin, -13.7, 2.0, 4.4), Color3.fromRGB(198, 205, 214), Enum.Material.Metal)
 	createSurfaceText(foodPrinter, "FoodPrinterText", "FOOD\nPRINTER", Enum.NormalId.Front, Color3.fromRGB(22, 34, 46), Color3.fromRGB(198, 205, 214))
-	local foodCube = createPart(room, "SpaceFoodCube", Vector3.new(1.1, 0.8, 1.1), cframeAt(origin, -13.7, 3.5, 2.9), Color3.fromRGB(255, 186, 88), Enum.Material.SmoothPlastic)
-	foodCube.Shape = Enum.PartType.Ball
+	local foodTray = createPart(room, "SpaceFoodTray", Vector3.new(2.6, 0.18, 1.4), cframeAt(origin, -13.7, 3.34, 2.72), Color3.fromRGB(230, 233, 238), Enum.Material.Metal)
+	foodTray:SetAttribute("FoodOutput", true)
+	local drumstickMeat = createPart(room, "SpaceFoodDrumstickMeat", Vector3.new(0.82, 0.72, 0.82), cframeAt(origin, -14.15, 3.78, 2.72), Color3.fromRGB(205, 106, 50), Enum.Material.SmoothPlastic)
+	drumstickMeat.Shape = Enum.PartType.Ball
+	drumstickMeat:SetAttribute("FoodOutput", true)
+	local drumstickBone = createPart(room, "SpaceFoodDrumstickBone", Vector3.new(1.1, 0.2, 0.2), cframeAt(origin, -13.35, 3.72, 2.72), Color3.fromRGB(245, 232, 201), Enum.Material.SmoothPlastic)
+	drumstickBone:SetAttribute("FoodOutput", true)
+	local foodTube = createPart(room, "SpaceFoodTube", Vector3.new(0.42, 0.42, 1.15), cframeAt(origin, -13.2, 3.63, 2.22) * CFrame.Angles(math.rad(12), math.rad(18), 0), Color3.fromRGB(119, 255, 203), Enum.Material.Metal)
+	foodTube:SetAttribute("FoodOutput", true)
 	createPrompt(foodPrinter, "Print", "Space Food", 0)
 	tag(foodPrinter, Constants.Tags.SpaceStationFoodPrinter)
 
@@ -2839,12 +2894,31 @@ local function makeSpaceStationRoom(roomFolder)
 	createPrompt(suitTorso, "Inspect", "Space Suit", 0)
 	tag(suitTorso, Constants.Tags.SpaceStationSuit)
 
-	local starMap = createPart(room, "SpaceStationStarMap", Vector3.new(8.4, 4.8, 0.3), cframeAt(origin, 0, 5.5, 7.2), Color3.fromRGB(10, 16, 32), Enum.Material.SmoothPlastic)
-	createSurfaceText(starMap, "StarMapText", "STAR MAP\nYOU ARE\nPROBABLY HERE", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(10, 16, 32))
-	createPrompt(starMap, "Rearrange", "Star Map", 0)
-	tag(starMap, Constants.Tags.SpaceStationStarMap)
-	for dotIndex = 1, 7 do
-		local dot = createPart(room, "StarMapDot" .. dotIndex, Vector3.new(0.28, 0.28, 0.08), starMap.CFrame * CFrame.new(-3.2 + dotIndex, 1.4 - (dotIndex % 3), -0.2), BOWLING_COSMIC_COLORS[((dotIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Enum.Material.Neon)
+	local starMapCore = createPart(room, "SpaceStationStarMapCore", Vector3.new(5.8, 5.8, 5.8), cframeAt(origin, 0, 7.8, 6.6), Color3.fromRGB(14, 24, 48), Enum.Material.Glass)
+	starMapCore.Shape = Enum.PartType.Ball
+	starMapCore.Transparency = 0.44
+	starMapCore.CanCollide = false
+	starMapCore:SetAttribute("BaseTransparency", starMapCore.Transparency)
+	starMapCore:SetAttribute("BaseCanCollide", false)
+	local starMapRingA = createPart(room, "SpaceStationStarMapRingA", Vector3.new(6.8, 0.12, 6.8), starMapCore.CFrame * CFrame.Angles(math.rad(90), 0, math.rad(18)), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	starMapRingA.Transparency = 0.28
+	starMapRingA.CanCollide = false
+	starMapRingA:SetAttribute("BaseTransparency", starMapRingA.Transparency)
+	starMapRingA:SetAttribute("BaseCanCollide", false)
+	local starMapRingB = createPart(room, "SpaceStationStarMapRingB", Vector3.new(6.2, 0.12, 6.2), starMapCore.CFrame * CFrame.Angles(math.rad(35), math.rad(90), math.rad(-10)), Color3.fromRGB(255, 232, 92), Enum.Material.Neon)
+	starMapRingB.Transparency = 0.34
+	starMapRingB.CanCollide = false
+	starMapRingB:SetAttribute("BaseTransparency", starMapRingB.Transparency)
+	starMapRingB:SetAttribute("BaseCanCollide", false)
+	local starMapPanel = createPart(room, "SpaceStationStarMap", Vector3.new(7.6, 2.15, 0.34), cframeAt(origin, 0, 3.9, 7.05), Color3.fromRGB(10, 16, 32), Enum.Material.Metal)
+	createSurfaceText(starMapPanel, "StarMapText", "STAR MAP\nFLOATING OBJECT\nBELOW AVERAGE PLAN", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(10, 16, 32))
+	createPrompt(starMapPanel, "Rearrange", "Star Map Controls", 0)
+	tag(starMapPanel, Constants.Tags.SpaceStationStarMap)
+	for dotIndex = 1, 12 do
+		local angle = dotIndex * math.pi * 2 / 12
+		local radius = 1.5 + (dotIndex % 4) * 0.45
+		local dot = createPart(room, "StarMapDot" .. dotIndex, Vector3.new(0.28, 0.28, 0.28), starMapCore.CFrame * CFrame.new(math.cos(angle) * radius, math.sin(dotIndex * 1.3) * 1.2, math.sin(angle) * radius), BOWLING_COSMIC_COLORS[((dotIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Enum.Material.Neon)
+		dot.Shape = Enum.PartType.Ball
 		dot.CanCollide = false
 		dot:SetAttribute("BaseCanCollide", false)
 	end
