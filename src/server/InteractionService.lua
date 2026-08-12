@@ -91,6 +91,7 @@ local SNACK_FLIGHT_INITIAL_BOOST = 16
 local SNACK_FLIGHT_CEILING_Y = Constants.Rooms.SnackLab.Zone.Max.Y - 5.2
 local SNACK_SLOW_MOTION_DURATION = 12
 local SNACK_SUPER_WIND_GUSTS = 5
+local SNACK_MIXER_WEATHER_DURATION = 35
 
 local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(119, 255, 203),
@@ -110,6 +111,11 @@ local BOWLING_ADS = {
 		Text = "VISIT THE SNACK LAB\nFRIDGE IDEAS SERVED COLD",
 		Background = Color3.fromRGB(91, 188, 124),
 		TextColor = Color3.fromRGB(245, 255, 235),
+	},
+	{
+		Text = "BLOXY TOAST\nBUTTERED ON PURPOSE",
+		Background = Color3.fromRGB(255, 178, 87),
+		TextColor = Color3.fromRGB(55, 31, 17),
 	},
 	{
 		Text = "BLOXY ZIPLINE\nTREES TODAY, ISLAND TOMORROW",
@@ -420,6 +426,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.snackRackState = {}
 	self.snackPackStateByUserId = {}
 	self.slowMotionTokensByHumanoid = {}
+	self.windStormTokensByHumanoid = {}
 	self.fruitBowlState = {}
 	self.islandExitBounceAtByUserId = {}
 	self.islandExitWarningsByUserId = {}
@@ -2242,12 +2249,27 @@ function InteractionService:_wireResetRoomButton(button)
 	end)
 end
 
+function InteractionService:_restoreSnackWindStorms()
+	for humanoid in pairs(self.windStormTokensByHumanoid) do
+		if humanoid and humanoid.Parent then
+			humanoid.WalkSpeed = humanoid:GetAttribute("SnackWindBaseWalkSpeed") or 16
+			if humanoid.UseJumpPower then
+				humanoid.JumpPower = humanoid:GetAttribute("SnackWindBaseJumpPower") or 50
+			else
+				humanoid.JumpHeight = humanoid:GetAttribute("SnackWindBaseJumpHeight") or 7.2
+			end
+		end
+		self.windStormTokensByHumanoid[humanoid] = nil
+	end
+end
+
 function InteractionService:ResetRoomForPlayer(player)
 	self:_clearAllTelevisions()
 	for _, state in pairs(self.snackFanState) do
 		state.SpinToken = nil
 	end
 	self:_stopSnackFlightForRoom(player)
+	self:_restoreSnackWindStorms()
 	self.eventManager:ResetRoom(player)
 	self:AfterRoomReset()
 end
@@ -3353,8 +3375,10 @@ function InteractionService:_pushSnackPlayersToWalls(level)
 		local rootPart = getRootPart(player)
 		if rootPart then
 			local direction = self:_getSnackWindDirection(rootPart.Position)
-			rootPart.AssemblyLinearVelocity = direction * (level >= 3 and 128 or 96) + Vector3.new(0, 12, 0)
-			rootPart.AssemblyAngularVelocity += Vector3.new(0, 3, 0)
+			local horizontalForce = 68 + level * 28
+			local lift = 7 + level * 6
+			rootPart.AssemblyLinearVelocity = direction * horizontalForce + Vector3.new(0, lift, 0)
+			rootPart.AssemblyAngularVelocity += Vector3.new(0, 2 + level, 0)
 		end
 	end
 end
@@ -3381,12 +3405,156 @@ function InteractionService:_pushLooseFruitToWalls(level)
 	end
 end
 
+function InteractionService:_applySnackWindStormToPlayer(player, level, duration)
+	local humanoid = getHumanoid(player)
+	local rootPart = getRootPart(player)
+	if not humanoid or not rootPart then
+		return
+	end
+
+	if humanoid:GetAttribute("SnackWindBaseWalkSpeed") == nil then
+		humanoid:SetAttribute("SnackWindBaseWalkSpeed", humanoid.WalkSpeed)
+		humanoid:SetAttribute("SnackWindBaseJumpPower", humanoid.JumpPower)
+		humanoid:SetAttribute("SnackWindBaseJumpHeight", humanoid.JumpHeight)
+	end
+
+	local token = {}
+	self.windStormTokensByHumanoid[humanoid] = token
+	local walkFactor = math.clamp(1 - level * 0.18, 0.38, 0.82)
+	local jumpFactor = math.clamp(1 - level * 0.14, 0.45, 0.86)
+	humanoid.WalkSpeed = math.max(5, (humanoid:GetAttribute("SnackWindBaseWalkSpeed") or 16) * walkFactor)
+
+	if humanoid.UseJumpPower then
+		humanoid.JumpPower = math.max(18, (humanoid:GetAttribute("SnackWindBaseJumpPower") or 50) * jumpFactor)
+	else
+		humanoid.JumpHeight = math.max(2.6, (humanoid:GetAttribute("SnackWindBaseJumpHeight") or 7.2) * jumpFactor)
+	end
+
+	task.spawn(function()
+		local endAt = os.clock() + duration
+		while os.clock() < endAt and humanoid.Parent and self.windStormTokensByHumanoid[humanoid] == token do
+			local currentRoot = getRootPart(player)
+			if currentRoot then
+				local direction = self:_getSnackWindDirection(currentRoot.Position)
+				currentRoot.AssemblyLinearVelocity += direction * (5 + level * 4) + Vector3.new(0, 2 + level * 0.9, 0)
+			end
+			task.wait(0.28)
+		end
+	end)
+
+	task.delay(duration, function()
+		if self.windStormTokensByHumanoid[humanoid] ~= token or not humanoid.Parent then
+			return
+		end
+
+		humanoid.WalkSpeed = humanoid:GetAttribute("SnackWindBaseWalkSpeed") or 16
+		if humanoid.UseJumpPower then
+			humanoid.JumpPower = humanoid:GetAttribute("SnackWindBaseJumpPower") or 50
+		else
+			humanoid.JumpHeight = humanoid:GetAttribute("SnackWindBaseJumpHeight") or 7.2
+		end
+		self.windStormTokensByHumanoid[humanoid] = nil
+	end)
+end
+
+function InteractionService:_spawnSnackWindStreak(origin, direction, level, index)
+	local cross = direction:Cross(Vector3.yAxis)
+	if cross.Magnitude < 0.1 then
+		cross = Vector3.xAxis
+	else
+		cross = cross.Unit
+	end
+
+	local streak = Instance.new("Part")
+	streak.Name = "SnackWindStreak"
+	streak.Anchored = true
+	streak.CanCollide = false
+	streak.CastShadow = false
+	streak.Material = Enum.Material.Neon
+	streak.Color = level >= 3 and Color3.fromRGB(214, 255, 255) or Color3.fromRGB(195, 236, 255)
+	streak.Transparency = math.max(0.22, 0.5 - level * 0.08)
+	streak.Size = Vector3.new(0.08 + level * 0.02, 0.08 + level * 0.02, 5 + level * 1.3)
+	streak.CFrame = CFrame.lookAt(origin, origin + direction)
+		* CFrame.new(
+			cross * ((index % 5 - 2) * (1.4 + level * 0.2))
+				+ Vector3.new(0, ((index % 4) - 1.5) * 0.6, 0)
+		)
+	streak.Parent = workspace
+	CollectionService:AddTag(streak, Constants.Tags.TemporaryObject)
+
+	tweenPart(streak, 0.42 + level * 0.04, {
+		CFrame = streak.CFrame + direction * (14 + level * 5),
+		Transparency = 1,
+	}, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+	Debris:AddItem(streak, 0.8)
+end
+
+function InteractionService:_spawnSnackWindDebris(origin, direction, level, index)
+	local debrisPart = Instance.new("Part")
+	debrisPart.Name = "SnackWindDebris"
+	debrisPart.Anchored = false
+	debrisPart.CanCollide = false
+	debrisPart.Material = index % 3 == 0 and Enum.Material.Plastic or Enum.Material.Wood
+	debrisPart.Color = ({
+		Color3.fromRGB(255, 225, 110),
+		Color3.fromRGB(255, 134, 96),
+		Color3.fromRGB(126, 222, 255),
+		Color3.fromRGB(191, 255, 153),
+	})[((index - 1) % 4) + 1]
+	local scale = 0.35 + level * 0.08 + (index % 3) * 0.04
+	debrisPart.Size = Vector3.new(scale * 1.5, scale * 0.16, scale)
+	debrisPart.CFrame = CFrame.new(origin + Vector3.new((index % 5 - 2) * 0.7, -1 + (index % 4) * 0.25, (index % 3 - 1) * 0.8))
+		* CFrame.Angles(math.rad(index * 21), math.rad(index * 39), math.rad(index * 17))
+	debrisPart.Parent = workspace
+	CollectionService:AddTag(debrisPart, Constants.Tags.TemporaryObject)
+	debrisPart.AssemblyLinearVelocity = direction * (42 + level * 26) + Vector3.new(0, 12 + level * 5, 0)
+	debrisPart.AssemblyAngularVelocity = Vector3.new(8 + level * 3, -13 - index, 9 + index)
+	Debris:AddItem(debrisPart, 5 + level)
+end
+
+function InteractionService:_spawnSnackWindEffects(button, level)
+	local fan = button and (button:FindFirstAncestor("SnackCeilingFan") or button)
+	local hub = fan and fan:FindFirstChild("FanHub", true)
+	local origin = if hub and hub:IsA("BasePart") then hub.Position else button.Position + Vector3.new(0, 3, 0)
+	local snackRoom = Constants.GetRoom("SnackLab")
+	local zone = snackRoom and snackRoom.Zone
+	local center = zone and (zone.Min + zone.Max) * 0.5 or origin
+	local direction = Vector3.new(center.X - origin.X, 0, center.Z - origin.Z)
+	if direction.Magnitude < 1 then
+		direction = Vector3.new(1, 0, 0)
+	else
+		direction = direction.Unit
+	end
+
+	local streakCount = 8 + level * 5
+	for index = 1, streakCount do
+		task.delay(index * 0.025, function()
+			self:_spawnSnackWindStreak(origin, direction, level, index)
+		end)
+	end
+
+	local debrisCount = level == 1 and 3 or (level == 2 and 6 or 10)
+	for index = 1, debrisCount do
+		task.delay(index * 0.07, function()
+			self:_spawnSnackWindDebris(origin, direction, level, index)
+		end)
+	end
+end
+
 function InteractionService:_triggerSnackSuperWind(button, level)
 	playSound(button, "rbxasset://sounds/electronicpingshort.wav", 0.62, level >= 3 and 1.8 or 1.35)
-	self.systemMessageRemote:FireAllClients("The Gravity Apology Fan has escalated to snack weather.")
+	local stormDuration = 2.6 + level * 1.15
+	self.systemMessageRemote:FireAllClients(("The Gravity Apology Fan is now at wind setting %d. Walking is optional research."):format(level))
+
+	for _, player in ipairs(self:_getPlayersInRoom("SnackLab")) do
+		self:_applySnackWindStormToPlayer(player, level, stormDuration)
+	end
+
+	self:_spawnSnackWindEffects(button, level)
 
 	for gust = 1, SNACK_SUPER_WIND_GUSTS do
 		task.delay((gust - 1) * 0.36, function()
+			self:_spawnSnackWindEffects(button, level)
 			self:_pushSnackPlayersToWalls(level)
 			self:_pushLooseFruitToWalls(level)
 		end)
@@ -3433,6 +3601,7 @@ function InteractionService:_wireSnackCeilingFan(button)
 		if state.Level == 1 then
 			prompt.ActionText = "Gust"
 			playSound(button, "rbxasset://sounds/button.wav", 0.5, 0.95)
+			self:_spawnSnackWindEffects(button, state.Level)
 			self.systemMessageRemote:FireClient(player, "Flight canceled. The ceiling fan is now quietly making decisions.")
 		else
 			prompt.ActionText = "More Wind"
@@ -3788,6 +3957,120 @@ function InteractionService:_wireSnackSink(sink)
 	end)
 end
 
+function InteractionService:_createMixerWeatherCloud(startCFrame)
+	local cloudModel = Instance.new("Model")
+	cloudModel.Name = "MixerWeatherCloud"
+	cloudModel.Parent = workspace
+	CollectionService:AddTag(cloudModel, Constants.Tags.TemporaryObject)
+
+	local offsets = {
+		Vector3.new(0, 0, 0),
+		Vector3.new(-1.35, -0.08, 0.15),
+		Vector3.new(1.22, -0.04, 0.05),
+		Vector3.new(-0.55, 0.52, -0.45),
+		Vector3.new(0.68, 0.43, -0.38),
+		Vector3.new(-0.2, 0.3, 0.72),
+		Vector3.new(1.85, 0.02, -0.36),
+		Vector3.new(-1.92, -0.02, -0.18),
+		Vector3.new(0.18, 0.74, 0.28),
+	}
+
+	for index, offset in ipairs(offsets) do
+		local puff = Instance.new("Part")
+		puff.Name = "WeatherCloudPuff"
+		puff.Anchored = true
+		puff.CanCollide = false
+		puff.CastShadow = false
+		puff.Shape = Enum.PartType.Ball
+		local size = 1.5 + (index % 4) * 0.28
+		puff.Size = Vector3.new(size * 1.45, size * 0.85, size)
+		puff.Color = index % 3 == 0 and Color3.fromRGB(194, 207, 222) or Color3.fromRGB(236, 245, 255)
+		puff.Material = Enum.Material.SmoothPlastic
+		puff.Transparency = 0.08
+		puff.CFrame = startCFrame * CFrame.new(offset)
+		puff.Parent = cloudModel
+		CollectionService:AddTag(puff, Constants.Tags.TemporaryObject)
+
+		if index == 1 then
+			cloudModel.PrimaryPart = puff
+		end
+	end
+
+	return cloudModel
+end
+
+function InteractionService:_spawnMixerRainDrop(position, index)
+	local drop = Instance.new("Part")
+	drop.Name = "MixerRainDrop"
+	drop.Anchored = false
+	drop.CanCollide = false
+	drop.CastShadow = false
+	drop.Material = Enum.Material.Neon
+	drop.Color = index % 4 == 0 and Color3.fromRGB(184, 255, 255) or Color3.fromRGB(88, 190, 255)
+	drop.Transparency = 0.08
+	drop.Size = Vector3.new(0.09, 0.62 + (index % 3) * 0.12, 0.09)
+	drop.CFrame = CFrame.new(position) * CFrame.Angles(math.rad(8), 0, math.rad((index % 2 == 0 and 1 or -1) * 8))
+	drop.Parent = workspace
+	CollectionService:AddTag(drop, Constants.Tags.TemporaryObject)
+	drop.AssemblyLinearVelocity = Vector3.new((index % 5 - 2) * 0.8, -42 - (index % 4) * 5, (index % 3 - 1) * 0.8)
+	Debris:AddItem(drop, 1.45)
+end
+
+function InteractionService:_startMixerPersonalWeather(player, bowl)
+	local rootPart = getRootPart(player)
+	local baseCFrame = if rootPart then CFrame.new(rootPart.Position + Vector3.new(0, 7.2, 0)) else bowl.CFrame + Vector3.new(0, 5, 0)
+	local cloudModel = self:_createMixerWeatherCloud(baseCFrame)
+	Debris:AddItem(cloudModel, SNACK_MIXER_WEATHER_DURATION + 3)
+
+	local rainIndex = 0
+	task.spawn(function()
+		local startAt = os.clock()
+		while cloudModel.Parent and os.clock() - startAt < SNACK_MIXER_WEATHER_DURATION do
+			local currentRoot = getRootPart(player)
+			local targetPosition
+			if currentRoot then
+				targetPosition = currentRoot.Position + Vector3.new(0, 7.2, 0)
+			else
+				targetPosition = bowl.Position + Vector3.new(0, 5, 0)
+			end
+
+			local wobble = Vector3.new(
+				math.sin(os.clock() * 2.2) * 0.45,
+				math.sin(os.clock() * 1.4) * 0.16,
+				math.cos(os.clock() * 1.8) * 0.45
+			)
+			cloudModel:PivotTo(CFrame.new(targetPosition + wobble))
+
+			for dropCount = 1, 6 do
+				rainIndex += 1
+				local offset = Vector3.new(
+					((rainIndex + dropCount) % 7 - 3) * 0.38,
+					-1.25,
+					((rainIndex + dropCount * 2) % 5 - 2) * 0.42
+				)
+				self:_spawnMixerRainDrop(targetPosition + offset, rainIndex)
+			end
+
+			if rainIndex % 30 == 0 then
+				playSound(cloudModel.PrimaryPart or bowl, "rbxasset://sounds/electronicpingshort.wav", 0.18, 0.45)
+			end
+
+			task.wait(0.18)
+		end
+
+		if cloudModel.Parent then
+			for _, descendant in ipairs(cloudModel:GetDescendants()) do
+				if descendant:IsA("BasePart") then
+					tweenPart(descendant, 1.2, {
+						Transparency = 1,
+					}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				end
+			end
+			Debris:AddItem(cloudModel, 1.4)
+		end
+	end)
+end
+
 function InteractionService:_wireSnackMixer(mixer)
 	local prompt = getPrompt(mixer)
 	local bowl = mixer:FindFirstChild("MixerBowl", true)
@@ -3853,22 +4136,32 @@ function InteractionService:_wireSnackMixer(mixer)
 		for index = 1, 7 do
 			rotateBladeRecords(beaterLeft, leftBladeRecords, math.rad(index * 65))
 			rotateBladeRecords(beaterRight, rightBladeRecords, math.rad(-index * 65))
+			if index <= 4 then
+				local previewPuff = Instance.new("Part")
+				previewPuff.Name = "MixerCloudPreview"
+				previewPuff.Anchored = true
+				previewPuff.CanCollide = false
+				previewPuff.CastShadow = false
+				previewPuff.Shape = Enum.PartType.Ball
+				previewPuff.Size = Vector3.new(1.2, 0.85, 1.2) * (0.85 + index * 0.1)
+				previewPuff.Color = Color3.fromRGB(238, 245, 255)
+				previewPuff.Material = Enum.Material.SmoothPlastic
+				previewPuff.Transparency = 0.1
+				previewPuff.CFrame = bowl.CFrame + Vector3.new(math.sin(index) * 1.4, 1.5 + index * 0.24, math.cos(index) * 1.4)
+				previewPuff.Parent = workspace
+				CollectionService:AddTag(previewPuff, Constants.Tags.TemporaryObject)
+				tweenPart(previewPuff, 0.9, {
+					CFrame = previewPuff.CFrame + Vector3.new(0, 1.3, 0),
+					Transparency = 1,
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Debris:AddItem(previewPuff, 1.1)
+			end
 
-			local cloud = Instance.new("Part")
-			cloud.Name = "MixerCloud"
-			cloud.Anchored = true
-			cloud.CanCollide = false
-			cloud.Shape = Enum.PartType.Ball
-			cloud.Size = Vector3.new(1.5, 1.5, 1.5) * (0.75 + index * 0.1)
-			cloud.Color = Color3.fromRGB(238, 245, 255)
-			cloud.Material = Enum.Material.Neon
-			cloud.Transparency = 0.18
-			cloud.CFrame = bowl.CFrame + Vector3.new(math.sin(index) * 1.8, 1.5 + index * 0.45, math.cos(index) * 1.8)
-			cloud.Parent = workspace
-			CollectionService:AddTag(cloud, Constants.Tags.TemporaryObject)
-			Debris:AddItem(cloud, 3)
 			task.wait(0.12)
 		end
+
+		self:_startMixerPersonalWeather(player, bowl)
+		self.systemMessageRemote:FireClient(player, "The mixer made personal weather. It follows you now.")
 
 		task.wait(1)
 		self.resetService.RestoreInstance(mixer)
