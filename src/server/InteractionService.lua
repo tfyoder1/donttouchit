@@ -2101,6 +2101,34 @@ function InteractionService:_wireTreetopZipline(zipline)
 		local startPosition = (typeof(startCFrame) == "CFrame" and startCFrame.Position) or rootPart.Position
 		local endPosition = (typeof(endCFrame) == "CFrame" and endCFrame.Position) or Constants.GetRoomSpawnCFrame("Island").Position
 		local finalCFrame = typeof(endCFrame) == "CFrame" and endCFrame or Constants.GetRoomSpawnCFrame("Island")
+		local pathPoints = {}
+		local pathPointCount = zipline:GetAttribute("PathPointCount")
+		if typeof(pathPointCount) == "number" then
+			for index = 1, pathPointCount do
+				local point = zipline:GetAttribute("PathPoint" .. index)
+				if typeof(point) == "Vector3" then
+					table.insert(pathPoints, point)
+				end
+			end
+		end
+
+		if #pathPoints < 2 then
+			pathPoints = { startPosition, endPosition }
+		end
+
+		local function getPathPosition(alpha)
+			alpha = math.clamp(alpha, 0, 1)
+			local segmentCount = #pathPoints - 1
+			if segmentCount <= 0 then
+				return endPosition
+			end
+
+			local scaled = alpha * segmentCount
+			local index = math.clamp(math.floor(scaled) + 1, 1, segmentCount)
+			local segmentAlpha = scaled - (index - 1)
+			local smoothAlpha = segmentAlpha * segmentAlpha * (3 - 2 * segmentAlpha)
+			return pathPoints[index]:Lerp(pathPoints[index + 1], smoothAlpha)
+		end
 
 		if humanoid then
 			humanoid.AutoRotate = false
@@ -2109,17 +2137,68 @@ function InteractionService:_wireTreetopZipline(zipline)
 		rootPart.AssemblyAngularVelocity = Vector3.zero
 		rootPart.Anchored = true
 
-		for step = 0, 66 do
+		local warpEmitter = Instance.new("ParticleEmitter")
+		warpEmitter.Name = "ZiplineTimeWarpTrail"
+		warpEmitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		warpEmitter.Color = ColorSequence.new(Color3.fromRGB(119, 255, 203), Color3.fromRGB(150, 112, 255))
+		warpEmitter.LightEmission = 0.7
+		warpEmitter.Rate = 80
+		warpEmitter.Lifetime = NumberRange.new(0.35, 0.8)
+		warpEmitter.Speed = NumberRange.new(1.5, 6)
+		warpEmitter.SpreadAngle = Vector2.new(180, 180)
+		warpEmitter.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.55),
+			NumberSequenceKeypoint.new(0.55, 1.8),
+			NumberSequenceKeypoint.new(1, 0.1),
+		})
+		warpEmitter.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.05),
+			NumberSequenceKeypoint.new(0.65, 0.28),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		warpEmitter.Parent = rootPart
+		Debris:AddItem(warpEmitter, 6)
+
+		local warpLight = Instance.new("PointLight")
+		warpLight.Name = "ZiplineTimeWarpLight"
+		warpLight.Color = Color3.fromRGB(119, 255, 203)
+		warpLight.Brightness = 2.6
+		warpLight.Range = 16
+		warpLight.Parent = rootPart
+		Debris:AddItem(warpLight, 6)
+
+		for step = 0, 96 do
 			if not player.Parent or not rootPart.Parent then
 				break
 			end
 
-			local alpha = step / 66
-			local eased = 1 - (1 - alpha) * (1 - alpha)
-			local arc = math.sin(math.pi * alpha) * 5
-			local position = startPosition:Lerp(endPosition, eased) + Vector3.new(0, arc, 0)
-			rootPart.CFrame = CFrame.new(position, endPosition)
+			local alpha = step / 96
+			local position = getPathPosition(alpha)
+			local lookPosition = getPathPosition(math.min(1, alpha + 0.018))
+			if (lookPosition - position).Magnitude < 0.05 then
+				lookPosition = endPosition
+			end
+
+			local roll = math.sin(alpha * math.pi * 10) * 0.3
+			local warpPulse = math.sin(alpha * math.pi * 16)
+			if warpLight then
+				warpLight.Brightness = 2.1 + math.max(0, warpPulse) * 2.2
+				warpLight.Color = Color3.fromRGB(
+					90 + math.floor(math.max(0, warpPulse) * 90),
+					220,
+					255 - math.floor(math.max(0, warpPulse) * 70)
+				)
+			end
+
+			rootPart.CFrame = CFrame.new(position, lookPosition) * CFrame.Angles(0, 0, roll)
 			task.wait(1 / 30)
+		end
+
+		if warpEmitter then
+			warpEmitter.Enabled = false
+		end
+		if warpLight then
+			warpLight.Enabled = false
 		end
 
 		if rootPart.Parent then

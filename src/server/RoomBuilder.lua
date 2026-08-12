@@ -720,6 +720,14 @@ local LIBRARY_LOFT_SPAWN_CFRAME = CFrame.new(Vector3.new(-14, 17.6, -45), Vector
 local LIBRARY_LOFT_RETURN_CFRAME = CFrame.new(Vector3.new(-8.8, 10.6, -13.0), Vector3.new(-8.8, 9.8, -16.55))
 local TREETOP_ENTRY_CFRAME = CFrame.new(Vector3.new(-14, 29, -220), Vector3.new(-7, 29, -240))
 local TREETOP_ZIPLINE_END_CFRAME = CFrame.new(Vector3.new(0, 5.8, 132), Vector3.new(0, 4, 154))
+local TREETOP_ZIPLINE_PATH_POINTS = {
+	Vector3.new(-14, 32, -229),
+	Vector3.new(16, 44, -156),
+	Vector3.new(16, 52, -48),
+	Vector3.new(-24, 46, 58),
+	Vector3.new(-10, 28, 108),
+	TREETOP_ZIPLINE_END_CFRAME.Position + Vector3.new(0, 5, 0),
+}
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
 local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
@@ -1885,11 +1893,91 @@ local function makeBowlingAdTv(parent, name, cframe, adOffset, laneIndex)
 	return tv
 end
 
+local function createZiplineFrame(parent, name, cframe, width, height, color)
+	local top = createPart(parent, name .. "Top", Vector3.new(width, 0.16, 0.22), cframe * CFrame.new(0, height / 2, 0), color, Enum.Material.Neon)
+	local bottom = createPart(parent, name .. "Bottom", Vector3.new(width, 0.16, 0.22), cframe * CFrame.new(0, -height / 2, 0), color, Enum.Material.Neon)
+	local left = createPart(parent, name .. "Left", Vector3.new(0.16, height, 0.22), cframe * CFrame.new(-width / 2, 0, 0), color, Enum.Material.Neon)
+	local right = createPart(parent, name .. "Right", Vector3.new(0.16, height, 0.22), cframe * CFrame.new(width / 2, 0, 0), color, Enum.Material.Neon)
+
+	for _, part in ipairs({ top, bottom, left, right }) do
+		part.CanCollide = false
+		part:SetAttribute("BaseCanCollide", false)
+	end
+end
+
+local function createZiplineWarpCorridor(parent, pathPoints)
+	local tunnel = makeModel(parent, "ZiplineParallaxWarpTunnel")
+	local colors = {
+		Color3.fromRGB(30, 54, 94),
+		Color3.fromRGB(44, 18, 80),
+		Color3.fromRGB(14, 72, 91),
+		Color3.fromRGB(69, 36, 112),
+	}
+
+	for index = 1, #pathPoints - 1 do
+		local startPoint = pathPoints[index]
+		local endPoint = pathPoints[index + 1]
+		local midpoint = (startPoint + endPoint) / 2
+		local length = (endPoint - startPoint).Magnitude
+		local segmentCFrame = CFrame.new(midpoint, endPoint)
+		local color = colors[((index - 1) % #colors) + 1]
+
+		for _, data in ipairs({
+			{ Name = "LeftWall", Offset = CFrame.new(-18, 0, 0), Size = Vector3.new(0.5, 34, length + 8), Color = color, Transparency = 0.08 },
+			{ Name = "RightWall", Offset = CFrame.new(18, 0, 0), Size = Vector3.new(0.5, 34, length + 8), Color = color, Transparency = 0.08 },
+			{ Name = "Ceiling", Offset = CFrame.new(0, 17, 0), Size = Vector3.new(36, 0.45, length + 8), Color = Color3.fromRGB(15, 22, 54), Transparency = 0.18 },
+			{ Name = "FloorMist", Offset = CFrame.new(0, -13, 0), Size = Vector3.new(36, 0.34, length + 8), Color = Color3.fromRGB(69, 201, 255), Transparency = 0.54 },
+		}) do
+			local panel = createPart(tunnel, ("ZiplineWarp%d%s"):format(index, data.Name), data.Size, segmentCFrame * data.Offset, data.Color, Enum.Material.SmoothPlastic)
+			panel.Transparency = data.Transparency
+			panel.CanCollide = false
+			panel:SetAttribute("BaseTransparency", data.Transparency)
+			panel:SetAttribute("BaseCanCollide", false)
+		end
+
+		for stripeIndex = 1, 4 do
+			local z = -length / 2 + stripeIndex * length / 5
+			local stripeColor = BOWLING_COSMIC_COLORS[((index + stripeIndex - 2) % #BOWLING_COSMIC_COLORS) + 1]
+			local leftStripe = createPart(tunnel, ("ZiplineWarp%dLeftStripe%d"):format(index, stripeIndex), Vector3.new(0.14, 0.18, 8), segmentCFrame * CFrame.new(-17.55, -8 + stripeIndex * 4, z) * CFrame.Angles(0, 0, math.rad(18)), stripeColor, Enum.Material.Neon)
+			local rightStripe = createPart(tunnel, ("ZiplineWarp%dRightStripe%d"):format(index, stripeIndex), Vector3.new(0.14, 0.18, 8), segmentCFrame * CFrame.new(17.55, 8 - stripeIndex * 4, z) * CFrame.Angles(0, 0, math.rad(-18)), stripeColor, Enum.Material.Neon)
+			leftStripe.CanCollide = false
+			rightStripe.CanCollide = false
+			leftStripe:SetAttribute("BaseCanCollide", false)
+			rightStripe:SetAttribute("BaseCanCollide", false)
+		end
+
+		for ringIndex = 1, 3 do
+			local alpha = ringIndex / 4
+			local ringPosition = startPoint:Lerp(endPoint, alpha)
+			local ringCFrame = CFrame.new(ringPosition, endPoint)
+			local ringColor = BOWLING_COSMIC_COLORS[((index + ringIndex - 2) % #BOWLING_COSMIC_COLORS) + 1]
+			createZiplineFrame(tunnel, ("ZiplineWarpRing%d_%d"):format(index, ringIndex), ringCFrame, 25 + ringIndex * 2, 17 + ringIndex, ringColor)
+
+			local angle = math.rad((index * 50 + ringIndex * 80) % 360)
+			local dot = createPart(
+				tunnel,
+				("ZiplineWarpSpiralDot%d_%d"):format(index, ringIndex),
+				Vector3.new(1.2, 1.2, 1.2),
+				ringCFrame * CFrame.new(math.cos(angle) * 12, math.sin(angle) * 7, 0),
+				ringColor,
+				Enum.Material.Neon
+			)
+			dot.Shape = Enum.PartType.Ball
+			dot.CanCollide = false
+			dot:SetAttribute("BaseCanCollide", false)
+		end
+	end
+
+	tunnel.PrimaryPart = tunnel:FindFirstChildWhichIsA("BasePart", true)
+	return tunnel
+end
+
 local function makeTreetopZiplineArea(room, bowlingOrigin)
 	local treetop = makeModel(room, "TreetopZiplineArea")
 	local platformCenter = Vector3.new(-14, 26.15, -224)
-	local ziplineStart = Vector3.new(-14, 32, -229)
-	local ziplineEnd = TREETOP_ZIPLINE_END_CFRAME.Position + Vector3.new(0, 5, 0)
+	local ziplinePath = TREETOP_ZIPLINE_PATH_POINTS
+	local ziplineStart = ziplinePath[1]
+	local ziplineEnd = ziplinePath[#ziplinePath]
 
 	local accessDoor = createPart(
 		room,
@@ -1946,8 +2034,14 @@ local function makeTreetopZiplineArea(room, bowlingOrigin)
 	local cliff = createPart(treetop, "TreetopCliffFace", Vector3.new(28, 18, 1.2), CFrame.new(platformCenter + Vector3.new(0, -8, -9.4)), Color3.fromRGB(93, 91, 85), Enum.Material.Slate)
 	cliff:SetAttribute("BaseCanCollide", true)
 
-	createBeamBetween(treetop, "IslandZiplineCable", ziplineStart, ziplineEnd, 0.24, Color3.fromRGB(35, 38, 42), Enum.Material.Metal)
-	createBeamBetween(treetop, "IslandZiplineGuideGlow", ziplineStart + Vector3.new(0, -0.35, 0), ziplineEnd + Vector3.new(0, -0.35, 0), 0.08, Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	createZiplineWarpCorridor(treetop, ziplinePath)
+
+	for segmentIndex = 1, #ziplinePath - 1 do
+		local startPoint = ziplinePath[segmentIndex]
+		local endPoint = ziplinePath[segmentIndex + 1]
+		createBeamBetween(treetop, "IslandZiplineCable" .. segmentIndex, startPoint, endPoint, 0.24, Color3.fromRGB(35, 38, 42), Enum.Material.Metal)
+		createBeamBetween(treetop, "IslandZiplineGuideGlow" .. segmentIndex, startPoint + Vector3.new(0, -0.35, 0), endPoint + Vector3.new(0, -0.35, 0), 0.08, BOWLING_COSMIC_COLORS[((segmentIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Enum.Material.Neon)
+	end
 
 	local zipHandle = createPart(
 		treetop,
@@ -1959,6 +2053,10 @@ local function makeTreetopZiplineArea(room, bowlingOrigin)
 	)
 	zipHandle:SetAttribute("StartCFrame", CFrame.new(ziplineStart + Vector3.new(0, -3, 3), ziplineEnd))
 	zipHandle:SetAttribute("EndCFrame", TREETOP_ZIPLINE_END_CFRAME)
+	zipHandle:SetAttribute("PathPointCount", #ziplinePath)
+	for index, point in ipairs(ziplinePath) do
+		zipHandle:SetAttribute("PathPoint" .. index, point)
+	end
 	createPrompt(zipHandle, "Ride", "Zipline to Island", 0.2)
 	tag(zipHandle, Constants.Tags.TreetopZipline)
 
@@ -2457,16 +2555,18 @@ local function makeIslandRoom(roomFolder)
 		end
 
 		for _, data in ipairs({
-			{ Name = "NorthSkyParallaxFar", Size = Vector3.new(170, 30, 0.34), CFrame = cframeAt(origin, 0, 14, 88), Color = Color3.fromRGB(132, 213, 255), Transparency = 0.54 },
-			{ Name = "NorthOceanParallaxMid", Size = Vector3.new(170, 8, 0.3), CFrame = cframeAt(origin, 0, 5.5, 86.6), Color = Color3.fromRGB(40, 149, 213), Transparency = 0.18 },
-			{ Name = "NorthCloudParallaxNear", Size = Vector3.new(44, 2.8, 0.24), CFrame = cframeAt(origin, -28, 20.5, 85.8), Color = Color3.fromRGB(235, 248, 255), Transparency = 0.34 },
-			{ Name = "NorthCloudParallaxWide", Size = Vector3.new(34, 2.4, 0.24), CFrame = cframeAt(origin, 31, 18.4, 85.6), Color = Color3.fromRGB(229, 244, 255), Transparency = 0.42 },
-			{ Name = "SouthSkyParallaxFar", Size = Vector3.new(170, 30, 0.34), CFrame = cframeAt(origin, 0, 14, -29), Color = Color3.fromRGB(118, 197, 238), Transparency = 0.62 },
-			{ Name = "SouthOceanParallaxMid", Size = Vector3.new(170, 7, 0.3), CFrame = cframeAt(origin, 0, 5.0, -27.8), Color = Color3.fromRGB(37, 137, 202), Transparency = 0.28 },
-			{ Name = "WestSkyParallaxFar", Size = Vector3.new(0.34, 30, 122), CFrame = cframeAt(origin, -76, 14, 31), Color = Color3.fromRGB(109, 192, 238), Transparency = 0.62 },
-			{ Name = "WestOceanParallaxMid", Size = Vector3.new(0.3, 7, 122), CFrame = cframeAt(origin, -74.6, 5.0, 31), Color = Color3.fromRGB(40, 148, 213), Transparency = 0.26 },
-			{ Name = "EastSkyParallaxFar", Size = Vector3.new(0.34, 30, 122), CFrame = cframeAt(origin, 76, 14, 31), Color = Color3.fromRGB(109, 192, 238), Transparency = 0.62 },
-			{ Name = "EastOceanParallaxMid", Size = Vector3.new(0.3, 7, 122), CFrame = cframeAt(origin, 74.6, 5.0, 31), Color = Color3.fromRGB(40, 148, 213), Transparency = 0.26 },
+			{ Name = "NorthSkyParallaxFar", Size = Vector3.new(170, 96, 0.82), CFrame = cframeAt(origin, 0, 46, 88), Color = Color3.fromRGB(132, 213, 255), Transparency = 0.05 },
+			{ Name = "NorthOceanParallaxMid", Size = Vector3.new(170, 16, 0.74), CFrame = cframeAt(origin, 0, 6.6, 86.6), Color = Color3.fromRGB(40, 149, 213), Transparency = 0.04 },
+			{ Name = "NorthCloudParallaxNear", Size = Vector3.new(50, 3.4, 0.58), CFrame = cframeAt(origin, -28, 24.5, 85.8), Color = Color3.fromRGB(235, 248, 255), Transparency = 0.16 },
+			{ Name = "NorthCloudParallaxWide", Size = Vector3.new(42, 2.8, 0.58), CFrame = cframeAt(origin, 31, 21.4, 85.6), Color = Color3.fromRGB(229, 244, 255), Transparency = 0.2 },
+			{ Name = "SouthSkyParallaxFar", Size = Vector3.new(170, 96, 0.82), CFrame = cframeAt(origin, 0, 46, -29), Color = Color3.fromRGB(118, 197, 238), Transparency = 0.05 },
+			{ Name = "SouthOceanParallaxMid", Size = Vector3.new(170, 16, 0.74), CFrame = cframeAt(origin, 0, 6.2, -27.8), Color = Color3.fromRGB(37, 137, 202), Transparency = 0.05 },
+			{ Name = "WestSkyParallaxFar", Size = Vector3.new(0.82, 96, 130), CFrame = cframeAt(origin, -76, 46, 31), Color = Color3.fromRGB(109, 192, 238), Transparency = 0.05 },
+			{ Name = "WestOceanParallaxMid", Size = Vector3.new(0.74, 16, 130), CFrame = cframeAt(origin, -74.6, 6.2, 31), Color = Color3.fromRGB(40, 148, 213), Transparency = 0.05 },
+			{ Name = "EastSkyParallaxFar", Size = Vector3.new(0.82, 96, 130), CFrame = cframeAt(origin, 76, 46, 31), Color = Color3.fromRGB(109, 192, 238), Transparency = 0.05 },
+			{ Name = "EastOceanParallaxMid", Size = Vector3.new(0.74, 16, 130), CFrame = cframeAt(origin, 74.6, 6.2, 31), Color = Color3.fromRGB(40, 148, 213), Transparency = 0.05 },
+			{ Name = "IslandSkyParallaxCanopy", Size = Vector3.new(170, 0.74, 130), CFrame = cframeAt(origin, 0, 82, 31), Color = Color3.fromRGB(122, 207, 248), Transparency = 0.18 },
+			{ Name = "IslandHighCloudWrap", Size = Vector3.new(130, 0.42, 32), CFrame = cframeAt(origin, -8, 70, 14), Color = Color3.fromRGB(238, 249, 255), Transparency = 0.42 },
 		}) do
 			makeIslandBackdrop(data.Name, data.Size, data.CFrame, data.Color, data.Transparency)
 		end
@@ -2488,10 +2588,10 @@ local function makeIslandRoom(roomFolder)
 		end
 
 		for _, data in ipairs({
-			{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, -31, 8, 5) },
-			{ Name = "IslandBoundaryRight", Size = Vector3.new(1, 16, 68), CFrame = cframeAt(origin, 31, 8, 5) },
-			{ Name = "IslandBoundaryBack", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, 34) },
-			{ Name = "IslandBoundaryFront", Size = Vector3.new(62, 16, 1), CFrame = cframeAt(origin, 0, 8, -25) },
+			{ Name = "IslandBoundaryLeft", Size = Vector3.new(1, 34, 68), CFrame = cframeAt(origin, -31, 17, 5) },
+			{ Name = "IslandBoundaryRight", Size = Vector3.new(1, 34, 68), CFrame = cframeAt(origin, 31, 17, 5) },
+			{ Name = "IslandBoundaryBack", Size = Vector3.new(62, 34, 1), CFrame = cframeAt(origin, 0, 17, 34) },
+			{ Name = "IslandBoundaryFront", Size = Vector3.new(62, 34, 1), CFrame = cframeAt(origin, 0, 17, -25) },
 		}) do
 			local boundary = createPart(room, data.Name, data.Size, data.CFrame, Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
 			boundary.Transparency = 1
