@@ -2306,11 +2306,33 @@ local function makeVoidRoom(roomFolder)
 
 	local rayPedestal = createPart(room, "VoidFreezeRayPedestal", Vector3.new(5, 1.2, 3.4), cframeAt(origin, 12.5, 1.1, 9.5), Color3.fromRGB(34, 45, 68), Enum.Material.Metal)
 	createSurfaceText(rayPedestal, "VoidPrizeText", "PRIZE\nMAY CHILL", Enum.NormalId.Front, Color3.fromRGB(203, 255, 255), Color3.fromRGB(34, 45, 68))
-	local freezeRay = createPart(room, "VoidFreezeRay", Vector3.new(3.2, 0.42, 0.42), cframeAt(origin, 12.5, 2.3, 9.5) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(108, 231, 255), Enum.Material.Neon)
+	local rayCenter = origin + Vector3.new(12.5, 2.55, 9.55)
+	local freezeRay = createPart(room, "VoidFreezeRay", Vector3.new(0.62, 3.45, 0.62), CFrame.new(rayCenter + Vector3.new(0, 0, -0.72)) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(55, 179, 255), Enum.Material.Neon)
 	freezeRay.Shape = Enum.PartType.Cylinder
-	local freezeTip = createPart(room, "VoidFreezeRayTip", Vector3.new(0.8, 0.8, 0.8), cframeAt(origin, 12.5, 2.3, 7.75), Color3.fromRGB(230, 255, 255), Enum.Material.Neon)
+	freezeRay.CanCollide = false
+	freezeRay:SetAttribute("BaseCanCollide", false)
+	local rayBody = createPart(room, "VoidFreezeRayBody", Vector3.new(1.45, 0.92, 1.22), CFrame.new(rayCenter + Vector3.new(0, -0.03, 0.7)), Color3.fromRGB(36, 116, 210), Enum.Material.Metal)
+	local rearBubble = createPart(room, "VoidFreezeRayRearBubble", Vector3.new(1.05, 1.05, 1.05), CFrame.new(rayCenter + Vector3.new(0, 0.02, 1.46)), Color3.fromRGB(84, 219, 255), Enum.Material.Glass)
+	rearBubble.Shape = Enum.PartType.Ball
+	local grip = createPart(room, "VoidFreezeRayGrip", Vector3.new(0.58, 1.55, 0.5), CFrame.new(rayCenter + Vector3.new(0, -1.0, 0.86)) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(21, 59, 111), Enum.Material.Metal)
+	local gripPommel = createPart(room, "VoidFreezeRayGripPommel", Vector3.new(0.82, 0.26, 0.66), CFrame.new(rayCenter + Vector3.new(0, -1.78, 1.03)) * CFrame.Angles(math.rad(-14), 0, 0), Color3.fromRGB(18, 42, 78), Enum.Material.Metal)
+	local triggerGuard = createPart(room, "VoidFreezeRayTriggerGuard", Vector3.new(0.16, 0.62, 0.9), CFrame.new(rayCenter + Vector3.new(0, -0.56, 0.08)) * CFrame.Angles(math.rad(18), 0, 0), Color3.fromRGB(178, 230, 255), Enum.Material.Metal)
+	local trigger = createPart(room, "VoidFreezeRayTrigger", Vector3.new(0.2, 0.42, 0.24), CFrame.new(rayCenter + Vector3.new(0, -0.62, 0.34)) * CFrame.Angles(math.rad(-18), 0, 0), Color3.fromRGB(8, 20, 42), Enum.Material.Metal)
+	local muzzleRing = createPart(room, "VoidFreezeRayMuzzleRing", Vector3.new(0.98, 0.32, 0.98), CFrame.new(rayCenter + Vector3.new(0, 0, -2.52)) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(181, 236, 255), Enum.Material.Metal)
+	muzzleRing.Shape = Enum.PartType.Cylinder
+	local rearRing = createPart(room, "VoidFreezeRayRearRing", Vector3.new(0.9, 0.28, 0.9), CFrame.new(rayCenter + Vector3.new(0, 0, -0.02)) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(145, 225, 255), Enum.Material.Metal)
+	rearRing.Shape = Enum.PartType.Cylinder
+	local topFin = createPart(room, "VoidFreezeRayTopFin", Vector3.new(0.2, 0.78, 0.92), CFrame.new(rayCenter + Vector3.new(0, 0.74, 0.36)) * CFrame.Angles(math.rad(-18), 0, 0), Color3.fromRGB(98, 204, 255), Enum.Material.Neon)
+	local antennaStem = createPart(room, "VoidFreezeRayAntennaStem", Vector3.new(0.14, 0.72, 0.14), CFrame.new(rayCenter + Vector3.new(0, 1.08, 1.12)) * CFrame.Angles(math.rad(16), 0, 0), Color3.fromRGB(181, 236, 255), Enum.Material.Metal)
+	antennaStem.Shape = Enum.PartType.Cylinder
+	local antennaOrb = createPart(room, "VoidFreezeRayAntennaOrb", Vector3.new(0.34, 0.34, 0.34), CFrame.new(rayCenter + Vector3.new(0, 1.45, 1.0)), Color3.fromRGB(120, 255, 255), Enum.Material.Neon)
+	antennaOrb.Shape = Enum.PartType.Ball
+	local freezeTip = createPart(room, "VoidFreezeRayTip", Vector3.new(0.76, 0.76, 0.76), CFrame.new(rayCenter + Vector3.new(0, 0, -2.78)), Color3.fromRGB(230, 255, 255), Enum.Material.Neon)
 	freezeTip.Shape = Enum.PartType.Ball
-	createBeamBetween(room, "VoidFreezeRayHandle", freezeRay.Position + Vector3.new(0, -0.55, 0.2), freezeRay.Position + Vector3.new(0, -1.05, 0.2), 0.24, Color3.fromRGB(26, 32, 46), Enum.Material.Metal)
+	for _, rayPart in ipairs({ rayBody, rearBubble, grip, gripPommel, triggerGuard, trigger, muzzleRing, rearRing, topFin, antennaStem, antennaOrb, freezeTip }) do
+		rayPart.CanCollide = false
+		rayPart:SetAttribute("BaseCanCollide", false)
+	end
 	createPrompt(freezeRay, "Take", "Freeze Ray Prototype", 0)
 	tag(freezeRay, Constants.Tags.VoidFreezeRay)
 
