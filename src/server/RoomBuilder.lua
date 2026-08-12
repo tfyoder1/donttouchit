@@ -2536,9 +2536,10 @@ local function makeBowlingAlley(roomFolder)
 		makeBowlingPins(room, laneIndex, laneX, -26, origin)
 	end
 
-	local machinery = createPart(room, "BowlingPinMachine", Vector3.new(40, 14.2, 5.6), CFrame.new(origin + Vector3.new(0, 7.35, -34.2)), Color3.fromRGB(48, 52, 63), Enum.Material.Metal)
+	local pinMachineWidth = 32.2
+	local machinery = createPart(room, "BowlingPinMachine", Vector3.new(pinMachineWidth, 14.2, 5.6), CFrame.new(origin + Vector3.new(0, 7.35, -34.2)), Color3.fromRGB(48, 52, 63), Enum.Material.Metal)
 	createSurfaceText(machinery, "PinMachineText", "PIN MACHINE\nDO NOT ENTER", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(48, 52, 63))
-	local machineCap = createPart(room, "BowlingPinMachineCap", Vector3.new(41.5, 1.2, 6.6), CFrame.new(origin + Vector3.new(0, 14.9, -34.2)), Color3.fromRGB(33, 36, 46), Enum.Material.Metal)
+	local machineCap = createPart(room, "BowlingPinMachineCap", Vector3.new(pinMachineWidth, 1.2, 6.6), CFrame.new(origin + Vector3.new(0, 14.9, -34.2)), Color3.fromRGB(33, 36, 46), Enum.Material.Metal)
 	machineCap:SetAttribute("CosmicSurface", true)
 
 	local maintenanceDoor = createPart(
