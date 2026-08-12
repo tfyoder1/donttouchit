@@ -961,7 +961,9 @@ local function makeHallway(roomFolder)
 
 	local label = createPart(hallway, "HallwaySign", Vector3.new(9.5, 2.2, 0.3), CFrame.new(0, 7.1, 22), Color3.fromRGB(250, 238, 111), Enum.Material.SmoothPlastic)
 	createSurfaceText(label, "HallwaySignText", "ROOMS", Enum.NormalId.Back, Color3.fromRGB(22, 22, 26), Color3.fromRGB(250, 238, 111))
-	local oceanSign = createPart(hallway, "IslandApproachSign", Vector3.new(7.2, 1.9, 0.3), CFrame.new(0, 6.4, 88), Color3.fromRGB(112, 222, 255), Enum.Material.SmoothPlastic)
+	local oceanSign = createPart(hallway, "IslandApproachSign", Vector3.new(7.2, 1.9, 0.3), CFrame.new(0, 8.15, 88), Color3.fromRGB(112, 222, 255), Enum.Material.SmoothPlastic)
+	oceanSign.CanCollide = false
+	oceanSign:SetAttribute("BaseCanCollide", false)
 	createSurfaceText(oceanSign, "IslandApproachSignText", "LONG HALLWAY\nFROM A SHORT VACATION", Enum.NormalId.Back, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSurfaceText(oceanSign, "IslandApproachReturnText", "THIS WAY\nTO PARADISE", Enum.NormalId.Front, Color3.fromRGB(18, 42, 54), Color3.fromRGB(112, 222, 255))
 	createSpawnLocation(hallway, "HallwaySpawn", "Hallway", Constants.Hallway.SpawnCFrame, Color3.fromRGB(96, 194, 134), false)
