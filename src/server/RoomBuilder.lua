@@ -721,7 +721,7 @@ local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
 local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
 local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
-local ISLAND_RETURN_CFRAME = CFrame.new(0, 3, 113)
+local ISLAND_RETURN_CFRAME = CFrame.new(Vector3.new(0, 3, 103), Vector3.new(0, 3, 88))
 local SPACE_STATION_ORIGIN = Vector3.new(92, 80, 150)
 local SPACE_STATION_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("SpaceStation")
 local ISLAND_SPACE_BLOCK_ID = "bent_palm_orbit_block"
@@ -1033,17 +1033,21 @@ local function makeHallway(roomFolder)
 		"Something behind this door is still rehearsing."
 	)
 
-	local islandDoor = makeHallDoor(
-		hallway,
-		"IslandDoor",
-		Vector3.new(7, 8.5, 0.45),
-		CFrame.new(0, 4.75, 121),
+		local islandDoor = makeHallDoor(
+			hallway,
+			"IslandDoor",
+			Vector3.new(7, 8.5, 0.45),
+			CFrame.new(0, 4.75, 121),
 		Enum.NormalId.Back,
 		"ISLAND",
 		ISLAND_SPAWN_CFRAME,
-		nil,
-		"Island"
-	)
+			nil,
+			"Island"
+		)
+		local islandDoorPrompt = islandDoor:FindFirstChild("InteractPrompt", true)
+		if islandDoorPrompt and islandDoorPrompt:IsA("ProximityPrompt") then
+			islandDoorPrompt.MaxActivationDistance = 6
+		end
 
 	local returnPad = createPart(hallway, "HallwayLanding", Vector3.new(8, 0.25, 8), CFrame.new(HALLWAY_SPAWN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(96, 194, 134), Enum.Material.Neon)
 	returnPad.Transparency = 0.35
@@ -2494,7 +2498,8 @@ local function makeIslandRoom(roomFolder)
 		exitGate:SetAttribute("RoomId", "Island")
 		exitGate:SetAttribute("ExitMode", "Door")
 		createSurfaceText(exitGate, "IslandExitText", "HALLWAY", Enum.NormalId.Front, Color3.fromRGB(231, 247, 255), Color3.fromRGB(35, 55, 70))
-		createPrompt(exitGate, "Leave", "Hallway", 0)
+		local exitPrompt = createPrompt(exitGate, "Leave", "Hallway", 0)
+		exitPrompt.MaxActivationDistance = 6
 		tag(exitGate, Constants.Tags.IslandExit)
 
 		for _, data in ipairs({

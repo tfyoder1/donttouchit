@@ -409,14 +409,15 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandTreasureState = {}
 	self.islandColaState = {}
 	self.islandCoconutState = {}
-	self.islandCoconutTreeState = {}
-	self.islandScrapWoodState = {}
-	self.islandWoodCountByUserId = {}
-	self.islandFireRingState = {}
-	self.islandSkyBlockState = {}
-	self.islandSpaceLadderState = {}
-	self.spaceStationState = {}
-	self.secretDoorState = {}
+		self.islandCoconutTreeState = {}
+		self.islandScrapWoodState = {}
+		self.islandWoodCountByUserId = {}
+		self.islandFireRingState = {}
+		self.islandSkyBlockState = {}
+		self.islandSpaceLadderState = {}
+		self.spaceStationState = {}
+		self.teleportCooldownByUserId = {}
+		self.secretDoorState = {}
 	self.libraryLampState = {}
 	self.libraryGlobeState = {}
 	self.libraryLadderState = {}
@@ -767,6 +768,20 @@ function InteractionService:_connectPrompt(prompt, callback)
 
 		callback(player)
 	end)
+end
+
+function InteractionService:_canUseTeleport(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local now = os.clock()
+	if now - (self.teleportCooldownByUserId[player.UserId] or 0) < 1.15 then
+		return false
+	end
+
+	self.teleportCooldownByUserId[player.UserId] = now
+	return true
 end
 
 function InteractionService:_wireDiscoveryPrompt(instance, discoveryId, message)
@@ -2894,14 +2909,18 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 		local destinationCFrame = door:GetAttribute("DestinationCFrame")
-		if typeof(destinationCFrame) ~= "CFrame" then
-			self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
-			return
-		end
+			if typeof(destinationCFrame) ~= "CFrame" then
+				self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
+				return
+			end
 
-		teleportPlayer(player, destinationCFrame)
-	end)
-end
+			if not self:_canUseTeleport(player) then
+				return
+			end
+
+			teleportPlayer(player, destinationCFrame)
+		end)
+	end
 
 function InteractionService:_getRoomDoorRequirementText(player, roomId)
 	local requiredRoomId, requiredCount = Constants.GetRoomUnlockRequirement(roomId)
@@ -4236,6 +4255,10 @@ function InteractionService:_wireIslandExit(exitGate)
 
 	local function returnToHallway(player)
 		if not player or not player.Parent then
+			return
+		end
+
+		if not self:_canUseTeleport(player) then
 			return
 		end
 
