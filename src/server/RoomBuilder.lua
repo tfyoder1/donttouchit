@@ -445,7 +445,7 @@ local function makePedestal(objectsFolder)
 	mark(shine)
 
 	local buttonPrompt = createPrompt(button, "Press", "Absolutely Do Not Touch", 0.15)
-	buttonPrompt.GamepadKeyCode = Enum.KeyCode.ButtonB
+	buttonPrompt.GamepadKeyCode = Enum.KeyCode.ButtonX
 	tag(button, Constants.Tags.MainButton)
 
 	local sign = createPart(
@@ -3140,7 +3140,7 @@ function RoomBuilder.Build()
 	local tvControls = makeRoomControlPanel(
 		roomFolder,
 		"TVRoomInsideControlPanel",
-		CFrame.new(-12.15, 4.7, Constants.Room.Depth / 2 - 0.62),
+		CFrame.new(6.35, 4.7, Constants.Room.Depth / 2 - 0.62),
 		"TVRoom",
 		"TV ROOM",
 		{

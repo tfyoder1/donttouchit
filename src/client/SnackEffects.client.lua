@@ -13,6 +13,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local touchFlightGui = nil
 local touchFlightUpHeld = false
 local touchFlightDownHeld = false
+local FLIGHT_ACTIVE_ATTRIBUTE = "DontTouchItSnackFlightActive"
 
 local SNACK_FLIGHT_HORIZONTAL_SPEED = 38
 local SNACK_FLIGHT_IDLE_VERTICAL = 3
@@ -165,6 +166,7 @@ local function stopFlight()
 
 	activeFlight = nil
 	setTouchFlightControlsVisible(false)
+	playerGui:SetAttribute(FLIGHT_ACTIVE_ATTRIBUTE, false)
 end
 
 local function startFlight(duration, ceilingY)
@@ -201,6 +203,7 @@ local function startFlight(duration, ceilingY)
 	humanoid.AutoRotate = true
 	humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 	setTouchFlightControlsVisible(true)
+	playerGui:SetAttribute(FLIGHT_ACTIVE_ATTRIBUTE, true)
 
 	activeFlight.Connection = RunService.RenderStepped:Connect(function()
 		if not activeFlight or activeFlight.Token ~= token then
@@ -223,7 +226,6 @@ local function startFlight(duration, ceilingY)
 			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 			or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
 			or UserInputService:IsKeyDown(Enum.KeyCode.C)
-			or isAnyGamepadButtonDown(Enum.KeyCode.ButtonB)
 			or isAnyGamepadButtonDown(Enum.KeyCode.ButtonX)
 			or touchFlightDownHeld
 		then
