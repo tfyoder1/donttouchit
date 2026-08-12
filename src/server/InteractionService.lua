@@ -100,6 +100,7 @@ local SNACK_FLIGHT_CEILING_Y = Constants.Rooms.SnackLab.Zone.Max.Y - 5.2
 local SNACK_SLOW_MOTION_DURATION = 12
 local SNACK_SUPER_WIND_GUSTS = 5
 local SNACK_MIXER_WEATHER_DURATION = 35
+local SECURITY_CAMERA_DURATION = 45
 
 local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(119, 255, 203),
@@ -406,6 +407,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.snackEffectRemote = RemoteService.GetRemote(Constants.Remotes.SnackEffect)
 	self.voidEffectRemote = RemoteService.GetRemote(Constants.Remotes.VoidEffect)
+	self.securityCameraRemote = RemoteService.GetRemote(Constants.Remotes.SecurityCamera)
 	self.connectedPrompts = {}
 	self.snackButtonRandom = Random.new()
 	self.couchState = {}
@@ -475,6 +477,8 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.caveLightState = {}
 	self.caveEntranceSealed = false
 	self.caveAlarmActive = false
+	self.securityCameraSessionByUserId = {}
+	self.sleepingAlarmStateByUserId = {}
 	return self
 end
 
@@ -510,6 +514,12 @@ function InteractionService:Initialize()
 		self.islandWoodCountByUserId[player.UserId] = nil
 		self.treetopZiplineStateByUserId[player.UserId] = nil
 		self.voidGravityTokensByUserId[player.UserId] = nil
+		self.securityCameraSessionByUserId[player.UserId] = nil
+		self.sleepingAlarmStateByUserId[player.UserId] = nil
+	end)
+
+	self.securityCameraRemote.OnServerEvent:Connect(function(player, payload)
+		self:_handleSecurityCameraRemote(player, payload)
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -824,6 +834,46 @@ function InteractionService:Initialize()
 		self:_wireCaveKeyDoor(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.SecurityMonitor, function(instance)
+		self:_wireSecurityMonitor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SecurityConsole, function(instance)
+		self:_wireSecurityConsole(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SecurityRedPhone, function(instance)
+		self:_wireSecurityRedPhone(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SecurityTapeDeck, function(instance)
+		self:_wireSecurityTapeDeck(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingBunk, function(instance)
+		self:_wireSleepingBunk(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingAlarmClock, function(instance)
+		self:_wireSleepingAlarmClock(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingLocker, function(instance)
+		self:_wireSleepingLocker(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingDreamButton, function(instance)
+		self:_wireSleepingDreamButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingBlanketFort, function(instance)
+		self:_wireSleepingBlanketFort(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingPillowPile, function(instance)
+		self:_wireSleepingPillowPile(instance)
+	end)
+
 	self:_updateBowlingScoreboards()
 	self:_startBowlingAdRotation()
 	self:_startBowlingMaintenanceMotion()
@@ -884,6 +934,266 @@ function InteractionService:_wireDiscoveryPrompt(instance, discoveryId, message)
 		if message then
 			self.systemMessageRemote:FireClient(player, message)
 		end
+	end)
+end
+
+function InteractionService:_stopSecurityCamera(player, message)
+	self.securityCameraSessionByUserId[player.UserId] = nil
+	self.securityCameraRemote:FireClient(player, {
+		Action = "Stop",
+		Message = message,
+	})
+end
+
+function InteractionService:_handleSecurityCameraRemote(player, payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	local action = payload.Action
+	if action == "Stop" then
+		self:_stopSecurityCamera(player)
+		return
+	end
+
+	if action ~= "HiddenButton" then
+		return
+	end
+
+	local session = self.securityCameraSessionByUserId[player.UserId]
+	if not session or os.clock() > session.ExpiresAt then
+		self.securityCameraSessionByUserId[player.UserId] = nil
+		return
+	end
+
+	self.discoveryService:Unlock(player, Constants.Discoveries.SecurityScreenButton.Id)
+	self.systemMessageRemote:FireClient(player, "The screen-only button admits it was watching you too.")
+	self:_stopSecurityCamera(player, "Button acknowledged. Returning your regular eyeballs.")
+end
+
+function InteractionService:_wireSecurityMonitor(monitor)
+	local prompt = getPrompt(monitor)
+
+	self:_connectPrompt(prompt, function(player)
+		local cameraCFrame = monitor:GetAttribute("CameraCFrame")
+		if typeof(cameraCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "This monitor only shows a very suspicious blank screen.")
+			return
+		end
+
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityMonitorWall.Id)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityCameraView.Id)
+		self.securityCameraSessionByUserId[player.UserId] = {
+			ExpiresAt = os.clock() + SECURITY_CAMERA_DURATION,
+		}
+
+		if monitor:IsA("BasePart") then
+			tweenPart(monitor, 0.18, {
+				Color = Color3.fromRGB(255, 88, 128),
+			})
+		end
+		playSound(monitor, "rbxasset://sounds/electronicpingshort.wav", 0.65, 1.35)
+		self.securityCameraRemote:FireClient(player, {
+			Action = "Start",
+			CameraCFrame = cameraCFrame,
+			Duration = SECURITY_CAMERA_DURATION,
+		})
+		self.systemMessageRemote:FireClient(player, "The monitor changes viewpoint. You appear on the screen with excellent timing.")
+	end)
+end
+
+function InteractionService:_wireSecurityConsole(console)
+	local prompt = getPrompt(console)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityMonitorWall.Id)
+		playSound(console, "rbxasset://sounds/button.wav", 0.5, 0.8)
+		if console:IsA("BasePart") then
+			tweenPart(console, 0.18, {
+				Color = Color3.fromRGB(119, 255, 203),
+			})
+			task.delay(0.65, function()
+				if console.Parent then
+					tweenPart(console, 0.3, {
+						Color = console:GetAttribute("BaseColor") or Color3.fromRGB(30, 39, 50),
+					})
+				end
+			end)
+		end
+		self.systemMessageRemote:FireClient(player, "The monitor wall confirms every camera is looking extremely busy.")
+	end)
+end
+
+function InteractionService:_wireSecurityRedPhone(phone)
+	local prompt = getPrompt(phone)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityRedPhone.Id)
+		for ring = 1, 3 do
+			task.delay((ring - 1) * 0.22, function()
+				playSound(phone, "rbxasset://sounds/electronicpingshort.wav", 0.45, 0.72 + ring * 0.08)
+			end)
+		end
+		if phone:IsA("BasePart") then
+			local baseCFrame = phone:GetAttribute("BaseCFrame") or phone.CFrame
+			tweenPart(phone, 0.12, {
+				CFrame = baseCFrame * CFrame.Angles(0, 0, math.rad(8)),
+			})
+			task.delay(0.22, function()
+				if phone.Parent then
+					tweenPart(phone, 0.18, {
+						CFrame = baseCFrame,
+					})
+				end
+			end)
+		end
+		self.systemMessageRemote:FireClient(player, "The red phone rings once, then decides that was enough responsibility.")
+	end)
+end
+
+function InteractionService:_wireSecurityTapeDeck(tapeDeck)
+	local prompt = getPrompt(tapeDeck)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityTapeDeck.Id)
+		playSound(tapeDeck, "rbxasset://sounds/button.wav", 0.5, 0.48)
+		playSound(tapeDeck, "rbxasset://sounds/electronicpingshort.wav", 0.38, 0.62)
+		setTextLabelText(tapeDeck, "SecurityTapeText", "TAPE 01\nSUBJECT TOUCHED\nTHE TAPE DECK")
+		self.systemMessageRemote:FireClient(player, "The tape deck updates the evidence with troubling efficiency.")
+	end)
+end
+
+function InteractionService:_wireSleepingBunk(bunk)
+	local prompt = getPrompt(bunk)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingCountedBunks.Id)
+		playSound(bunk, "rbxasset://sounds/button.wav", 0.35, 0.6)
+		local total = bunk:GetAttribute("BunkTotal") or 100
+		self.systemMessageRemote:FireClient(player, ("You count %d bunks. That seems like at least several."):format(total))
+	end)
+end
+
+function InteractionService:_wireSleepingAlarmClock(clock)
+	local prompt = getPrompt(clock)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingAlarmClock.Id)
+		local count = (self.sleepingAlarmStateByUserId[player.UserId] or 0) + 1
+		self.sleepingAlarmStateByUserId[player.UserId] = count
+
+		local colors = {
+			Color3.fromRGB(255, 202, 103),
+			Color3.fromRGB(255, 88, 128),
+			Color3.fromRGB(119, 255, 203),
+			Color3.fromRGB(150, 112, 255),
+		}
+		if clock:IsA("BasePart") then
+			tweenPart(clock, 0.16, {
+				Color = colors[((count - 1) % #colors) + 1],
+			})
+		end
+		setTextLabelText(clock, "SleepingAlarmClockText", if count % 2 == 0 then "12:00\nSTILL" else "12:00\nNOPE")
+		playSound(clock, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.15 + (count % 3) * 0.22)
+		self.systemMessageRemote:FireClient(player, "The alarm clock snoozes you back with suspicious patience.")
+	end)
+end
+
+function InteractionService:_wireSleepingLocker(locker)
+	local prompt = getPrompt(locker)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingLocker.Id)
+		playSound(locker, "rbxasset://sounds/snap.wav", 0.5, 0.75)
+		setTextLabelText(locker, "SleepingLockerText", "LOCKER\nEXTRA SOCKS\nCLASSIFIED")
+		if locker:IsA("BasePart") then
+			tweenPart(locker, 0.18, {
+				Color = Color3.fromRGB(119, 255, 203),
+			})
+		end
+		self.systemMessageRemote:FireClient(player, "The locker opens just enough to reveal classified socks.")
+	end)
+end
+
+function InteractionService:_spawnSleepingDreamBubble(source, index)
+	if not source or not source.Parent then
+		return
+	end
+
+	local bubble = Instance.new("Part")
+	bubble.Name = "SleepingDreamBubble"
+	bubble.Anchored = true
+	bubble.CanCollide = false
+	bubble.Shape = Enum.PartType.Ball
+	bubble.Material = Enum.Material.Neon
+	bubble.Color = BOWLING_COSMIC_COLORS[((index - 1) % #BOWLING_COSMIC_COLORS) + 1]
+	bubble.Size = Vector3.new(0.65, 0.65, 0.65)
+	bubble.CFrame = source.CFrame * CFrame.new(math.cos(index) * 2.4, 0.5 + index * 0.18, math.sin(index) * 2.4)
+	bubble.Parent = workspace
+	Debris:AddItem(bubble, 2.4)
+
+	tweenPart(bubble, 2.2, {
+		Transparency = 1,
+		Size = Vector3.new(2.8, 2.8, 2.8),
+		CFrame = bubble.CFrame * CFrame.new(0, 5.5, 0),
+	}, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+end
+
+function InteractionService:_wireSleepingDreamButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingDreamButton.Id)
+		playSound(button, "rbxasset://sounds/electronicpingshort.wav", 0.6, 0.44)
+		for index = 1, 8 do
+			task.delay(index * 0.08, function()
+				self:_spawnSleepingDreamBubble(button, index)
+			end)
+		end
+		self.systemMessageRemote:FireClient(player, "The dream button releases several official-looking bubbles.")
+	end)
+end
+
+function InteractionService:_wireSleepingBlanketFort(fort)
+	local prompt = getPrompt(fort)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingBlanketFort.Id)
+		playSound(fort, "rbxasset://sounds/button.wav", 0.35, 0.54)
+		setTextLabelText(fort, "BlanketFortText", "FORT\nAPPROVED\nPROBABLY")
+		self.systemMessageRemote:FireClient(player, "The blanket fort upgrades itself from suspicious to almost official.")
+	end)
+end
+
+function InteractionService:_wireSleepingPillowPile(pillow)
+	local prompt = getPrompt(pillow)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingPillowPile.Id)
+		playSound(pillow, "rbxasset://sounds/button.wav", 0.4, 1.8)
+
+		if pillow:IsA("BasePart") then
+			for puffIndex = 1, 6 do
+				local puff = Instance.new("Part")
+				puff.Name = "SleepingPillowPuff"
+				puff.Anchored = true
+				puff.CanCollide = false
+				puff.Shape = Enum.PartType.Ball
+				puff.Material = Enum.Material.SmoothPlastic
+				puff.Color = Color3.fromRGB(245, 248, 255)
+				puff.Transparency = 0.28
+				puff.Size = Vector3.new(0.45, 0.25, 0.45)
+				puff.CFrame = pillow.CFrame * CFrame.new(math.cos(puffIndex) * 0.7, 0.4, math.sin(puffIndex) * 0.7)
+				puff.Parent = workspace
+				Debris:AddItem(puff, 1.25)
+				tweenPart(puff, 1.1, {
+					Transparency = 1,
+					Size = Vector3.new(1.5, 0.8, 1.5),
+					CFrame = puff.CFrame * CFrame.new(math.cos(puffIndex) * 2.2, 1.8, math.sin(puffIndex) * 2.2),
+				}, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			end
+		end
+		self.systemMessageRemote:FireClient(player, "The pillow pile releases a soft complaint.")
 	end)
 end
 
@@ -3890,18 +4200,28 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 		local destinationCFrame = door:GetAttribute("DestinationCFrame")
-			if typeof(destinationCFrame) ~= "CFrame" then
-				self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
-				return
-			end
+		if typeof(destinationCFrame) ~= "CFrame" then
+			self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
+			return
+		end
 
-			if not self:_canUseTeleport(player) then
-				return
-			end
+		if not self:_canUseTeleport(player) then
+			return
+		end
 
-			teleportPlayer(player, destinationCFrame)
-		end)
-	end
+		teleportPlayer(player, destinationCFrame)
+
+		local unlockDiscoveryId = door:GetAttribute("UnlockDiscoveryId")
+		if typeof(unlockDiscoveryId) == "string" then
+			self.discoveryService:Unlock(player, unlockDiscoveryId)
+		end
+
+		local travelMessage = door:GetAttribute("TravelMessage")
+		if typeof(travelMessage) == "string" then
+			self.systemMessageRemote:FireClient(player, travelMessage)
+		end
+	end)
+end
 
 function InteractionService:_getRoomDoorRequirementText(player, roomId)
 	local requiredRoomId, requiredCount = Constants.GetRoomUnlockRequirement(roomId)

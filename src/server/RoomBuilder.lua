@@ -822,6 +822,12 @@ local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
 local CAVE_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("CaveEntrance")
 local CAVE_HALLWAY_RETURN_CFRAME = CFrame.new(Vector3.new(-3.2, 3, 45), Vector3.new(3.2, 3, 45))
+local SECURITY_ROOM_ORIGIN = Vector3.new(82, 0, -28)
+local SECURITY_ROOM_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("SecurityRoom")
+local SECURITY_HALLWAY_RETURN_CFRAME = CFrame.new(Vector3.new(3.2, 3, 59), Vector3.new(-3.2, 3, 59))
+local SLEEPING_QUARTERS_ORIGIN = Vector3.new(82, 0, -135)
+local SLEEPING_QUARTERS_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("SleepingQuarters")
+local SLEEPING_HALLWAY_RETURN_CFRAME = CFrame.new(Vector3.new(-3.2, 3, 59), Vector3.new(3.2, 3, 59))
 local LIBRARY_WIDTH = 36
 local LIBRARY_DEPTH = 34
 local LIBRARY_HEIGHT = 15
@@ -1422,6 +1428,313 @@ local function makeCaveEntranceArea(roomFolder)
 	return cave
 end
 
+local function makeSecurityRoom(roomFolder)
+	local room = makeModel(roomFolder, "SecurityRoom")
+	local origin = SECURITY_ROOM_ORIGIN
+	local width = 46
+	local depth = 38
+	local height = 16
+
+	createPart(room, "SecurityFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(55, 60, 68), Enum.Material.Concrete)
+	createPart(room, "SecurityCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(35, 39, 48), Enum.Material.Metal)
+	createPart(room, "SecurityBackWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, -depth / 2), Color3.fromRGB(28, 32, 40), Enum.Material.Metal)
+	createPart(room, "SecurityFrontWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, depth / 2), Color3.fromRGB(74, 80, 91), Enum.Material.SmoothPlastic)
+	createPart(room, "SecurityLeftWall", Vector3.new(1, height, depth), cframeAt(origin, -width / 2, height / 2, 0), Color3.fromRGB(58, 64, 74), Enum.Material.SmoothPlastic)
+	createPart(room, "SecurityRightWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(58, 64, 74), Enum.Material.SmoothPlastic)
+
+	createSpawnLocation(room, "SecuritySpawn", "SecurityRoom", SECURITY_ROOM_SPAWN_CFRAME, Color3.fromRGB(119, 255, 203), false)
+
+	local exitDoor = makeHallDoor(
+		room,
+		"SecurityExitDoor",
+		Vector3.new(7, 7.8, 0.42),
+		cframeAt(origin, 0, 4.4, depth / 2 - 0.55),
+		Enum.NormalId.Front,
+		"HALLWAY",
+		SECURITY_HALLWAY_RETURN_CFRAME
+	)
+	exitDoor:SetAttribute("TravelMessage", "Security returns you to the hallway and keeps a copy of the paperwork.")
+
+	local controls = makeRoomControlPanel(
+		room,
+		"SecurityInsideControlPanel",
+		CFrame.new(origin + Vector3.new(-width / 2 + 0.58, 4.65, depth / 2 - 6.6), origin + Vector3.new(0, 4.65, depth / 2 - 6.6)),
+		"SecurityRoom",
+		"SECURITY",
+		{
+			IncludeReset = true,
+			PanelLabel = "SECURITY CONTROLS",
+			LightPromptObjectText = "Security Light Switch",
+			LogText = "SECURITY\nLOG\nOPEN",
+		}
+	)
+
+	local sign = createPart(room, "SecurityTitleSign", Vector3.new(15, 2.6, 0.32), cframeAt(origin, 0, 12.3, depth / 2 - 0.82), Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
+	createSurfaceText(sign, "SecurityTitleText", "SECURITY\nPLEASE LOOK CASUAL", Enum.NormalId.Front, Color3.fromRGB(23, 24, 28), Color3.fromRGB(255, 221, 84))
+
+	local monitorWall = makeModel(room, "SecurityMonitorWall")
+	local monitorCameraCFrame = CFrame.new(origin + Vector3.new(0, 7.3, -depth / 2 + 1.45), origin + Vector3.new(0, 3.4, depth / 2 - 3))
+	local specialRow = 2
+	local specialColumn = 5
+	for row = 1, 4 do
+		for column = 1, 8 do
+			local monitorIndex = (row - 1) * 8 + column
+			local x = -18.35 + (column - 1) * 5.25
+			local y = 4.0 + (row - 1) * 2.85
+			local screenCFrame = cframeAt(origin, x, y, -depth / 2 + 0.42)
+			local frame = createPart(monitorWall, ("SecurityMonitor%02dFrame"):format(monitorIndex), Vector3.new(5.05, 2.7, 0.22), screenCFrame, Color3.fromRGB(11, 13, 18), Enum.Material.Metal)
+			local screen = createPart(monitorWall, ("SecurityMonitor%02dScreen"):format(monitorIndex), Vector3.new(4.48, 2.16, 0.12), screenCFrame * CFrame.new(0, 0, 0.18), Color3.fromRGB(18, 32, 42), Enum.Material.Neon)
+			local screenText = if row == specialRow and column == specialColumn then "CAM 17\nYOU?" else ("CAM %02d\nLIVE"):format(monitorIndex)
+			createSurfaceText(screen, "SecurityMonitorText", screenText, Enum.NormalId.Back, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 32, 42))
+
+			if row == specialRow and column == specialColumn then
+				screen.Name = "SecuritySpecialMonitorScreen"
+				screen:SetAttribute("CameraCFrame", monitorCameraCFrame)
+				local prompt = createPrompt(screen, "Watch", "Suspicious Monitor", 0.1)
+				prompt.MaxActivationDistance = 16
+				tag(screen, Constants.Tags.SecurityMonitor)
+			end
+
+			local glow = Instance.new("SurfaceLight")
+			glow.Name = "SecurityMonitorGlow"
+			glow.Face = Enum.NormalId.Back
+			glow.Brightness = if row == specialRow and column == specialColumn then 1.5 else 0.75
+			glow.Color = if row == specialRow and column == specialColumn then Color3.fromRGB(255, 88, 128) else Color3.fromRGB(119, 255, 203)
+			glow.Range = 9
+			glow.Parent = screen
+			mark(glow)
+
+			frame.CanCollide = false
+			screen.CanCollide = false
+			frame:SetAttribute("BaseCanCollide", false)
+			screen:SetAttribute("BaseCanCollide", false)
+		end
+	end
+	monitorWall.PrimaryPart = monitorWall:FindFirstChildWhichIsA("BasePart", true)
+
+	local desk = makeModel(room, "SecurityDesk")
+	local desktop = createPart(desk, "SecurityDeskTop", Vector3.new(17, 0.55, 4.8), cframeAt(origin, 0, 2.25, 5.8), Color3.fromRGB(74, 49, 34), Enum.Material.Wood)
+	createPart(desk, "SecurityDeskFront", Vector3.new(17.3, 2.5, 0.42), cframeAt(origin, 0, 1.25, 8.0), Color3.fromRGB(62, 43, 32), Enum.Material.Wood)
+	for legX = -1, 1, 2 do
+		for legZ = -1, 1, 2 do
+			createPart(desk, ("SecurityDeskLeg_%d_%d"):format(legX, legZ), Vector3.new(0.5, 2.4, 0.5), cframeAt(origin, legX * 7.6, 1.15, 5.8 + legZ * 1.8), Color3.fromRGB(53, 36, 27), Enum.Material.Wood)
+		end
+	end
+
+	local console = createPart(desk, "SecurityConsole", Vector3.new(5.2, 1.25, 2.2), cframeAt(origin, -4.6, 3.1, 5.4) * CFrame.Angles(math.rad(-10), 0, 0), Color3.fromRGB(30, 39, 50), Enum.Material.Metal)
+	createSurfaceText(console, "SecurityConsoleText", "ALL CAMERAS\nPROBABLY FINE", Enum.NormalId.Top, Color3.fromRGB(119, 255, 203), Color3.fromRGB(30, 39, 50))
+	createPrompt(console, "Scan", "Monitor Wall Console", 0)
+	tag(console, Constants.Tags.SecurityConsole)
+
+	local redPhoneBase = createPart(desk, "SecurityRedPhoneBase", Vector3.new(2.4, 0.52, 1.55), cframeAt(origin, 3.9, 2.78, 5.25), Color3.fromRGB(188, 24, 43), Enum.Material.SmoothPlastic)
+	local redPhoneHandle = createPart(desk, "SecurityRedPhone", Vector3.new(2.85, 0.48, 0.56), cframeAt(origin, 3.9, 3.18, 5.25), Color3.fromRGB(232, 43, 62), Enum.Material.SmoothPlastic)
+	createPrompt(redPhoneHandle, "Answer", "Red Phone", 0)
+	tag(redPhoneHandle, Constants.Tags.SecurityRedPhone)
+	redPhoneBase.CanCollide = false
+	redPhoneHandle.CanCollide = false
+	redPhoneBase:SetAttribute("BaseCanCollide", false)
+	redPhoneHandle:SetAttribute("BaseCanCollide", false)
+
+	local tapeDeck = createPart(desk, "SecurityTapeDeck", Vector3.new(3.8, 0.72, 2.2), cframeAt(origin, 8.0, 2.92, 5.55), Color3.fromRGB(38, 41, 48), Enum.Material.Metal)
+	createSurfaceText(tapeDeck, "SecurityTapeText", "TAPE\n01: DO NOT ERASE", Enum.NormalId.Top, Color3.fromRGB(255, 221, 84), Color3.fromRGB(38, 41, 48))
+	createPrompt(tapeDeck, "Review", "Chunky Tape Deck", 0)
+	tag(tapeDeck, Constants.Tags.SecurityTapeDeck)
+
+	makeAtomicStarburst(room, "SecurityAtomicStarburst", cframeAt(origin, width / 2 - 0.58, 11.4, 3.8) * CFrame.Angles(0, math.rad(-90), 0), 0.74, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Cream)
+	makeAtomicBoomerang(room, "SecurityAtomicBoomerang", cframeAt(origin, -width / 2 + 0.58, 10.7, -7.4) * CFrame.Angles(0, math.rad(90), 0), 0.8, ATOMIC_COLORS.Orange)
+
+	room.PrimaryPart = desktop
+	return {
+		Model = room,
+		ExitDoor = exitDoor,
+		LightSwitch = controls.LightSwitch,
+		ResetRoomButton = controls.ResetRoomButton,
+		ReferenceBook = controls.ReferenceBook,
+	}
+end
+
+local function makeSleepingQuartersRoom(roomFolder)
+	local room = makeModel(roomFolder, "SleepingQuartersRoom")
+	local origin = SLEEPING_QUARTERS_ORIGIN
+	local width = 58
+	local depth = 172
+	local height = 16
+
+	createPart(room, "SleepingFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(87, 91, 102), Enum.Material.Concrete)
+	createPart(room, "SleepingCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(57, 54, 65), Enum.Material.SmoothPlastic)
+	createPart(room, "SleepingBackWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, -depth / 2), Color3.fromRGB(91, 77, 96), Enum.Material.SmoothPlastic)
+	createPart(room, "SleepingFrontWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, depth / 2), Color3.fromRGB(98, 87, 103), Enum.Material.SmoothPlastic)
+	createPart(room, "SleepingLeftWall", Vector3.new(1, height, depth), cframeAt(origin, -width / 2, height / 2, 0), Color3.fromRGB(103, 84, 92), Enum.Material.SmoothPlastic)
+	createPart(room, "SleepingRightWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(103, 84, 92), Enum.Material.SmoothPlastic)
+
+	createSpawnLocation(room, "SleepingQuartersSpawn", "SleepingQuarters", SLEEPING_QUARTERS_SPAWN_CFRAME, Color3.fromRGB(255, 142, 191), false)
+
+	local exitDoor = makeHallDoor(
+		room,
+		"SleepingExitDoor",
+		Vector3.new(7, 7.8, 0.42),
+		cframeAt(origin, 0, 4.4, depth / 2 - 0.55),
+		Enum.NormalId.Front,
+		"HALLWAY",
+		SLEEPING_HALLWAY_RETURN_CFRAME
+	)
+	exitDoor:SetAttribute("TravelMessage", "Back to the hallway. Somehow it feels less full of beds.")
+
+	local controls = makeRoomControlPanel(
+		room,
+		"SleepingInsideControlPanel",
+		CFrame.new(origin + Vector3.new(-width / 2 + 0.58, 4.65, depth / 2 - 7.0), origin + Vector3.new(0, 4.65, depth / 2 - 7.0)),
+		"SleepingQuarters",
+		"SLEEPING QUARTERS",
+		{
+			IncludeReset = true,
+			PanelLabel = "SLEEP CONTROLS",
+			LightPromptObjectText = "Sleeping Quarters Light Switch",
+			LogText = "SLEEPING\nLOG\nOPEN",
+		}
+	)
+
+	local title = createPart(room, "SleepingTitleSign", Vector3.new(18, 2.6, 0.32), cframeAt(origin, 0, 12.2, depth / 2 - 0.82), Color3.fromRGB(255, 202, 103), Enum.Material.Neon)
+	createSurfaceText(title, "SleepingTitleText", "SLEEPING QUARTERS\nBED COUNT: TOO MANY", Enum.NormalId.Front, Color3.fromRGB(35, 27, 38), Color3.fromRGB(255, 202, 103))
+
+	createNoTouchClock(
+		room,
+		"SleepingWallClock",
+		"SleepingQuarters",
+		Vector3.new(6.8, 2.0, 0.25),
+		CFrame.new(origin + Vector3.new(14.3, 8.0, depth / 2 - 0.66), origin + Vector3.new(0, 5, 0)),
+		Enum.NormalId.Front
+	)
+
+	local function makeBunkBed(sideName, sideSign, index, zOffset)
+		local bunk = makeModel(room, sideName .. "Bunk" .. index)
+		local sideColor = if sideSign < 0 then Color3.fromRGB(255, 142, 191) else Color3.fromRGB(255, 163, 92)
+		local frameColor = Color3.fromRGB(81, 59, 48)
+		local blanketColor = if index % 3 == 0 then Color3.fromRGB(119, 255, 203) elseif index % 3 == 1 then Color3.fromRGB(255, 142, 191) else Color3.fromRGB(255, 202, 103)
+		local centerX = sideSign * 21.0
+		local baseCFrame = cframeAt(origin, centerX, 0, zOffset)
+
+		local lowerFrame = createPart(bunk, "LowerFrame", Vector3.new(8.4, 0.28, 2.34), baseCFrame * CFrame.new(0, 1.05, 0), frameColor, Enum.Material.Wood)
+		local lowerMattress = createPart(bunk, "LowerMattress", Vector3.new(7.55, 0.42, 1.86), baseCFrame * CFrame.new(0, 1.38, 0), sideColor, Enum.Material.Fabric)
+		local upperFrame = createPart(bunk, "UpperFrame", Vector3.new(8.4, 0.28, 2.34), baseCFrame * CFrame.new(0, 4.15, 0), frameColor, Enum.Material.Wood)
+		createPart(bunk, "UpperMattress", Vector3.new(7.55, 0.42, 1.86), baseCFrame * CFrame.new(0, 4.48, 0), blanketColor, Enum.Material.Fabric)
+
+		for _, offset in ipairs({
+			Vector3.new(-4.05, 2.55, -1.0),
+			Vector3.new(4.05, 2.55, -1.0),
+			Vector3.new(-4.05, 2.55, 1.0),
+			Vector3.new(4.05, 2.55, 1.0),
+		}) do
+			createPart(bunk, "BunkPost", Vector3.new(0.22, 3.9, 0.22), baseCFrame * CFrame.new(offset), frameColor, Enum.Material.Wood)
+		end
+
+		local ladder = createPart(bunk, "BunkLadder", Vector3.new(0.18, 3.1, 0.18), baseCFrame * CFrame.new(-3.75, 2.75, sideSign * 1.38) * CFrame.Angles(0, 0, math.rad(9 * sideSign)), Color3.fromRGB(158, 100, 61), Enum.Material.Wood)
+		ladder.Shape = Enum.PartType.Cylinder
+		for rung = 1, 4 do
+			local rungPart = createPart(bunk, "BunkLadderRung" .. rung, Vector3.new(1.1, 0.12, 0.12), baseCFrame * CFrame.new(-3.75, 1.55 + rung * 0.58, sideSign * 1.38), Color3.fromRGB(181, 121, 67), Enum.Material.Wood)
+			rungPart.CanCollide = false
+			rungPart:SetAttribute("BaseCanCollide", false)
+		end
+
+		if sideSign < 0 and index == 37 then
+			lowerMattress.Name = "CountableBunkMattress"
+			lowerMattress:SetAttribute("BunkTotal", 100)
+			createPrompt(lowerMattress, "Count", "Bunk 37 of Too Many", 0)
+			tag(lowerMattress, Constants.Tags.SleepingBunk)
+		end
+
+		if index % 10 == 0 then
+			local sign = createPart(bunk, sideName .. "BunkRowSign" .. index, Vector3.new(3.2, 1.05, 0.14), baseCFrame * CFrame.new(0, 6.35, -1.24), Color3.fromRGB(39, 44, 54), Enum.Material.Neon)
+			createSurfaceText(sign, "BunkRowText", ("BUNKS\n%d-%d"):format(index - 9, index), Enum.NormalId.Front, Color3.fromRGB(255, 242, 181), Color3.fromRGB(39, 44, 54))
+		end
+
+		bunk.PrimaryPart = lowerFrame
+		return bunk
+	end
+
+	for index = 1, 50 do
+		local zOffset = depth / 2 - 17 - (index - 1) * 3.08
+		makeBunkBed("Left", -1, index, zOffset)
+		makeBunkBed("Right", 1, index, zOffset)
+	end
+
+	local alarmTable = createPart(room, "SleepingAlarmTable", Vector3.new(4.2, 1.0, 3.0), cframeAt(origin, 8.6, 1.0, depth / 2 - 13.5), Color3.fromRGB(99, 66, 43), Enum.Material.Wood)
+	local alarm = createPart(room, "SleepingAlarmClock", Vector3.new(1.35, 1.0, 0.86), alarmTable.CFrame * CFrame.new(0, 0.95, -0.18), Color3.fromRGB(255, 202, 103), Enum.Material.Metal)
+	createSurfaceText(alarm, "SleepingAlarmClockText", "12:00\nNOPE", Enum.NormalId.Front, Color3.fromRGB(43, 30, 39), Color3.fromRGB(255, 202, 103))
+	createPrompt(alarm, "Snooze", "Alarm Clock", 0)
+	tag(alarm, Constants.Tags.SleepingAlarmClock)
+
+	local locker = createPart(room, "SleepingWhisperLocker", Vector3.new(3.4, 6.8, 1.2), cframeAt(origin, 15.4, 3.9, depth / 2 - 10.8), Color3.fromRGB(67, 87, 105), Enum.Material.Metal)
+	createSurfaceText(locker, "SleepingLockerText", "LOCKER\nSHHH", Enum.NormalId.Front, Color3.fromRGB(229, 246, 255), Color3.fromRGB(67, 87, 105))
+	createPrompt(locker, "Open", "Whisper Locker", 0)
+	tag(locker, Constants.Tags.SleepingLocker)
+
+	local dreamButtonBase = createPart(room, "SleepingDreamButtonPlate", Vector3.new(4.2, 2.4, 0.22), cframeAt(origin, 0, 5.2, -depth / 2 + 0.62), Color3.fromRGB(39, 44, 54), Enum.Material.Metal)
+	createSurfaceText(dreamButtonBase, "SleepingDreamButtonLabel", "RESPONSIBLE\nDREAM BUTTON", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(39, 44, 54))
+	local dreamButton = createPart(room, "SleepingDreamButton", Vector3.new(1.45, 0.34, 1.45), dreamButtonBase.CFrame * CFrame.new(0, -0.1, -0.24) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(255, 72, 158), Enum.Material.Neon)
+	dreamButton.Shape = Enum.PartType.Cylinder
+	createPrompt(dreamButton, "Press", "Dream Button", 0)
+	tag(dreamButton, Constants.Tags.SleepingDreamButton)
+
+	local fort = makeModel(room, "SleepingBlanketFort")
+	local fortCenter = cframeAt(origin, 0, 1.3, 12)
+	local fortLeft = createPart(fort, "BlanketFortLeftWall", Vector3.new(6.2, 0.22, 4.2), fortCenter * CFrame.new(-1.8, 1.7, 0) * CFrame.Angles(0, 0, math.rad(26)), Color3.fromRGB(255, 142, 191), Enum.Material.Fabric)
+	local fortRight = createPart(fort, "BlanketFortRightWall", Vector3.new(6.2, 0.22, 4.2), fortCenter * CFrame.new(1.8, 1.7, 0) * CFrame.Angles(0, 0, math.rad(-26)), Color3.fromRGB(119, 255, 203), Enum.Material.Fabric)
+	local fortSign = createPart(fort, "BlanketFortSign", Vector3.new(4.2, 1.1, 0.18), fortCenter * CFrame.new(0, 2.2, -2.2), Color3.fromRGB(255, 232, 112), Enum.Material.SmoothPlastic)
+	createSurfaceText(fortSign, "BlanketFortText", "FORT\nPERMIT PENDING", Enum.NormalId.Front, Color3.fromRGB(39, 34, 21), Color3.fromRGB(255, 232, 112))
+	createPrompt(fortSign, "Inspect", "Blanket Fort", 0)
+	tag(fortSign, Constants.Tags.SleepingBlanketFort)
+	fortLeft.CanCollide = false
+	fortRight.CanCollide = false
+	fortLeft:SetAttribute("BaseCanCollide", false)
+	fortRight:SetAttribute("BaseCanCollide", false)
+	fort.PrimaryPart = fortSign
+
+	local pillowPile = makeModel(room, "SleepingPillowPile")
+	local pillowColors = {
+		Color3.fromRGB(245, 248, 255),
+		Color3.fromRGB(255, 202, 224),
+		Color3.fromRGB(203, 255, 255),
+	}
+	local pillowPromptTarget = nil
+	for pillowIndex = 1, 12 do
+		local angle = math.rad(pillowIndex * 63)
+		local radius = 0.4 + (pillowIndex % 4) * 0.42
+		local pillow = createPart(
+			pillowPile,
+			"SleepingPillow" .. pillowIndex,
+			Vector3.new(1.35, 0.42, 0.9),
+			cframeAt(origin, math.cos(angle) * radius - 7, 1.04 + (pillowIndex % 3) * 0.2, math.sin(angle) * radius + 6) * CFrame.Angles(0, angle, math.rad((pillowIndex % 5) * 8)),
+			pillowColors[((pillowIndex - 1) % #pillowColors) + 1],
+			Enum.Material.Fabric
+		)
+		pillow.CanCollide = false
+		pillow:SetAttribute("BaseCanCollide", false)
+		pillowPromptTarget = pillowPromptTarget or pillow
+	end
+	createPrompt(pillowPromptTarget, "Fluff", "Pillow Pile", 0)
+	tag(pillowPromptTarget, Constants.Tags.SleepingPillowPile)
+	pillowPile.PrimaryPart = pillowPromptTarget
+
+	for lightIndex = 1, 8 do
+		local zOffset = depth / 2 - 24 - (lightIndex - 1) * 18
+		local strip = createPart(room, "SleepingNeonGuideStrip" .. lightIndex, Vector3.new(0.18, 0.22, 7.2), cframeAt(origin, 0, height - 0.72, zOffset), BOWLING_COSMIC_COLORS[((lightIndex - 1) % #BOWLING_COSMIC_COLORS) + 1], Enum.Material.Neon)
+		strip.CanCollide = false
+		strip:SetAttribute("BaseCanCollide", false)
+	end
+	makeAtomicBoomerang(room, "SleepingAtomicBoomerang", cframeAt(origin, width / 2 - 0.58, 10.5, depth / 2 - 20) * CFrame.Angles(0, math.rad(-90), 0), 0.76, ATOMIC_COLORS.Orange)
+	makeAtomicDiamondCluster(room, "SleepingAtomicDiamonds", cframeAt(origin, -width / 2 + 0.58, 10.2, -12) * CFrame.Angles(0, math.rad(90), 0), 0.66)
+
+	room.PrimaryPart = title
+	return {
+		Model = room,
+		ExitDoor = exitDoor,
+		LightSwitch = controls.LightSwitch,
+		ResetRoomButton = controls.ResetRoomButton,
+		ReferenceBook = controls.ReferenceBook,
+	}
+end
+
 local function makeHallway(roomFolder)
 	local hallway = makeModel(roomFolder, "DoorHallway")
 
@@ -1482,6 +1795,32 @@ local function makeHallway(roomFolder)
 	)
 	makeRoomControlPanel(
 		hallway,
+		"SecurityHallControlPanel",
+		CFrame.new(5.88, 4.55, 66.6) * CFrame.Angles(0, math.rad(90), 0),
+		"SecurityRoom",
+		"SECURITY",
+		{
+			IncludeReset = false,
+			PanelLabel = "SECURITY",
+			LightPromptObjectText = "Security Door Light Switch",
+			LogText = "SECURITY\nLOG\nOPEN",
+		}
+	)
+	makeRoomControlPanel(
+		hallway,
+		"SleepingHallControlPanel",
+		CFrame.new(-5.88, 4.55, 66.6) * CFrame.Angles(0, math.rad(-90), 0),
+		"SleepingQuarters",
+		"SLEEPING QUARTERS",
+		{
+			IncludeReset = false,
+			PanelLabel = "SLEEPING",
+			LightPromptObjectText = "Sleeping Quarters Door Light Switch",
+			LogText = "SLEEPING\nLOG\nOPEN",
+		}
+	)
+	makeRoomControlPanel(
+		hallway,
 		"IslandHallControlPanel",
 		CFrame.new(3.95, 4.55, 114.2) * CFrame.Angles(0, math.rad(90), 0),
 		"Island",
@@ -1515,6 +1854,30 @@ local function makeHallway(roomFolder)
 		CAVE_SPAWN_CFRAME
 	)
 
+	local securityDoor = makeHallDoor(
+		hallway,
+		"SecurityDoor",
+		Vector3.new(0.45, 8.5, 6.5),
+		CFrame.new(5.95, 4.75, 59),
+		Enum.NormalId.Left,
+		"SECURITY",
+		SECURITY_ROOM_SPAWN_CFRAME
+	)
+	securityDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.SecurityEntered.Id)
+	securityDoor:SetAttribute("TravelMessage", "Security unlocked. Try to look less monitored.")
+
+	local sleepingDoor = makeHallDoor(
+		hallway,
+		"SleepingQuartersDoor",
+		Vector3.new(0.45, 8.5, 6.5),
+		CFrame.new(-5.95, 4.75, 59),
+		Enum.NormalId.Right,
+		"SLEEPING\nQUARTERS",
+		SLEEPING_QUARTERS_SPAWN_CFRAME
+	)
+	sleepingDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.SleepingEntered.Id)
+	sleepingDoor:SetAttribute("TravelMessage", "Sleeping Quarters unlocked. There are definitely enough beds.")
+
 		local islandDoor = makeHallDoor(
 			hallway,
 			"IslandDoor",
@@ -1542,6 +1905,8 @@ local function makeHallway(roomFolder)
 	return {
 		Model = hallway,
 		SnackDoor = snackDoor,
+		SecurityDoor = securityDoor,
+		SleepingDoor = sleepingDoor,
 		IslandDoor = islandDoor,
 	}
 end
@@ -3954,6 +4319,8 @@ function RoomBuilder.Build()
 	makeAtomicBoomerang(roomFolder, "TVRoomLeftWallAtomicBoomerang", CFrame.new(-Constants.Room.Width / 2 + 0.58, 10.6, -3.2) * CFrame.Angles(0, math.rad(90), 0), 0.9, ATOMIC_COLORS.Orange)
 	makeAtomicDiamondCluster(roomFolder, "TVRoomRightWallAtomicDiamonds", CFrame.new(Constants.Room.Width / 2 - 0.58, 11.5, -6.8) * CFrame.Angles(0, math.rad(-90), 0), 0.68)
 	local caveEntrance = makeCaveEntranceArea(roomFolder)
+	local securityRoom = makeSecurityRoom(roomFolder)
+	local sleepingQuarters = makeSleepingQuartersRoom(roomFolder)
 	local hallway = makeHallway(roomFolder)
 	local snackLab = makeSnackLabShell(roomFolder)
 	local islandRoom = makeIslandRoom(roomFolder)
@@ -3997,6 +4364,8 @@ function RoomBuilder.Build()
 		UnderfloorChamber = underfloorChamber,
 		ExitDoor = exitDoor,
 		CaveEntrance = caveEntrance,
+		SecurityRoom = securityRoom,
+		SleepingQuarters = sleepingQuarters,
 		ResetRoomButton = resetRoomButton,
 		TVInsideLog = tvInsideLog,
 		Hallway = hallway,

@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.54"
+Constants.BuildVersion = "0.5.55"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -28,6 +28,7 @@ Constants.Remotes = {
 	FeedbackRequest = "FeedbackRequest",
 	DevTools = "DevTools",
 	VoidEffect = "VoidEffect",
+	SecurityCamera = "SecurityCamera",
 }
 
 Constants.Tags = {
@@ -118,13 +119,23 @@ Constants.Tags = {
 	CaveExitKey = "DontTouchIt_CaveExitKey",
 	CaveKeyDoor = "DontTouchIt_CaveKeyDoor",
 	CaveAlarmLight = "DontTouchIt_CaveAlarmLight",
+	SecurityMonitor = "DontTouchIt_SecurityMonitor",
+	SecurityConsole = "DontTouchIt_SecurityConsole",
+	SecurityRedPhone = "DontTouchIt_SecurityRedPhone",
+	SecurityTapeDeck = "DontTouchIt_SecurityTapeDeck",
+	SleepingBunk = "DontTouchIt_SleepingBunk",
+	SleepingAlarmClock = "DontTouchIt_SleepingAlarmClock",
+	SleepingLocker = "DontTouchIt_SleepingLocker",
+	SleepingDreamButton = "DontTouchIt_SleepingDreamButton",
+	SleepingBlanketFort = "DontTouchIt_SleepingBlanketFort",
+	SleepingPillowPile = "DontTouchIt_SleepingPillowPile",
 }
 
 Constants.Hallway = {
 	Id = "Hallway",
 	Name = "Hallway",
 	UnlockedRoomCount = 1,
-	TotalRoomCount = 4,
+	TotalRoomCount = 6,
 	UnlockDiscoveryFraction = 0.5,
 	Zone = {
 		Min = Vector3.new(-7.75, -3, Constants.Room.Depth / 2 - 0.5),
@@ -633,6 +644,76 @@ Constants.Discoveries = {
 		Name = "Opened the Cave Door",
 		Hint = "The long tunnel ends at a door shaped like the key from the desk.",
 	},
+	SecurityEntered = {
+		Id = "security_entered",
+		Name = "Entered Security",
+		Hint = "The hallway has a door marked Security.",
+	},
+	SecurityMonitorWall = {
+		Id = "security_monitor_wall",
+		Name = "Noticed the Monitor Wall",
+		Hint = "Inspect the giant wall of screens in Security.",
+	},
+	SecurityCameraView = {
+		Id = "security_camera_view",
+		Name = "Watched Yourself Watching",
+		Hint = "One monitor in Security does more than display static.",
+	},
+	SecurityScreenButton = {
+		Id = "security_screen_button",
+		Name = "Pressed the Screen-Only Button",
+		Hint = "Use the Security monitor view and look for a button that only appears on the screen.",
+	},
+	SecurityRedPhone = {
+		Id = "security_red_phone",
+		Name = "Picked Up the Red Phone",
+		Hint = "Security desks tend to have phones for extremely normal emergencies.",
+	},
+	SecurityTapeDeck = {
+		Id = "security_tape_deck",
+		Name = "Reviewed the Tape",
+		Hint = "The Security room stores footage in a suspiciously chunky machine.",
+	},
+	SleepingEntered = {
+		Id = "sleeping_entered",
+		Name = "Entered Sleeping Quarters",
+		Hint = "The hallway has a door marked Sleeping Quarters.",
+	},
+	SleepingCountedBunks = {
+		Id = "sleeping_counted_bunks",
+		Name = "Counted Too Many Bunks",
+		Hint = "One of the bunk beds is practically begging to be counted.",
+	},
+	SleepingAlarmClock = {
+		Id = "sleeping_alarm_clock",
+		Name = "Snoozed the Wrong Alarm",
+		Hint = "The tiny alarm clock near the entrance is not enjoying its job.",
+	},
+	SleepingLocker = {
+		Id = "sleeping_locker",
+		Name = "Opened the Whisper Locker",
+		Hint = "There is a locker in Sleeping Quarters that seems overqualified.",
+	},
+	SleepingDreamButton = {
+		Id = "sleeping_dream_button",
+		Name = "Pressed the Dream Button",
+		Hint = "Find the button that promises absolutely responsible dreaming.",
+	},
+	SleepingBlanketFort = {
+		Id = "sleeping_blanket_fort",
+		Name = "Inspected the Blanket Fort",
+		Hint = "One bunk has developed architecture.",
+	},
+	SleepingPillowPile = {
+		Id = "sleeping_pillow_pile",
+		Name = "Disturbed the Pillow Pile",
+		Hint = "The pillow pile is not structural, probably.",
+	},
+	SleepingNoTouch = {
+		Id = "sleeping_no_touch",
+		Name = "Left the Sleeping Quarters Alone",
+		Hint = "Stand in Sleeping Quarters for two minutes without interacting with anything.",
+	},
 }
 
 Constants.RoomDiscoveryOrder = {
@@ -641,6 +722,24 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.CaveChangedLights.Id,
 		Constants.Discoveries.CaveExitKey.Id,
 		Constants.Discoveries.CaveOpenedDoor.Id,
+	},
+	SecurityRoom = {
+		Constants.Discoveries.SecurityEntered.Id,
+		Constants.Discoveries.SecurityMonitorWall.Id,
+		Constants.Discoveries.SecurityCameraView.Id,
+		Constants.Discoveries.SecurityScreenButton.Id,
+		Constants.Discoveries.SecurityRedPhone.Id,
+		Constants.Discoveries.SecurityTapeDeck.Id,
+	},
+	SleepingQuarters = {
+		Constants.Discoveries.SleepingEntered.Id,
+		Constants.Discoveries.SleepingCountedBunks.Id,
+		Constants.Discoveries.SleepingAlarmClock.Id,
+		Constants.Discoveries.SleepingLocker.Id,
+		Constants.Discoveries.SleepingDreamButton.Id,
+		Constants.Discoveries.SleepingBlanketFort.Id,
+		Constants.Discoveries.SleepingPillowPile.Id,
+		Constants.Discoveries.SleepingNoTouch.Id,
 	},
 	TVRoom = {
 		Constants.Discoveries.PressedButton.Id,
@@ -787,12 +886,17 @@ Constants.RoomCompletionOrder = {
 
 Constants.RoomOrder = {
 	"TVRoom",
+	"CaveEntrance",
+	"SecurityRoom",
+	"SleepingQuarters",
 	"SnackLab",
 	"Island",
 }
 
 Constants.DiscoveryRoomOrder = {
 	"CaveEntrance",
+	"SecurityRoom",
+	"SleepingQuarters",
 	"TVRoom",
 	"SnackLab",
 	"Island",
@@ -805,6 +909,8 @@ Constants.DiscoveryRoomOrder = {
 
 Constants.RoomDetectionOrder = {
 	"CaveEntrance",
+	"SecurityRoom",
+	"SleepingQuarters",
 	"TVRoom",
 	"SnackLab",
 	"Island",
@@ -817,6 +923,8 @@ Constants.RoomDetectionOrder = {
 
 Constants.RoomResumeDiscoveries = {
 	CaveEntrance = Constants.Discoveries.CaveFirstLight.Id,
+	SecurityRoom = Constants.Discoveries.SecurityEntered.Id,
+	SleepingQuarters = Constants.Discoveries.SleepingEntered.Id,
 	Library = Constants.Discoveries.LibraryEntered.Id,
 	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
 	TreetopZipline = Constants.Discoveries.TreetopZiplineEntered.Id,
@@ -833,6 +941,27 @@ Constants.Rooms = {
 		Zone = {
 			Min = Vector3.new(-155, -28, -155),
 			Max = Vector3.new(-42, 18, 70),
+		},
+	},
+	SecurityRoom = {
+		Id = "SecurityRoom",
+		Name = "Security",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.SecurityRoom,
+		SpawnCFrame = CFrame.new(Vector3.new(82, 3, -15), Vector3.new(82, 3, -44)),
+		Zone = {
+			Min = Vector3.new(56, -3, -48),
+			Max = Vector3.new(108, 22, -8),
+		},
+	},
+	SleepingQuarters = {
+		Id = "SleepingQuarters",
+		Name = "Sleeping Quarters",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.SleepingQuarters,
+		NoTouchDiscoveryId = Constants.Discoveries.SleepingNoTouch.Id,
+		SpawnCFrame = CFrame.new(Vector3.new(82, 3, -52), Vector3.new(82, 3, -122)),
+		Zone = {
+			Min = Vector3.new(50, -3, -222),
+			Max = Vector3.new(114, 22, -48),
 		},
 	},
 	TVRoom = {
@@ -1015,6 +1144,19 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.CaveChangedLights.Id] = Constants.Tags.CaveLight,
 	[Constants.Discoveries.CaveExitKey.Id] = Constants.Tags.CaveExitKey,
 	[Constants.Discoveries.CaveOpenedDoor.Id] = Constants.Tags.CaveKeyDoor,
+	[Constants.Discoveries.SecurityEntered.Id] = Constants.Tags.HallDoor,
+	[Constants.Discoveries.SecurityMonitorWall.Id] = Constants.Tags.SecurityMonitor,
+	[Constants.Discoveries.SecurityCameraView.Id] = Constants.Tags.SecurityMonitor,
+	[Constants.Discoveries.SecurityScreenButton.Id] = Constants.Tags.SecurityMonitor,
+	[Constants.Discoveries.SecurityRedPhone.Id] = Constants.Tags.SecurityRedPhone,
+	[Constants.Discoveries.SecurityTapeDeck.Id] = Constants.Tags.SecurityTapeDeck,
+	[Constants.Discoveries.SleepingEntered.Id] = Constants.Tags.HallDoor,
+	[Constants.Discoveries.SleepingCountedBunks.Id] = Constants.Tags.SleepingBunk,
+	[Constants.Discoveries.SleepingAlarmClock.Id] = Constants.Tags.SleepingAlarmClock,
+	[Constants.Discoveries.SleepingLocker.Id] = Constants.Tags.SleepingLocker,
+	[Constants.Discoveries.SleepingDreamButton.Id] = Constants.Tags.SleepingDreamButton,
+	[Constants.Discoveries.SleepingBlanketFort.Id] = Constants.Tags.SleepingBlanketFort,
+	[Constants.Discoveries.SleepingPillowPile.Id] = Constants.Tags.SleepingPillowPile,
 }
 
 Constants.NoTouch = {
