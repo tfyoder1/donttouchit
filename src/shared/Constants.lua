@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.36"
+Constants.BuildVersion = "0.5.37"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -764,7 +764,7 @@ Constants.Rooms = {
 		Name = "Library",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.Library,
 		NoTouchDiscoveryId = Constants.Discoveries.LibraryNoTouch.Id,
-		SpawnCFrame = CFrame.new(-14, 3, -29) * CFrame.Angles(0, math.rad(180), 0),
+		SpawnCFrame = CFrame.new(Vector3.new(-14, 3, -29), Vector3.new(-14, 3, -45)),
 		Zone = {
 			Min = Vector3.new(-34, -3, -64),
 			Max = Vector3.new(6, 30, -26),
