@@ -79,16 +79,21 @@ local function makeButton(parent, text, color, onClick)
 	return button
 end
 
-local function makeList(parent, height)
+local function makeList(parent)
 	local list = Instance.new("Frame")
+	list.AutomaticSize = Enum.AutomaticSize.Y
 	list.BackgroundTransparency = 1
-	list.Size = UDim2.new(1, 0, 0, height)
+	list.Size = UDim2.new(1, 0, 0, 0)
 	list.Parent = parent
 
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 5)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
+
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		list.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
+	end)
 
 	return list
 end
@@ -590,12 +595,12 @@ local function buildGui()
 		scroll.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 18)
 	end)
 
-	roomList = makeList(scroll, 204)
-	presetList = makeList(scroll, 246)
-	eventList = makeList(scroll, 330)
-	areaList = makeList(scroll, 365)
-	storeList = makeList(scroll, 525)
-	discoveryList = makeList(scroll, 620)
+	roomList = makeList(scroll)
+	presetList = makeList(scroll)
+	eventList = makeList(scroll)
+	areaList = makeList(scroll)
+	storeList = makeList(scroll)
+	discoveryList = makeList(scroll)
 
 	toggleButton.Activated:Connect(function()
 		panel.Visible = not panel.Visible
