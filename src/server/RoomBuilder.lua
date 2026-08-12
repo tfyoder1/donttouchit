@@ -716,6 +716,7 @@ local BOWLING_ALLEY_ORIGIN = Vector3.new(-14, 0, -132)
 local BOWLING_ALLEY_SPAWN_CFRAME = CFrame.new(-14, 3, -84)
 local BOWLING_ALLEY_RETURN_CFRAME = CFrame.new(Vector3.new(-7, 3, -58), Vector3.new(-14, 3, -45))
 local BOWLING_MAINTENANCE_CFRAME = CFrame.new(-14, 3, -175)
+local BOWLING_MAINTENANCE_ROOM_CFRAME = CFrame.new(Vector3.new(-21, 3, -194), Vector3.new(-21, 3, -184))
 local LIBRARY_LOFT_SPAWN_CFRAME = CFrame.new(Vector3.new(-14, 17.6, -45), Vector3.new(-14, 17.6, -36))
 local LIBRARY_LOFT_RETURN_CFRAME = CFrame.new(Vector3.new(-8.8, 10.6, -13.0), Vector3.new(-8.8, 9.8, -16.55))
 local TREETOP_ENTRY_CFRAME = CFrame.new(Vector3.new(-14, 29, -220), Vector3.new(-7, 29, -240))
@@ -1879,6 +1880,57 @@ local function makeBowlingPins(parent, laneIndex, laneX, z, origin)
 	end
 end
 
+local function makeMaintenancePin(parent, name, baseCFrame, scale, motionIndex)
+	scale = scale or 1
+	local pinModel = makeModel(parent, name)
+	local coreHeight = 2.55 * scale
+	local coreDiameter = 0.58 * scale
+
+	local core = createPart(
+		pinModel,
+		name .. "Core",
+		Vector3.new(coreDiameter, coreHeight, coreDiameter),
+		baseCFrame * CFrame.new(0, coreHeight / 2, 0),
+		Color3.fromRGB(245, 244, 232),
+		Enum.Material.SmoothPlastic
+	)
+	core.Shape = Enum.PartType.Cylinder
+	core.Transparency = 1
+	core.CanCollide = false
+	core:SetAttribute("BaseTransparency", 1)
+	core:SetAttribute("BaseCanCollide", false)
+	pinModel.PrimaryPart = core
+
+	local function addPiece(pieceName, size, yOffset, color)
+		local piece = createPart(
+			pinModel,
+			name .. pieceName,
+			size * scale,
+			baseCFrame * CFrame.new(0, yOffset * scale, 0),
+			color,
+			Enum.Material.SmoothPlastic
+		)
+		piece.Shape = Enum.PartType.Ball
+		piece.CanCollide = false
+		piece:SetAttribute("BaseCanCollide", false)
+		return piece
+	end
+
+	addPiece("Foot", Vector3.new(0.9, 0.28, 0.9), 0.14, Color3.fromRGB(248, 247, 237))
+	addPiece("Belly", Vector3.new(0.98, 1.05, 0.98), 0.64, Color3.fromRGB(248, 247, 237))
+	addPiece("Shoulder", Vector3.new(0.72, 0.78, 0.72), 1.34, Color3.fromRGB(248, 247, 237))
+	addPiece("LowerStripe", Vector3.new(0.64, 0.11, 0.64), 1.65, Color3.fromRGB(220, 52, 67))
+	addPiece("UpperStripe", Vector3.new(0.55, 0.11, 0.55), 1.82, Color3.fromRGB(220, 52, 67))
+	addPiece("Neck", Vector3.new(0.42, 0.66, 0.42), 2.02, Color3.fromRGB(248, 247, 237))
+	addPiece("Head", Vector3.new(0.54, 0.54, 0.54), 2.42, Color3.fromRGB(248, 247, 237))
+
+	pinModel:SetAttribute("MaintenanceBasePivot", pinModel:GetPivot())
+	pinModel:SetAttribute("MaintenanceMotionKind", "Pin")
+	pinModel:SetAttribute("MaintenanceMotionIndex", motionIndex or 1)
+	tag(pinModel, Constants.Tags.BowlingMaintenanceMover)
+	return pinModel
+end
+
 local function makeBowlingAdTv(parent, name, cframe, adOffset, laneIndex)
 	local tv = makeModel(parent, name)
 	local frame = createPart(tv, name .. "Frame", Vector3.new(8.6, 4.3, 0.42), cframe, Color3.fromRGB(12, 14, 19), Enum.Material.Metal)
@@ -2405,17 +2457,86 @@ local function makeBowlingAlley(roomFolder)
 		makeBowlingPins(room, laneIndex, laneX, -26, origin)
 	end
 
-	local machinery = createPart(room, "BowlingPinMachine", Vector3.new(36, 5, 4), CFrame.new(origin + Vector3.new(0, 3.6, -33.5)), Color3.fromRGB(48, 52, 63), Enum.Material.Metal)
+	local machinery = createPart(room, "BowlingPinMachine", Vector3.new(40, 14.2, 5.6), CFrame.new(origin + Vector3.new(0, 7.35, -34.2)), Color3.fromRGB(48, 52, 63), Enum.Material.Metal)
 	createSurfaceText(machinery, "PinMachineText", "PIN MACHINE\nDO NOT ENTER", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(48, 52, 63))
-	local maintenanceDoor = createPart(room, "BowlingMaintenanceDoor", Vector3.new(6.2, 7.6, 0.35), CFrame.new(origin + Vector3.new(0, 4.25, -37.8)), Color3.fromRGB(91, 95, 107), Enum.Material.Metal)
-	maintenanceDoor:SetAttribute("DestinationCFrame", BOWLING_MAINTENANCE_CFRAME)
+	local machineCap = createPart(room, "BowlingPinMachineCap", Vector3.new(41.5, 1.2, 6.6), CFrame.new(origin + Vector3.new(0, 14.9, -34.2)), Color3.fromRGB(33, 36, 46), Enum.Material.Metal)
+	machineCap:SetAttribute("CosmicSurface", true)
+
+	local maintenanceDoor = createPart(
+		room,
+		"BowlingMaintenanceDoor",
+		Vector3.new(6.2, 7.6, 0.35),
+		CFrame.new(origin + Vector3.new(1.2, 4.25, -49.35)) * CFrame.Angles(0, math.rad(180), 0),
+		Color3.fromRGB(91, 95, 107),
+		Enum.Material.Metal
+	)
+	maintenanceDoor:SetAttribute("DestinationCFrame", BOWLING_MAINTENANCE_ROOM_CFRAME)
 	createSurfaceText(maintenanceDoor, "MaintenanceDoorText", "MAINTENANCE\nROOM", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(91, 95, 107))
 	createPrompt(maintenanceDoor, "Enter", "Maintenance Room", 0)
 	tag(maintenanceDoor, Constants.Tags.BowlingMaintenanceDoor)
 
-	createPart(room, "MaintenanceFloor", Vector3.new(20, 1, 12), CFrame.new(origin + Vector3.new(0, 0, -45)), Color3.fromRGB(55, 58, 66), Enum.Material.Concrete)
-	createPart(room, "MaintenanceBackWall", Vector3.new(20, 10, 1), CFrame.new(origin + Vector3.new(0, 5, -51)), Color3.fromRGB(43, 45, 54), Enum.Material.SmoothPlastic)
-	local lever = createPart(room, "PinsetterResetLever", Vector3.new(0.55, 3.2, 0.55), CFrame.new(origin + Vector3.new(-6.5, 3.1, -47.5)) * CFrame.Angles(0, 0, math.rad(-18)), Color3.fromRGB(255, 214, 96), Enum.Material.Metal)
+	local maintenanceOrigin = origin + Vector3.new(-7, 0, -63)
+	local maintenanceWidth = 20
+	local maintenanceDepth = 20
+	local maintenanceHeight = 12
+	local function maintenanceCFrame(x, y, z)
+		return CFrame.new(maintenanceOrigin + Vector3.new(x, y, z))
+	end
+
+	createPart(room, "MaintenanceFloor", Vector3.new(maintenanceWidth, 1, maintenanceDepth), maintenanceCFrame(0, 0, 0), Color3.fromRGB(55, 58, 66), Enum.Material.Concrete)
+	createPart(room, "MaintenanceBackWall", Vector3.new(maintenanceWidth, maintenanceHeight, 1), maintenanceCFrame(0, maintenanceHeight / 2, -maintenanceDepth / 2), Color3.fromRGB(43, 45, 54), Enum.Material.SmoothPlastic)
+	createPart(room, "MaintenanceFrontWall", Vector3.new(maintenanceWidth, maintenanceHeight, 1), maintenanceCFrame(0, maintenanceHeight / 2, maintenanceDepth / 2), Color3.fromRGB(43, 45, 54), Enum.Material.SmoothPlastic)
+	createPart(room, "MaintenanceLeftWall", Vector3.new(1, maintenanceHeight, maintenanceDepth), maintenanceCFrame(-maintenanceWidth / 2, maintenanceHeight / 2, 0), Color3.fromRGB(37, 39, 48), Enum.Material.SmoothPlastic)
+	createPart(room, "MaintenanceRightWall", Vector3.new(1, maintenanceHeight, maintenanceDepth), maintenanceCFrame(maintenanceWidth / 2, maintenanceHeight / 2, 0), Color3.fromRGB(37, 39, 48), Enum.Material.SmoothPlastic)
+	createPart(room, "MaintenanceCeiling", Vector3.new(maintenanceWidth, 1, maintenanceDepth), maintenanceCFrame(0, maintenanceHeight, 0), Color3.fromRGB(27, 29, 38), Enum.Material.Concrete)
+
+	local maintenanceExitDoor = createPart(
+		room,
+		"MaintenanceBowlingExitDoor",
+		Vector3.new(6.2, 7.2, 0.34),
+		CFrame.new(maintenanceOrigin + Vector3.new(0, 4.15, maintenanceDepth / 2 - 0.62), maintenanceOrigin + Vector3.new(0, 4.15, 0)),
+		Color3.fromRGB(73, 91, 122),
+		Enum.Material.Wood
+	)
+	maintenanceExitDoor:SetAttribute("DestinationCFrame", BOWLING_MAINTENANCE_CFRAME)
+	maintenanceExitDoor:SetAttribute("DestinationName", "the bowling alley")
+	createSurfaceText(maintenanceExitDoor, "MaintenanceExitText", "BOWLING\nALLEY", Enum.NormalId.Front, Color3.fromRGB(235, 245, 255), Color3.fromRGB(73, 91, 122))
+	createPrompt(maintenanceExitDoor, "Exit", "Bowling Alley", 0)
+	tag(maintenanceExitDoor, Constants.Tags.SecretRoomExit)
+
+	local roomSign = createPart(room, "MaintenanceRoomSign", Vector3.new(10, 1.7, 0.24), maintenanceCFrame(0, 9.4, maintenanceDepth / 2 - 0.92), Color3.fromRGB(255, 235, 149), Enum.Material.Neon)
+	createSurfaceText(roomSign, "MaintenanceRoomSignText", "PIN WORKSHOP\nAUTHORIZED TOUCHING?", Enum.NormalId.Front, Color3.fromRGB(34, 34, 40), Color3.fromRGB(255, 235, 149))
+
+	local conveyor = createPart(room, "MaintenanceConveyor", Vector3.new(15.8, 0.34, 2.3), maintenanceCFrame(0, 1.2, -1.8), Color3.fromRGB(34, 38, 48), Enum.Material.Metal)
+	conveyor:SetAttribute("CosmicSurface", true)
+	for rollerIndex = 1, 7 do
+		local roller = createPart(room, "MaintenanceRoller" .. rollerIndex, Vector3.new(0.38, 1.95, 0.38), maintenanceCFrame(-6 + (rollerIndex - 1) * 2, 1.42, -1.8) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(91, 95, 107), Enum.Material.Metal)
+		roller.Shape = Enum.PartType.Cylinder
+	end
+
+	for ballIndex, ballData in ipairs({
+		{ Offset = Vector3.new(-6.2, 2.1, -1.8), Color = Color3.fromRGB(84, 154, 255) },
+		{ Offset = Vector3.new(-2.0, 2.1, -1.8), Color = Color3.fromRGB(255, 88, 128) },
+		{ Offset = Vector3.new(2.2, 2.1, -1.8), Color = Color3.fromRGB(150, 112, 255) },
+		{ Offset = Vector3.new(6.1, 2.1, -1.8), Color = Color3.fromRGB(119, 255, 203) },
+	}) do
+		local ball = createPart(room, "MaintenanceBallMover" .. ballIndex, Vector3.new(1.55, 1.55, 1.55), CFrame.new(maintenanceOrigin + ballData.Offset), ballData.Color, Enum.Material.SmoothPlastic)
+		ball.Shape = Enum.PartType.Ball
+		ball.CanCollide = false
+		ball:SetAttribute("BaseCanCollide", false)
+		ball:SetAttribute("MaintenanceMotionKind", "Ball")
+		ball:SetAttribute("MaintenanceMotionIndex", ballIndex)
+		tag(ball, Constants.Tags.BowlingMaintenanceMover)
+	end
+
+	for pinIndex, pinX in ipairs({ -6.3, -3.1, 0.1, 3.3, 6.5 }) do
+		makeMaintenancePin(room, "MaintenancePinMover" .. pinIndex, CFrame.new(maintenanceOrigin + Vector3.new(pinX, 1.38, 2.45)), 0.78, pinIndex + 4)
+	end
+
+	local partsCrate = createPart(room, "MaintenancePartsCrate", Vector3.new(4.5, 2.4, 3.2), maintenanceCFrame(-6.4, 1.7, 6.0), Color3.fromRGB(91, 58, 38), Enum.Material.WoodPlanks)
+	createSurfaceText(partsCrate, "MaintenancePartsText", "SPARE\nPIN FEELINGS", Enum.NormalId.Front, Color3.fromRGB(255, 235, 149), Color3.fromRGB(91, 58, 38))
+
+	local lever = createPart(room, "PinsetterResetLever", Vector3.new(0.55, 3.2, 0.55), maintenanceCFrame(6.6, 3.1, 5.9) * CFrame.Angles(0, 0, math.rad(-18)), Color3.fromRGB(255, 214, 96), Enum.Material.Metal)
 	createPrompt(lever, "Pull", "Pinsetter Lever", 0)
 	tag(lever, Constants.Tags.BowlingResetLever)
 

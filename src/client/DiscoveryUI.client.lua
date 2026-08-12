@@ -50,6 +50,60 @@ titleSizeConstraint.MaxSize = Vector2.new(620, 42)
 titleSizeConstraint.MinSize = Vector2.new(220, 32)
 titleSizeConstraint.Parent = title
 
+local totalProgressPanel = Instance.new("Frame")
+totalProgressPanel.Name = "TotalDiscoveryProgress"
+totalProgressPanel.AnchorPoint = Vector2.new(0.5, 0)
+totalProgressPanel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+totalProgressPanel.BackgroundTransparency = 0.14
+totalProgressPanel.BorderSizePixel = 0
+totalProgressPanel.Position = UDim2.new(0.5, 0, 0, 74)
+totalProgressPanel.Size = UDim2.new(0.9, 0, 0, 42)
+totalProgressPanel.Parent = gui
+
+local totalProgressPanelConstraint = Instance.new("UISizeConstraint")
+totalProgressPanelConstraint.MaxSize = Vector2.new(720, 42)
+totalProgressPanelConstraint.MinSize = Vector2.new(300, 38)
+totalProgressPanelConstraint.Parent = totalProgressPanel
+
+local totalProgressCorner = Instance.new("UICorner")
+totalProgressCorner.CornerRadius = UDim.new(0, 8)
+totalProgressCorner.Parent = totalProgressPanel
+
+local totalProgressLabel = Instance.new("TextLabel")
+totalProgressLabel.Name = "TotalProgressLabel"
+totalProgressLabel.BackgroundTransparency = 1
+totalProgressLabel.Font = Enum.Font.GothamBlack
+totalProgressLabel.Position = UDim2.fromOffset(12, 2)
+totalProgressLabel.Size = UDim2.new(1, -24, 0, 24)
+totalProgressLabel.Text = "Touched 0 / 0 things that asked nicely."
+totalProgressLabel.TextColor3 = Color3.fromRGB(236, 246, 255)
+totalProgressLabel.TextScaled = true
+totalProgressLabel.TextWrapped = true
+totalProgressLabel.Parent = totalProgressPanel
+
+local totalProgressTrack = Instance.new("Frame")
+totalProgressTrack.Name = "TotalProgressTrack"
+totalProgressTrack.BackgroundColor3 = Color3.fromRGB(42, 47, 56)
+totalProgressTrack.BorderSizePixel = 0
+totalProgressTrack.Position = UDim2.new(0, 12, 1, -12)
+totalProgressTrack.Size = UDim2.new(1, -24, 0, 6)
+totalProgressTrack.Parent = totalProgressPanel
+
+local totalProgressTrackCorner = Instance.new("UICorner")
+totalProgressTrackCorner.CornerRadius = UDim.new(0, 3)
+totalProgressTrackCorner.Parent = totalProgressTrack
+
+local totalProgressFill = Instance.new("Frame")
+totalProgressFill.Name = "TotalProgressFill"
+totalProgressFill.BackgroundColor3 = Color3.fromRGB(255, 221, 84)
+totalProgressFill.BorderSizePixel = 0
+totalProgressFill.Size = UDim2.fromScale(0, 1)
+totalProgressFill.Parent = totalProgressTrack
+
+local totalProgressFillCorner = Instance.new("UICorner")
+totalProgressFillCorner.CornerRadius = UDim.new(0, 3)
+totalProgressFillCorner.Parent = totalProgressFill
+
 local counter = Instance.new("TextLabel")
 counter.Name = "DiscoveryCounter"
 counter.AnchorPoint = Vector2.new(0, 0)
@@ -57,7 +111,7 @@ counter.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 counter.BackgroundTransparency = 0.18
 counter.BorderSizePixel = 0
 counter.Font = Enum.Font.GothamBold
-counter.Position = UDim2.new(0, 18, 0, 96)
+counter.Position = UDim2.new(0, 18, 0, 126)
 counter.Size = UDim2.fromOffset(280, 38)
 counter.Text = "Finding room..."
 counter.TextColor3 = Color3.fromRGB(236, 246, 255)
@@ -74,7 +128,7 @@ noTouchPanel.AnchorPoint = Vector2.new(0, 0)
 noTouchPanel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
 noTouchPanel.BackgroundTransparency = 0.18
 noTouchPanel.BorderSizePixel = 0
-noTouchPanel.Position = UDim2.new(0, 18, 0, 140)
+noTouchPanel.Position = UDim2.new(0, 18, 0, 170)
 noTouchPanel.Size = UDim2.fromOffset(280, 56)
 noTouchPanel.Visible = false
 noTouchPanel.Parent = gui
@@ -769,6 +823,92 @@ local START_INTRO_LINES = {
 	"Current evidence: %s touched %d of %d objects marked by common sense as probably a bad idea.",
 }
 
+local TOTAL_PROGRESS_LINES = {
+	"Touched %d / %d things. The furniture is taking notes.",
+	"Tapped %d / %d forbidden items. Excellent curiosity, questionable restraint.",
+	"%d / %d objects have received your personal attention.",
+	"You touched %d / %d things that were clearly enjoying their quiet time.",
+	"%d / %d do-not-touch items have been thoroughly misunderstood.",
+	"The room reports %d / %d touches and one raised eyebrow.",
+	"%d / %d objects have entered the official oops ledger.",
+	"You discovered %d / %d reasons the sign was probably serious.",
+	"%d / %d things were minding their business until just now.",
+	"Touched %d / %d items. The warning label sighs politely.",
+	"%d / %d objects have been promoted to evidence.",
+	"You poked %d / %d possibilities. Science is complicated.",
+	"%d / %d items now know what your interact button feels like.",
+	"Discovery tally: %d / %d touches the room specifically did not request.",
+	"%d / %d objects were asked a very hands-on question.",
+	"You have bothered %d / %d perfectly suspicious objects.",
+	"%d / %d things have learned you are not great at ignoring them.",
+	"The no-touch scoreboard says %d / %d. It is blinking slowly.",
+	"%d / %d objects have been touched for reasons still under review.",
+	"You pressed onward through %d / %d bad ideas.",
+	"%d / %d items have filed a tiny complaint.",
+	"Touched %d / %d things. The room appreciates your honesty.",
+	"%d / %d discoveries found by not following directions very carefully.",
+	"You interacted with %d / %d objects labeled by vibes alone.",
+	"%d / %d items have been added to the 'well, that happened' list.",
+	"The room counted %d / %d touches and adjusted its expectations.",
+	"%d / %d things have been personally inspected against advice.",
+	"You found %d / %d ways to make the room nervous.",
+	"%d / %d objects are no longer innocent bystanders.",
+	"Touched %d / %d things. The sign remains undefeated.",
+	"%d / %d questionable choices have become measurable progress.",
+	"The room whispers %d / %d and hides the nice plates.",
+	"%d / %d items have received unexpected customer service.",
+	"You activated %d / %d things that were hoping for retirement.",
+	"%d / %d objects have joined the touch report.",
+	"Current mischief reading: %d / %d.",
+	"%d / %d items have been gently accused of being interactive.",
+	"You found %d / %d things the game hoped you would ignore.",
+	"%d / %d objects have been handled with maximum curiosity.",
+	"Touched %d / %d. The room is updating its safety poster.",
+	"%d / %d discoveries unlocked by extremely suspicious helpfulness.",
+	"You gave %d / %d objects a reason to make noises.",
+	"%d / %d things are now part of the official touching history.",
+	"The walls observed %d / %d touches and said nothing.",
+	"%d / %d items have been explored with brave uncertainty.",
+	"You interacted with %d / %d things that looked too interesting.",
+	"%d / %d objects have moved from 'maybe' to 'definitely touched'.",
+	"Touch report: %d / %d. The room requests a clipboard.",
+	"%d / %d suspicious objects have been responsibly irresponsible.",
+	"You uncovered %d / %d things by doing the exact tempting thing.",
+	"%d / %d items have been added to the button-adjacent database.",
+	"Touched %d / %d things. The carpet is pretending not to judge.",
+	"%d / %d discoveries found through enthusiastic rule testing.",
+	"You investigated %d / %d no-touch suggestions.",
+	"%d / %d objects have been politely startled.",
+	"The room has counted %d / %d touches and one dramatic pause.",
+	"%d / %d things have been contacted by your curiosity department.",
+	"You have touched %d / %d objects that looked touchable on purpose.",
+	"%d / %d items are now in the 'probably should not have' column.",
+	"Touched %d / %d things. The warning sign is still pointing.",
+	"%d / %d discoveries unlocked. The room blames the buttons.",
+	"You found %d / %d ways to make ordinary items suspicious.",
+	"%d / %d objects have been nudged into doing something weird.",
+	"The official count is %d / %d touches. Very official. Very worried.",
+	"%d / %d items have been encouraged to reveal their secrets.",
+	"You touched %d / %d things and somehow this is progress.",
+	"%d / %d do-not-touch candidates have been interviewed.",
+	"The room counted %d / %d discoveries and locked eyes with the exit.",
+	"%d / %d objects have been promoted from decoration to incident.",
+	"You found %d / %d excellent reasons to keep looking around.",
+	"%d / %d items have received the classic player inspection.",
+	"Touched %d / %d. The room is practicing deep breaths.",
+	"%d / %d discoveries logged by carefully ignoring the title.",
+	"You interacted with %d / %d things that had suspicious body language.",
+	"%d / %d objects have been placed in the evidence snack tray.",
+	"The no-touch committee records %d / %d touches.",
+	"%d / %d items have become part of today's lesson.",
+	"You discovered %d / %d things by following the sparkle of bad ideas.",
+	"%d / %d objects have been asked to explain themselves.",
+	"Touched %d / %d. The room says it saw everything.",
+	"%d / %d discoveries found. The title is doing its best.",
+	"You have touched %d / %d things that were almost certainly not homework.",
+	"%d / %d objects have joined the grand tour of questionable choices.",
+}
+
 local function tween(instance, duration, properties)
 	local tweenObject = TweenService:Create(
 		instance,
@@ -854,6 +994,33 @@ local function setStartIntro(payload)
 	end
 
 	startIntro.Text = sessionStartIntroText
+end
+
+local function formatTotalProgressText(count, total)
+	count = math.max(0, math.floor(tonumber(count) or 0))
+	total = math.max(1, math.floor(tonumber(total) or Constants.TotalDiscoveries or 1))
+
+	if count <= 0 then
+		return ("Touched 0 / %d things. Perfect record, suspiciously early."):format(total)
+	end
+
+	local template = TOTAL_PROGRESS_LINES[((count - 1) % #TOTAL_PROGRESS_LINES) + 1]
+	return template:format(count, total)
+end
+
+local function updateTotalProgress(payload)
+	payload = payload or {}
+	local total = math.max(1, math.floor(tonumber(payload.TotalDiscoveries or payload.Total or Constants.TotalDiscoveries) or 1))
+	local count = math.clamp(math.floor(tonumber(payload.DiscoveryCount or payload.Count) or 0), 0, total)
+	local ratio = math.clamp(count / total, 0, 1)
+
+	totalProgressLabel.Text = formatTotalProgressText(count, total)
+	totalProgressFill.Size = UDim2.fromScale(ratio, 1)
+	totalProgressFill.BackgroundColor3 = if ratio >= 1
+		then Color3.fromRGB(119, 255, 203)
+		elseif ratio >= 0.5
+		then Color3.fromRGB(255, 198, 82)
+		else Color3.fromRGB(255, 221, 84)
 end
 
 local function updateCounter(payload)
@@ -1041,6 +1208,7 @@ local function renderStartOptions(payload)
 	restartButton.Modal = true
 	setOverlayMouse(true, continueButton)
 	setStartIntro(payload)
+	updateTotalProgress(payload)
 	startSubtitle.Text = ("Book: %d / %d found    Hints: %d    Clues: %d"):format(
 		payload.DiscoveryCount or 0,
 		payload.TotalDiscoveries or Constants.TotalDiscoveries,
@@ -1408,11 +1576,17 @@ discoveryRemote.OnClientEvent:Connect(function(payload)
 	end
 
 	updateCounter(payload)
+	updateTotalProgress(payload)
 
 	if payload.Type == "Unlocked" and payload.Name then
 		showDiscoveryToast(payload.Name)
 	end
 end)
+
+updateTotalProgress({
+	Count = 0,
+	Total = Constants.TotalDiscoveries,
+})
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)

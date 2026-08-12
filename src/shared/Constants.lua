@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.45"
+Constants.BuildVersion = "0.5.46"
 Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -89,6 +89,7 @@ Constants.Tags = {
 	BowlingCosmicSwitch = "DontTouchIt_BowlingCosmicSwitch",
 	BowlingDiscoBall = "DontTouchIt_BowlingDiscoBall",
 	BowlingMaintenanceDoor = "DontTouchIt_BowlingMaintenanceDoor",
+	BowlingMaintenanceMover = "DontTouchIt_BowlingMaintenanceMover",
 	BowlingResetLever = "DontTouchIt_BowlingResetLever",
 	BowlingShoeRack = "DontTouchIt_BowlingShoeRack",
 	BowlingScoreboard = "DontTouchIt_BowlingScoreboard",

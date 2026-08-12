@@ -460,6 +460,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.bowlingCosmicActive = false
 	self.bowlingCosmicToken = nil
 	self.bowlingAdToken = nil
+	self.bowlingMaintenanceMotionConnection = nil
 	self.treetopZiplineStateByUserId = {}
 	self.voidGravityTokensByUserId = {}
 	self.voidChillTokensByHumanoid = {}
@@ -790,6 +791,7 @@ function InteractionService:Initialize()
 
 	self:_updateBowlingScoreboards()
 	self:_startBowlingAdRotation()
+	self:_startBowlingMaintenanceMotion()
 	self:_startVoidAmbientMotion()
 
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -1727,6 +1729,53 @@ function InteractionService:_startBowlingAdRotation()
 			self:_updateBowlingAds(step)
 			step += 1
 			task.wait(4)
+		end
+	end)
+end
+
+function InteractionService:_startBowlingMaintenanceMotion()
+	if self.bowlingMaintenanceMotionConnection then
+		self.bowlingMaintenanceMotionConnection:Disconnect()
+	end
+
+	local startedAt = os.clock()
+	self.bowlingMaintenanceMotionConnection = RunService.Heartbeat:Connect(function()
+		local elapsed = os.clock() - startedAt
+
+		for _, mover in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingMaintenanceMover)) do
+			if not mover.Parent then
+				continue
+			end
+
+			local kind = mover:GetAttribute("MaintenanceMotionKind") or "Ball"
+			local index = mover:GetAttribute("MaintenanceMotionIndex") or 1
+			local wobble = elapsed + index * 0.67
+			local offset
+			local rotation
+
+			if kind == "Pin" then
+				offset = Vector3.new(math.sin(wobble * 0.92) * 1.8, math.sin(wobble * 2.1) * 0.08, math.cos(wobble * 0.75) * 1.05)
+				rotation = CFrame.Angles(math.sin(wobble * 1.4) * 0.06, math.rad(elapsed * 28 + index * 18), math.sin(wobble) * 0.16)
+			else
+				offset = Vector3.new(math.sin(wobble * 0.8) * 5.5, math.abs(math.cos(wobble * 1.45)) * 0.18, math.cos(wobble * 0.8) * 0.48)
+				rotation = CFrame.Angles(math.rad(elapsed * 95 + index * 31), math.rad(elapsed * 42), math.rad(elapsed * 73))
+			end
+
+			if mover:IsA("Model") then
+				local basePivot = mover:GetAttribute("MaintenanceBasePivot")
+				if typeof(basePivot) ~= "CFrame" then
+					basePivot = mover:GetPivot()
+					mover:SetAttribute("MaintenanceBasePivot", basePivot)
+				end
+				mover:PivotTo(basePivot * CFrame.new(offset) * rotation)
+			elseif mover:IsA("BasePart") then
+				local baseCFrame = mover:GetAttribute("MaintenanceBaseCFrame") or mover:GetAttribute("BaseCFrame")
+				if typeof(baseCFrame) ~= "CFrame" then
+					baseCFrame = mover.CFrame
+					mover:SetAttribute("MaintenanceBaseCFrame", baseCFrame)
+				end
+				mover.CFrame = baseCFrame * CFrame.new(offset) * rotation
+			end
 		end
 	end)
 end
