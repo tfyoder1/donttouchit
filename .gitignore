@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 build/
+docs/private/
 *.rbxl
 *.rbxl.lock
 *.rbxlx.lock
