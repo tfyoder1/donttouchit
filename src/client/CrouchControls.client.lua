@@ -1,29 +1,45 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local movementRemote = remotes:WaitForChild(Constants.Remotes.MovementAuthority)
 
-local CROUCH_ATTRIBUTE = "DontTouchItCrouching"
 local FLIGHT_ACTIVE_ATTRIBUTE = "DontTouchItSnackFlightActive"
+local SLIDE_KEY = Enum.KeyCode.ButtonB
+local SLIDE_MIN_WALK_SPEED = 21
+local SLIDE_MIN_HORIZONTAL_SPEED = 18
 local CROUCH_KEYS = {
 	[Enum.KeyCode.ButtonB] = true,
 	[Enum.KeyCode.C] = true,
 }
 
 local crouching = false
-local crouchHumanoid = nil
-local baseWalkSpeed = nil
-local baseHipHeight = nil
-local baseCameraOffset = nil
+
+local function requestCrouch(active)
+	movementRemote:FireServer({
+		Action = "Crouch",
+		Active = active == true,
+	})
+end
+
+local function requestSlide()
+	movementRemote:FireServer({
+		Action = "Slide",
+	})
+end
 
 local function getHumanoid()
 	local character = player.Character
-	if not character then
-		return nil
-	end
+	return character and character:FindFirstChildOfClass("Humanoid")
+end
 
-	return character:FindFirstChildOfClass("Humanoid")
+local function getRootPart()
+	local character = player.Character
+	return character and character:FindFirstChild("HumanoidRootPart")
 end
 
 local function isRoomLogOpen()
@@ -32,24 +48,29 @@ local function isRoomLogOpen()
 	return referenceBook and referenceBook.Visible == true
 end
 
+local function shouldSlide()
+	if isRoomLogOpen() or playerGui:GetAttribute(FLIGHT_ACTIVE_ATTRIBUTE) == true then
+		return false
+	end
+
+	local humanoid = getHumanoid()
+	if not humanoid or humanoid.Health <= 0 or humanoid.MoveDirection.Magnitude < 0.25 then
+		return false
+	end
+
+	local rootPart = getRootPart()
+	local velocity = rootPart and rootPart.AssemblyLinearVelocity or Vector3.zero
+	local horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	return humanoid.WalkSpeed >= SLIDE_MIN_WALK_SPEED or horizontalSpeed >= SLIDE_MIN_HORIZONTAL_SPEED
+end
+
 local function restoreCrouch()
 	if not crouching then
 		return
 	end
 
-	local humanoid = crouchHumanoid
-	if humanoid and humanoid.Parent then
-		humanoid.WalkSpeed = baseWalkSpeed or humanoid.WalkSpeed
-		humanoid.HipHeight = baseHipHeight or humanoid.HipHeight
-		humanoid.CameraOffset = baseCameraOffset or Vector3.zero
-		humanoid:SetAttribute(CROUCH_ATTRIBUTE, false)
-	end
-
 	crouching = false
-	crouchHumanoid = nil
-	baseWalkSpeed = nil
-	baseHipHeight = nil
-	baseCameraOffset = nil
+	requestCrouch(false)
 end
 
 local function beginCrouch()
@@ -57,25 +78,17 @@ local function beginCrouch()
 		return
 	end
 
-	local humanoid = getHumanoid()
-	if not humanoid or humanoid.Health <= 0 then
-		return
-	end
-
 	crouching = true
-	crouchHumanoid = humanoid
-	baseWalkSpeed = humanoid.WalkSpeed
-	baseHipHeight = humanoid.HipHeight
-	baseCameraOffset = humanoid.CameraOffset
-
-	humanoid:SetAttribute(CROUCH_ATTRIBUTE, true)
-	humanoid.WalkSpeed = math.max(6, baseWalkSpeed * 0.58)
-	humanoid.HipHeight = math.max(0.45, baseHipHeight - 1.05)
-	humanoid.CameraOffset = baseCameraOffset + Vector3.new(0, -1.05, 0)
+	requestCrouch(true)
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if not CROUCH_KEYS[input.KeyCode] or gameProcessed then
+		return
+	end
+
+	if input.KeyCode == SLIDE_KEY and shouldSlide() then
+		requestSlide()
 		return
 	end
 

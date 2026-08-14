@@ -1,23 +1,21 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local movementRemote = remotes:WaitForChild(Constants.Remotes.MovementAuthority)
 
 local BOOST_KEY = Enum.KeyCode.ButtonL3
-local BOOST_MULTIPLIER = 1.55
-local BOOST_MIN_SPEED = 24
 
 local boosting = false
-local boostHumanoid = nil
-local baseWalkSpeed = nil
 
-local function getHumanoid()
-	local character = player.Character
-	if not character then
-		return nil
-	end
-
-	return character:FindFirstChildOfClass("Humanoid")
+local function requestBoost(active)
+	movementRemote:FireServer({
+		Action = "SpeedBoost",
+		Active = active == true,
+	})
 end
 
 local function stopBoost()
@@ -25,13 +23,8 @@ local function stopBoost()
 		return
 	end
 
-	if boostHumanoid and boostHumanoid.Parent and baseWalkSpeed then
-		boostHumanoid.WalkSpeed = baseWalkSpeed
-	end
-
 	boosting = false
-	boostHumanoid = nil
-	baseWalkSpeed = nil
+	requestBoost(false)
 end
 
 local function startBoost()
@@ -39,18 +32,15 @@ local function startBoost()
 		return
 	end
 
-	local humanoid = getHumanoid()
-	if not humanoid or humanoid.Health <= 0 then
+	boosting = true
+	requestBoost(true)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
 		return
 	end
 
-	boosting = true
-	boostHumanoid = humanoid
-	baseWalkSpeed = humanoid.WalkSpeed
-	humanoid.WalkSpeed = math.max(BOOST_MIN_SPEED, baseWalkSpeed * BOOST_MULTIPLIER)
-end
-
-UserInputService.InputBegan:Connect(function(input)
 	if input.KeyCode ~= BOOST_KEY then
 		return
 	end

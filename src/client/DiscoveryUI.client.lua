@@ -1,5 +1,6 @@
 local Debris = game:GetService("Debris")
 local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -24,11 +25,30 @@ local playerGui = player:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
 gui.IgnoreGuiInset = false
+gui.DisplayOrder = 10
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
+pcall(function()
+	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+end)
 
 local function isStartOverlayDismissedForDevSession()
 	return gui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true or playerGui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true
+end
+
+local function getViewportSize()
+	local camera = workspace.CurrentCamera
+	return camera and camera.ViewportSize or Vector2.new(1200, 720)
+end
+
+local function isCompactHud()
+	local viewport = getViewportSize()
+	return UserInputService.TouchEnabled or viewport.X < 900 or viewport.Y < 560
+end
+
+local function isTouchLandscape()
+	local viewport = getViewportSize()
+	return UserInputService.TouchEnabled and viewport.X > viewport.Y
 end
 
 local title = Instance.new("TextLabel")
@@ -172,6 +192,145 @@ local noTouchFillCorner = Instance.new("UICorner")
 noTouchFillCorner.CornerRadius = UDim.new(0, 5)
 noTouchFillCorner.Parent = noTouchFill
 
+local energyPanel = Instance.new("Frame")
+energyPanel.Name = "PlayerEnergy"
+energyPanel.AnchorPoint = Vector2.new(1, 0)
+energyPanel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+energyPanel.BackgroundTransparency = 0.18
+energyPanel.BorderSizePixel = 0
+energyPanel.Position = UDim2.new(1, -18, 0, 126)
+energyPanel.Size = UDim2.fromOffset(250, 44)
+energyPanel.Parent = gui
+
+local energyCorner = Instance.new("UICorner")
+energyCorner.CornerRadius = UDim.new(0, 7)
+energyCorner.Parent = energyPanel
+
+local energyLabel = Instance.new("TextLabel")
+energyLabel.Name = "EnergyLabel"
+energyLabel.BackgroundTransparency = 1
+energyLabel.Font = Enum.Font.GothamBlack
+energyLabel.Position = UDim2.fromOffset(10, 3)
+energyLabel.Size = UDim2.new(1, -20, 0, 23)
+energyLabel.Text = "Energy: 100%"
+energyLabel.TextColor3 = Color3.fromRGB(236, 246, 255)
+energyLabel.TextScaled = true
+energyLabel.TextXAlignment = Enum.TextXAlignment.Left
+energyLabel.Parent = energyPanel
+
+local energyTrack = Instance.new("Frame")
+energyTrack.Name = "EnergyTrack"
+energyTrack.BackgroundColor3 = Color3.fromRGB(42, 47, 56)
+energyTrack.BorderSizePixel = 0
+energyTrack.Position = UDim2.fromOffset(10, 31)
+energyTrack.Size = UDim2.new(1, -20, 0, 8)
+energyTrack.Parent = energyPanel
+
+local energyTrackCorner = Instance.new("UICorner")
+energyTrackCorner.CornerRadius = UDim.new(0, 4)
+energyTrackCorner.Parent = energyTrack
+
+local energyFill = Instance.new("Frame")
+energyFill.Name = "EnergyFill"
+energyFill.BackgroundColor3 = Color3.fromRGB(119, 255, 203)
+energyFill.BorderSizePixel = 0
+energyFill.Size = UDim2.fromScale(1, 1)
+energyFill.Parent = energyTrack
+
+local energyFillCorner = Instance.new("UICorner")
+energyFillCorner.CornerRadius = UDim.new(0, 4)
+energyFillCorner.Parent = energyFill
+
+noTouchPanel:SetAttribute("ShouldShow", false)
+
+local function isGameplayHudSuppressed()
+	return gui:GetAttribute("GameplayHudSuppressed") == true
+end
+
+local function applyHudVisibility()
+	local suppressed = isGameplayHudSuppressed()
+	local compact = isCompactHud()
+
+	title.Visible = not suppressed and not compact
+	totalProgressPanel.Visible = not suppressed
+	counter.Visible = not suppressed
+	energyPanel.Visible = not suppressed
+	noTouchPanel.Visible = not suppressed and noTouchPanel:GetAttribute("ShouldShow") == true
+end
+
+local function updateHudLayout()
+	local compact = isCompactHud()
+
+	totalProgressPanel:SetAttribute("Compact", compact)
+	counter:SetAttribute("Compact", compact)
+	noTouchPanel:SetAttribute("Compact", compact)
+
+	energyPanel:SetAttribute("Compact", compact)
+	if compact then
+		local touchLandscape = isTouchLandscape()
+		local sideInset = if UserInputService.TouchEnabled then 32 else 8
+		totalProgressPanel.Position = UDim2.new(0.5, 0, 0, touchLandscape and 42 or 50)
+		totalProgressPanel.Size = UDim2.new(touchLandscape and 0.56 or 0.68, 0, 0, 30)
+		totalProgressPanelConstraint.MaxSize = Vector2.new(touchLandscape and 520 or 620, 30)
+		totalProgressPanelConstraint.MinSize = Vector2.new(touchLandscape and 220 or 250, 28)
+		totalProgressLabel.Position = UDim2.fromOffset(10, 1)
+		totalProgressLabel.Size = UDim2.new(1, -20, 0, 18)
+		totalProgressTrack.Position = UDim2.new(0, 10, 1, -8)
+		totalProgressTrack.Size = UDim2.new(1, -20, 0, 4)
+
+		counter.Position = UDim2.new(0, sideInset, 0, 100)
+		counter.Size = UDim2.fromOffset(180, 30)
+		noTouchPanel.Position = UDim2.new(0, sideInset, 0, 135)
+		noTouchPanel.Size = UDim2.fromOffset(190, 38)
+		noTouchLabel.Position = UDim2.fromOffset(8, 2)
+		noTouchLabel.Size = UDim2.new(1, -16, 0, 18)
+		noTouchTrack.Position = UDim2.fromOffset(8, 27)
+		noTouchTrack.Size = UDim2.new(1, -16, 0, 6)
+
+		energyPanel.Position = UDim2.new(1, -sideInset, 0, 100)
+		energyPanel.Size = UDim2.fromOffset(136, 32)
+		energyLabel.Position = UDim2.fromOffset(8, 2)
+		energyLabel.Size = UDim2.new(1, -16, 0, 18)
+		energyTrack.Position = UDim2.fromOffset(8, 24)
+		energyTrack.Size = UDim2.new(1, -16, 0, 6)
+	else
+		title.Visible = true
+		totalProgressPanel.Position = UDim2.new(0.5, 0, 0, 74)
+		totalProgressPanel.Size = UDim2.new(0.9, 0, 0, 42)
+		totalProgressPanelConstraint.MaxSize = Vector2.new(720, 42)
+		totalProgressPanelConstraint.MinSize = Vector2.new(300, 38)
+		totalProgressLabel.Position = UDim2.fromOffset(12, 2)
+		totalProgressLabel.Size = UDim2.new(1, -24, 0, 24)
+		totalProgressTrack.Position = UDim2.new(0, 12, 1, -12)
+		totalProgressTrack.Size = UDim2.new(1, -24, 0, 6)
+
+		counter.Position = UDim2.new(0, 18, 0, 126)
+		counter.Size = UDim2.fromOffset(280, 38)
+		noTouchPanel.Position = UDim2.new(0, 18, 0, 170)
+		noTouchPanel.Size = UDim2.fromOffset(280, 56)
+		noTouchLabel.Position = UDim2.fromOffset(10, 4)
+		noTouchLabel.Size = UDim2.new(1, -20, 0, 28)
+		noTouchTrack.Position = UDim2.fromOffset(10, 38)
+		noTouchTrack.Size = UDim2.new(1, -20, 0, 10)
+
+		energyPanel.Position = UDim2.new(1, -18, 0, 126)
+		energyPanel.Size = UDim2.fromOffset(250, 44)
+		energyLabel.Position = UDim2.fromOffset(10, 3)
+		energyLabel.Size = UDim2.new(1, -20, 0, 23)
+		energyTrack.Position = UDim2.fromOffset(10, 31)
+		energyTrack.Size = UDim2.new(1, -20, 0, 8)
+	end
+
+	applyHudVisibility()
+end
+
+updateHudLayout()
+UserInputService.LastInputTypeChanged:Connect(updateHudLayout)
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateHudLayout)
+if workspace.CurrentCamera then
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateHudLayout)
+end
+
 local toast = Instance.new("TextLabel")
 toast.Name = "DiscoveryToast"
 toast.AnchorPoint = Vector2.new(0.5, 0)
@@ -224,17 +383,32 @@ messageCorner.Parent = message
 local function updateMessagePosition()
 	local bottomOffset = 118
 	if UserInputService.TouchEnabled then
-		bottomOffset = 152
+		bottomOffset = 116
 	elseif UserInputService.GamepadEnabled then
 		bottomOffset = 132
 	end
 
 	local camera = workspace.CurrentCamera
 	if camera and camera.ViewportSize.Y < 560 then
-		bottomOffset = math.max(96, bottomOffset - 22)
+		bottomOffset = math.max(92, bottomOffset - 16)
 	end
 
-	message.Position = UDim2.new(0.5, 0, 1, -bottomOffset)
+	if isTouchLandscape() then
+		bottomOffset = 76
+		message.Size = UDim2.new(0.42, 0, 0, 42)
+		messageSizeConstraint.MaxSize = Vector2.new(420, 42)
+		messageSizeConstraint.MinSize = Vector2.new(220, 38)
+	elseif UserInputService.TouchEnabled then
+		message.Size = UDim2.new(0.76, 0, 0, 58)
+		messageSizeConstraint.MaxSize = Vector2.new(560, 58)
+		messageSizeConstraint.MinSize = Vector2.new(240, 42)
+	else
+		message.Size = UDim2.new(0.88, 0, 0, 72)
+		messageSizeConstraint.MaxSize = Vector2.new(620, 72)
+		messageSizeConstraint.MinSize = Vector2.new(280, 44)
+	end
+
+	message.Position = UDim2.new(isTouchLandscape() and 0.36 or 0.5, 0, 1, -bottomOffset)
 end
 
 updateMessagePosition()
@@ -644,11 +818,28 @@ startOverlay.Active = true
 startOverlay.ZIndex = 20
 startOverlay.Parent = gui
 
+local startBlur = Lighting:FindFirstChild("DontTouchItStartMenuBlur")
+if not startBlur or not startBlur:IsA("BlurEffect") then
+	startBlur = Instance.new("BlurEffect")
+	startBlur.Name = "DontTouchItStartMenuBlur"
+	startBlur.Parent = Lighting
+end
+startBlur.Enabled = false
+startBlur.Size = 0
+
+local function setStartOverlayVisible(visible)
+	startOverlay.Visible = visible
+	startBlur.Enabled = visible
+	startBlur.Size = visible and 18 or 0
+	gui:SetAttribute("GameplayHudSuppressed", visible == true)
+	applyHudVisibility()
+end
+
 local startPanel = Instance.new("Frame")
 startPanel.Name = "StartChoicePanel"
 startPanel.AnchorPoint = Vector2.new(0.5, 0.5)
 startPanel.BackgroundColor3 = Color3.fromRGB(24, 27, 34)
-startPanel.BackgroundTransparency = 0.04
+startPanel.BackgroundTransparency = 1
 startPanel.BorderSizePixel = 0
 startPanel.Position = UDim2.fromScale(0.5, 0.52)
 startPanel.Size = UDim2.new(0.92, 0, 0.84, 0)
@@ -797,6 +988,109 @@ restartButton.Parent = startPanel
 local restartCorner = Instance.new("UICorner")
 restartCorner.CornerRadius = UDim.new(0, 6)
 restartCorner.Parent = restartButton
+
+local function updateStartLayout()
+	local compact = isCompactHud()
+	local touchLandscape = isTouchLandscape()
+
+	if compact then
+		startOverlay.BackgroundTransparency = touchLandscape and 0.72 or 0.62
+		startPanel.BackgroundTransparency = 1
+		startPanel.Position = UDim2.fromScale(touchLandscape and 0.42 or 0.5, touchLandscape and 0.55 or 0.53)
+		startPanel.Size = UDim2.new(touchLandscape and 0.54 or 0.74, 0, touchLandscape and 0.76 or 0.8, 0)
+		startPanelConstraint.MaxSize = Vector2.new(touchLandscape and 500 or 460, touchLandscape and 330 or 350)
+		startPanelConstraint.MinSize = Vector2.new(touchLandscape and 280 or 300, touchLandscape and 240 or 260)
+
+		startTitle.Position = UDim2.fromOffset(14, 9)
+		startTitle.Size = UDim2.new(1, -78, 0, 28)
+		startTitle.TextScaled = false
+		startTitle.TextSize = touchLandscape and 24 or 26
+
+		startIntro.Position = UDim2.fromOffset(16, 42)
+		startIntro.Size = UDim2.new(1, -32, 0, touchLandscape and 42 or 46)
+		startIntro.TextScaled = false
+		startIntro.TextSize = touchLandscape and 15 or 16
+
+		startSubtitle.Position = UDim2.fromOffset(16, touchLandscape and 86 or 91)
+		startSubtitle.Size = UDim2.new(1, -32, 0, 24)
+		startSubtitle.TextScaled = false
+		startSubtitle.TextSize = touchLandscape and 17 or 19
+
+		startRoomTitle.Position = UDim2.fromOffset(16, touchLandscape and 112 or 121)
+		startRoomTitle.Size = UDim2.new(1, -32, 0, 18)
+		startRoomTitle.Text = "Unlocked Rooms"
+		startRoomTitle.TextScaled = false
+		startRoomTitle.TextSize = 16
+
+		startRoomList.Position = UDim2.fromOffset(16, touchLandscape and 134 or 143)
+		startRoomList.Size = UDim2.new(1, -32, 1, touchLandscape and -180 or -196)
+		startRoomList.ScrollBarThickness = 4
+		startRoomLayout.Padding = UDim.new(0, 4)
+		startVersion.AnchorPoint = Vector2.new(1, 0)
+		startVersion.Position = UDim2.new(1, -14, 0, 13)
+		startVersion.Size = UDim2.fromOffset(58, 12)
+		startVersion.TextScaled = false
+		startVersion.TextSize = 10
+
+		continueButton.Position = UDim2.new(0, 16, 1, touchLandscape and -39 or -44)
+		continueButton.Size = restartButton.Visible and UDim2.new(0.5, -20, 0, touchLandscape and 30 or 32) or UDim2.new(1, -32, 0, touchLandscape and 30 or 32)
+		continueButton.TextScaled = false
+		continueButton.TextSize = touchLandscape and 17 or 19
+
+		restartButton.Position = UDim2.new(0.5, 4, 1, touchLandscape and -39 or -44)
+		restartButton.Size = UDim2.new(0.5, -20, 0, touchLandscape and 30 or 32)
+		restartButton.TextScaled = false
+		restartButton.TextSize = touchLandscape and 17 or 19
+		return
+	end
+
+	startOverlay.BackgroundTransparency = 0.5
+	startPanel.BackgroundTransparency = 1
+	startPanel.Position = UDim2.fromScale(0.5, 0.52)
+	startPanel.Size = UDim2.new(0.92, 0, 0.84, 0)
+	startPanelConstraint.MaxSize = Vector2.new(520, 520)
+	startPanelConstraint.MinSize = Vector2.new(320, 390)
+
+	startTitle.Position = UDim2.fromOffset(18, 18)
+	startTitle.Size = UDim2.new(1, -36, 0, 36)
+	startTitle.TextScaled = true
+
+	startIntro.Position = UDim2.fromOffset(24, 62)
+	startIntro.Size = UDim2.new(1, -48, 0, 66)
+	startIntro.TextScaled = true
+
+	startSubtitle.Position = UDim2.fromOffset(24, 132)
+	startSubtitle.Size = UDim2.new(1, -48, 0, 38)
+	startSubtitle.TextScaled = true
+
+	startRoomTitle.Position = UDim2.fromOffset(24, 178)
+	startRoomTitle.Size = UDim2.new(1, -48, 0, 22)
+	startRoomTitle.Text = "Choose Unlocked Room"
+	startRoomTitle.TextScaled = true
+
+	startRoomList.Position = UDim2.fromOffset(24, 204)
+	startRoomList.Size = UDim2.new(1, -48, 1, -326)
+	startRoomList.ScrollBarThickness = 6
+	startRoomLayout.Padding = UDim.new(0, 6)
+	startVersion.AnchorPoint = Vector2.new(1, 1)
+	startVersion.Position = UDim2.new(1, -12, 1, -8)
+	startVersion.Size = UDim2.fromOffset(120, 18)
+	startVersion.TextScaled = true
+
+	continueButton.Position = UDim2.new(0, 24, 1, -104)
+	continueButton.Size = UDim2.new(1, -48, 0, 38)
+	continueButton.TextScaled = true
+
+	restartButton.Position = UDim2.new(0, 24, 1, -58)
+	restartButton.Size = UDim2.new(1, -48, 0, 34)
+	restartButton.TextScaled = true
+end
+
+UserInputService.LastInputTypeChanged:Connect(updateStartLayout)
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateStartLayout)
+if workspace.CurrentCamera then
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateStartLayout)
+end
 
 local activeToastTween = nil
 local activeMessageTween = nil
@@ -1000,6 +1294,10 @@ local function formatTotalProgressText(count, total)
 	count = math.max(0, math.floor(tonumber(count) or 0))
 	total = math.max(1, math.floor(tonumber(total) or Constants.TotalDiscoveries or 1))
 
+	if totalProgressPanel:GetAttribute("Compact") == true then
+		return ("%d / %d touched so far."):format(count, total)
+	end
+
 	if count <= 0 then
 		return ("Touched 0 / %d things. Perfect record, suspiciously early."):format(total)
 	end
@@ -1023,6 +1321,64 @@ local function updateTotalProgress(payload)
 		else Color3.fromRGB(255, 221, 84)
 end
 
+local function formatHudRoomName(name)
+	name = tostring(name or "Room")
+	if counter:GetAttribute("Compact") ~= true then
+		return name
+	end
+
+	local compactNames = {
+		["TV Room"] = "TV",
+		["Snack Lab"] = "Snack",
+		["Sleeping Quarters"] = "Sleep",
+		["Bowling Alley"] = "Bowl",
+		["Treetop Zipline"] = "Zip",
+		["Cave Entrance"] = "Cave",
+		["Security Room"] = "Security",
+		["Training Arena"] = "Arena",
+		["Space Station"] = "Space",
+	}
+
+	return compactNames[name] or name
+end
+
+local function getReplicatedEnergyAttribute(attributeName, fallback)
+	local value = playerGui:GetAttribute(attributeName)
+	if value == nil then
+		value = player:GetAttribute(attributeName)
+	end
+
+	return tonumber(value) or fallback
+end
+
+local function updateEnergyBar()
+	local energy = math.clamp(getReplicatedEnergyAttribute("DontTouchItPlayerEnergy", 1), 0, 1)
+	local signalLoad = math.clamp(getReplicatedEnergyAttribute("DontTouchItBunkerHunger", 0), 0, 1)
+	local percent = math.floor(energy * 100 + 0.5)
+	local compact = energyPanel:GetAttribute("Compact") == true
+
+	local signalText = if signalLoad >= 0.66 then "irregular" elseif signalLoad >= 0.33 then "active" else "quiet"
+	local fieldText = if energy <= 0.22 then "field tiny" elseif energy <= 0.48 then "field low" else "field steady"
+
+	if compact then
+		energyLabel.Text = ("Energy %d%%"):format(percent)
+	else
+		energyLabel.Text = ("Energy: %d%%  %s  Signal: %s"):format(percent, fieldText, signalText)
+	end
+
+	energyPanel.BackgroundColor3 = if energy <= 0.22
+		then Color3.fromRGB(48, 16, 22)
+		elseif energy <= 0.48
+		then Color3.fromRGB(45, 35, 22)
+		else Color3.fromRGB(18, 20, 24)
+	energyFill.Size = UDim2.fromScale(energy, 1)
+	energyFill.BackgroundColor3 = if energy <= 0.22
+		then Color3.fromRGB(255, 96, 102)
+		elseif energy <= 0.48
+		then Color3.fromRGB(255, 198, 82)
+		else Color3.fromRGB(119, 255, 203)
+end
+
 local function updateCounter(payload)
 	if currentStatusType == "Hallway" then
 		return
@@ -1031,13 +1387,22 @@ local function updateCounter(payload)
 	if currentStatusType == "Room" and currentStatusRoomId and typeof(payload.Rooms) == "table" then
 		for _, room in ipairs(payload.Rooms) do
 			if room.RoomId == currentStatusRoomId then
-				counter.Text = ("%s: %d / %d"):format(room.Name or "Room", room.Count or 0, room.Total or 0)
+				local roomName = formatHudRoomName(room.Name or "Room")
+				if counter:GetAttribute("Compact") == true then
+					counter.Text = ("%s: %d/%d"):format(roomName, room.Count or 0, room.Total or 0)
+				else
+					counter.Text = ("%s: %d / %d"):format(roomName, room.Count or 0, room.Total or 0)
+				end
 				return
 			end
 		end
 	end
 
-	counter.Text = ("Discoveries: %d / %d"):format(payload.Count or 0, payload.Total or Constants.TotalDiscoveries)
+	if counter:GetAttribute("Compact") == true then
+		counter.Text = ("%d/%d found"):format(payload.Count or 0, payload.Total or Constants.TotalDiscoveries)
+	else
+		counter.Text = ("Discoveries: %d / %d"):format(payload.Count or 0, payload.Total or Constants.TotalDiscoveries)
+	end
 end
 
 local function updateRoomStatus(payload)
@@ -1049,31 +1414,43 @@ local function updateRoomStatus(payload)
 	currentStatusRoomId = payload.RoomId
 
 	if payload.Type == "Hallway" then
-		counter.Text = ("%s: %d / %d rooms unlocked"):format(
-			payload.Name or "Hallway",
-			payload.UnlockedRooms or 0,
-			payload.TotalRooms or 0
-		)
+		if counter:GetAttribute("Compact") == true then
+			counter.Text = ("Hall: %d/%d rooms"):format(payload.UnlockedRooms or 0, payload.TotalRooms or 0)
+		else
+			counter.Text = ("%s: %d / %d rooms unlocked"):format(
+				payload.Name or "Hallway",
+				payload.UnlockedRooms or 0,
+				payload.TotalRooms or 0
+			)
+		end
 	elseif payload.Type == "Room" then
-		counter.Text = ("%s: %d / %d"):format(
-			payload.RoomName or "Room",
-			payload.Count or 0,
-			payload.Total or 0
-		)
+		local roomName = formatHudRoomName(payload.RoomName or "Room")
+		if counter:GetAttribute("Compact") == true then
+			counter.Text = ("%s: %d/%d"):format(roomName, payload.Count or 0, payload.Total or 0)
+		else
+			counter.Text = ("%s: %d / %d"):format(roomName, payload.Count or 0, payload.Total or 0)
+		end
 		local elapsed = math.max(0, payload.NoTouchElapsed or 0)
 		local target = math.max(1, payload.NoTouchTarget or Constants.NoTouch.AccomplishmentSeconds)
 		local totalPlay = math.max(0, payload.TotalPlaySeconds or 0)
 		local ratio = math.clamp(elapsed / target, 0, 1)
-		noTouchPanel.Visible = true
+		noTouchPanel:SetAttribute("ShouldShow", true)
+		applyHudVisibility()
 		noTouchFill.Size = UDim2.fromScale(ratio, 1)
-		noTouchLabel.Text = ("Still: %.1f / %.1f min  Room: %.1f min"):format(elapsed / 60, target / 60, totalPlay / 60)
+		if noTouchPanel:GetAttribute("Compact") == true then
+			noTouchLabel.Text = ("Still %.1fm | Room %.1fm"):format(elapsed / 60, totalPlay / 60)
+		else
+			noTouchLabel.Text = ("Still: %.1f / %.1f min  Room: %.1f min"):format(elapsed / 60, target / 60, totalPlay / 60)
+		end
 	else
 		counter.Text = ""
-		noTouchPanel.Visible = false
+		noTouchPanel:SetAttribute("ShouldShow", false)
+		applyHudVisibility()
 	end
 
 	if payload.Type == "Hallway" then
-		noTouchPanel.Visible = false
+		noTouchPanel:SetAttribute("ShouldShow", false)
+		applyHudVisibility()
 	end
 end
 
@@ -1117,7 +1494,7 @@ local function closeReferenceBook()
 end
 
 local function sendStartChoice(action, roomId)
-	startOverlay.Visible = false
+	setStartOverlayVisible(false)
 	continueButton.Modal = false
 	restartButton.Modal = false
 	setOverlayMouse(false)
@@ -1165,10 +1542,11 @@ local function renderStartRoomChoices(payload)
 		roomButton.BorderSizePixel = 0
 		roomButton.Font = Enum.Font.GothamBlack
 		roomButton.LayoutOrder = index
-		roomButton.Size = UDim2.new(1, 0, 0, 36)
+		roomButton.Size = UDim2.new(1, 0, 0, isCompactHud() and 28 or 36)
 		roomButton.Text = room.IsResumeRoom and ("%s  |  Last"):format(room.Name or "Room") or (room.Name or "Room")
 		roomButton.TextColor3 = room.IsResumeRoom and Color3.fromRGB(14, 40, 24) or Color3.fromRGB(224, 236, 245)
-		roomButton.TextScaled = true
+		roomButton.TextScaled = not isCompactHud()
+		roomButton.TextSize = isCompactHud() and 18 or 14
 		roomButton.TextWrapped = true
 		roomButton.ZIndex = 23
 		roomButton.Parent = startRoomList
@@ -1195,7 +1573,7 @@ local function renderStartOptions(payload)
 
 	if isStartOverlayDismissedForDevSession() then
 		pendingStartOptions = nil
-		startOverlay.Visible = false
+		setStartOverlayVisible(false)
 		continueButton.Modal = false
 		restartButton.Modal = false
 		setOverlayMouse(false)
@@ -1203,20 +1581,28 @@ local function renderStartOptions(payload)
 	end
 
 	pendingStartOptions = payload
-	startOverlay.Visible = true
+	setStartOverlayVisible(true)
 	continueButton.Modal = true
 	restartButton.Modal = true
 	setOverlayMouse(true, continueButton)
 	setStartIntro(payload)
 	updateTotalProgress(payload)
-	startSubtitle.Text = ("Book: %d / %d found    Hints: %d    Clues: %d"):format(
-		payload.DiscoveryCount or 0,
-		payload.TotalDiscoveries or Constants.TotalDiscoveries,
-		payload.Hints or 0,
-		payload.Clues or 0
-	)
+	if isCompactHud() then
+		startSubtitle.Text = ("Book %d/%d  |  Hints %d  |  Clues %d"):format(
+			payload.DiscoveryCount or 0,
+			payload.TotalDiscoveries or Constants.TotalDiscoveries,
+			payload.Hints or 0,
+			payload.Clues or 0
+		)
+	else
+		startSubtitle.Text = ("Book: %d / %d found    Hints: %d    Clues: %d"):format(
+			payload.DiscoveryCount or 0,
+			payload.TotalDiscoveries or Constants.TotalDiscoveries,
+			payload.Hints or 0,
+			payload.Clues or 0
+		)
+	end
 	startVersion.Text = "v" .. tostring(payload.BuildVersion or Constants.BuildVersion or "dev")
-	renderStartRoomChoices(payload)
 
 	if payload.HasProgress then
 		continueButton.Text = ("Continue: %s"):format(payload.ResumeRoomName or "TV Room")
@@ -1225,12 +1611,15 @@ local function renderStartOptions(payload)
 		continueButton.Text = "Enter TV Room"
 		restartButton.Visible = false
 	end
+
+	updateStartLayout()
+	renderStartRoomChoices(payload)
 end
 
 gui:GetAttributeChangedSignal(DEV_DISMISS_START_ATTRIBUTE):Connect(function()
 	if isStartOverlayDismissedForDevSession() then
 		pendingStartOptions = nil
-		startOverlay.Visible = false
+		setStartOverlayVisible(false)
 		continueButton.Modal = false
 		restartButton.Modal = false
 		setOverlayMouse(false)
@@ -1240,7 +1629,7 @@ end)
 playerGui:GetAttributeChangedSignal(DEV_DISMISS_START_ATTRIBUTE):Connect(function()
 	if isStartOverlayDismissedForDevSession() then
 		pendingStartOptions = nil
-		startOverlay.Visible = false
+		setStartOverlayVisible(false)
 		continueButton.Modal = false
 		restartButton.Modal = false
 		setOverlayMouse(false)
@@ -1373,8 +1762,8 @@ local function renderReferenceBook(payload)
 		setOverlayMouse(true, closeBookButton)
 	end
 
-	hintTray.Visible = mode ~= "Teleport"
-	if mode == "Teleport" then
+	hintTray.Visible = mode ~= "Teleport" and mode ~= "Field"
+	if mode == "Teleport" or mode == "Field" then
 		bookList.Position = UDim2.fromOffset(18, 84)
 		bookList.Size = UDim2.new(1, -36, 1, -104)
 	else
@@ -1383,11 +1772,14 @@ local function renderReferenceBook(payload)
 	end
 
 	if mode == "Store" then
-		bookTitle.Text = (payload.RoomName or "Room") .. " Store"
-		bookCount.Text = "Earn it, trade it, or rush it"
+		bookTitle.Text = (payload.RoomName or "Room") .. " Rewards"
+		bookCount.Text = "Earn, trade, or rush carefully"
 	elseif mode == "Teleport" then
 		bookTitle.Text = "Teleport Key"
 		bookCount.Text = "Choose any opened room"
+	elseif mode == "Field" then
+		bookTitle.Text = "Field Controls"
+		bookCount.Text = "Temporary physics and scale settings"
 	else
 		bookTitle.Text = (payload.RoomName or "Room") .. " Log"
 		bookCount.Text = ("%d / %d found"):format(payload.Count or 0, payload.Total or 0)
@@ -1401,7 +1793,11 @@ local function renderReferenceBook(payload)
 	if payload.HasTeleportKey then
 		keyText ..= " | Teleport: yes"
 	end
-	hintCount.Text = ("Hints: %d | Clues: %d%s"):format(payload.Hints or 0, payload.Clues or 0, keyText)
+	if mode == "Field" then
+		hintCount.Text = "RESET restores the field."
+	else
+		hintCount.Text = ("Hints: %d | Clues: %d%s"):format(payload.Hints or 0, payload.Clues or 0, keyText)
+	end
 	hintText.Text = payload.HintText
 		or payload.StatusText
 		or "Free hint, trade 5 hints for a clue, or trade 3 clues for a reveal."
@@ -1456,11 +1852,13 @@ local function renderReferenceBook(payload)
 
 	if mode == "Store" then
 		local packSize = storePrices.HintPackSize or Constants.NoTouch.HintPackSize or 10
-		makeBookRow("Label", ("Hint Pack: %d hints | %d R$ target"):format(packSize, storePrices.HintPackRobux or Constants.NoTouch.HintPackRobux or 0), Color3.fromRGB(40, 58, 48), Color3.fromRGB(205, 255, 218), 1)
-		makeBookRow("Label", ("Clue: %d hints or %d R$ target"):format(storePrices.ClueHintCost or Constants.NoTouch.ClueHintCost or 5, storePrices.ClueRobux or Constants.NoTouch.ClueRobux or 0), Color3.fromRGB(36, 58, 76), Color3.fromRGB(190, 226, 255), 2)
-		makeBookRow("Label", ("Reveal: %d clues or %d R$ target"):format(storePrices.RevealClueCost or Constants.NoTouch.RevealClueCost or 3, storePrices.RevealRobux or Constants.NoTouch.RevealRobux or 0), Color3.fromRGB(88, 66, 24), Color3.fromRGB(255, 232, 143), 3)
-		makeBookRow("Label", ("Library Key rush: %d clues after the room is complete"):format(storePrices.SecretKeyClueCost or Constants.NoTouch.SecretKeyClueCost or 3), Color3.fromRGB(65, 50, 83), Color3.fromRGB(232, 216, 255), 4)
-		makeBookRow("Button", ("Teleport Key: find in loft, or rush for %d clues / %d R$ target"):format(storePrices.TeleportKeyClueCost or Constants.NoTouch.TeleportKeyClueCost or 3, storePrices.TeleportKeyRobux or Constants.NoTouch.TeleportKeyRobux or 5), Color3.fromRGB(32, 70, 72), Color3.fromRGB(194, 255, 246), 5, function()
+		makeBookRow("Label", ("Room time: every %d min grants %d hints"):format(math.floor((Constants.RoomPlay.HintIntervalSeconds or 300) / 60), Constants.RoomPlay.HintsPerInterval or 5), Color3.fromRGB(38, 61, 47), Color3.fromRGB(205, 255, 218), 1)
+		makeBookRow("Label", ("Stillness: %d min discovery, %d min hint pack"):format(math.floor((Constants.NoTouch.AccomplishmentSeconds or 120) / 60), math.floor((Constants.NoTouch.BonusSeconds or 900) / 60)), Color3.fromRGB(55, 48, 72), Color3.fromRGB(232, 216, 255), 2)
+		makeBookRow("Label", ("Hint Pack: %d hints | %d R$ target"):format(packSize, storePrices.HintPackRobux or Constants.NoTouch.HintPackRobux or 0), Color3.fromRGB(40, 58, 48), Color3.fromRGB(205, 255, 218), 3)
+		makeBookRow("Label", ("Clue: %d hints or %d R$ target"):format(storePrices.ClueHintCost or Constants.NoTouch.ClueHintCost or 5, storePrices.ClueRobux or Constants.NoTouch.ClueRobux or 0), Color3.fromRGB(36, 58, 76), Color3.fromRGB(190, 226, 255), 4)
+		makeBookRow("Label", ("Reveal: %d clues or %d R$ target"):format(storePrices.RevealClueCost or Constants.NoTouch.RevealClueCost or 3, storePrices.RevealRobux or Constants.NoTouch.RevealRobux or 0), Color3.fromRGB(88, 66, 24), Color3.fromRGB(255, 232, 143), 5)
+		makeBookRow("Label", ("Library Key rush: %d clues after the room is complete"):format(storePrices.SecretKeyClueCost or Constants.NoTouch.SecretKeyClueCost or 3), Color3.fromRGB(65, 50, 83), Color3.fromRGB(232, 216, 255), 6)
+		makeBookRow("Button", ("Teleport Key: find in loft, or rush for %d clues / %d R$ target"):format(storePrices.TeleportKeyClueCost or Constants.NoTouch.TeleportKeyClueCost or 3, storePrices.TeleportKeyRobux or Constants.NoTouch.TeleportKeyRobux or 5), Color3.fromRGB(32, 70, 72), Color3.fromRGB(194, 255, 246), 7, function()
 			if activeBookRoomId then
 				hintPackRemote:FireServer({
 					Action = "BuyTeleportKey",
@@ -1468,6 +1866,33 @@ local function renderReferenceBook(payload)
 				})
 			end
 		end)
+		bookList.CanvasSize = UDim2.fromOffset(0, listLayout.AbsoluteContentSize.Y + 16)
+		return
+	elseif mode == "Field" then
+		for index, fieldControl in ipairs(payload.FieldControls or {}) do
+			local titleText = string.upper(fieldControl.Name or fieldControl.Id or "FIELD")
+			local descriptionText = fieldControl.Description or "Temporary field adjustment."
+			makeBookRow(
+				"Button",
+				("%s  |  %s"):format(titleText, descriptionText),
+				Color3.fromRGB(54, 42, 76),
+				Color3.fromRGB(233, 219, 255),
+				index,
+				function()
+					if activeBookRoomId and fieldControl.Id then
+						hintPackRemote:FireServer({
+							Action = "FieldEffect",
+							RoomId = activeBookRoomId,
+							EffectId = fieldControl.Id,
+						})
+						closeReferenceBook()
+					end
+				end
+			)
+		end
+		if #(payload.FieldControls or {}) == 0 then
+			makeBookRow("Label", "No field controls are wired yet.", Color3.fromRGB(40, 43, 50), Color3.fromRGB(225, 230, 238), 1)
+		end
 		bookList.CanvasSize = UDim2.fromOffset(0, listLayout.AbsoluteContentSize.Y + 16)
 		return
 	elseif mode == "Teleport" then
@@ -1665,6 +2090,13 @@ updateTotalProgress({
 	Count = 0,
 	Total = Constants.TotalDiscoveries,
 })
+updateEnergyBar()
+
+player:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEnergyBar)
+player:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateEnergyBar)
+playerGui:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEnergyBar)
+playerGui:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateEnergyBar)
+energyPanel:GetAttributeChangedSignal("Compact"):Connect(updateEnergyBar)
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)

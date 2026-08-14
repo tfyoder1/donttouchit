@@ -1,6 +1,7 @@
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
@@ -31,6 +32,10 @@ local function restoreCamera()
 		activeSession.Gui:Destroy()
 	end
 
+	if activeSession.CameraUpdateConnection then
+		activeSession.CameraUpdateConnection:Disconnect()
+	end
+
 	ContextActionService:UnbindAction(SCREEN_BUTTON_ACTION)
 	ContextActionService:UnbindAction(STOP_ACTION)
 	activeSession = nil
@@ -46,7 +51,7 @@ local function fireHiddenButton()
 	})
 end
 
-local function makeOverlay(duration)
+local function makeOverlay(duration, cameraLabel)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "DontTouchItSecurityCamera"
 	gui.DisplayOrder = 85
@@ -81,7 +86,7 @@ local function makeOverlay(duration)
 	label.Font = Enum.Font.GothamBlack
 	label.Position = UDim2.new(0, 22, 0, 22)
 	label.Size = UDim2.fromOffset(330, 74)
-	label.Text = "CAM 17 - INTERNAL FEED\nSCREEN-ONLY OBJECT DETECTED"
+	label.Text = ("%s\nSCREEN-ONLY OBJECT DETECTED"):format(cameraLabel or "CAM 23 - INTERNAL FEED")
 	label.TextColor3 = Color3.fromRGB(119, 255, 203)
 	label.TextScaled = true
 	label.TextWrapped = true
@@ -152,13 +157,23 @@ local function startCamera(payload)
 		CameraSubject = camera.CameraSubject,
 		CameraCFrame = camera.CFrame,
 		FieldOfView = camera.FieldOfView,
-		Gui = makeOverlay(payload.Duration or 45),
+		TargetCFrame = cameraCFrame,
+		Gui = makeOverlay(payload.Duration or 45, payload.CameraLabel),
 	}
 
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CameraSubject = nil
 	camera.CFrame = cameraCFrame
-	camera.FieldOfView = 46
+	camera.FieldOfView = 64
+
+	activeSession.CameraUpdateConnection = RunService.RenderStepped:Connect(function()
+		local currentCamera = workspace.CurrentCamera
+		if currentCamera and activeSession then
+			currentCamera.CameraType = Enum.CameraType.Scriptable
+			currentCamera.CameraSubject = nil
+			currentCamera.CFrame = activeSession.TargetCFrame
+		end
+	end)
 
 	ContextActionService:BindAction(SCREEN_BUTTON_ACTION, function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
