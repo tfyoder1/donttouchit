@@ -9,6 +9,8 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local DevToolsService = {}
 DevToolsService.__index = DevToolsService
 
+local TELEPORT_LANDING_LIFT = Vector3.new(0, 2.6, 0)
+
 local PRESETS = {
 	"Fresh",
 	"Midway",
@@ -16,6 +18,11 @@ local PRESETS = {
 }
 
 local SECRET_AREAS = {
+	{
+		Id = "Hallway",
+		Name = "Main Hallway",
+		CFrame = Constants.GetNamedPlaceCFrame("Hallway"),
+	},
 	{
 		Id = "SubLevel1",
 		Name = "TV Sub Level 1",
@@ -25,6 +32,11 @@ local SECRET_AREAS = {
 		Id = "SubLevel2",
 		Name = "TV Sub Level 2",
 		CFrame = CFrame.new(0, -15, 5.5),
+	},
+	{
+		Id = "VictoryWalkway",
+		Name = "Victory Walkway",
+		CFrame = Constants.GetNamedPlaceCFrame("VictoryWalkway"),
 	},
 	{
 		Id = "Library",
@@ -47,6 +59,23 @@ local SECRET_AREAS = {
 		CFrame = Constants.GetRoomSpawnCFrame("SpaceStation"),
 	},
 }
+
+local observationSecretAreas = {}
+for _, place in pairs(Constants.NamedPlaces or {}) do
+	if place.TeleportGroup == "Observation" then
+		table.insert(observationSecretAreas, {
+			Id = place.Id,
+			Name = place.Name,
+			CFrame = place.SpawnCFrame,
+		})
+	end
+end
+table.sort(observationSecretAreas, function(left, right)
+	return (left.Name or left.Id or "") < (right.Name or right.Id or "")
+end)
+for _, area in ipairs(observationSecretAreas) do
+	table.insert(SECRET_AREAS, area)
+end
 
 local function getRootPart(player)
 	local character = player.Character
@@ -71,7 +100,7 @@ local function teleportPlayer(player, destinationCFrame)
 
 	rootPart.AssemblyLinearVelocity = Vector3.zero
 	rootPart.AssemblyAngularVelocity = Vector3.zero
-	rootPart.CFrame = destinationCFrame
+	rootPart.CFrame = destinationCFrame + TELEPORT_LANDING_LIFT
 	return true
 end
 
@@ -85,13 +114,15 @@ local function listContains(items, value)
 	return false
 end
 
-function DevToolsService.new(discoveryService, roomProgressService, eventManager, resetService, interactionService)
+function DevToolsService.new(discoveryService, roomProgressService, eventManager, resetService, interactionService, movementAuthorityService, bunkerEnergyService)
 	local self = setmetatable({}, DevToolsService)
 	self.discoveryService = discoveryService
 	self.roomProgressService = roomProgressService
 	self.eventManager = eventManager
 	self.resetService = resetService
 	self.interactionService = interactionService
+	self.movementAuthorityService = movementAuthorityService
+	self.bunkerEnergyService = bunkerEnergyService
 	self.remote = RemoteService.GetRemote(Constants.Remotes.DevTools)
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.eventIds = {}
@@ -104,6 +135,14 @@ function DevToolsService.new(discoveryService, roomProgressService, eventManager
 	end
 
 	return self
+end
+
+function DevToolsService:_teleportPlayer(player, destinationCFrame, reason)
+	if self.movementAuthorityService and self.movementAuthorityService.TeleportPlayer then
+		return self.movementAuthorityService:TeleportPlayer(player, destinationCFrame, reason)
+	end
+
+	return teleportPlayer(player, destinationCFrame)
 end
 
 function DevToolsService:Initialize()
@@ -223,6 +262,7 @@ function DevToolsService:_sendState(player, stateType, roomId)
 			Fly = movementState.Fly == true,
 			Noclip = movementState.Noclip == true,
 		},
+		Energy = self.bunkerEnergyService and self.bunkerEnergyService:GetDevState(player) or nil,
 		StorePrices = self.roomProgressService and self.roomProgressService:GetStorePrices() or Constants.NoTouch,
 		RoomSnapshot = self.discoveryService:GetRoomSnapshot(player, currentRoomId),
 	})
@@ -281,6 +321,10 @@ function DevToolsService:_setMovementState(player, payload)
 	end
 
 	self.movementStateByUserId[player.UserId] = state
+	if self.movementAuthorityService and self.movementAuthorityService.SetDevMovement then
+		self.movementAuthorityService:SetDevMovement(player, state)
+	end
+
 	self.remote:FireClient(player, {
 		Type = "MovementState",
 		Fly = state.Fly,
@@ -320,7 +364,7 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 			return
 		end
 		self.discoveryService:EnableDevOverride(player)
-		teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId))
+		self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId), "DevJumpToRoom")
 		self:_sendMessage(player, ("Dev jump: %s. Progress is session-only."):format(room.Name))
 		task.delay(0.15, function()
 			if player.Parent then
@@ -340,6 +384,15 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 	elseif action == "ResetCurrentRoom" then
 		self:_resetRoom(player)
 		self:_sendState(player, "State", self:_getCurrentRoomId(player))
+	elseif action == "FreshStart" then
+		self.discoveryService:StartFreshDevSession(player)
+		self:_resetRoom(player)
+		if self.roomProgressService and self.roomProgressService.StartFreshDevSession then
+			self.roomProgressService:StartFreshDevSession(player)
+		end
+		self:_refreshWorldState()
+		self:_sendMessage(player, "Dev fresh start: all discoveries and inventory are clear for this session only.")
+		self:_sendState(player, "State", Constants.Prologue.StartRoomId or "CaveEntrance")
 	elseif action == "TriggerSpecificEvent" then
 		local eventId = payload.EventId
 		if typeof(eventId) == "string" and self.eventIds[eventId] then
@@ -355,7 +408,7 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 		local area = self:_getAreaById(payload.AreaId)
 		if area then
 			self.discoveryService:EnableDevOverride(player)
-			teleportPlayer(player, area.CFrame)
+			self:_teleportPlayer(player, area.CFrame, "DevSecretArea")
 			self:_sendMessage(player, ("Dev teleport: %s."):format(area.Name))
 			task.delay(0.15, function()
 				if player.Parent then
@@ -377,6 +430,46 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 	elseif action == "SetMovement" then
 		self:_setMovementState(player, payload)
 		self:_sendState(player, "State", self:_getCurrentRoomId(player))
+	elseif action == "SetNourishment" then
+		if self.bunkerEnergyService and self.bunkerEnergyService:SetPlayerEnergyForDev(player, payload.Value) then
+			self:_sendMessage(player, "Dev nourishment level set for this session.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		end
+	elseif action == "SetBunkerPower" then
+		if self.bunkerEnergyService and self.bunkerEnergyService:SetWorldPowerForDev(payload.Value) then
+			self:_sendMessage(player, "Dev bunker power level set for this server session.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		end
+	elseif action == "TriggerPassOut" then
+		if self.bunkerEnergyService and self.bunkerEnergyService:TriggerPassOutForDev(player) then
+			self:_sendMessage(player, "Dev recovery sequence triggered.")
+			self:_sendState(player, "State", "Infirmary")
+		end
+	elseif action == "TeleportInfirmary" then
+		self.discoveryService:EnableDevOverride(player)
+		self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame("Infirmary"), "DevInfirmary")
+		self:_sendMessage(player, "Dev teleport: Infirmary.")
+		task.delay(0.15, function()
+			if player.Parent then
+				self:_sendState(player, "State", "Infirmary")
+			end
+		end)
+	elseif action == "RestoreHealthyState" then
+		if self.bunkerEnergyService and self.bunkerEnergyService:RestoreHealthyStateForDev(player) then
+			self:_sendMessage(player, "Dev healthy state restored.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		end
+	elseif action == "SimulateInactivity" then
+		if self.bunkerEnergyService and self.bunkerEnergyService:SimulateProlongedInactivityForDev(player) then
+			self:_sendMessage(player, "Dev inactivity simulated. Watch lights and signal response.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		end
+	elseif action == "ResetInfirmaryState" then
+		if self.bunkerEnergyService and self.bunkerEnergyService:RestoreHealthyStateForDev(player) then
+			self:_resetRoom(player)
+			self:_sendMessage(player, "Dev infirmary/recovery state reset.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		end
 	elseif action == "SetDiscovery" then
 		if self:_setDiscoveryCompletion(player, payload) then
 			self:_sendState(player, "State", payload.RoomId)
