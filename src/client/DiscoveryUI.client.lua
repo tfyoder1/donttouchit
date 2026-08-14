@@ -21,6 +21,7 @@ local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
 local playerGui = player:WaitForChild("PlayerGui")
+local introMusicSound = nil
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
@@ -34,6 +35,83 @@ end)
 
 local function isStartOverlayDismissedForDevSession()
 	return gui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true or playerGui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true
+end
+
+local function normalizeSoundId(soundId)
+	if typeof(soundId) == "number" then
+		return "rbxassetid://" .. tostring(soundId)
+	end
+
+	if typeof(soundId) ~= "string" or soundId == "" then
+		return nil
+	end
+
+	if string.match(soundId, "^%d+$") then
+		return "rbxassetid://" .. soundId
+	end
+
+	return soundId
+end
+
+local function getIntroMusicId()
+	local music = Constants.AudioAssets and Constants.AudioAssets.Music
+	return music and normalizeSoundId(music.IntroMusicId)
+end
+
+local function stopIntroMusic(fadeSeconds)
+	local sound = introMusicSound
+	introMusicSound = nil
+
+	if not sound then
+		return
+	end
+
+	if not sound.Parent then
+		return
+	end
+
+	fadeSeconds = math.max(0, tonumber(fadeSeconds) or 0)
+	if fadeSeconds <= 0 then
+		sound:Stop()
+		sound:Destroy()
+		return
+	end
+
+	TweenService:Create(
+		sound,
+		TweenInfo.new(fadeSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Volume = 0 }
+	):Play()
+	Debris:AddItem(sound, fadeSeconds + 0.2)
+end
+
+local function startIntroMusic()
+	local soundId = getIntroMusicId()
+	if not soundId then
+		return
+	end
+
+	if introMusicSound and introMusicSound.Parent then
+		if not introMusicSound.IsPlaying then
+			introMusicSound:Play()
+		end
+		return
+	end
+
+	local sound = Instance.new("Sound")
+	sound.Name = "DontTouchItIntroMusic"
+	sound.SoundId = soundId
+	sound.Looped = true
+	sound.Volume = 0
+	sound.Parent = gui
+	sound:Play()
+	introMusicSound = sound
+
+	TweenService:Create(
+		sound,
+		TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Volume = 0.34 }
+	):Play()
 end
 
 local function getViewportSize()
@@ -832,6 +910,11 @@ local function setStartOverlayVisible(visible)
 	startBlur.Enabled = visible
 	startBlur.Size = visible and 18 or 0
 	gui:SetAttribute("GameplayHudSuppressed", visible == true)
+	if visible then
+		startIntroMusic()
+	else
+		stopIntroMusic(0.45)
+	end
 	applyHudVisibility()
 end
 

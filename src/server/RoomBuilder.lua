@@ -1,3 +1,4 @@
+local AssetService = game:GetService("AssetService")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -14,6 +15,7 @@ local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(255, 232, 92),
 	Color3.fromRGB(93, 217, 255),
 }
+local SNACK_DONUT_ASSET_ID = 13742217239
 local ATOMIC_COLORS = {
 	Pink = Color3.fromRGB(255, 102, 176),
 	Orange = Color3.fromRGB(255, 134, 58),
@@ -433,7 +435,7 @@ local function makeShell(roomFolder)
 	)
 	createSurfaceText(door, "DoorText", "TV ROOM", Enum.NormalId.Front, Color3.fromRGB(230, 255, 240), Color3.fromRGB(42, 66, 76))
 	createPrompt(door, "Inspect", "TV Room", 0)
-	door:SetAttribute("DestinationCFrame", CFrame.new(0, 3, depth / 2 + 9))
+	door:SetAttribute("DestinationCFrame", CFrame.new(Vector3.new(0, 3, depth / 2 + 9), Vector3.new(0, 3, depth / 2 + 24)))
 	door:SetAttribute("RoomId", "TVRoom")
 	door:SetAttribute("LockedDuringPrologue", true)
 	door:SetAttribute("PrologueLockedMessage", "The TV room door is quiet. It does not open before lockdown.")
@@ -864,7 +866,7 @@ local function makeUnderfloorChamber(roomFolder, recoveryFloor)
 	return chamber, safetyFloor
 end
 
-local HALLWAY_SPAWN_CFRAME = CFrame.new(0, 3, 27)
+local HALLWAY_SPAWN_CFRAME = CFrame.new(Vector3.new(0, 3, 27), Vector3.new(0, 3, 42))
 local TV_ROOM_RETURN_CFRAME = CFrame.new(0, 3, 10)
 local CAVE_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("CaveEntrance")
 local CAVE_HALLWAY_RETURN_CFRAME = CFrame.new(Vector3.new(-1.4, 3, 45), Vector3.new(5.5, 3, 45))
@@ -920,7 +922,7 @@ local VOID_ZIPLINE_PATH_POINTS = {
 	TREETOP_ZIPLINE_END_CFRAME.Position + Vector3.new(0, 5, 0),
 }
 local SNACK_LAB_ORIGIN = Vector3.new(48, 0, 44)
-local SNACK_LAB_SPAWN_CFRAME = cframeAt(SNACK_LAB_ORIGIN, -11, 3, 10)
+local SNACK_LAB_SPAWN_CFRAME = CFrame.new(SNACK_LAB_ORIGIN + Vector3.new(-11, 3, 10), SNACK_LAB_ORIGIN + Vector3.new(0, 3, 0))
 local ISLAND_ORIGIN = Vector3.new(0, 0, 150)
 local ISLAND_SPAWN_CFRAME = Constants.GetRoomSpawnCFrame("Island")
 local ISLAND_RETURN_CFRAME = CFrame.new(Vector3.new(0, 3, 103), Vector3.new(0, 3, 88))
@@ -1043,6 +1045,72 @@ local OBSERVATION_SUITES = {
 	},
 }
 
+local function makeObservationTeleportPanel(parent, spec, cframe)
+	local panel = makeModel(parent, spec.Id .. "MiniTeleportPanel")
+	panel:SetAttribute("BunkerEnergyIgnored", true)
+	panel:SetAttribute("RoomId", spec.RoomId)
+	panel:SetAttribute("ObservationPlaceId", spec.Id)
+
+	local panelColor = Color3.fromRGB(30, 39, 48)
+	local teleporterColor = Color3.fromRGB(119, 255, 203)
+	local plate = createPart(
+		panel,
+		"MiniTeleportPanelPlate",
+		Vector3.new(1.25, 1.0, 0.12),
+		cframe,
+		panelColor,
+		Enum.Material.Metal
+	)
+	plate.CanCollide = false
+	plate:SetAttribute("BaseCanCollide", false)
+	plate:SetAttribute("RoomId", spec.RoomId)
+	plate:SetAttribute("ObservationPlaceId", spec.Id)
+
+	local label = createSurfaceText(
+		plate,
+		"MiniTeleportText",
+		"TELE\nPORT",
+		Enum.NormalId.Front,
+		teleporterColor,
+		panelColor
+	)
+	label.Position = UDim2.fromScale(0, 0.04)
+	label.Size = UDim2.fromScale(1, 0.44)
+
+	local button = createPart(
+		panel,
+		"MiniTeleportButton",
+		Vector3.new(0.58, 0.16, 0.58),
+		cframe * CFrame.new(0, -0.24, -0.18) * CFrame.Angles(math.rad(90), 0, 0),
+		teleporterColor,
+		Enum.Material.Neon
+	)
+	button.Shape = Enum.PartType.Cylinder
+	button.CanCollide = false
+	button:SetAttribute("BaseCanCollide", false)
+	button:SetAttribute("RoomId", spec.RoomId)
+	button:SetAttribute("ObservationPlaceId", spec.Id)
+	button:SetAttribute("ObservationLabel", spec.Label)
+
+	local lowerGlow = createPart(
+		panel,
+		"MiniTeleportLowerGlow",
+		Vector3.new(0.64, 0.08, 0.05),
+		cframe * CFrame.new(0, -0.26, -0.24),
+		teleporterColor,
+		Enum.Material.Neon
+	)
+	lowerGlow.CanCollide = false
+	lowerGlow:SetAttribute("BaseCanCollide", false)
+
+	local prompt = createPrompt(button, "Open", "Teleport", 0.2)
+	prompt.MaxActivationDistance = 7
+	tag(button, Constants.Tags.TeleportButton)
+
+	panel.PrimaryPart = plate
+	return panel
+end
+
 local function makeObservationSuite(parent, spec)
 	local suite = makeModel(parent, spec.Id .. "Suite")
 	suite:SetAttribute("BunkerEnergyIgnored", true)
@@ -1106,6 +1174,12 @@ local function makeObservationSuite(parent, spec)
 
 	local status = createPart(suite, spec.Id .. "StatusPanel", Vector3.new(5.4, 2.2, 0.24), roomRelativeCFrame(0, 1.6, roomDepth / 2 - 0.24), Color3.fromRGB(14, 22, 26), Enum.Material.Metal)
 	createSurfaceText(status, spec.Id .. "StatusText", "OBSERVATION\nROOM\nNO DOOR FILED", Enum.NormalId.Back, Color3.fromRGB(194, 255, 246), Color3.fromRGB(14, 22, 26))
+
+	makeObservationTeleportPanel(
+		suite,
+		spec,
+		roomRelativeCFrame(roomWidth / 2 - 0.28, 0.85, 1.25) * CFrame.Angles(0, math.rad(90), 0)
+	)
 
 	local light = Instance.new("PointLight")
 	light.Name = spec.Id .. "ObservationStatusLight"
@@ -1848,8 +1922,8 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	options = options or {}
 	local includeReset = options.IncludeReset == true
 	local includeLightSwitch = options.IncludeLightSwitch ~= false
-	local panelWidth = options.PanelWidth or (includeReset and 7.35 or 6.8)
-	local panelHeight = options.PanelHeight or (includeReset and 4.15 or 3.75)
+	local panelWidth = options.PanelWidth or (includeReset and 5.15 or 4.75)
+	local panelHeight = options.PanelHeight or (includeReset and 6.35 or 5.85)
 	local panelLabel = options.PanelLabel or "ROOM CONSOLE"
 	local controls = makeModel(parent, name)
 	controls:SetAttribute("StrictPromptTargets", true)
@@ -1886,15 +1960,15 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	makePanelReadout(
 		controls,
 		"ControlPanelRewardReadout",
-		panelCFrame * CFrame.new(if includeReset then -0.34 else 0, panelHeight / 2 - 0.88, -0.22),
-		Vector3.new(if includeReset then 3.55 else 3.35, 0.44, 0.08),
-		"REWARDS: 5m=HINTS  2m=STILL",
+		panelCFrame * CFrame.new(0, panelHeight / 2 - 0.92, -0.22),
+		Vector3.new(panelWidth - 0.78, 0.56, 0.08),
+		"REWARDS\n5m=HINTS  2m=STILL",
 		Color3.fromRGB(255, 242, 181),
 		Color3.fromRGB(13, 21, 22)
 	)
 
-	local logX = if includeReset then -2.14 else -1.78
-	local logY = if includeReset then -0.02 else 0.08
+	local logX = if includeReset then -1.16 else -1.05
+	local logY = panelHeight / 2 - 2.22
 	local referenceBook = makeCompactReferenceBook(
 		controls,
 		name .. "Log",
@@ -1913,7 +1987,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		lightSwitch = makeLightSwitch(
 			controls,
 			name .. "LightSwitch",
-			panelCFrame * CFrame.new(if includeReset then 2.32 else 2.04, if includeReset then 0.58 else 0.32, -0.22),
+			panelCFrame * CFrame.new(if includeReset then 1.48 else 1.34, logY + 0.32, -0.22),
 			{
 				RoomId = roomId,
 				Label = options.SwitchLabel or "LIGHT",
@@ -1931,20 +2005,19 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		resetRoomButton = makeCompactResetRoomButton(
 			controls,
 			name .. "ResetRoomButton",
-			panelCFrame * CFrame.new(2.32, -0.5, -0.22),
+			panelCFrame * CFrame.new(1.48, logY - 0.82, -0.22),
 			options.ResetPromptObjectText or "Room Reset"
 		)
 	end
 
-	local storeX = if includeReset then -2.58 else -2.22
-	local teleportX = 0
-	local fieldX = if includeReset then 2.58 else 2.22
-	local bottomButtonY = if includeReset then -1.43 else -1.2
+	local commandButtonX = 0
+	local commandButtonTopY = if includeReset then -0.95 else -0.7
+	local commandButtonSpacing = 0.84
 
 	local storeButtonModel, storeButton = makeCompactPanelButton(
 		controls,
 		name .. "StoreButton",
-		panelCFrame * CFrame.new(storeX, bottomButtonY, -0.22),
+		panelCFrame * CFrame.new(commandButtonX, commandButtonTopY, -0.22),
 		"REWARD",
 		"Open",
 		"Rewards & Store",
@@ -1956,7 +2029,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	local teleportButtonModel, teleportButton = makeCompactPanelButton(
 		controls,
 		name .. "TeleportButton",
-		panelCFrame * CFrame.new(teleportX, bottomButtonY, -0.22),
+		panelCFrame * CFrame.new(commandButtonX, commandButtonTopY - commandButtonSpacing, -0.22),
 		"TELE",
 		"Open",
 		"Teleport",
@@ -1968,7 +2041,7 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	local fieldButtonModel, fieldButton = makeCompactPanelButton(
 		controls,
 		name .. "FieldButton",
-		panelCFrame * CFrame.new(fieldX, bottomButtonY, -0.22),
+		panelCFrame * CFrame.new(commandButtonX, commandButtonTopY - commandButtonSpacing * 2, -0.22),
 		"FIELD",
 		"Open",
 		"Field Controls",
@@ -2744,9 +2817,9 @@ local function makeSleepingQuartersRoom(roomFolder)
 	end
 	cleaningLockerModel.PrimaryPart = locker
 
-	local dreamButtonBase = createPart(room, "SleepingDreamButtonPlate", Vector3.new(4.2, 2.4, 0.22), cframeAt(origin, 0, 5.2, -depth / 2 + 0.62), Color3.fromRGB(39, 44, 54), Enum.Material.Metal)
-	createSurfaceText(dreamButtonBase, "SleepingDreamButtonLabel", "RESPONSIBLE\nDREAM BUTTON", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(39, 44, 54))
-	local dreamButton = createPart(room, "SleepingDreamButton", Vector3.new(1.45, 0.34, 1.45), dreamButtonBase.CFrame * CFrame.new(0, -0.1, -0.24) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(255, 72, 158), Enum.Material.Neon)
+	local dreamButtonBase = createPart(room, "SleepingDreamButtonPlate", Vector3.new(4.2, 2.4, 0.22), cframeAt(origin, -10.5, 5.2, -depth / 2 + 0.62), Color3.fromRGB(39, 44, 54), Enum.Material.Metal)
+	createSurfaceText(dreamButtonBase, "SleepingDreamButtonLabel", "RESPONSIBLE\nDREAM BUTTON", Enum.NormalId.Back, Color3.fromRGB(119, 255, 203), Color3.fromRGB(39, 44, 54))
+	local dreamButton = createPart(room, "SleepingDreamButton", Vector3.new(1.45, 0.34, 1.45), dreamButtonBase.CFrame * CFrame.new(0, -0.1, 0.24) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(255, 72, 158), Enum.Material.Neon)
 	dreamButton.Shape = Enum.PartType.Cylinder
 	createPrompt(dreamButton, "Press", "Dream Button", 0)
 	tag(dreamButton, Constants.Tags.SleepingDreamButton)
@@ -2821,12 +2894,33 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 	local branchLeftWallX = 134.4
 	local branchRightWallX = 157.6
 	local branchUsableWidth = branchRightWallX - branchLeftWallX - 0.6
+	local infirmaryApproachNorthZ = -188
+	local infirmaryDoorNorthEdgeZ = INFIRMARY_ORIGIN.Z - 6
+	local infirmaryApproachRightWallDepth = infirmaryDoorNorthEdgeZ - infirmaryApproachNorthZ
+	local infirmaryApproachRightWallCenterZ = (infirmaryApproachNorthZ + infirmaryDoorNorthEdgeZ) / 2
 	local connectorWallLeftEdgeX = 115
 	local connectorWallRightEdgeX = branchLeftWallX - 0.8
 	local connectorWallLength = connectorWallRightEdgeX - connectorWallLeftEdgeX
 	local connectorWallCenterX = connectorWallLeftEdgeX + connectorWallLength / 2
 	local gymRampWallThickness = 0.42
 	local gymRampLeftWallX = connectorWallRightEdgeX + gymRampWallThickness / 2
+	local gymEntranceWallX = GYM_ORIGIN.X - 28
+	local gymEntranceNorthZ = GYM_ORIGIN.Z - 6
+	local gymEntranceSouthZ = GYM_ORIGIN.Z + 6
+	local gymRampSouthZ = -188
+	local gymRampOpenTurnZ = gymEntranceSouthZ
+	local gymRampLeftWallDepth = gymRampSouthZ - gymEntranceNorthZ
+	local gymRampLeftWallCenterZ = (gymEntranceNorthZ + gymRampSouthZ) / 2
+	local gymRampRightWallDepth = gymRampSouthZ - gymRampOpenTurnZ
+	local gymRampRightWallCenterZ = (gymRampOpenTurnZ + gymRampSouthZ) / 2
+	local gymEntryReturnWallMinX = gymRampLeftWallX - gymRampWallThickness / 2
+	local gymEntryReturnWallMaxX = gymEntranceWallX
+	local gymEntryReturnWallLength = gymEntryReturnWallMaxX - gymEntryReturnWallMinX
+	local gymEntryReturnWallCenterX = (gymEntryReturnWallMinX + gymEntryReturnWallMaxX) / 2
+	local gymEntryLandingFloorMinX = gymRampLeftWallX + gymRampWallThickness / 2
+	local gymEntryLandingFloorMaxX = gymEntranceWallX + 0.15
+	local gymEntryLandingFloorWidth = gymEntryLandingFloorMaxX - gymEntryLandingFloorMinX
+	local gymEntryLandingFloorCenterX = (gymEntryLandingFloorMinX + gymEntryLandingFloorMaxX) / 2
 
 	createPart(branch, "BranchConnectorFloor", Vector3.new(34, 0.42, 18), CFrame.new(131, 0.38, -188), floorColor, Enum.Material.Metal)
 	createPart(branch, "BranchConnectorCeiling", Vector3.new(34, 0.36, 18), CFrame.new(131, hallHeight, -188), ceilingColor, Enum.Material.Concrete)
@@ -2836,7 +2930,7 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 	createPart(branch, "BranchJunctionFloor", Vector3.new(branchUsableWidth, 0.42, 72), CFrame.new(branchCenterX, 0.4, -189), floorColor, Enum.Material.Metal)
 	createPart(branch, "BranchJunctionCeiling", Vector3.new(branchUsableWidth, 0.36, 42), CFrame.new(branchCenterX, hallHeight, -171), ceilingColor, Enum.Material.Concrete)
 	createPart(branch, "InfirmaryApproachLeftWall", Vector3.new(0.42, hallHeight, 34), CFrame.new(branchLeftWallX, hallHeight / 2, -171), wallColor, Enum.Material.SmoothPlastic)
-	createPart(branch, "InfirmaryApproachRightWall", Vector3.new(0.42, hallHeight, 34), CFrame.new(branchRightWallX, hallHeight / 2, -171), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "InfirmaryApproachRightWall", Vector3.new(0.42, hallHeight, infirmaryApproachRightWallDepth), CFrame.new(branchRightWallX, hallHeight / 2, infirmaryApproachRightWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "InfirmaryEntryThresholdFloor", Vector3.new(10.2, 0.42, 7.2), CFrame.new(139.3, 0.42, -150.4), floorColor, Enum.Material.Metal)
 	createPart(branch, "InfirmaryEntryOuterSafetyWall", Vector3.new(0.42, hallHeight, 7.8), CFrame.new(branchLeftWallX, hallHeight / 2, -150.1), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "InfirmaryEntrySouthReturnWall", Vector3.new(9.4, hallHeight, 0.42), CFrame.new(139.1, hallHeight / 2, -147.35), wallColor, Enum.Material.SmoothPlastic)
@@ -2855,9 +2949,12 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 			Enum.Material.Metal
 		)
 	end
-	createPart(branch, "GymRampLeftWall", Vector3.new(gymRampWallThickness, 14, 38), CFrame.new(gymRampLeftWallX, 6.8, -209), wallColor, Enum.Material.SmoothPlastic)
-	createPart(branch, "GymRampRightWall", Vector3.new(0.42, 14, 38), CFrame.new(branchRightWallX, 6.8, -209), wallColor, Enum.Material.SmoothPlastic)
-	createPart(branch, "GymRampCeiling", Vector3.new(branchUsableWidth, 0.36, 38), CFrame.new(branchCenterX, 16.8, -209), ceilingColor, Enum.Material.Concrete)
+	createPart(branch, "GymEntrySideLandingFloor", Vector3.new(gymEntryLandingFloorWidth, 0.38, 8.4), CFrame.new(gymEntryLandingFloorCenterX, 6.45, gymEntranceNorthZ + 4.2), floorColor, Enum.Material.Metal)
+	createPart(branch, "GymRampLeftWall", Vector3.new(gymRampWallThickness, 14, gymRampLeftWallDepth), CFrame.new(gymRampLeftWallX, 6.8, gymRampLeftWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "GymRampRightWall", Vector3.new(0.42, 14, gymRampRightWallDepth), CFrame.new(branchRightWallX, 6.8, gymRampRightWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "GymRampCeiling", Vector3.new(branchUsableWidth, 0.36, gymRampLeftWallDepth), CFrame.new(branchCenterX, 16.8, gymRampLeftWallCenterZ), ceilingColor, Enum.Material.Concrete)
+	createPart(branch, "GymEntryNorthReturnWall", Vector3.new(gymEntryReturnWallLength, 14, 0.42), CFrame.new(gymEntryReturnWallCenterX, 6.8, gymEntranceNorthZ), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "GymEntrySouthReturnWall", Vector3.new(gymEntryReturnWallLength, 14, 0.42), CFrame.new(gymEntryReturnWallCenterX, 6.8, gymEntranceSouthZ), wallColor, Enum.Material.SmoothPlastic)
 
 	for lightIndex, data in ipairs({
 		{ Position = Vector3.new(126, 8.7, -188), Color = Color3.fromRGB(119, 255, 203) },
@@ -3479,20 +3576,22 @@ local function makeHallway(roomFolder)
 	}
 end
 
-local function makeSnackWallDonut(parent)
-	local origin = SNACK_LAB_ORIGIN
-	local donut = makeModel(parent, "SnackLabWallDonut")
-	local center = origin + Vector3.new(-7.8, 8.05, Constants.Room.Depth / 2 - 0.74)
-	local wallCFrame = CFrame.new(center)
-	local frontOffset = Vector3.new(0, 0, -0.36)
-	local pastryColor = Color3.fromRGB(191, 111, 55)
-	local frostingColor = Color3.fromRGB(255, 102, 176)
-
-	local mount = createPart(donut, "DonutWallMount", Vector3.new(7.6, 7.6, 0.18), wallCFrame * CFrame.new(0, 0, 0.08), Color3.fromRGB(91, 55, 45), Enum.Material.SmoothPlastic)
+local function makeSnackDonutMount(parent, wallCFrame)
+	local mount = createPart(parent, "DonutWallMount", Vector3.new(7.6, 7.6, 0.18), wallCFrame * CFrame.new(0, 0, 0.08), Color3.fromRGB(91, 55, 45), Enum.Material.SmoothPlastic)
 	mount.Transparency = 0.28
 	mount.CanCollide = false
 	mount:SetAttribute("BaseTransparency", mount.Transparency)
 	mount:SetAttribute("BaseCanCollide", false)
+	return mount
+end
+
+local function makeFallbackSnackWallDonut(parent, center, wallCFrame)
+	local donut = makeModel(parent, "SnackLabWallDonut")
+	local frontOffset = Vector3.new(0, 0, -0.36)
+	local pastryColor = Color3.fromRGB(191, 111, 55)
+	local frostingColor = Color3.fromRGB(255, 102, 176)
+
+	makeSnackDonutMount(donut, wallCFrame)
 
 	local pastry
 	for segmentIndex = 1, 24 do
@@ -3566,6 +3665,71 @@ local function makeSnackWallDonut(parent)
 		sprinkle:SetAttribute("BaseCanCollide", false)
 	end
 
+	donut.PrimaryPart = pastry
+	return donut
+end
+
+local function prepareSnackDonutAssetModel(model)
+	local visualParts = {}
+
+	for _, descendant in ipairs(model:GetDescendants()) do
+		if descendant:IsA("LuaSourceContainer") or descendant:IsA("Constraint") or descendant:IsA("BodyMover") then
+			descendant:Destroy()
+		elseif descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			descendant:SetAttribute("BaseCanCollide", false)
+			descendant:SetAttribute("BaseCanQuery", false)
+			descendant:SetAttribute("BaseCanTouch", false)
+			table.insert(visualParts, descendant)
+		end
+	end
+
+	return visualParts
+end
+
+local function makeAssetSnackWallDonut(parent, wallCFrame)
+	local success, assetModel = pcall(AssetService.LoadAssetAsync, AssetService, SNACK_DONUT_ASSET_ID)
+	if not success or not assetModel then
+		warn(("[DON'T TOUCH IT] Could not load Snack Lab donut asset %d: %s"):format(SNACK_DONUT_ASSET_ID, tostring(assetModel)))
+		return nil
+	end
+
+	local donut = makeModel(parent, "SnackLabWallDonut")
+	makeSnackDonutMount(donut, wallCFrame)
+
+	assetModel.Name = "ObbySpinningDonutAsset"
+	assetModel.Parent = donut
+
+	local visualParts = prepareSnackDonutAssetModel(assetModel)
+	if #visualParts == 0 then
+		warn(("[DON'T TOUCH IT] Snack Lab donut asset %d loaded without visible parts."):format(SNACK_DONUT_ASSET_ID))
+		donut:Destroy()
+		return nil
+	end
+
+	local _, currentSize = assetModel:GetBoundingBox()
+	local largestAxis = math.max(currentSize.X, currentSize.Y, currentSize.Z)
+	if largestAxis > 0 then
+		assetModel:ScaleTo(6.4 / largestAxis)
+	end
+
+	local targetCFrame = wallCFrame * CFrame.new(0, 0, -0.58) * CFrame.Angles(math.rad(90), 0, 0)
+	assetModel:PivotTo(targetCFrame)
+	local boundsCFrame = assetModel:GetBoundingBox()
+	assetModel:PivotTo(assetModel:GetPivot() + (targetCFrame.Position - boundsCFrame.Position))
+
+	for _, part in ipairs(visualParts) do
+		mark(part)
+	end
+
+	donut.PrimaryPart = visualParts[1]
+	return donut
+end
+
+local function addSnackDonutHitbox(donut, wallCFrame)
 	local hitbox = createPart(donut, "MassiveDonutHitbox", Vector3.new(7.8, 7.8, 1.2), wallCFrame * CFrame.new(0, 0, -0.58), Color3.fromRGB(255, 102, 176), Enum.Material.SmoothPlastic)
 	hitbox.Transparency = 1
 	hitbox.CanCollide = false
@@ -3573,7 +3737,18 @@ local function makeSnackWallDonut(parent)
 	hitbox:SetAttribute("BaseCanCollide", false)
 	createPrompt(hitbox, "Inspect", "Massive Donut", 0)
 	tag(hitbox, Constants.Tags.SnackDonut)
-	donut.PrimaryPart = pastry
+	return hitbox
+end
+
+local function makeSnackWallDonut(parent)
+	local center = SNACK_LAB_ORIGIN + Vector3.new(-7.8, 8.05, Constants.Room.Depth / 2 - 0.74)
+	local wallCFrame = CFrame.new(center)
+	local donut = makeAssetSnackWallDonut(parent, wallCFrame)
+	if not donut then
+		donut = makeFallbackSnackWallDonut(parent, center, wallCFrame)
+	end
+
+	addSnackDonutHitbox(donut, wallCFrame)
 	return donut
 end
 
