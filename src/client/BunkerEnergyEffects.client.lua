@@ -40,6 +40,8 @@ local recoveryBeepSound = nil
 local recoveryBeepCanStopAt = 0
 local observedAuraByPlayer = {}
 local observedAuraAccumulator = 1
+local getRootPart
+local getHumanoid
 
 local colorEffect = Lighting:FindFirstChild(COLOR_EFFECT_NAME)
 if not colorEffect then
@@ -200,6 +202,29 @@ local function normalizeSoundId(soundId)
 	return text
 end
 
+local function positionInZone(position, zone)
+	if not position or not zone or not zone.Min or not zone.Max then
+		return false
+	end
+
+	return position.X >= zone.Min.X
+		and position.X <= zone.Max.X
+		and position.Y >= zone.Min.Y
+		and position.Y <= zone.Max.Y
+		and position.Z >= zone.Min.Z
+		and position.Z <= zone.Max.Z
+end
+
+local function isLocalPlayerInInfirmary()
+	if not getRootPart then
+		return false
+	end
+
+	local rootPart = getRootPart()
+	local infirmary = Constants.GetRoom and Constants.GetRoom("Infirmary")
+	return rootPart ~= nil and infirmary ~= nil and positionInZone(rootPart.Position, infirmary.Zone)
+end
+
 local function stopRecoveryBeep()
 	if recoveryBeepSound then
 		recoveryBeepSound:Stop()
@@ -232,7 +257,12 @@ local function stopRecoveryBeepFromMovement()
 		return
 	end
 
-	local humanoid = getHumanoid()
+	if not isLocalPlayerInInfirmary() then
+		stopRecoveryBeep()
+		return
+	end
+
+	local humanoid = getHumanoid and getHumanoid()
 	if humanoid and (humanoid.MoveDirection.Magnitude > 0.05 or humanoid.Jump) then
 		stopRecoveryBeep()
 	end
@@ -334,12 +364,12 @@ local function getReplicatedPlayerGlow(targetPlayer)
 	return math.clamp((personalPower - worldPower) / math.max(0.05, 1 - worldPower), 0, 1)
 end
 
-local function getRootPart()
+getRootPart = function()
 	local character = player.Character
 	return character and character:FindFirstChild("HumanoidRootPart")
 end
 
-local function getHumanoid()
+getHumanoid = function()
 	local character = player.Character
 	return character and character:FindFirstChildOfClass("Humanoid")
 end

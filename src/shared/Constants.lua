@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.146"
+Constants.BuildVersion = "0.5.154"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -36,6 +36,9 @@ Constants.Remotes = {
 	TopDownArena = "TopDownArena",
 	NourishmentRecovery = "NourishmentRecovery",
 	TransformCamera = "TransformCamera",
+	LocalAudio = "LocalAudio",
+	LocationPing = "LocationPing",
+	InventoryAction = "InventoryAction",
 }
 
 Constants.Tags = {
@@ -178,7 +181,7 @@ Constants.Hallway = {
 		Min = Vector3.new(-35, -13, Constants.Room.Depth / 2 - 0.5),
 		Max = Vector3.new(7.75, 13, 124),
 	},
-	SpawnCFrame = CFrame.new(0, 3, 27),
+	SpawnCFrame = CFrame.new(Vector3.new(0, 3, 27), Vector3.new(0, 3, 42)),
 }
 
 Constants.NamedPlaces = {
@@ -366,6 +369,70 @@ Constants.AudioAssets = {
 	Interface = {
 		ControlPanelInteractionId = "rbxassetid://112555741154994",
 	},
+	Events = {
+		ObjectRainCollectId = "rbxassetid://98585875176475",
+	},
+	Music = {
+		IntroMusicId = "rbxassetid://138890398994853",
+		EndingCreditsId = "rbxassetid://139436746292079",
+	},
+	Television = {
+		StaticId = "rbxassetid://140708560546036",
+		TestToneId = "rbxassetid://99709938803492",
+		PleaseStopId = "rbxassetid://72577143736585",
+	},
+	Footsteps = {
+		Volume = 0.32,
+		RollOffMaxDistance = 18,
+		MinIntervalSeconds = 0.24,
+		MaxIntervalSeconds = 0.48,
+		AreaOrder = {
+			"LibraryLoft",
+			"BowlingMaintenance",
+		},
+		TaggedParts = {
+			[Constants.Tags.VictoryBrick] = "rbxassetid://82615619091463",
+		},
+		Areas = {
+			LibraryLoft = {
+				SoundId = "rbxassetid://18642905583",
+				Zone = {
+					Min = Vector3.new(-23, 12, -52),
+					Max = Vector3.new(-5, 24, -38),
+				},
+			},
+			BowlingMaintenance = {
+				SoundId = "rbxassetid://18642905583",
+				Zone = {
+					Min = Vector3.new(-31, -3, -205),
+					Max = Vector3.new(-11, 16, -185),
+				},
+			},
+		},
+		Rooms = {
+			TVRoom = "rbxassetid://99669343610628",
+			CaveEntrance = "rbxassetid://18640165054",
+			TopDownArena = "rbxassetid://140596208736991",
+			Island = "rbxassetid://123746536034323",
+			SpaceStation = "rbxassetid://140355631752127",
+			Library = "rbxassetid://137500783092459",
+			BowlingAlley = "rbxassetid://137500783092459",
+		},
+		Materials = {
+			Grass = "rbxassetid://135446324303740",
+			LeafyGrass = "rbxassetid://135446324303740",
+			Sand = "rbxassetid://123746536034323",
+			Fabric = "rbxassetid://140596208736991",
+			Wood = "rbxassetid://137500783092459",
+			WoodPlanks = "rbxassetid://137500783092459",
+			Metal = "rbxassetid://18642905583",
+			DiamondPlate = "rbxassetid://18642905583",
+			CorrodedMetal = "rbxassetid://18642905583",
+			Concrete = "rbxassetid://140355631752127",
+			Plastic = "rbxassetid://99669343610628",
+			SmoothPlastic = "rbxassetid://99669343610628",
+		},
+	},
 	Prologue = {
 		OutsideCaveAmbienceId = "rbxassetid://9112764573",
 		InsideCaveAmbienceId = "rbxassetid://9112775414",
@@ -462,16 +529,19 @@ Constants.FieldControls = {
 		Id = "LowGravity",
 		Name = "Low Gravity",
 		Description = "Gravity becomes negotiable until RESET.",
+		RequiresDiscoveryId = "low_gravity",
 	},
 	{
 		Id = "TinyPlayer",
 		Name = "Tiny Player",
 		Description = "Make yourself travel-size for a short while.",
+		RequiresDiscoveryId = "tiny_players",
 	},
 	{
 		Id = "GiantPlayer",
 		Name = "Giant Player",
 		Description = "Make yourself problem-size for a short while.",
+		RequiresDiscoveryId = "giant_player",
 	},
 }
 
@@ -1473,7 +1543,7 @@ Constants.Rooms = {
 		Name = "TV Room",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.TVRoom,
 		NoTouchDiscoveryId = Constants.Discoveries.TVRoomNoTouch.Id,
-		SpawnCFrame = CFrame.new(0, 3, 11),
+		SpawnCFrame = CFrame.new(Vector3.new(0, 3, 11), Vector3.new(0, 3, 0)),
 		Zone = {
 			Min = Vector3.new(-Constants.Room.Width / 2, Constants.Room.RecoveryY - 3, -Constants.Room.Depth / 2),
 			Max = Vector3.new(Constants.Room.Width / 2, Constants.Room.TVHeight + 2, Constants.Room.Depth / 2),
@@ -1484,7 +1554,7 @@ Constants.Rooms = {
 		Name = "Snack Lab",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.SnackLab,
 		NoTouchDiscoveryId = Constants.Discoveries.SnackLabNoTouch.Id,
-		SpawnCFrame = CFrame.new(37, 3, 54),
+		SpawnCFrame = CFrame.new(Vector3.new(37, 3, 54), Vector3.new(48, 3, 44)),
 		Zone = {
 			Min = Vector3.new(48 - Constants.Room.Width / 2, -3, 44 - Constants.Room.Depth / 2),
 			Max = Vector3.new(48 + Constants.Room.Width / 2, Constants.Room.Height + 2, 44 + Constants.Room.Depth / 2),

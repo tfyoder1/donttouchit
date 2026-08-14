@@ -21,6 +21,7 @@ function EventManager.new(discoveryService, resetService, roomReferences, roomPr
 	self.active = false
 	self.buttonPressCount = 0
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
+	self.localAudioRemote = RemoteService.GetRemote(Constants.Remotes.LocalAudio)
 	return self
 end
 
@@ -36,6 +37,21 @@ end
 
 function EventManager:_broadcastMessage(text)
 	self.systemMessageRemote:FireAllClients(text)
+end
+
+function EventManager:_playLocalSound(player, soundId, options)
+	if not player or not player.Parent or not soundId then
+		return
+	end
+
+	options = options or {}
+	self.localAudioRemote:FireClient(player, {
+		Action = "PlaySound",
+		SoundId = soundId,
+		Volume = options.Volume,
+		PlaybackSpeed = options.PlaybackSpeed,
+		Lifetime = options.Lifetime,
+	})
 end
 
 function EventManager:_chooseEvent()
@@ -90,6 +106,9 @@ function EventManager:_buildContext(triggeringPlayer, eventDefinition)
 		end,
 		BroadcastMessage = function(text)
 			self:_broadcastMessage(text)
+		end,
+		PlayLocalSound = function(player, soundId, options)
+			self:_playLocalSound(player, soundId, options)
 		end,
 		RecordInteraction = function(player)
 			if self.roomProgressService then

@@ -1050,6 +1050,54 @@ function BunkerEnergyService:_updatePocketItemToolName(tool)
 	self:_updateStackedToolName(tool, "PocketItemBaseName", "PocketStackCount")
 end
 
+function BunkerEnergyService:_getEquippedInventoryTool(player)
+	local character = player and player.Character
+	if not character then
+		return nil
+	end
+
+	for _, item in ipairs(character:GetChildren()) do
+		if item:IsA("Tool")
+			and item.Enabled ~= false
+			and (item:GetAttribute("DontTouchItEnergyReserve") == true or item:GetAttribute("DontTouchItPocketItem") == true)
+		then
+			return item
+		end
+	end
+
+	return nil
+end
+
+function BunkerEnergyService:_getToolHandleSnapshot(tool)
+	local handle = tool and tool:FindFirstChild("Handle")
+	if not handle or not handle:IsA("BasePart") then
+		return {}
+	end
+
+	return {
+		Color = handle.Color,
+		Material = handle.Material,
+		Size = handle.Size,
+		Shape = handle.Shape,
+	}
+end
+
+function BunkerEnergyService:_consumeOneFromStackedTool(tool, stackAttributeName, kind)
+	local stackCount = math.max(1, math.floor(tonumber(tool:GetAttribute(stackAttributeName)) or 1)) - 1
+	if stackCount <= 0 then
+		tool.Enabled = false
+		Debris:AddItem(tool, 0.1)
+		return
+	end
+
+	tool:SetAttribute(stackAttributeName, stackCount)
+	if kind == "EnergyReserve" then
+		self:_updateEnergyReserveToolName(tool)
+	else
+		self:_updatePocketItemToolName(tool)
+	end
+end
+
 function BunkerEnergyService:_findStackableEnergyReserveTool(player, kind)
 	local stackLimit = self:_getEnergyReserveStackLimit()
 	return self:_getStackableTool(player, "DontTouchItEnergyReserve", "EnergyReserveKind", kind, stackLimit)
@@ -1129,6 +1177,58 @@ function BunkerEnergyService:_buildPocketItemToolVisual(tool, options)
 	end
 
 	tool.Grip = if kind == "IslandWood" then CFrame.new(0, -0.2, 0) * CFrame.Angles(0, math.rad(90), 0) else CFrame.new(0, -0.2, 0)
+end
+
+function BunkerEnergyService:DropOneEquippedInventoryItem(player)
+	if not player or not player.Parent then
+		return false, nil, "No player found for that inventory action."
+	end
+
+	local tool = self:_getEquippedInventoryTool(player)
+	if not tool then
+		return false, nil, "Hold a pocket item before dropping it."
+	end
+
+	local visual = self:_getToolHandleSnapshot(tool)
+	if tool:GetAttribute("DontTouchItPocketItem") == true then
+		local kind = tool:GetAttribute("PocketItemKind") or "Item"
+		local baseName = tool:GetAttribute("PocketItemBaseName") or tool.Name
+		local itemData = {
+			InventoryType = "PocketItem",
+			Kind = kind,
+			Name = baseName,
+			ToolTip = tool.ToolTip,
+			Color = visual.Color,
+			Material = visual.Material,
+			Size = visual.Size,
+			Shape = visual.Shape,
+			StackLimit = math.max(1, math.floor(tonumber(tool:GetAttribute("PocketStackLimit")) or Constants.BunkerEnergy.EnergyReserveStackLimit or 10)),
+		}
+
+		self:_consumeOneFromStackedTool(tool, "PocketStackCount", "PocketItem")
+		return true, itemData
+	end
+
+	if tool:GetAttribute("DontTouchItEnergyReserve") == true then
+		local kind = tool:GetAttribute("EnergyReserveKind") or "Fruit"
+		local baseName = tool:GetAttribute("EnergyReserveBaseName") or self:_getEnergyReserveBaseName({}, kind)
+		local itemData = {
+			InventoryType = "EnergyReserve",
+			Kind = kind,
+			Name = baseName,
+			ToolTip = tool.ToolTip,
+			Color = visual.Color,
+			Material = visual.Material,
+			Size = visual.Size,
+			Shape = visual.Shape,
+			RestoreAmount = tonumber(tool:GetAttribute("EnergyRestoreAmount")) or Constants.BunkerEnergy.FruitEnergyRestore or 0.32,
+		}
+
+		self:_consumeOneFromStackedTool(tool, "EnergyReserveStackCount", "EnergyReserve")
+		return true, itemData
+	end
+
+	return false, nil, "That item refuses to leave your hand."
 end
 
 function BunkerEnergyService:GrantPocketItemTool(player, options)

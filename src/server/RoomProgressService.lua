@@ -562,6 +562,49 @@ function RoomProgressService:_buildUnlockedTeleportRooms(player)
 	return rooms
 end
 
+function RoomProgressService:_getFieldControl(effectId)
+	if typeof(effectId) ~= "string" then
+		return nil
+	end
+
+	for _, fieldControl in ipairs(Constants.FieldControls or {}) do
+		if fieldControl.Id == effectId then
+			return fieldControl
+		end
+	end
+
+	return nil
+end
+
+function RoomProgressService:_isFieldControlUnlocked(player, fieldControl)
+	if typeof(fieldControl) ~= "table" then
+		return false
+	end
+
+	local requirement = fieldControl.RequiresDiscoveryId
+	if not requirement then
+		return true
+	end
+
+	return self.discoveryService:HasDiscovery(player, requirement)
+end
+
+function RoomProgressService:_buildUnlockedFieldControls(player)
+	local controls = {}
+
+	for _, fieldControl in ipairs(Constants.FieldControls or {}) do
+		if self:_isFieldControlUnlocked(player, fieldControl) then
+			local control = {}
+			for key, value in pairs(fieldControl) do
+				control[key] = value
+			end
+			table.insert(controls, control)
+		end
+	end
+
+	return controls
+end
+
 function RoomProgressService:ShowStore(player, roomId)
 	self:ShowReferenceBook(player, roomId, {
 		Mode = "Store",
@@ -587,7 +630,7 @@ function RoomProgressService:ShowFieldControls(player, roomId)
 	self:ShowReferenceBook(player, roomId, {
 		Mode = "Field",
 		StatusText = "Temporary field adjustments. Discoveries and rewards still follow the room rules.",
-		FieldControls = Constants.FieldControls,
+		FieldControls = self:_buildUnlockedFieldControls(player),
 	})
 end
 
@@ -1080,6 +1123,17 @@ function RoomProgressService:_applyPlayerScaleField(player, scale, discoveryId, 
 end
 
 function RoomProgressService:_requestFieldEffect(player, roomId, effectId)
+	local fieldControl = self:_getFieldControl(effectId)
+	if not fieldControl then
+		self.systemMessageRemote:FireClient(player, "That field setting is not wired yet.")
+		return
+	end
+
+	if not self:_isFieldControlUnlocked(player, fieldControl) then
+		self.systemMessageRemote:FireClient(player, "That field capability has not been unlocked yet.")
+		return
+	end
+
 	if effectId == "LowGravity" then
 		self:_runLowGravityFromField(player)
 	elseif effectId == "TinyPlayer" then

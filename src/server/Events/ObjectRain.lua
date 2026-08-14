@@ -266,6 +266,12 @@ local function createMovePrompt(blob, context, random)
 
 			prompt.Enabled = false
 			pocketPrompt.Enabled = false
+			if context.PlayLocalSound and Constants.AudioAssets and Constants.AudioAssets.Events then
+				context.PlayLocalSound(player, Constants.AudioAssets.Events.ObjectRainCollectId, {
+					Volume = 0.62,
+					Lifetime = 2,
+				})
+			end
 			if context.SendMessage then
 				context.SendMessage(player, message or "Pocketed loose matter for later.")
 			end

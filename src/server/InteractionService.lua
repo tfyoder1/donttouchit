@@ -81,11 +81,14 @@ local TV_ROOM_MOOD_SURFACES = {
 	RightWall = true,
 }
 
+local televisionAudio = Constants.AudioAssets and Constants.AudioAssets.Television
 local TV_SOUND_IDS = {
-	Static = "rbxasset://sounds/electronicpingshort.wav",
-	TestTone = "rbxasset://sounds/electronicpingshort.wav",
-	Warning = "rbxasset://sounds/snap.wav",
+	Static = (televisionAudio and televisionAudio.StaticId) or "rbxasset://sounds/electronicpingshort.wav",
+	TestTone = (televisionAudio and televisionAudio.TestToneId) or "rbxasset://sounds/electronicpingshort.wav",
+	Warning = (televisionAudio and televisionAudio.PleaseStopId) or "rbxasset://sounds/snap.wav",
 }
+local TV_EYE_DURATION = 10
+local TV_EYE_FADE_DURATION = 2.25
 local CONTROL_PANEL_SOUND_ID = if Constants.AudioAssets and Constants.AudioAssets.Interface
 	then Constants.AudioAssets.Interface.ControlPanelInteractionId
 	else "rbxassetid://112555741154994"
@@ -116,6 +119,11 @@ local TELEPORT_LANDING_LIFT = Vector3.new(0, 2.6, 0)
 local BUNKER_RECLAIM_MESSAGE_COOLDOWN = 24
 local OBJECT_RAIN_SORT_COOLDOWN = 3.5
 local OBJECT_RAIN_SORT_UPPER_Y = Constants.Room.FloorY - 3.5
+local INVENTORY_DROP_COOLDOWN = 0.45
+local INVENTORY_DROP_DISTANCE = 5.2
+local INVENTORY_DROP_RAY_HEIGHT = 7.5
+local INVENTORY_DROP_RAY_DEPTH = 22
+local SECURITY_WEIGHT_DROP_MARGIN = 2.2
 
 local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(119, 255, 203),
@@ -485,6 +493,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.securityCameraRemote = RemoteService.GetRemote(Constants.Remotes.SecurityCamera)
 	self.topDownArenaRemote = RemoteService.GetRemote(Constants.Remotes.TopDownArena)
 	self.transformCameraRemote = RemoteService.GetRemote(Constants.Remotes.TransformCamera)
+	self.inventoryActionRemote = RemoteService.GetRemote(Constants.Remotes.InventoryAction)
 	self.connectedPrompts = {}
 	self.snackButtonRandom = Random.new()
 	self.couchState = {}
@@ -577,6 +586,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.topDownBucketTouchAtByUserId = {}
 	self.topDownPracticeTargetState = {}
 	self.topDownCameraMode = "Overhead"
+	self.inventoryDropAtByUserId = {}
 	self.bunkerReclaimMessageAtByKey = {}
 	self.objectRainSortLastAt = 0
 	self.objectRainSortRandom = Random.new()
@@ -685,6 +695,7 @@ function InteractionService:Initialize()
 		self.topDownLastThrowByUserId[player.UserId] = nil
 		self.topDownLoadedBalloonsByUserId[player.UserId] = nil
 		self.topDownBucketTouchAtByUserId[player.UserId] = nil
+		self.inventoryDropAtByUserId[player.UserId] = nil
 	end)
 
 	self.securityCameraRemote.OnServerEvent:Connect(function(player, payload)
@@ -693,6 +704,10 @@ function InteractionService:Initialize()
 
 	self.topDownArenaRemote.OnServerEvent:Connect(function(player, payload)
 		self:_handleTopDownArenaRemote(player, payload)
+	end)
+
+	self.inventoryActionRemote.OnServerEvent:Connect(function(player, payload)
+		self:_handleInventoryActionRemote(player, payload)
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -1568,7 +1583,7 @@ function InteractionService:_attachLooseFruitEatPrompt(primary, fruitRoot)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "LooseFruitEatPrompt"
 	prompt.ActionText = "Eat"
-	prompt.ObjectText = "Loose Fruit"
+	prompt.ObjectText = "Loose Fruit - Eat / Pocket"
 	prompt.HoldDuration = 0.12
 	prompt.RequiresLineOfSight = false
 	prompt.ClickablePrompt = true
@@ -1602,7 +1617,7 @@ function InteractionService:_attachLooseFruitEatPrompt(primary, fruitRoot)
 	self:_attachEnergyReservePrompt(primary, fruitRoot, {
 		PromptName = "LooseFruitPocketPrompt",
 		ActionText = "Pocket",
-		ObjectText = "Loose Fruit",
+		ObjectText = "Loose Fruit - Eat / Pocket",
 		Kind = "Fruit",
 		Name = "Pocketed Fruit",
 		RestoreAmount = Constants.BunkerEnergy.FruitEnergyRestore or 0.32,
@@ -1612,6 +1627,384 @@ function InteractionService:_attachLooseFruitEatPrompt(primary, fruitRoot)
 		ReclaimKey = "fruit_pocketed",
 		ReclaimMessage = "The Snack Lab quietly absorbs the fruit-shaped gap left behind.",
 	})
+end
+
+function InteractionService:_getDroppedInventoryItemSize(itemData)
+	local kind = itemData and itemData.Kind or "Item"
+	local size = itemData and itemData.Size
+	if typeof(size) == "Vector3" then
+		return size
+	end
+
+	if kind == "IslandRock" then
+		return Vector3.new(0.9, 0.74, 0.9)
+	elseif kind == "IslandWood" then
+		return Vector3.new(0.52, 0.42, 1.9)
+	elseif kind == "Popcorn" then
+		return Vector3.new(0.55, 0.46, 0.55)
+	end
+
+	return Vector3.new(0.82, 0.82, 0.82)
+end
+
+function InteractionService:_getInventoryDropCFrame(player, itemData)
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return nil
+	end
+
+	local forward = rootPart.CFrame.LookVector
+	local flatForward = Vector3.new(forward.X, 0, forward.Z)
+	if flatForward.Magnitude < 0.05 then
+		flatForward = Vector3.new(0, 0, -1)
+	else
+		flatForward = flatForward.Unit
+	end
+
+	local size = self:_getDroppedInventoryItemSize(itemData)
+	local rayOrigin = rootPart.Position + flatForward * INVENTORY_DROP_DISTANCE + Vector3.new(0, INVENTORY_DROP_RAY_HEIGHT, 0)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { player.Character }
+	params.IgnoreWater = false
+
+	local result = workspace:Raycast(rayOrigin, Vector3.new(0, -INVENTORY_DROP_RAY_DEPTH, 0), params)
+	local position = if result then result.Position + Vector3.new(0, size.Y / 2 + 0.04, 0) else rootPart.Position + flatForward * INVENTORY_DROP_DISTANCE + Vector3.new(0, size.Y / 2, 0)
+	return CFrame.lookAt(position, position + flatForward)
+end
+
+function InteractionService:_refreshDroppedInventoryCounts(player, kind)
+	if not player then
+		return
+	end
+
+	if kind == "IslandRock" then
+		self.islandRockCountByUserId[player.UserId] = self:_getPocketItemCount(player, "IslandRock", self.islandRockCountByUserId)
+	elseif kind == "IslandWood" then
+		self.islandWoodCountByUserId[player.UserId] = self:_getPocketItemCount(player, "IslandWood", self.islandWoodCountByUserId)
+	end
+end
+
+function InteractionService:_claimDroppedInventoryRoot(root)
+	if not root or not root.Parent or root:GetAttribute("DroppedInventoryClaimed") == true then
+		return false
+	end
+
+	root:SetAttribute("DroppedInventoryClaimed", true)
+	return true
+end
+
+function InteractionService:_releaseDroppedInventoryRoot(root)
+	if root and root.Parent then
+		root:SetAttribute("DroppedInventoryClaimed", false)
+	end
+end
+
+function InteractionService:_fadeAndDestroyDroppedInventory(root)
+	if not root or not root.Parent then
+		return
+	end
+
+	setPromptEnabled(root, false)
+	for _, instance in ipairs(getInstanceAndDescendants(root)) do
+		if instance:IsA("BasePart") then
+			instance.CanCollide = false
+			instance.CanTouch = false
+			tweenPart(instance, 0.18, {
+				Transparency = 1,
+				CFrame = instance.CFrame + Vector3.new(0, 0.24, 0),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+	end
+	Debris:AddItem(root, 0.24)
+end
+
+function InteractionService:_createDroppedInventoryPart(itemData, cframe)
+	local kind = itemData and itemData.Kind or "Item"
+	local inventoryType = itemData and itemData.InventoryType or "PocketItem"
+	local material = itemData and itemData.Material
+	if not material then
+		material = if kind == "IslandRock" then Enum.Material.Slate elseif kind == "IslandWood" then Enum.Material.Wood else Enum.Material.SmoothPlastic
+	end
+	local color = itemData and itemData.Color
+	if not color then
+		color = if kind == "IslandRock" then Color3.fromRGB(112, 113, 111) elseif kind == "IslandWood" then Color3.fromRGB(129, 82, 45) elseif kind == "Matter" then Color3.fromRGB(119, 255, 203) else Color3.fromRGB(255, 134, 35)
+	end
+	local shape = itemData and itemData.Shape
+	if not shape then
+		shape = if kind == "IslandRock" or inventoryType == "EnergyReserve" then Enum.PartType.Ball else Enum.PartType.Block
+	end
+
+	local part = Instance.new("Part")
+	part.Name = ("Dropped%s"):format(kind)
+	part.Anchored = true
+	part.CanCollide = inventoryType == "PocketItem"
+	part.CanTouch = false
+	part.CanQuery = true
+	part.Material = material
+	part.Color = color
+	part.Size = self:_getDroppedInventoryItemSize(itemData)
+	part.Shape = shape
+	part.CFrame = cframe
+	part.Parent = workspace
+	part:SetAttribute("DroppedInventoryItem", true)
+	part:SetAttribute("DroppedInventoryKind", kind)
+	CollectionService:AddTag(part, Constants.Tags.TemporaryObject)
+
+	if inventoryType == "EnergyReserve" and kind ~= "Popcorn" then
+		local cap = Instance.new("Part")
+		cap.Name = "DroppedReserveCap"
+		cap.Anchored = true
+		cap.CanCollide = false
+		cap.CanTouch = false
+		cap.CanQuery = false
+		cap.Material = Enum.Material.SmoothPlastic
+		cap.Color = if kind == "Matter" then Color3.fromRGB(236, 246, 255) else Color3.fromRGB(72, 96, 46)
+		cap.Size = Vector3.new(0.18, 0.34, 0.18)
+		cap.CFrame = part.CFrame * CFrame.new(0, part.Size.Y / 2 + 0.16, 0)
+		cap.Parent = part
+	end
+
+	return part
+end
+
+function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
+	if not primary or not primary:IsA("BasePart") then
+		return
+	end
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "DroppedPocketItemPrompt"
+	prompt.ActionText = "Pick Up"
+	prompt.ObjectText = itemData.Name or "Dropped Item"
+	prompt.HoldDuration = 0.12
+	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
+	prompt.MaxActivationDistance = 9
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+	prompt.Parent = primary
+
+	self:_connectPrompt(prompt, function(player)
+		if not self:_claimDroppedInventoryRoot(primary) then
+			return
+		end
+
+		local ok, message = self:_grantPocketItem(player, {
+			Kind = itemData.Kind or "Item",
+			Name = itemData.Name,
+			ToolTip = itemData.ToolTip,
+			Color = itemData.Color or primary.Color,
+			StackLimit = itemData.StackLimit,
+			GrantMessage = ("%s picked up."):format(itemData.Name or "Item"),
+		})
+		if not ok then
+			self:_releaseDroppedInventoryRoot(primary)
+			self.systemMessageRemote:FireClient(player, message or "Your pockets are full.")
+			return
+		end
+
+		self:_refreshDroppedInventoryCounts(player, itemData.Kind)
+		playSound(primary, "rbxasset://sounds/button.wav", 0.32, 0.86)
+		self.systemMessageRemote:FireClient(player, message or ("%s picked up."):format(itemData.Name or "Item"))
+		self:_fadeAndDestroyDroppedInventory(primary)
+	end)
+end
+
+function InteractionService:_attachDroppedEnergyPrompts(primary, itemData)
+	if not primary or not primary:IsA("BasePart") then
+		return
+	end
+
+	local kind = itemData.Kind or "Fruit"
+	local useAction = if kind == "Fruit" then "Eat" else "Use"
+	local objectText = ("%s - %s / Pocket"):format(itemData.Name or "Energy Item", useAction)
+
+	local usePrompt = Instance.new("ProximityPrompt")
+	usePrompt.Name = "DroppedEnergyUsePrompt"
+	usePrompt.ActionText = useAction
+	usePrompt.ObjectText = objectText
+	usePrompt.HoldDuration = 0.12
+	usePrompt.RequiresLineOfSight = false
+	usePrompt.ClickablePrompt = true
+	usePrompt.MaxActivationDistance = 9
+	usePrompt.KeyboardKeyCode = Enum.KeyCode.E
+	usePrompt.GamepadKeyCode = Enum.KeyCode.ButtonX
+	usePrompt.Parent = primary
+
+	self:_connectPrompt(usePrompt, function(player)
+		if not self:_claimDroppedInventoryRoot(primary) then
+			return
+		end
+
+		if self.bunkerEnergyService then
+			if kind == "Fruit" and self.bunkerEnergyService.RecordFruitEaten then
+				self.bunkerEnergyService:RecordFruitEaten(player, itemData.RestoreAmount)
+			elseif self.bunkerEnergyService.RecordEnergyItemUsed then
+				self.bunkerEnergyService:RecordEnergyItemUsed(player, kind, itemData.RestoreAmount)
+			end
+		end
+
+		playSound(primary, "rbxasset://sounds/snap.wav", 0.45, 1.1)
+		self.systemMessageRemote:FireClient(player, if kind == "Fruit" then "The fruit helps. Nearby lights react to the leftovers." else "Energy returns for a moment. Nearby lights react to the transaction.")
+		self:_fadeAndDestroyDroppedInventory(primary)
+	end)
+
+	local pocketPrompt = Instance.new("ProximityPrompt")
+	pocketPrompt.Name = "DroppedEnergyPocketPrompt"
+	pocketPrompt.ActionText = "Pocket"
+	pocketPrompt.ObjectText = objectText
+	pocketPrompt.HoldDuration = 0.18
+	pocketPrompt.RequiresLineOfSight = false
+	pocketPrompt.ClickablePrompt = true
+	pocketPrompt.MaxActivationDistance = 9
+	pocketPrompt.KeyboardKeyCode = Enum.KeyCode.F
+	pocketPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+	pocketPrompt.Parent = primary
+
+	self:_connectPrompt(pocketPrompt, function(player)
+		if not self:_claimDroppedInventoryRoot(primary) then
+			return
+		end
+
+		if not self.bunkerEnergyService or not self.bunkerEnergyService.GrantEnergyReserveTool then
+			self:_releaseDroppedInventoryRoot(primary)
+			self.systemMessageRemote:FireClient(player, "This item refuses to fit in a pocket yet.")
+			return
+		end
+
+		local ok, message = self.bunkerEnergyService:GrantEnergyReserveTool(player, {
+			Kind = kind,
+			Name = itemData.Name,
+			ToolTip = itemData.ToolTip,
+			RestoreAmount = itemData.RestoreAmount,
+			Color = itemData.Color or primary.Color,
+			GrantMessage = ("%s pocketed."):format(itemData.Name or "Energy item"),
+			UseMessage = if kind == "Fruit" then "The fruit helps your energy. Nearby lights react to the transaction." else nil,
+		})
+		if not ok then
+			self:_releaseDroppedInventoryRoot(primary)
+			self.systemMessageRemote:FireClient(player, message or "Your pockets are out of room.")
+			return
+		end
+
+		playSound(primary, "rbxasset://sounds/button.wav", 0.32, 0.95)
+		self.systemMessageRemote:FireClient(player, message or ("%s pocketed."):format(itemData.Name or "Energy item"))
+		self:_fadeAndDestroyDroppedInventory(primary)
+	end)
+end
+
+function InteractionService:_spawnDroppedInventoryItem(player, itemData, cframe)
+	if not cframe then
+		return false
+	end
+
+	local part = self:_createDroppedInventoryPart(itemData, cframe)
+	if itemData.InventoryType == "EnergyReserve" then
+		self:_attachDroppedEnergyPrompts(part, itemData)
+	else
+		self:_attachDroppedPocketItemPrompt(part, itemData)
+	end
+
+	playSound(part, "rbxasset://sounds/button.wav", 0.25, 0.72)
+	self.systemMessageRemote:FireClient(player, ("%s dropped."):format(itemData.Name or "Item"))
+	return true
+end
+
+function InteractionService:_findSecurityWeightPlateForDrop(player, dropCFrame)
+	if self.securityPressurePlateState.Weight or not dropCFrame then
+		return nil
+	end
+
+	local candidatePositions = { dropCFrame.Position }
+	local rootPart = getRootPart(player)
+	if rootPart then
+		table.insert(candidatePositions, rootPart.Position)
+	end
+
+	for _, plate in ipairs(CollectionService:GetTagged(Constants.Tags.SecurityPressurePlate)) do
+		if plate:IsA("BasePart") and (plate:GetAttribute("PlateIndex") or 0) == 2 then
+			for _, position in ipairs(candidatePositions) do
+				local relative = plate.CFrame:PointToObjectSpace(position)
+				local insideX = math.abs(relative.X) <= plate.Size.X / 2 + SECURITY_WEIGHT_DROP_MARGIN
+				local insideZ = math.abs(relative.Z) <= plate.Size.Z / 2 + SECURITY_WEIGHT_DROP_MARGIN
+				if insideX and insideZ and math.abs(relative.Y) <= 7 then
+					return plate
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_placeDroppedRockOnSecurityPlate(player, itemData, plate)
+	if not plate or not plate:IsA("BasePart") then
+		return false
+	end
+
+	local baseCFrame = plate:GetAttribute("BaseCFrame") or plate.CFrame
+	local size = self:_getDroppedInventoryItemSize(itemData)
+	local rock = self:_createDroppedInventoryPart(itemData, baseCFrame * CFrame.new(0, plate.Size.Y / 2 + size.Y / 2 + 0.05, 0))
+	rock.Name = "SecurityWeightBeachRock"
+	rock.CanCollide = true
+	rock:SetAttribute("SecurityWeightRock", true)
+
+	self.securityPressurePlateState.Weight = true
+	tweenPart(plate, 0.12, {
+		Color = Color3.fromRGB(119, 255, 203),
+		CFrame = baseCFrame * CFrame.new(0, -0.08, 0),
+	})
+	playSound(plate, "rbxasset://sounds/button.wav", 0.36, 0.72)
+
+	if self.securityPressurePlateState.Badge then
+		self:_setSecurityControlsPowered(true, plate)
+		self.systemMessageRemote:FireClient(player, "The beach rock settles on the weight plate. Security controls power up.")
+	else
+		self.systemMessageRemote:FireClient(player, "The beach rock settles on the weight plate. The badge plate is still waiting.")
+	end
+
+	return true
+end
+
+function InteractionService:_handleInventoryActionRemote(player, payload)
+	if typeof(payload) ~= "table" or payload.Action ~= "DropEquipped" then
+		return
+	end
+
+	local now = os.clock()
+	local lastDropAt = self.inventoryDropAtByUserId[player.UserId] or 0
+	if now - lastDropAt < INVENTORY_DROP_COOLDOWN then
+		return
+	end
+	self.inventoryDropAtByUserId[player.UserId] = now
+
+	if not getRootPart(player) then
+		return
+	end
+
+	if not self.bunkerEnergyService or not self.bunkerEnergyService.DropOneEquippedInventoryItem then
+		self.systemMessageRemote:FireClient(player, "Inventory drops are not available right now.")
+		return
+	end
+
+	local ok, itemData, message = self.bunkerEnergyService:DropOneEquippedInventoryItem(player)
+	if not ok or not itemData then
+		self.systemMessageRemote:FireClient(player, message or "Hold a pocket item before dropping it.")
+		return
+	end
+
+	self:_refreshDroppedInventoryCounts(player, itemData.Kind)
+	local dropCFrame = self:_getInventoryDropCFrame(player, itemData)
+	if itemData.Kind == "IslandRock" then
+		local plate = self:_findSecurityWeightPlateForDrop(player, dropCFrame)
+		if plate and self:_placeDroppedRockOnSecurityPlate(player, itemData, plate) then
+			self:_refreshDroppedInventoryCounts(player, itemData.Kind)
+			return
+		end
+	end
+
+	self:_spawnDroppedInventoryItem(player, itemData, dropCFrame)
 end
 
 function InteractionService:_wireLibraryBookStorm(book)
@@ -5862,9 +6255,9 @@ function InteractionService:_cycleTelevision(screen, textLabel, pressCount)
 	self:_clearTelevisionSounds(tv)
 
 	if channelIndex == 1 then
-		self:_playTelevisionLoop(screen, "TVStaticSound", TV_SOUND_IDS.Static, 0.28, 7.5)
+		self:_playTelevisionLoop(screen, "TVStaticSound", TV_SOUND_IDS.Static, 0.28, 1)
 	elseif channelIndex == 2 then
-		self:_playTelevisionLoop(screen, "TVTestTone", TV_SOUND_IDS.TestTone, 0.2, 0.38)
+		self:_playTelevisionLoop(screen, "TVTestTone", TV_SOUND_IDS.TestTone, 0.2, 1)
 	else
 		self:_startTelevisionWarning(tv, screen)
 	end
@@ -5874,17 +6267,16 @@ function InteractionService:_televisionSecret(tv, screen, textLabel, player, sta
 	state.Reacting = true
 	self:_clearTelevisionSounds(tv)
 	self.discoveryService:Unlock(player, Constants.Discoveries.AngeredTelevision.Id)
-	self.systemMessageRemote:FireClient(player, "The television noticed you.")
 
-	textLabel.Text = "STOP PRESSING BUTTONS."
-	textLabel.TextColor3 = Color3.fromRGB(255, 60, 70)
+	textLabel.Text = ""
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 245)
 	screen.Color = Color3.fromRGB(255, 255, 255)
 	task.wait(0.15)
-	screen.Color = Color3.fromRGB(40, 10, 18)
-	self:_spawnTelevisionEye(tv, screen, player)
-	self:_startTelevisionWarning(tv, screen)
-	task.wait(30)
+	screen.Color = Color3.fromRGB(6, 7, 9)
+	self:_spawnTelevisionEye(tv, screen, player, TV_EYE_DURATION)
+	task.wait(TV_EYE_DURATION)
 
+	self:_clearTelevisionSounds(tv)
 	self.resetService.RestoreInstance(tv)
 	state.Reacting = false
 end
@@ -5953,11 +6345,14 @@ function InteractionService:_startTelevisionWarning(tv, screen)
 	end)
 end
 
-function InteractionService:_spawnTelevisionEye(tv, screen, player)
+function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	local existingEye = tv:FindFirstChild("WatchingEye")
 	if existingEye then
 		existingEye:Destroy()
 	end
+
+	duration = duration or TV_EYE_DURATION
+	local fadeDuration = math.min(TV_EYE_FADE_DURATION, duration)
 
 	local model = Instance.new("Model")
 	model.Name = "WatchingEye"
@@ -5968,8 +6363,11 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player)
 	eye.Name = "EyeWhite"
 	eye.Anchored = true
 	eye.CanCollide = false
+	eye.CanQuery = false
+	eye.CanTouch = false
+	eye.CastShadow = false
 	eye.Shape = Enum.PartType.Ball
-	eye.Size = Vector3.new(2.6, 2.6, 0.9)
+	eye.Size = Vector3.new(3.45, 3.45, 0.12)
 	eye.Color = Color3.fromRGB(255, 255, 245)
 	eye.Material = Enum.Material.Neon
 	eye.Parent = model
@@ -5979,37 +6377,50 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player)
 	pupil.Name = "EyePupil"
 	pupil.Anchored = true
 	pupil.CanCollide = false
+	pupil.CanQuery = false
+	pupil.CanTouch = false
+	pupil.CastShadow = false
 	pupil.Shape = Enum.PartType.Ball
-	pupil.Size = Vector3.new(0.7, 0.7, 0.18)
+	pupil.Size = Vector3.new(0.86, 0.86, 0.08)
 	pupil.Color = Color3.fromRGB(12, 14, 18)
 	pupil.Material = Enum.Material.SmoothPlastic
 	pupil.Parent = model
 	CollectionService:AddTag(pupil, Constants.Tags.TemporaryObject)
 
-	local origin = screen.Position + Vector3.new(0, 0, 0.45)
+	local eyeCFrame = screen.CFrame * CFrame.new(0, 0, screen.Size.Z / 2 + 0.08)
+	local maxPupilOffset = 1.08
 	local startedAt = os.clock()
 
 	task.spawn(function()
-		while model.Parent and os.clock() - startedAt < 30 do
-			local rootPart = getRootPart(player)
-			local targetPosition = rootPart and rootPart.Position or origin + Vector3.new(0, 0, 8)
-			local direction = targetPosition - origin
-			if direction.Magnitude < 0.1 then
-				direction = Vector3.new(0, 0, 1)
+		while model.Parent do
+			local elapsed = os.clock() - startedAt
+			if elapsed >= duration then
+				break
 			end
 
-			direction = direction.Unit
-			eye.CFrame = CFrame.new(origin, origin + direction)
-			pupil.CFrame = CFrame.new(origin + direction * 0.5, origin + direction)
+			local rootPart = getRootPart(player)
+			local targetPosition = if rootPart then rootPart.Position + Vector3.new(0, 1.35, 0) else eyeCFrame.Position
+			local targetLocal = screen.CFrame:PointToObjectSpace(targetPosition)
+			local targetDistance = math.max(math.abs(targetLocal.Z), 6)
+			local pupilOffset = Vector2.new(
+				math.clamp((targetLocal.X / targetDistance) * 1.9, -maxPupilOffset, maxPupilOffset),
+				math.clamp((targetLocal.Y / targetDistance) * 1.9, -maxPupilOffset, maxPupilOffset)
+			)
+			if pupilOffset.Magnitude > maxPupilOffset then
+				pupilOffset = pupilOffset.Unit * maxPupilOffset
+			end
+
+			local fadeStart = duration - fadeDuration
+			local fadeAlpha = if elapsed > fadeStart then math.clamp((elapsed - fadeStart) / fadeDuration, 0, 1) else 0
+			eye.Transparency = fadeAlpha
+			pupil.Transparency = fadeAlpha
+			eye.CFrame = eyeCFrame
+			pupil.CFrame = eyeCFrame * CFrame.new(pupilOffset.X, pupilOffset.Y, 0.08)
 			task.wait(0.08)
 		end
 
 		if model.Parent then
 			model:Destroy()
-		end
-
-		if tv.Parent then
-			self:_clearTelevisionSounds(tv)
 		end
 	end)
 end
