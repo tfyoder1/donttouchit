@@ -3,6 +3,7 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local PlayerScale = require(script.Parent:WaitForChild("PlayerScale"))
 
 local ResetService = {}
 
@@ -15,6 +16,8 @@ local BASE_ATTRIBUTES = {
 	Color = "BaseColor",
 	Transparency = "BaseTransparency",
 	CanCollide = "BaseCanCollide",
+	CanQuery = "BaseCanQuery",
+	CanTouch = "BaseCanTouch",
 	Anchored = "BaseAnchored",
 	Material = "BaseMaterial",
 }
@@ -36,6 +39,8 @@ function ResetService.MarkBaseline(instance)
 		instance:SetAttribute(BASE_ATTRIBUTES.Color, instance.Color)
 		instance:SetAttribute(BASE_ATTRIBUTES.Transparency, instance.Transparency)
 		instance:SetAttribute(BASE_ATTRIBUTES.CanCollide, instance.CanCollide)
+		instance:SetAttribute(BASE_ATTRIBUTES.CanQuery, instance.CanQuery)
+		instance:SetAttribute(BASE_ATTRIBUTES.CanTouch, instance.CanTouch)
 		instance:SetAttribute(BASE_ATTRIBUTES.Anchored, instance.Anchored)
 		instance:SetAttribute(BASE_ATTRIBUTES.Material, instance.Material.Name)
 	elseif instance:IsA("PointLight") or instance:IsA("SpotLight") or instance:IsA("SurfaceLight") then
@@ -81,6 +86,16 @@ local function restorePart(part)
 	local baseCanCollide = part:GetAttribute(BASE_ATTRIBUTES.CanCollide)
 	if baseCanCollide ~= nil then
 		part.CanCollide = baseCanCollide
+	end
+
+	local baseCanQuery = part:GetAttribute(BASE_ATTRIBUTES.CanQuery)
+	if baseCanQuery ~= nil then
+		part.CanQuery = baseCanQuery
+	end
+
+	local baseCanTouch = part:GetAttribute(BASE_ATTRIBUTES.CanTouch)
+	if baseCanTouch ~= nil then
+		part.CanTouch = baseCanTouch
 	end
 
 	local baseAnchored = part:GetAttribute(BASE_ATTRIBUTES.Anchored)
@@ -206,6 +221,7 @@ end
 function ResetService.RestoreAll()
 	workspace.Gravity = Constants.NormalGravity
 	ResetService.RestoreLighting()
+	PlayerScale.RestoreAllActive()
 
 	for _, temporaryObject in ipairs(CollectionService:GetTagged(Constants.Tags.TemporaryObject)) do
 		if temporaryObject and temporaryObject.Parent then

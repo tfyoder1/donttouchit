@@ -1,5 +1,6 @@
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 
@@ -14,6 +15,138 @@ local COLORS = {
 local SUB_LEVEL_ONE_Y = Constants.Room.RecoveryY + 9.15
 local SUB_LEVEL_ONE_EDGE_X = (Constants.Room.Width + 14) / 2 - 3
 local SUB_LEVEL_ONE_EDGE_Z = (Constants.Room.Depth + 14) / 2 - 3
+local MATTER_MESSAGE_COOLDOWN = 28
+
+local function getInstanceAndDescendants(root)
+	if not root then
+		return {}
+	end
+
+	local instances = root:GetDescendants()
+	table.insert(instances, root)
+	return instances
+end
+
+local function tweenPart(part, duration, properties, easingStyle, easingDirection)
+	local tween = TweenService:Create(
+		part,
+		TweenInfo.new(duration, easingStyle or Enum.EasingStyle.Quad, easingDirection or Enum.EasingDirection.Out),
+		properties
+	)
+	tween:Play()
+	return tween
+end
+
+local function broadcastMatterMessage(context, messageState, key, message)
+	if not context.BroadcastMessage or not message then
+		return
+	end
+
+	local now = os.clock()
+	if now - (messageState[key] or 0) < MATTER_MESSAGE_COOLDOWN then
+		return
+	end
+
+	messageState[key] = now
+	context.BroadcastMessage(message)
+end
+
+local function scheduleObjectRainReclaim(root, context, messageState, options)
+	options = options or {}
+	local absorbDelay = options.Delay or Constants.MatterConversion.ObjectRainAbsorbDelaySeconds or 285
+	local decayDelay = options.DecayDelay or Constants.MatterConversion.ObjectRainDecayDelaySeconds or 150
+	local decayDuration = options.DecayDuration or Constants.MatterConversion.DecayDurationSeconds or 14
+	local absorbDuration = options.Duration or Constants.MatterConversion.ObjectRainAbsorbDurationSeconds or 3.4
+
+	task.delay(decayDelay, function()
+		if not root or not root.Parent then
+			return
+		end
+
+		local parts = {}
+		for _, instance in ipairs(getInstanceAndDescendants(root)) do
+			if instance:IsA("BasePart") and CollectionService:HasTag(instance, Constants.Tags.ObjectRainObject) then
+				table.insert(parts, instance)
+			end
+		end
+
+		if #parts == 0 then
+			return
+		end
+
+		broadcastMatterMessage(
+			context,
+			messageState,
+			"object_rain_decay",
+			"A few rain objects go ashen at the edges. The floor hums like it recognizes released matter."
+		)
+
+		for _, part in ipairs(parts) do
+			if part.Parent and part:GetAttribute("BunkerMatterDecayStarted") ~= true then
+				part:SetAttribute("BunkerMatterDecayStarted", true)
+				part:SetAttribute("MatterConversionOriginalColor", part.Color)
+				tweenPart(part, decayDuration, {
+					Color = Constants.MatterConversion.DecayColor or Color3.fromRGB(42, 43, 42),
+				}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+			end
+		end
+	end)
+
+	task.delay(absorbDelay, function()
+		if not root or not root.Parent then
+			return
+		end
+
+		local parts = {}
+		for _, instance in ipairs(getInstanceAndDescendants(root)) do
+			if instance:IsA("ProximityPrompt") then
+				instance.Enabled = false
+			elseif instance:IsA("BasePart") and CollectionService:HasTag(instance, Constants.Tags.ObjectRainObject) then
+				table.insert(parts, instance)
+			end
+		end
+
+		if #parts == 0 then
+			root:Destroy()
+			return
+		end
+
+			broadcastMatterMessage(
+				context,
+				messageState,
+				"object_rain_absorb",
+				"Grey rain objects sink into bunker seams. The room's signal settles for a moment."
+			)
+
+		if context.RecordMatterReclaimed then
+			context.RecordMatterReclaimed(#parts)
+		end
+
+		for index, part in ipairs(parts) do
+			if part.Parent then
+				part.Anchored = true
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = false
+				tweenPart(part, absorbDuration, {
+					CFrame = part.CFrame + Vector3.new(math.sin(index) * 0.3, -2.8, math.cos(index) * 0.3),
+					Size = Vector3.new(
+						math.max(0.05, part.Size.X * 0.24),
+						math.max(0.05, part.Size.Y * 0.24),
+						math.max(0.05, part.Size.Z * 0.24)
+					),
+					Transparency = 1,
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end
+
+		task.delay(absorbDuration + 0.15, function()
+			if root and root.Parent then
+				root:Destroy()
+			end
+		end)
+	end)
+end
 
 local function getRootPart(player)
 	local character = player.Character
@@ -85,6 +218,72 @@ local function createMovePrompt(blob, context, random)
 			random:NextNumber(-12, 12)
 		)
 	end)
+
+	if blob.Size.Magnitude <= 3.25 then
+		local pocketPrompt = Instance.new("ProximityPrompt")
+		pocketPrompt.Name = "ObjectRainPocketPrompt"
+		pocketPrompt.ActionText = "Pocket"
+		pocketPrompt.ObjectText = "Loose Matter"
+		pocketPrompt.HoldDuration = 0.18
+		pocketPrompt.RequiresLineOfSight = false
+		pocketPrompt.ClickablePrompt = true
+		pocketPrompt.MaxActivationDistance = 8
+		pocketPrompt.KeyboardKeyCode = Enum.KeyCode.F
+		pocketPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+		pocketPrompt.Parent = blob
+
+		pocketPrompt.Triggered:Connect(function(player)
+			if not blob.Parent then
+				return
+			end
+
+			if context.RecordInteraction then
+				context.RecordInteraction(player)
+			end
+
+			if not context.GrantEnergyReserveTool then
+				if context.SendMessage then
+					context.SendMessage(player, "This piece of loose matter has not learned how pockets work.")
+				end
+				return
+			end
+
+			local ok, message = context.GrantEnergyReserveTool(player, {
+				Kind = "Matter",
+				Name = "Pocketed Matter",
+				ToolTip = "Use to steady your energy when the signal starts to drag.",
+				RestoreAmount = Constants.BunkerEnergy.MatterEnergyRestore or 0.18,
+				Color = blob.Color,
+				GrantMessage = "Pocketed loose matter for later. It hums like a very small bad idea.",
+				UseMessage = "The matter steadies your energy. The room signal settles for a moment.",
+			})
+			if not ok then
+				if context.SendMessage then
+					context.SendMessage(player, message or "Your pockets cannot carry more bunker snacks.")
+				end
+				return
+			end
+
+			prompt.Enabled = false
+			pocketPrompt.Enabled = false
+			if context.SendMessage then
+				context.SendMessage(player, message or "Pocketed loose matter for later.")
+			end
+			blob.Anchored = true
+			blob.CanCollide = false
+			blob.CanTouch = false
+			blob.CanQuery = false
+			tweenPart(blob, 0.35, {
+				Size = Vector3.new(0.08, 0.08, 0.08),
+				Transparency = 1,
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			task.delay(0.45, function()
+				if blob.Parent then
+					blob:Destroy()
+				end
+			end)
+		end)
+	end
 end
 
 local function clampToSubLevel(position)
@@ -296,6 +495,7 @@ return {
 		CollectionService:AddTag(folder, Constants.Tags.TemporaryObject)
 
 		local random = Random.new()
+		local matterMessageState = {}
 
 		if context.BroadcastMessage then
 			context.BroadcastMessage("Object rain is actually inside the ceiling this time. Look up.")
@@ -329,6 +529,10 @@ return {
 			CollectionService:AddTag(blob, Constants.Tags.TemporaryObject)
 			CollectionService:AddTag(blob, Constants.Tags.ObjectRainObject)
 			createMovePrompt(blob, context, random)
+			scheduleObjectRainReclaim(blob, context, matterMessageState, {
+				DecayDelay = (Constants.MatterConversion.ObjectRainDecayDelaySeconds or 150) + random:NextNumber(0, 34),
+				Delay = (Constants.MatterConversion.ObjectRainAbsorbDelaySeconds or 285) + random:NextNumber(0, 64),
+			})
 			blob.AssemblyLinearVelocity = Vector3.new(random:NextNumber(-5, 5), random:NextNumber(-42, -26), random:NextNumber(-5, 5))
 			blob.AssemblyAngularVelocity = Vector3.new(random:NextNumber(-7, 7), random:NextNumber(-7, 7), random:NextNumber(-7, 7))
 

@@ -2,6 +2,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local PlayerScale = require(script.Parent.Parent:WaitForChild("PlayerScale"))
+local RemoteService = require(script.Parent.Parent:WaitForChild("RemoteService"))
+local transformCameraRemote = RemoteService.GetRemote(Constants.Remotes.TransformCamera)
 
 return {
 	Id = "giant_player",
@@ -17,18 +19,21 @@ return {
 
 		local random = Random.new()
 		local chosenPlayer = context.Players[random:NextInteger(1, #context.Players)]
-		local snapshot = nil
 
 		local ok, errorMessage = pcall(function()
-			snapshot = PlayerScale.Apply(chosenPlayer, 2.25)
+			PlayerScale.ApplyTemporary(chosenPlayer, 2.25, Constants.SizeTransformDuration or Constants.EventDuration)
+			transformCameraRemote:FireClient(chosenPlayer, {
+				Action = "SizeTransform",
+				Scale = 2.25,
+				Duration = Constants.SizeTransformCameraDuration or 3,
+				Label = "Giant mode",
+			})
 
 			context.BroadcastMessage(chosenPlayer.DisplayName .. " is huge now. Seems fine.")
 			context.DiscoveryService:UnlockForPlayers(context.Players, Constants.Discoveries.GiantPlayer.Id)
 
-			task.wait(Constants.EventDuration)
+			task.wait(Constants.SizeTransformDuration or Constants.EventDuration)
 		end)
-
-		PlayerScale.Restore(snapshot)
 
 		if not ok then
 			error(errorMessage)

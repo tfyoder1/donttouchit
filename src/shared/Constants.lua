@@ -1,11 +1,13 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.55"
-Constants.GameIntro = "Feel free to look around. Just don't touch anything... especially the things that look like buttons."
+Constants.BuildVersion = "0.5.146"
+Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
 Constants.EventDuration = 10
 Constants.EventCooldown = 2.5
+Constants.SizeTransformDuration = 24
+Constants.SizeTransformCameraDuration = 3
 
 Constants.Room = {
 	Width = 42,
@@ -27,8 +29,13 @@ Constants.Remotes = {
 	SnackEffect = "SnackEffect",
 	FeedbackRequest = "FeedbackRequest",
 	DevTools = "DevTools",
+	MovementAuthority = "MovementAuthority",
 	VoidEffect = "VoidEffect",
 	SecurityCamera = "SecurityCamera",
+	Prologue = "Prologue",
+	TopDownArena = "TopDownArena",
+	NourishmentRecovery = "NourishmentRecovery",
+	TransformCamera = "TransformCamera",
 }
 
 Constants.Tags = {
@@ -45,6 +52,7 @@ Constants.Tags = {
 	ReferenceBook = "DontTouchIt_ReferenceBook",
 	StoreButton = "DontTouchIt_StoreButton",
 	TeleportButton = "DontTouchIt_TeleportButton",
+	FieldButton = "DontTouchIt_FieldButton",
 	SecretRoomDoor = "DontTouchIt_SecretRoomDoor",
 	SecretRoomExit = "DontTouchIt_SecretRoomExit",
 	ResetRoomButton = "DontTouchIt_ResetRoomButton",
@@ -57,6 +65,8 @@ Constants.Tags = {
 	SnackMixer = "DontTouchIt_SnackMixer",
 	SnackRack = "DontTouchIt_SnackRack",
 	SnackPack = "DontTouchIt_SnackPack",
+	SnackDonut = "DontTouchIt_SnackDonut",
+	SnackPopcornMachine = "DontTouchIt_SnackPopcornMachine",
 	FruitBowl = "DontTouchIt_FruitBowl",
 	SnackCeilingFan = "DontTouchIt_SnackCeilingFan",
 	LooseFruit = "DontTouchIt_LooseFruit",
@@ -72,6 +82,7 @@ Constants.Tags = {
 	IslandCoconut = "DontTouchIt_IslandCoconut",
 	IslandCoconutTree = "DontTouchIt_IslandCoconutTree",
 	IslandScrapWood = "DontTouchIt_IslandScrapWood",
+	IslandRock = "DontTouchIt_IslandRock",
 	IslandFireRing = "DontTouchIt_IslandFireRing",
 	IslandHiddenSkyBlock = "DontTouchIt_IslandHiddenSkyBlock",
 	IslandSpaceLadder = "DontTouchIt_IslandSpaceLadder",
@@ -80,6 +91,7 @@ Constants.Tags = {
 	TemporaryObject = "DontTouchIt_TemporaryObject",
 	LibraryBook = "DontTouchIt_LibraryBook",
 	LibraryShelf = "DontTouchIt_LibraryShelf",
+	LibraryBookStorm = "DontTouchIt_LibraryBookStorm",
 	LibraryLamp = "DontTouchIt_LibraryLamp",
 	LibraryGlobe = "DontTouchIt_LibraryGlobe",
 	LibraryCatalog = "DontTouchIt_LibraryCatalog",
@@ -116,39 +128,174 @@ Constants.Tags = {
 	SpaceStationEscapePod = "DontTouchIt_SpaceStationEscapePod",
 	CaveLight = "DontTouchIt_CaveLight",
 	CaveEntranceSeal = "DontTouchIt_CaveEntranceSeal",
+	CaveLockdownReveal = "DontTouchIt_CaveLockdownReveal",
 	CaveExitKey = "DontTouchIt_CaveExitKey",
 	CaveKeyDoor = "DontTouchIt_CaveKeyDoor",
 	CaveAlarmLight = "DontTouchIt_CaveAlarmLight",
+	CaveHallwayDoor = "DontTouchIt_CaveHallwayDoor",
+	LowerTunnelBlastDoor = "DontTouchIt_LowerTunnelBlastDoor",
+	ContributorDuckStand = "DontTouchIt_ContributorDuckStand",
+	VictoryBrickStand = "DontTouchIt_VictoryBrickStand",
+	VictoryBrick = "DontTouchIt_VictoryBrick",
+	VictoryBrickBorder = "DontTouchIt_VictoryBrickBorder",
 	SecurityMonitor = "DontTouchIt_SecurityMonitor",
 	SecurityConsole = "DontTouchIt_SecurityConsole",
 	SecurityRedPhone = "DontTouchIt_SecurityRedPhone",
 	SecurityTapeDeck = "DontTouchIt_SecurityTapeDeck",
+	SecurityPressurePlate = "DontTouchIt_SecurityPressurePlate",
+	BunkerPowerMeter = "DontTouchIt_BunkerPowerMeter",
+	ObservationMirror = "DontTouchIt_ObservationMirror",
 	SleepingBunk = "DontTouchIt_SleepingBunk",
+	SleepingMattress = "DontTouchIt_SleepingMattress",
 	SleepingAlarmClock = "DontTouchIt_SleepingAlarmClock",
 	SleepingLocker = "DontTouchIt_SleepingLocker",
 	SleepingDreamButton = "DontTouchIt_SleepingDreamButton",
 	SleepingBlanketFort = "DontTouchIt_SleepingBlanketFort",
 	SleepingPillowPile = "DontTouchIt_SleepingPillowPile",
+	SleepingIdBadge = "DontTouchIt_SleepingIdBadge",
+	InfirmaryRecoveryBed = "DontTouchIt_InfirmaryRecoveryBed",
+	InfirmaryMonitor = "DontTouchIt_InfirmaryMonitor",
+	InfirmaryCabinet = "DontTouchIt_InfirmaryCabinet",
+	InfirmaryNourishment = "DontTouchIt_InfirmaryNourishment",
+	GymTreadmill = "DontTouchIt_GymTreadmill",
+	GymBike = "DontTouchIt_GymBike",
+	GymWeights = "DontTouchIt_GymWeights",
+	GymWaterStation = "DontTouchIt_GymWaterStation",
+	TopDownCameraConsole = "DontTouchIt_TopDownCameraConsole",
+	TopDownWaterBalloonBucket = "DontTouchIt_TopDownWaterBalloonBucket",
+	TopDownTargetRing = "DontTouchIt_TopDownTargetRing",
+	TopDownSplashTarget = "DontTouchIt_TopDownSplashTarget",
+	TopDownScoreboard = "DontTouchIt_TopDownScoreboard",
 }
 
 Constants.Hallway = {
 	Id = "Hallway",
 	Name = "Hallway",
 	UnlockedRoomCount = 1,
-	TotalRoomCount = 6,
+	TotalRoomCount = 9,
 	UnlockDiscoveryFraction = 0.5,
 	Zone = {
-		Min = Vector3.new(-7.75, -3, Constants.Room.Depth / 2 - 0.5),
+		Min = Vector3.new(-35, -13, Constants.Room.Depth / 2 - 0.5),
 		Max = Vector3.new(7.75, 13, 124),
 	},
 	SpawnCFrame = CFrame.new(0, 3, 27),
 }
 
+Constants.NamedPlaces = {
+	Hallway = {
+		Id = "Hallway",
+		Name = "Main Hallway",
+		SpawnCFrame = CFrame.new(Vector3.new(0, 3, 27), Vector3.new(0, 3, 42)),
+	},
+	VictoryWalkway = {
+		Id = "VictoryWalkway",
+		Name = "Victory Walkway",
+		SpawnCFrame = CFrame.new(Vector3.new(-61, 3, 45), Vector3.new(-48, 3, 45)),
+	},
+	ObservationSecurity = {
+		Id = "ObservationSecurity",
+		Name = "OBS-SEC-01: Security Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(112, 3, -28), Vector3.new(105, 3, -28)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationTVRoom = {
+		Id = "ObservationTVRoom",
+		Name = "OBS-TV-01: TV Room Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-31, 3, 0), Vector3.new(-21, 3, 0)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationSnackLab = {
+		Id = "ObservationSnackLab",
+		Name = "OBS-SNK-01: Snack Lab Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(75, 3, 44), Vector3.new(69, 3, 44)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationIsland = {
+		Id = "ObservationIsland",
+		Name = "OBS-ISL-01: Island Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-64, 3, 160), Vector3.new(-55, 3, 160)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationLibrary = {
+		Id = "ObservationLibrary",
+		Name = "OBS-LIB-01: Library Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-38, 3, -45), Vector3.new(-32, 3, -45)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationBowling = {
+		Id = "ObservationBowling",
+		Name = "OBS-BOWL-01: Bowling Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-46, 3, -132), Vector3.new(-38, 3, -132)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationSleeping = {
+		Id = "ObservationSleeping",
+		Name = "OBS-SLEEP-01: Sleeping Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(45, 3, -188), Vector3.new(50, 3, -188)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationTopDown = {
+		Id = "ObservationTopDown",
+		Name = "OBS-TRAIN-01: Training Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(154, 5, -398), Vector3.new(146, 5, -398)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationCave = {
+		Id = "ObservationCave",
+		Name = "OBS-CAVE-01: Cave Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-88, 3, 68), Vector3.new(-88, 3, 58)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationVoid = {
+		Id = "ObservationVoid",
+		Name = "OBS-VOID-01: Void Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-120, 47, -28), Vector3.new(-110, 47, -28)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationSpace = {
+		Id = "ObservationSpace",
+		Name = "OBS-SPACE-01: Space Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(122, 84, 150), Vector3.new(116, 84, 150)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+	ObservationTreetop = {
+		Id = "ObservationTreetop",
+		Name = "OBS-ZIP-01: Zipline Observation",
+		SpawnCFrame = CFrame.new(Vector3.new(-30, 31, -220), Vector3.new(-14, 31, -220)),
+		TeleportGroup = "Observation",
+		RequiresDiscoveryId = "security_observation_mirror",
+	},
+}
+
 Constants.DataStore = {
 	Name = "DontTouchItPrototype_v1",
 	FeedbackName = "DontTouchItFeedback_v1",
+	VictoryBricksName = "DontTouchItVictoryBricks_v1",
+	VictoryBricksKey = "victory_brick_registry",
 	AutosaveSeconds = 45,
 	RetryCount = 3,
+}
+
+Constants.VictoryWalkway = {
+	CavePriorityPosition = Vector3.new(-46, 0, 55),
+	EmptyBrickText = "FUTURE\nWINNER",
+	DeluxeTextPrefix = "DELUXE",
+	StandardBrickColorA = Color3.fromRGB(180, 96, 62),
+	StandardBrickColorB = Color3.fromRGB(124, 72, 48),
+	SignedBrickColor = Color3.fromRGB(154, 82, 56),
+	DeluxeBrickColor = Color3.fromRGB(132, 82, 46),
+	GoldBorderColor = Color3.fromRGB(255, 213, 83),
 }
 
 Constants.Feedback = {
@@ -191,9 +338,141 @@ Constants.Confetti = {
 	DurationSeconds = 90,
 }
 
+Constants.Prologue = {
+	StartRoomId = "CaveEntrance",
+	ContainmentRoomId = "TVRoom",
+	CountdownSeconds = 3,
+	LightSpinUpSeconds = 30,
+	FlashlightRange = 58,
+	InspectRange = 34,
+	InspectIntervalSeconds = 0.18,
+	InspectMovementThreshold = 0.85,
+	InspectLookThresholdDegrees = 10,
+	InspectStillResampleSeconds = 4.5,
+	InspectCandidateSpreadPixels = 32,
+	InspectMaxCandidates = 5,
+	DarkLighting = {
+		Ambient = Color3.fromRGB(1, 2, 5),
+		OutdoorAmbient = Color3.fromRGB(0, 0, 0),
+		Brightness = 0.05,
+		ClockTime = 0,
+		FogStart = 16,
+		FogEnd = 120,
+		FogColor = Color3.fromRGB(4, 6, 12),
+	},
+}
+
+Constants.AudioAssets = {
+	Interface = {
+		ControlPanelInteractionId = "rbxassetid://112555741154994",
+	},
+	Prologue = {
+		OutsideCaveAmbienceId = "rbxassetid://9112764573",
+		InsideCaveAmbienceId = "rbxassetid://9112775414",
+		FirstTouchAlarmId = "rbxassetid://9113865831",
+		ComputerBootUpId = "rbxassetid://115995638665948",
+		LockdownId = "rbxassetid://9116570823",
+		LockdownDoorEchoId = "rbxassetid://9116581685",
+		DripIds = {},
+		CreakIds = {},
+	},
+}
+
+Constants.BunkerEnergy = {
+	MinimumVisualPower = 0.12,
+	NeonDimBlend = 0.72,
+	NeonExtraTransparency = 0.22,
+	LightMinimumPower = 0.18,
+	InitialWorldPowerCharge = 0,
+	WorldPowerChargeCapacity = 28,
+	WorldPowerDecaySeconds = 420,
+	WorldPowerExponent = 0.68,
+	WorldPowerPulseSeconds = 2.8,
+	ActivityPowerPerInteraction = 0.35,
+	ActivityPowerPerDiscovery = 1.15,
+	PlayerActivityPerInteraction = 0.095,
+	PlayerActivityPerDiscovery = 0.18,
+	PlayerActivityPerFruit = 0.16,
+	PlayerActivityDecaySeconds = 210,
+	PersonalProgressLightBonus = 0.12,
+	MaxPersonalLightBonus = 0.34,
+	MaxSessionPowerBonus = 0.22,
+	MaxSpeedPenalty = 0.22,
+	ProgressSpeedPenalty = 0.04,
+	MinimumSpeedScale = 0.66,
+	InitialPlayerEnergy = 1,
+	PassiveDrainPerSecond = 0.00018,
+	BunkerDrainPerSecond = 0.00105,
+	BunkerHungerExponent = 1.2,
+	BunkerHungerProgressWeight = 0.58,
+	BunkerHungerUnderfedWeight = 0.78,
+	BunkerPlayerDrainHungerThreshold = 0.34,
+	SubsystemMinimumPower = 0.14,
+	SubsystemWeakPower = 0.38,
+	SubsystemFullPower = 0.72,
+	CosmicMinimumPower = 0.2,
+	CosmicWeakPower = 0.5,
+	WalkingDrainPerStud = 0.000018,
+	WalkingDrainHungerMultiplier = 0.7,
+	MaxTrackedWalkDistancePerUpdate = 80,
+	InteractionEnergyCost = 0.009,
+	DiscoveryEnergyCost = 0.014,
+	LowEnergyWarningThreshold = 0.24,
+	LowEnergyWarningCooldownSeconds = 36,
+	PassOutThreshold = 0.025,
+	PassOutCriticalSeconds = 8,
+	RecoveryEnergyBaseline = 0.46,
+	RecoveryFadeOutSeconds = 2.1,
+	RecoveryBlackSeconds = 2,
+	RecoveryFadeInSeconds = 2.2,
+	RecoveryBeepSoundId = "rbxassetid://93825496198148",
+	RecoveryBeepVolume = 0.38,
+	InactivityEnticementHungerThreshold = 0.64,
+	InactivityEnticementCooldownSeconds = 85,
+	FruitEnergyRestore = 0.32,
+	MatterEnergyRestore = 0.18,
+	PopcornEnergyRestore = 0.12,
+	ColaEnergyRestore = 0.24,
+	MaxPocketEnergyItems = 5,
+	EnergyReserveStackLimit = 10,
+	FruitRecoverySeconds = 150,
+	FruitSpeedRelief = 0.11,
+	FruitPowerBonus = 2.2,
+	MatterReclaimPowerPerPart = 0.018,
+	UpdateIntervalSeconds = 4,
+}
+
+Constants.MatterConversion = {
+	DecayColor = Color3.fromRGB(42, 43, 42),
+	DecayLeadSeconds = 22,
+	DecayDurationSeconds = 14,
+	DecayMinimumDelaySeconds = 8,
+	ObjectRainDecayDelaySeconds = 150,
+	ObjectRainAbsorbDelaySeconds = 285,
+	ObjectRainAbsorbDurationSeconds = 3.4,
+}
+
 Constants.RoomPlay = {
 	HintIntervalSeconds = 300,
 	HintsPerInterval = 5,
+}
+
+Constants.FieldControls = {
+	{
+		Id = "LowGravity",
+		Name = "Low Gravity",
+		Description = "Gravity becomes negotiable until RESET.",
+	},
+	{
+		Id = "TinyPlayer",
+		Name = "Tiny Player",
+		Description = "Make yourself travel-size for a short while.",
+	},
+	{
+		Id = "GiantPlayer",
+		Name = "Giant Player",
+		Description = "Make yourself problem-size for a short while.",
+	},
 }
 
 Constants.FloorPressMessages = {
@@ -241,8 +520,8 @@ Constants.Discoveries = {
 	},
 	RanAppliance = {
 		Id = "ran_appliance",
-		Name = "Started the Tiny Appliance",
-		Hint = "The timer on the table is not just decoration.",
+		Name = "Started the Microwave",
+		Hint = "The microwave on the wall-side table is not just decoration.",
 	},
 	RodeCouch = {
 		Id = "rode_couch",
@@ -313,6 +592,16 @@ Constants.Discoveries = {
 		Id = "snack_rack",
 		Name = "Checked the Snack Rack",
 		Hint = "Inspect the colorful snack shelf in the Snack Lab.",
+	},
+	SnackDonut = {
+		Id = "snack_wall_donut",
+		Name = "Admired the Wall Donut",
+		Hint = "The Snack Lab has one snack too large for any plate.",
+	},
+	SnackPopcorn = {
+		Id = "snack_popcorn_machine",
+		Name = "Started the Popcorn Machine",
+		Hint = "The popcorn machine near the Snack Lab wall is not just for decoration.",
 	},
 	HeardSnackSound = {
 		Id = "heard_snack_sound",
@@ -388,6 +677,11 @@ Constants.Discoveries = {
 		Id = "island_driftwood",
 		Name = "Collected Driftwood",
 		Hint = "Look near the island edges for scraps of wood.",
+	},
+	IslandCollectedRock = {
+		Id = "island_collected_rock",
+		Name = "Collected a Very Official Rock",
+		Hint = "The small beach rocks are portable, which is probably a clue.",
 	},
 	IslandCampfire = {
 		Id = "island_campfire",
@@ -478,6 +772,11 @@ Constants.Discoveries = {
 		Id = "library_shushed_shelf",
 		Name = "Got Shushed by a Shelf",
 		Hint = "A tall Library shelf reacts if inspected directly.",
+	},
+	LibraryBookStorm = {
+		Id = "library_book_storm",
+		Name = "Started a Book Storm",
+		Hint = "A suspiciously loose Library book may object to being shelved.",
 	},
 	LibraryLamp = {
 		Id = "library_lamp",
@@ -624,6 +923,11 @@ Constants.Discoveries = {
 		Name = "Left the Void Alone",
 		Hint = "Stand in the Void for two minutes without interacting with anything. The Void takes this personally.",
 	},
+	CaveEntered = {
+		Id = "cave_entered",
+		Name = "Found the Lit Cave",
+		Hint = "Start at the cave entrance and follow the suspicious electric glow.",
+	},
 	CaveFirstLight = {
 		Id = "cave_first_light",
 		Name = "Touched the First Cave Light",
@@ -643,6 +947,11 @@ Constants.Discoveries = {
 		Id = "cave_opened_door",
 		Name = "Opened the Cave Door",
 		Hint = "The long tunnel ends at a door shaped like the key from the desk.",
+	},
+	LowerTunnelBlastDoor = {
+		Id = "lower_tunnel_blast_door",
+		Name = "Found the Lower Blast Doors",
+		Hint = "Before paradise, look for the open stairwell down to the duck pond tunnel.",
 	},
 	SecurityEntered = {
 		Id = "security_entered",
@@ -674,6 +983,11 @@ Constants.Discoveries = {
 		Name = "Reviewed the Tape",
 		Hint = "The Security room stores footage in a suspiciously chunky machine.",
 	},
+	SecurityObservationMirror = {
+		Id = "security_observation_mirror",
+		Name = "Found the Observation Glass",
+		Hint = "Security has one mirror that is much too interested in both sides.",
+	},
 	SleepingEntered = {
 		Id = "sleeping_entered",
 		Name = "Entered Sleeping Quarters",
@@ -691,8 +1005,13 @@ Constants.Discoveries = {
 	},
 	SleepingLocker = {
 		Id = "sleeping_locker",
-		Name = "Opened the Whisper Locker",
-		Hint = "There is a locker in Sleeping Quarters that seems overqualified.",
+		Name = "Opened the Cleaning Supplies Locker",
+		Hint = "There is a wall locker in Sleeping Quarters with suspiciously tidy equipment.",
+	},
+	SleepingAllLockers = {
+		Id = "sleeping_all_lockers",
+		Name = "Checked Every Bunk Locker",
+		Hint = "The little lockers between the bunks each want a quick inspection.",
 	},
 	SleepingDreamButton = {
 		Id = "sleeping_dream_button",
@@ -709,19 +1028,126 @@ Constants.Discoveries = {
 		Name = "Disturbed the Pillow Pile",
 		Hint = "The pillow pile is not structural, probably.",
 	},
+	SleepingIdBadge = {
+		Id = "sleeping_id_badge",
+		Name = "Found the ID Badge",
+		Hint = "Sleeping Quarters has one badge left behind by someone who wanted doors to stop asking questions.",
+	},
 	SleepingNoTouch = {
 		Id = "sleeping_no_touch",
 		Name = "Left the Sleeping Quarters Alone",
 		Hint = "Stand in Sleeping Quarters for two minutes without interacting with anything.",
 	},
+	InfirmaryEntered = {
+		Id = "infirmary_entered",
+		Name = "Found the Infirmary",
+		Hint = "Sleeping Quarters has a midpoint branch that does not look newly installed.",
+	},
+	InfirmaryRecoveryBed = {
+		Id = "infirmary_recovery_bed",
+		Name = "Inspected the Recovery Bed",
+		Hint = "The primary medical bed is set apart from the others, as if it expects company.",
+	},
+	InfirmaryMonitor = {
+		Id = "infirmary_monitor",
+		Name = "Read the Patient Monitor",
+		Hint = "The old monitor near the recovery bed knows more about your condition than it should.",
+	},
+	InfirmaryCabinet = {
+		Id = "infirmary_cabinet",
+		Name = "Opened the Neatest Cabinet",
+		Hint = "One Infirmary cabinet is unusually well stocked for a place this old.",
+	},
+	InfirmaryNourishment = {
+		Id = "infirmary_nourishment",
+		Name = "Accepted Stabilization Snack",
+		Hint = "There is food and water near the recovery bed, left where a waking person would see it.",
+	},
+	InfirmaryNoTouch = {
+		Id = "infirmary_no_touch",
+		Name = "Left the Infirmary Alone",
+		Hint = "Stand in the Infirmary for two minutes without interacting with anything.",
+	},
+	GymEntered = {
+		Id = "gym_entered",
+		Name = "Found Physical Conditioning",
+		Hint = "The Sleeping Quarters midpoint branch also leads upward toward a room with exercise equipment.",
+	},
+	GymTreadmill = {
+		Id = "gym_treadmill",
+		Name = "Tested Tomorrow's Treadmill",
+		Hint = "The Gym treadmill looks like it tracks more than distance.",
+	},
+	GymBike = {
+		Id = "gym_bike",
+		Name = "Pedaled for the System",
+		Hint = "The stationary bike has cables that disappear into the wall.",
+	},
+	GymWeights = {
+		Id = "gym_weights",
+		Name = "Lifted Approved Mass",
+		Hint = "The free weights are arranged like someone still checks inventory.",
+	},
+	GymWaterStation = {
+		Id = "gym_water_station",
+		Name = "Used the Recovery Fountain",
+		Hint = "The Gym water station is clean enough to be suspicious.",
+	},
+	GymNoTouch = {
+		Id = "gym_no_touch",
+		Name = "Left the Gym Alone",
+		Hint = "Stand in the Gym for two minutes without interacting with anything.",
+	},
+	TopDownEntered = {
+		Id = "top_down_entered",
+		Name = "Entered the Training Arena",
+		Hint = "Go through the arena door at the back of Sleeping Quarters.",
+	},
+	TopDownCamera = {
+		Id = "top_down_camera",
+		Name = "Looked From Above",
+		Hint = "The arena changes your view from above. The camera console explains itself if inspected.",
+	},
+	TopDownWaterBalloon = {
+		Id = "top_down_water_balloon",
+		Name = "Threw a Water Balloon",
+		Hint = "Use one of the water balloon buckets around the Training Arena.",
+	},
+	TopDownRingScore = {
+		Id = "top_down_ring_score",
+		Name = "Lobbed One Into the Ring",
+		Hint = "If nobody else is nearby, a water balloon bucket lobs toward the big target ring.",
+	},
+	TopDownPlayerSplash = {
+		Id = "top_down_player_splash",
+		Name = "Splashed a Moving Target",
+		Hint = "Use a water balloon bucket while another player or the practice target is inside the arena.",
+	},
+	TopDownBucketRefill = {
+		Id = "top_down_bucket_refill",
+		Name = "Trusted the Refill Bucket",
+		Hint = "The bucket near the glowing pipe has extra water balloons and very little supervision.",
+	},
+	TopDownScoreboard = {
+		Id = "top_down_scoreboard",
+		Name = "Checked the Splash Score",
+		Hint = "The arena scoreboard is keeping track of questionable accuracy.",
+	},
+	TopDownNoTouch = {
+		Id = "top_down_no_touch",
+		Name = "Left the Arena Alone",
+		Hint = "Stand in the Training Arena for two minutes without interacting with anything.",
+	},
 }
 
 Constants.RoomDiscoveryOrder = {
 	CaveEntrance = {
+		Constants.Discoveries.CaveEntered.Id,
 		Constants.Discoveries.CaveFirstLight.Id,
 		Constants.Discoveries.CaveChangedLights.Id,
 		Constants.Discoveries.CaveExitKey.Id,
 		Constants.Discoveries.CaveOpenedDoor.Id,
+		Constants.Discoveries.LowerTunnelBlastDoor.Id,
 	},
 	SecurityRoom = {
 		Constants.Discoveries.SecurityEntered.Id,
@@ -730,16 +1156,45 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.SecurityScreenButton.Id,
 		Constants.Discoveries.SecurityRedPhone.Id,
 		Constants.Discoveries.SecurityTapeDeck.Id,
+		Constants.Discoveries.SecurityObservationMirror.Id,
 	},
 	SleepingQuarters = {
 		Constants.Discoveries.SleepingEntered.Id,
 		Constants.Discoveries.SleepingCountedBunks.Id,
 		Constants.Discoveries.SleepingAlarmClock.Id,
 		Constants.Discoveries.SleepingLocker.Id,
+		Constants.Discoveries.SleepingAllLockers.Id,
 		Constants.Discoveries.SleepingDreamButton.Id,
 		Constants.Discoveries.SleepingBlanketFort.Id,
 		Constants.Discoveries.SleepingPillowPile.Id,
+		Constants.Discoveries.SleepingIdBadge.Id,
 		Constants.Discoveries.SleepingNoTouch.Id,
+	},
+	Infirmary = {
+		Constants.Discoveries.InfirmaryEntered.Id,
+		Constants.Discoveries.InfirmaryRecoveryBed.Id,
+		Constants.Discoveries.InfirmaryMonitor.Id,
+		Constants.Discoveries.InfirmaryCabinet.Id,
+		Constants.Discoveries.InfirmaryNourishment.Id,
+		Constants.Discoveries.InfirmaryNoTouch.Id,
+	},
+	Gym = {
+		Constants.Discoveries.GymEntered.Id,
+		Constants.Discoveries.GymTreadmill.Id,
+		Constants.Discoveries.GymBike.Id,
+		Constants.Discoveries.GymWeights.Id,
+		Constants.Discoveries.GymWaterStation.Id,
+		Constants.Discoveries.GymNoTouch.Id,
+	},
+	TopDownArena = {
+		Constants.Discoveries.TopDownEntered.Id,
+		Constants.Discoveries.TopDownCamera.Id,
+		Constants.Discoveries.TopDownWaterBalloon.Id,
+		Constants.Discoveries.TopDownRingScore.Id,
+		Constants.Discoveries.TopDownPlayerSplash.Id,
+		Constants.Discoveries.TopDownBucketRefill.Id,
+		Constants.Discoveries.TopDownScoreboard.Id,
+		Constants.Discoveries.TopDownNoTouch.Id,
 	},
 	TVRoom = {
 		Constants.Discoveries.PressedButton.Id,
@@ -766,6 +1221,8 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.AngrySink.Id,
 		Constants.Discoveries.MixedCloud.Id,
 		Constants.Discoveries.SnackRack.Id,
+		Constants.Discoveries.SnackDonut.Id,
+		Constants.Discoveries.SnackPopcorn.Id,
 		Constants.Discoveries.HeardSnackSound.Id,
 		Constants.Discoveries.AllSnackSounds.Id,
 		Constants.Discoveries.LivingFruit.Id,
@@ -782,6 +1239,7 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.IslandCoconutCrab.Id,
 		Constants.Discoveries.IslandDroppedCoconut.Id,
 		Constants.Discoveries.IslandDriftwood.Id,
+		Constants.Discoveries.IslandCollectedRock.Id,
 		Constants.Discoveries.IslandCampfire.Id,
 		Constants.Discoveries.IslandSeagulls.Id,
 		Constants.Discoveries.IslandNoTouch.Id,
@@ -803,6 +1261,7 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.LibraryEntered.Id,
 		Constants.Discoveries.LibraryForbiddenBook.Id,
 		Constants.Discoveries.LibraryShushedShelf.Id,
+		Constants.Discoveries.LibraryBookStorm.Id,
 		Constants.Discoveries.LibraryLamp.Id,
 		Constants.Discoveries.LibraryGlobe.Id,
 		Constants.Discoveries.LibraryCatalog.Id,
@@ -889,6 +1348,9 @@ Constants.RoomOrder = {
 	"CaveEntrance",
 	"SecurityRoom",
 	"SleepingQuarters",
+	"Infirmary",
+	"Gym",
+	"TopDownArena",
 	"SnackLab",
 	"Island",
 }
@@ -897,6 +1359,9 @@ Constants.DiscoveryRoomOrder = {
 	"CaveEntrance",
 	"SecurityRoom",
 	"SleepingQuarters",
+	"Infirmary",
+	"Gym",
+	"TopDownArena",
 	"TVRoom",
 	"SnackLab",
 	"Island",
@@ -911,6 +1376,9 @@ Constants.RoomDetectionOrder = {
 	"CaveEntrance",
 	"SecurityRoom",
 	"SleepingQuarters",
+	"Infirmary",
+	"Gym",
+	"TopDownArena",
 	"TVRoom",
 	"SnackLab",
 	"Island",
@@ -922,9 +1390,12 @@ Constants.RoomDetectionOrder = {
 }
 
 Constants.RoomResumeDiscoveries = {
-	CaveEntrance = Constants.Discoveries.CaveFirstLight.Id,
+	CaveEntrance = Constants.Discoveries.CaveEntered.Id,
 	SecurityRoom = Constants.Discoveries.SecurityEntered.Id,
 	SleepingQuarters = Constants.Discoveries.SleepingEntered.Id,
+	Infirmary = Constants.Discoveries.InfirmaryEntered.Id,
+	Gym = Constants.Discoveries.GymEntered.Id,
+	TopDownArena = Constants.Discoveries.TopDownEntered.Id,
 	Library = Constants.Discoveries.LibraryEntered.Id,
 	BowlingAlley = Constants.Discoveries.BowlingEntered.Id,
 	TreetopZipline = Constants.Discoveries.TreetopZiplineEntered.Id,
@@ -937,10 +1408,10 @@ Constants.Rooms = {
 		Id = "CaveEntrance",
 		Name = "Cave Entrance",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.CaveEntrance,
-		SpawnCFrame = CFrame.new(Vector3.new(-55, 3, 45), Vector3.new(-82, 3, 45)),
+		SpawnCFrame = CFrame.new(Vector3.new(-56.5, 5.2, 45), Vector3.new(-46.8, 5.2, 45)),
 		Zone = {
 			Min = Vector3.new(-155, -28, -155),
-			Max = Vector3.new(-42, 18, 70),
+			Max = Vector3.new(-10, 18, 70),
 		},
 	},
 	SecurityRoom = {
@@ -958,10 +1429,43 @@ Constants.Rooms = {
 		Name = "Sleeping Quarters",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.SleepingQuarters,
 		NoTouchDiscoveryId = Constants.Discoveries.SleepingNoTouch.Id,
-		SpawnCFrame = CFrame.new(Vector3.new(82, 3, -52), Vector3.new(82, 3, -122)),
+		SpawnCFrame = CFrame.new(Vector3.new(82, 4.2, -58), Vector3.new(82, 4.2, -122)),
 		Zone = {
-			Min = Vector3.new(50, -3, -222),
-			Max = Vector3.new(114, 22, -48),
+			Min = Vector3.new(48, -3, -331),
+			Max = Vector3.new(116, 34, -48),
+		},
+	},
+	Infirmary = {
+		Id = "Infirmary",
+		Name = "Infirmary",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.Infirmary,
+		NoTouchDiscoveryId = Constants.Discoveries.InfirmaryNoTouch.Id,
+		SpawnCFrame = CFrame.new(Vector3.new(157, 4.2, -154), Vector3.new(180, 4.2, -154)),
+		Zone = {
+			Min = Vector3.new(124, -3, -181),
+			Max = Vector3.new(204, 25, -122),
+		},
+	},
+	Gym = {
+		Id = "Gym",
+		Name = "Gym",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.Gym,
+		NoTouchDiscoveryId = Constants.Discoveries.GymNoTouch.Id,
+		SpawnCFrame = CFrame.new(Vector3.new(157, 10.2, -224), Vector3.new(180, 10.2, -224)),
+		Zone = {
+			Min = Vector3.new(124, 1, -264),
+			Max = Vector3.new(206, 36, -188),
+		},
+	},
+	TopDownArena = {
+		Id = "TopDownArena",
+		Name = "Training Arena",
+		DiscoveryOrder = Constants.RoomDiscoveryOrder.TopDownArena,
+		NoTouchDiscoveryId = Constants.Discoveries.TopDownNoTouch.Id,
+		SpawnCFrame = CFrame.new(Vector3.new(82, 5, -382), Vector3.new(82, 5, -436)),
+		Zone = {
+			Min = Vector3.new(18, -3, -466),
+			Max = Vector3.new(146, 44, -330),
 		},
 	},
 	TVRoom = {
@@ -1002,7 +1506,7 @@ Constants.Rooms = {
 		Name = "Space Station",
 		DiscoveryOrder = Constants.RoomDiscoveryOrder.SpaceStation,
 		NoTouchDiscoveryId = Constants.Discoveries.SpaceStationNoTouch.Id,
-		SpawnCFrame = CFrame.new(Vector3.new(92, 83, 156), Vector3.new(92, 83, 145)),
+		SpawnCFrame = CFrame.new(Vector3.new(92, 84, 150), Vector3.new(92, 84, 140)),
 		Zone = {
 			Min = Vector3.new(66, 76, 126),
 			Max = Vector3.new(118, 106, 176),
@@ -1054,6 +1558,14 @@ Constants.Rooms = {
 }
 
 Constants.RoomUnlockRules = {
+	SecurityRoom = {
+		RequiredRoomId = "SleepingQuarters",
+		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
+	},
+	TopDownArena = {
+		RequiredRoomId = "SleepingQuarters",
+		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
+	},
 	SnackLab = {
 		RequiredRoomId = "TVRoom",
 		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
@@ -1086,6 +1598,8 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.AngrySink.Id] = Constants.Tags.SnackSink,
 	[Constants.Discoveries.MixedCloud.Id] = Constants.Tags.SnackMixer,
 	[Constants.Discoveries.SnackRack.Id] = Constants.Tags.SnackRack,
+	[Constants.Discoveries.SnackDonut.Id] = Constants.Tags.SnackDonut,
+	[Constants.Discoveries.SnackPopcorn.Id] = Constants.Tags.SnackPopcornMachine,
 	[Constants.Discoveries.HeardSnackSound.Id] = Constants.Tags.SnackPack,
 	[Constants.Discoveries.AllSnackSounds.Id] = Constants.Tags.SnackPack,
 	[Constants.Discoveries.LivingFruit.Id] = Constants.Tags.FruitBowl,
@@ -1099,6 +1613,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.IslandCoconutCrab.Id] = Constants.Tags.IslandCoconut,
 	[Constants.Discoveries.IslandDroppedCoconut.Id] = Constants.Tags.IslandCoconutTree,
 	[Constants.Discoveries.IslandDriftwood.Id] = Constants.Tags.IslandScrapWood,
+	[Constants.Discoveries.IslandCollectedRock.Id] = Constants.Tags.IslandRock,
 	[Constants.Discoveries.IslandCampfire.Id] = Constants.Tags.IslandFireRing,
 	[Constants.Discoveries.IslandSeagulls.Id] = Constants.Tags.IslandCoconut,
 	[Constants.Discoveries.SpaceStationAirlock.Id] = Constants.Tags.SpaceStationAirlock,
@@ -1114,6 +1629,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.LibraryEntered.Id] = Constants.Tags.SecretRoomDoor,
 	[Constants.Discoveries.LibraryForbiddenBook.Id] = Constants.Tags.LibraryBook,
 	[Constants.Discoveries.LibraryShushedShelf.Id] = Constants.Tags.LibraryShelf,
+	[Constants.Discoveries.LibraryBookStorm.Id] = Constants.Tags.LibraryBookStorm,
 	[Constants.Discoveries.LibraryLamp.Id] = Constants.Tags.LibraryLamp,
 	[Constants.Discoveries.LibraryGlobe.Id] = Constants.Tags.LibraryGlobe,
 	[Constants.Discoveries.LibraryCatalog.Id] = Constants.Tags.LibraryCatalog,
@@ -1140,23 +1656,45 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.VoidGravityFlip.Id] = Constants.Tags.VoidGravityOrb,
 	[Constants.Discoveries.VoidEcho.Id] = Constants.Tags.VoidEchoButton,
 	[Constants.Discoveries.VoidFreezeRay.Id] = Constants.Tags.VoidFreezeRay,
+	[Constants.Discoveries.CaveEntered.Id] = Constants.Tags.CaveHallwayDoor,
 	[Constants.Discoveries.CaveFirstLight.Id] = Constants.Tags.CaveLight,
 	[Constants.Discoveries.CaveChangedLights.Id] = Constants.Tags.CaveLight,
 	[Constants.Discoveries.CaveExitKey.Id] = Constants.Tags.CaveExitKey,
 	[Constants.Discoveries.CaveOpenedDoor.Id] = Constants.Tags.CaveKeyDoor,
+	[Constants.Discoveries.LowerTunnelBlastDoor.Id] = Constants.Tags.LowerTunnelBlastDoor,
 	[Constants.Discoveries.SecurityEntered.Id] = Constants.Tags.HallDoor,
 	[Constants.Discoveries.SecurityMonitorWall.Id] = Constants.Tags.SecurityMonitor,
 	[Constants.Discoveries.SecurityCameraView.Id] = Constants.Tags.SecurityMonitor,
 	[Constants.Discoveries.SecurityScreenButton.Id] = Constants.Tags.SecurityMonitor,
 	[Constants.Discoveries.SecurityRedPhone.Id] = Constants.Tags.SecurityRedPhone,
 	[Constants.Discoveries.SecurityTapeDeck.Id] = Constants.Tags.SecurityTapeDeck,
+	[Constants.Discoveries.SecurityObservationMirror.Id] = Constants.Tags.ObservationMirror,
 	[Constants.Discoveries.SleepingEntered.Id] = Constants.Tags.HallDoor,
 	[Constants.Discoveries.SleepingCountedBunks.Id] = Constants.Tags.SleepingBunk,
 	[Constants.Discoveries.SleepingAlarmClock.Id] = Constants.Tags.SleepingAlarmClock,
 	[Constants.Discoveries.SleepingLocker.Id] = Constants.Tags.SleepingLocker,
+	[Constants.Discoveries.SleepingAllLockers.Id] = Constants.Tags.SleepingLocker,
 	[Constants.Discoveries.SleepingDreamButton.Id] = Constants.Tags.SleepingDreamButton,
 	[Constants.Discoveries.SleepingBlanketFort.Id] = Constants.Tags.SleepingBlanketFort,
 	[Constants.Discoveries.SleepingPillowPile.Id] = Constants.Tags.SleepingPillowPile,
+	[Constants.Discoveries.SleepingIdBadge.Id] = Constants.Tags.SleepingIdBadge,
+	[Constants.Discoveries.InfirmaryEntered.Id] = Constants.Tags.InfirmaryRecoveryBed,
+	[Constants.Discoveries.InfirmaryRecoveryBed.Id] = Constants.Tags.InfirmaryRecoveryBed,
+	[Constants.Discoveries.InfirmaryMonitor.Id] = Constants.Tags.InfirmaryMonitor,
+	[Constants.Discoveries.InfirmaryCabinet.Id] = Constants.Tags.InfirmaryCabinet,
+	[Constants.Discoveries.InfirmaryNourishment.Id] = Constants.Tags.InfirmaryNourishment,
+	[Constants.Discoveries.GymEntered.Id] = Constants.Tags.GymTreadmill,
+	[Constants.Discoveries.GymTreadmill.Id] = Constants.Tags.GymTreadmill,
+	[Constants.Discoveries.GymBike.Id] = Constants.Tags.GymBike,
+	[Constants.Discoveries.GymWeights.Id] = Constants.Tags.GymWeights,
+	[Constants.Discoveries.GymWaterStation.Id] = Constants.Tags.GymWaterStation,
+	[Constants.Discoveries.TopDownEntered.Id] = Constants.Tags.HallDoor,
+	[Constants.Discoveries.TopDownCamera.Id] = Constants.Tags.TopDownCameraConsole,
+	[Constants.Discoveries.TopDownWaterBalloon.Id] = Constants.Tags.TopDownWaterBalloonBucket,
+	[Constants.Discoveries.TopDownRingScore.Id] = Constants.Tags.TopDownTargetRing,
+	[Constants.Discoveries.TopDownPlayerSplash.Id] = Constants.Tags.TopDownSplashTarget,
+	[Constants.Discoveries.TopDownBucketRefill.Id] = Constants.Tags.TopDownWaterBalloonBucket,
+	[Constants.Discoveries.TopDownScoreboard.Id] = Constants.Tags.TopDownScoreboard,
 }
 
 Constants.NoTouch = {
@@ -1180,6 +1718,10 @@ Constants.NoTouch = {
 	SecretKeyClueCost = 3,
 	TeleportKeyClueCost = 3,
 	TeleportKeyRobux = 5,
+	DuckFounderRobux = 80000,
+	DuckFounderProductId = 0,
+	VictoryBrickRobux = 8000,
+	VictoryBrickProductId = 0,
 }
 
 Constants.DiscoveryOrder = {}
@@ -1206,6 +1748,10 @@ function Constants.GetRoom(roomId)
 	return Constants.Rooms[roomId]
 end
 
+function Constants.GetNamedPlace(placeId)
+	return Constants.NamedPlaces[placeId]
+end
+
 function Constants.GetRoomUnlockRequirement(roomId)
 	local rule = Constants.RoomUnlockRules[roomId]
 	if not rule then
@@ -1227,6 +1773,15 @@ function Constants.GetRoomSpawnCFrame(roomId)
 	end
 
 	return Constants.Rooms.TVRoom.SpawnCFrame
+end
+
+function Constants.GetNamedPlaceCFrame(placeId)
+	local place = Constants.NamedPlaces[placeId]
+	if place and place.SpawnCFrame then
+		return place.SpawnCFrame
+	end
+
+	return Constants.Hallway.SpawnCFrame
 end
 
 return Constants

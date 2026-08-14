@@ -2,6 +2,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local PlayerScale = require(script.Parent.Parent:WaitForChild("PlayerScale"))
+local RemoteService = require(script.Parent.Parent:WaitForChild("RemoteService"))
+local transformCameraRemote = RemoteService.GetRemote(Constants.Remotes.TransformCamera)
 
 return {
 	Id = "tiny_players",
@@ -10,23 +12,20 @@ return {
 	StartMessage = "Everyone has been made travel-size.",
 
 	Run = function(context)
-		local snapshots = {}
-
 		local ok, errorMessage = pcall(function()
 			for _, player in ipairs(context.Players) do
-				local snapshot = PlayerScale.Apply(player, 0.45)
-				if snapshot then
-					table.insert(snapshots, snapshot)
-				end
+				PlayerScale.ApplyTemporary(player, 0.45, Constants.SizeTransformDuration or Constants.EventDuration)
+				transformCameraRemote:FireClient(player, {
+					Action = "SizeTransform",
+					Scale = 0.45,
+					Duration = Constants.SizeTransformCameraDuration or 3,
+					Label = "Tiny mode",
+				})
 			end
 
 			context.DiscoveryService:UnlockForPlayers(context.Players, Constants.Discoveries.TinyPlayers.Id)
-			task.wait(Constants.EventDuration)
+			task.wait(Constants.SizeTransformDuration or Constants.EventDuration)
 		end)
-
-		for _, snapshot in ipairs(snapshots) do
-			PlayerScale.Restore(snapshot)
-		end
 
 		if not ok then
 			error(errorMessage)

@@ -86,6 +86,9 @@ local TV_SOUND_IDS = {
 	TestTone = "rbxasset://sounds/electronicpingshort.wav",
 	Warning = "rbxasset://sounds/snap.wav",
 }
+local CONTROL_PANEL_SOUND_ID = if Constants.AudioAssets and Constants.AudioAssets.Interface
+	then Constants.AudioAssets.Interface.ControlPanelInteractionId
+	else "rbxassetid://112555741154994"
 
 local SNACK_BUTTON_ACTIVITIES = {
 	"flight",
@@ -101,6 +104,18 @@ local SNACK_SLOW_MOTION_DURATION = 12
 local SNACK_SUPER_WIND_GUSTS = 5
 local SNACK_MIXER_WEATHER_DURATION = 35
 local SECURITY_CAMERA_DURATION = 45
+local TOP_DOWN_THROW_COOLDOWN = 0.75
+local TOP_DOWN_BALLOON_LIFETIME = 5.5
+local TOP_DOWN_RING_SCORE_RADIUS = 15
+local TOP_DOWN_MAX_LOADED_BALLOONS = 6
+local TOP_DOWN_DEFAULT_LOAD_COUNT = 3
+local TOP_DOWN_REFILL_LOAD_COUNT = 5
+local TOP_DOWN_THROW_DISTANCE = 58
+local TOP_DOWN_THROW_ACTION = "Throw"
+local TELEPORT_LANDING_LIFT = Vector3.new(0, 2.6, 0)
+local BUNKER_RECLAIM_MESSAGE_COOLDOWN = 24
+local OBJECT_RAIN_SORT_COOLDOWN = 3.5
+local OBJECT_RAIN_SORT_UPPER_Y = Constants.Room.FloorY - 3.5
 
 local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(119, 255, 203),
@@ -240,6 +255,19 @@ local function getRootPart(player)
 	return character:FindFirstChild("HumanoidRootPart")
 end
 
+local function getPlayerFromHit(hit)
+	if not hit then
+		return nil
+	end
+
+	local character = hit:FindFirstAncestorOfClass("Model")
+	if not character or not character:FindFirstChildOfClass("Humanoid") then
+		return nil
+	end
+
+	return Players:GetPlayerFromCharacter(character)
+end
+
 local function teleportPlayer(player, destinationCFrame)
 	local rootPart = getRootPart(player)
 	if not rootPart or typeof(destinationCFrame) ~= "CFrame" then
@@ -248,7 +276,7 @@ local function teleportPlayer(player, destinationCFrame)
 
 	rootPart.AssemblyLinearVelocity = Vector3.zero
 	rootPart.AssemblyAngularVelocity = Vector3.zero
-	rootPart.CFrame = destinationCFrame
+	rootPart.CFrame = destinationCFrame + TELEPORT_LANDING_LIFT
 end
 
 local function positionInZone(position, zone)
@@ -321,6 +349,50 @@ local function playSound(parent, soundId, volume, playbackSpeed)
 	sound.Parent = parent
 	sound:Play()
 	Debris:AddItem(sound, 3)
+end
+
+local function isControlPanelInteraction(instance)
+	local current = instance
+	while current do
+		if current:GetAttribute("StrictPromptTargets") == true then
+			return true
+		end
+		current = current.Parent
+	end
+
+	return false
+end
+
+local function playControlPanelSound(parent, volume, playbackSpeed)
+	playSound(parent, CONTROL_PANEL_SOUND_ID, volume or 0.48, playbackSpeed or 1)
+end
+
+local function playLoopedSpatialSound(parent, name, soundId, options)
+	if not parent or not parent.Parent or not soundId then
+		return nil
+	end
+	options = options or {}
+
+	local existing = parent:FindFirstChild(name)
+	if existing and existing:IsA("Sound") then
+		if not existing.IsPlaying then
+			existing:Play()
+		end
+		return existing
+	end
+
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.SoundId = soundId
+	sound.Volume = options.Volume or 0.5
+	sound.PlaybackSpeed = options.PlaybackSpeed or 1
+	sound.Looped = true
+	sound.RollOffMode = options.RollOffMode or Enum.RollOffMode.InverseTapered
+	sound.RollOffMinDistance = options.RollOffMinDistance or 8
+	sound.RollOffMaxDistance = options.RollOffMaxDistance or 45
+	sound.Parent = parent
+	sound:Play()
+	return sound
 end
 
 local function getInstanceAndDescendants(root)
@@ -398,16 +470,21 @@ local function getMaterialByName(materialName)
 	return nil
 end
 
-function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService)
+function InteractionService.new(eventManager, discoveryService, resetService, roomProgressService, movementAuthorityService, bunkerEnergyService, victoryBrickService)
 	local self = setmetatable({}, InteractionService)
 	self.eventManager = eventManager
 	self.discoveryService = discoveryService
 	self.resetService = resetService
 	self.roomProgressService = roomProgressService
+	self.movementAuthorityService = movementAuthorityService
+	self.bunkerEnergyService = bunkerEnergyService
+	self.victoryBrickService = victoryBrickService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.snackEffectRemote = RemoteService.GetRemote(Constants.Remotes.SnackEffect)
 	self.voidEffectRemote = RemoteService.GetRemote(Constants.Remotes.VoidEffect)
 	self.securityCameraRemote = RemoteService.GetRemote(Constants.Remotes.SecurityCamera)
+	self.topDownArenaRemote = RemoteService.GetRemote(Constants.Remotes.TopDownArena)
+	self.transformCameraRemote = RemoteService.GetRemote(Constants.Remotes.TransformCamera)
 	self.connectedPrompts = {}
 	self.snackButtonRandom = Random.new()
 	self.couchState = {}
@@ -435,6 +512,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.sinkState = {}
 	self.mixerState = {}
 	self.snackRackState = {}
+	self.snackPopcornState = {}
 	self.snackPackStateByUserId = {}
 	self.slowMotionTokensByHumanoid = {}
 	self.windStormTokensByHumanoid = {}
@@ -447,20 +525,25 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.islandTreasureState = {}
 	self.islandColaState = {}
 	self.islandCoconutState = {}
-		self.islandCoconutTreeState = {}
-		self.islandScrapWoodState = {}
-		self.islandWoodCountByUserId = {}
-		self.islandFireRingState = {}
-		self.islandSkyBlockState = {}
-		self.islandSpaceLadderState = {}
-		self.spaceStationState = {}
-		self.teleportCooldownByUserId = {}
-		self.secretDoorState = {}
+	self.islandCoconutTreeState = {}
+	self.islandScrapWoodState = {}
+	self.islandRockState = {}
+	self.islandWoodCountByUserId = {}
+	self.islandRockCountByUserId = {}
+	self.islandFireRingState = {}
+	self.islandSkyBlockState = {}
+	self.islandSpaceLadderState = {}
+	self.islandResourceRandom = Random.new()
+	self.islandResourceLoopStarted = false
+	self.spaceStationState = {}
+	self.teleportCooldownByUserId = {}
+	self.secretDoorState = {}
 	self.libraryLampState = {}
 	self.libraryGlobeState = {}
 	self.libraryLadderState = {}
 	self.libraryLoftDoorState = {}
 	self.libraryBookcaseState = {}
+	self.libraryBookStormState = {}
 	self.bowlingLaneState = {}
 	self.bowlingLaneCounts = {
 		[1] = 0,
@@ -477,9 +560,87 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.caveLightState = {}
 	self.caveEntranceSealed = false
 	self.caveAlarmActive = false
+	self.caveHallDoorLockedByUserId = {}
 	self.securityCameraSessionByUserId = {}
+	self.securityPressurePlateState = {
+		Badge = false,
+		Weight = false,
+		Unlocked = false,
+	}
 	self.sleepingAlarmStateByUserId = {}
+	self.sleepingLockerCheckedByUserId = {}
+	self.sleepingMattressBounceAtByHumanoid = {}
+	self.topDownScoresByUserId = {}
+	self.topDownThrowsByUserId = {}
+	self.topDownLastThrowByUserId = {}
+	self.topDownLoadedBalloonsByUserId = {}
+	self.topDownBucketTouchAtByUserId = {}
+	self.topDownPracticeTargetState = {}
+	self.topDownCameraMode = "Overhead"
+	self.bunkerReclaimMessageAtByKey = {}
+	self.objectRainSortLastAt = 0
+	self.objectRainSortRandom = Random.new()
 	return self
+end
+
+function InteractionService:_teleportPlayer(player, destinationCFrame, reason)
+	if self.movementAuthorityService and self.movementAuthorityService.TeleportPlayer then
+		local success = self.movementAuthorityService:TeleportPlayer(player, destinationCFrame, reason)
+		if success and self.roomProgressService and self.roomProgressService.RememberSafeSpawn then
+			self.roomProgressService:RememberSafeSpawn(player, destinationCFrame)
+		end
+		return success
+	end
+
+	teleportPlayer(player, destinationCFrame)
+	if self.roomProgressService and self.roomProgressService.RememberSafeSpawn then
+		self.roomProgressService:RememberSafeSpawn(player, destinationCFrame)
+	end
+	return true
+end
+
+function InteractionService:_applyImpulse(player, velocity, reason)
+	if self.movementAuthorityService and self.movementAuthorityService.ApplyImpulse then
+		return self.movementAuthorityService:ApplyImpulse(player, velocity, reason)
+	end
+
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return false
+	end
+
+	rootPart.AssemblyLinearVelocity = velocity
+	return true
+end
+
+function InteractionService:_addImpulse(player, velocity, reason)
+	if self.movementAuthorityService and self.movementAuthorityService.AddImpulse then
+		return self.movementAuthorityService:AddImpulse(player, velocity, reason)
+	end
+
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return false
+	end
+
+	rootPart.AssemblyLinearVelocity += velocity
+	return true
+end
+
+function InteractionService:_beginScriptedMotion(player, reason)
+	if self.movementAuthorityService and self.movementAuthorityService.BeginScriptedMotion then
+		return self.movementAuthorityService:BeginScriptedMotion(player, reason)
+	end
+
+	return false
+end
+
+function InteractionService:_endScriptedMotion(player)
+	if self.movementAuthorityService and self.movementAuthorityService.EndScriptedMotion then
+		return self.movementAuthorityService:EndScriptedMotion(player)
+	end
+
+	return false
 end
 
 function InteractionService:Initialize()
@@ -512,14 +673,26 @@ function InteractionService:Initialize()
 		self.islandExitWarningsByUserId[player.UserId] = nil
 		self.islandWarningReadStateByUserId[player.UserId] = nil
 		self.islandWoodCountByUserId[player.UserId] = nil
+		self.islandRockCountByUserId[player.UserId] = nil
 		self.treetopZiplineStateByUserId[player.UserId] = nil
 		self.voidGravityTokensByUserId[player.UserId] = nil
+		self.caveHallDoorLockedByUserId[player.UserId] = nil
 		self.securityCameraSessionByUserId[player.UserId] = nil
 		self.sleepingAlarmStateByUserId[player.UserId] = nil
+		self.sleepingLockerCheckedByUserId[player.UserId] = nil
+		self.topDownScoresByUserId[player.UserId] = nil
+		self.topDownThrowsByUserId[player.UserId] = nil
+		self.topDownLastThrowByUserId[player.UserId] = nil
+		self.topDownLoadedBalloonsByUserId[player.UserId] = nil
+		self.topDownBucketTouchAtByUserId[player.UserId] = nil
 	end)
 
 	self.securityCameraRemote.OnServerEvent:Connect(function(player, payload)
 		self:_handleSecurityCameraRemote(player, payload)
+	end)
+
+	self.topDownArenaRemote.OnServerEvent:Connect(function(player, payload)
+		self:_handleTopDownArenaRemote(player, payload)
 	end)
 
 	self:_connectTagged(Constants.Tags.MainButton, function(instance)
@@ -572,6 +745,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.TeleportButton, function(instance)
 		self:_wireTeleportButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.FieldButton, function(instance)
+		self:_wireFieldButton(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.SecretRoomDoor, function(instance)
@@ -630,6 +807,14 @@ function InteractionService:Initialize()
 		self:_wireSnackRack(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.SnackDonut, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.SnackDonut.Id, "The wall donut has been inspected. It remains too large to dunk responsibly.")
+	end)
+
+	self:_connectTagged(Constants.Tags.SnackPopcornMachine, function(instance)
+		self:_wireSnackPopcornMachine(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SnackPack, function(instance)
 		self:_wireSnackPack(instance)
 	end)
@@ -674,6 +859,10 @@ function InteractionService:Initialize()
 		self:_wireIslandScrapWood(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.IslandRock, function(instance)
+		self:_wireIslandRock(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.IslandFireRing, function(instance)
 		self:_wireIslandFireRing(instance)
 	end)
@@ -692,6 +881,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.LibraryShelf, function(instance)
 		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryShushedShelf.Id, "The shelf shushes you before you even make noise.")
+	end)
+
+	self:_connectTagged(Constants.Tags.LibraryBookStorm, function(instance)
+		self:_wireLibraryBookStorm(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.LibraryLamp, function(instance)
@@ -834,6 +1027,22 @@ function InteractionService:Initialize()
 		self:_wireCaveKeyDoor(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.LowerTunnelBlastDoor, function(instance)
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LowerTunnelBlastDoor.Id, "The blast doors look important, expensive, and deeply uninterested in opening yet.")
+	end)
+
+	self:_connectTagged(Constants.Tags.ContributorDuckStand, function(instance)
+		self:_wireContributorDuckStand(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.VictoryBrickStand, function(instance)
+		self:_wireVictoryBrickStand(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.VictoryBrick, function(instance)
+		self:_wireVictoryBrick(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SecurityMonitor, function(instance)
 		self:_wireSecurityMonitor(instance)
 	end)
@@ -850,8 +1059,19 @@ function InteractionService:Initialize()
 		self:_wireSecurityTapeDeck(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.SecurityPressurePlate, function(instance)
+		self:_wireSecurityPressurePlate(instance)
+	end)
+	self:_connectTagged(Constants.Tags.ObservationMirror, function(instance)
+		self:_wireObservationMirror(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SleepingBunk, function(instance)
 		self:_wireSleepingBunk(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.SleepingMattress, function(instance)
+		self:_wireSleepingMattress(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.SleepingAlarmClock, function(instance)
@@ -874,10 +1094,70 @@ function InteractionService:Initialize()
 		self:_wireSleepingPillowPile(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.SleepingIdBadge, function(instance)
+		self:_wireSleepingIdBadge(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.InfirmaryRecoveryBed, function(instance)
+		self:_wireInfirmaryRecoveryBed(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.InfirmaryMonitor, function(instance)
+		self:_wireInfirmaryMonitor(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.InfirmaryCabinet, function(instance)
+		self:_wireInfirmaryCabinet(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.InfirmaryNourishment, function(instance)
+		self:_wireInfirmaryNourishment(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.GymTreadmill, function(instance)
+		self:_wireGymTreadmill(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.GymBike, function(instance)
+		self:_wireGymBike(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.GymWeights, function(instance)
+		self:_wireGymWeights(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.GymWaterStation, function(instance)
+		self:_wireGymWaterStation(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TopDownCameraConsole, function(instance)
+		self:_wireTopDownCameraConsole(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TopDownWaterBalloonBucket, function(instance)
+		self:_wireTopDownWaterBalloonBucket(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TopDownTargetRing, function(instance)
+		self:_wireTopDownTargetRing(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TopDownSplashTarget, function(instance)
+		self:_wireTopDownSplashTarget(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TopDownScoreboard, function(instance)
+		self:_wireTopDownScoreboard(instance)
+	end)
+
 	self:_updateBowlingScoreboards()
+	self:_updateTopDownScoreboards()
 	self:_startBowlingAdRotation()
 	self:_startBowlingMaintenanceMotion()
+	self:_startCaveAmbientSounds()
 	self:_startVoidAmbientMotion()
+	self:_startIslandAmbientResources()
+	self:_startTopDownPracticeTargetMotion()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
@@ -896,18 +1176,48 @@ function InteractionService:_connectTagged(tagName, wireCallback)
 	CollectionService:GetInstanceAddedSignal(tagName):Connect(wireCallback)
 end
 
-function InteractionService:_connectPrompt(prompt, callback)
+function InteractionService:_connectPrompt(prompt, callback, options)
 	if not prompt or self.connectedPrompts[prompt] then
 		return
 	end
 
 	self.connectedPrompts[prompt] = true
 	prompt.Triggered:Connect(function(player)
+		local roomId = nil
+		local prologueSafeNavigation = options and options.PrologueSafeNavigation == true
+		local doNotRecordInteraction = options and options.DoNotRecordInteraction == true
 		if self.roomProgressService then
-			self.roomProgressService:RecordInteraction(player)
+			if self.roomProgressService.TryTriggerUntouchedPrologue
+				and self.roomProgressService:TryTriggerUntouchedPrologue(player, prompt, prologueSafeNavigation)
+			then
+				return
+			end
+
+			local shouldRecordInteraction = not doNotRecordInteraction
+				and not (prologueSafeNavigation and self.roomProgressService:IsUntouchedPrologueActive(player))
+			if shouldRecordInteraction then
+				self.roomProgressService:RecordInteraction(player)
+				if self.bunkerEnergyService then
+					self.bunkerEnergyService:RecordInteraction(player)
+				end
+			end
+			if self.roomProgressService.GetRoomForPlayer then
+				roomId = self.roomProgressService:GetRoomForPlayer(player)
+			end
 		end
 
 		callback(player)
+
+		if roomId == "CaveEntrance" and not prologueSafeNavigation and self:_setCaveEntranceSealed() then
+			local soundParent = prompt.Parent or workspace
+			playSound(soundParent, "rbxasset://sounds/snap.wav", 0.75, 0.38)
+			task.delay(0.08, function()
+				if soundParent.Parent then
+					playSound(soundParent, "rbxasset://sounds/button.wav", 0.55, 0.42)
+				end
+			end)
+			self.systemMessageRemote:FireClient(player, "The cave entrance rumbles shut behind you. Someone absolutely noticed.")
+		end
 	end)
 end
 
@@ -925,6 +1235,46 @@ function InteractionService:_canUseTeleport(player)
 	return true
 end
 
+function InteractionService:_getBunkerSubsystemPower()
+	if self.bunkerEnergyService and self.bunkerEnergyService.GetSubsystemPower then
+		return self.bunkerEnergyService:GetSubsystemPower()
+	end
+
+	return 1
+end
+
+function InteractionService:_getBunkerPowerState()
+	local power = self:_getBunkerSubsystemPower()
+	local minimum = Constants.BunkerEnergy.SubsystemMinimumPower or 0.14
+	local weak = Constants.BunkerEnergy.SubsystemWeakPower or 0.38
+	local full = Constants.BunkerEnergy.SubsystemFullPower or 0.72
+
+	if power <= minimum then
+		return "Offline", power
+	elseif power <= weak then
+		return "Flicker", power
+	elseif power <= full then
+		return "Weak", power
+	end
+
+	return "Ready", power
+end
+
+function InteractionService:_bunkerSputter(part, message)
+	if part then
+		playSound(part, "rbxasset://sounds/snap.wav", 0.42, 0.45 + math.random() * 0.18)
+		task.delay(0.12, function()
+			if part.Parent then
+				playSound(part, "rbxasset://sounds/electronicpingshort.wav", 0.22, 0.32 + math.random() * 0.12)
+			end
+		end)
+	end
+
+	if message then
+		self.systemMessageRemote:FireAllClients(message)
+	end
+end
+
 function InteractionService:_wireDiscoveryPrompt(instance, discoveryId, message)
 	local prompt = getPrompt(instance)
 
@@ -934,6 +1284,403 @@ function InteractionService:_wireDiscoveryPrompt(instance, discoveryId, message)
 		if message then
 			self.systemMessageRemote:FireClient(player, message)
 		end
+	end)
+end
+
+function InteractionService:_broadcastBunkerReclaimMessage(key, message)
+	if not message then
+		return
+	end
+
+	local now = os.clock()
+	local messageKey = key or "default"
+	if now - (self.bunkerReclaimMessageAtByKey[messageKey] or 0) < BUNKER_RECLAIM_MESSAGE_COOLDOWN then
+		return
+	end
+
+	self.bunkerReclaimMessageAtByKey[messageKey] = now
+	self.systemMessageRemote:FireAllClients(message)
+end
+
+function InteractionService:_scheduleBunkerReclaim(root, options)
+	if not root then
+		return
+	end
+
+	options = options or {}
+	local delaySeconds = options.Delay or 90
+	local duration = options.Duration or 1.35
+	local sinkDistance = options.SinkDistance or 2.6
+	local driftDistance = options.DriftDistance or 0.42
+	local decayDuration = options.DecayDuration or Constants.MatterConversion.DecayDurationSeconds or 14
+	local decayMinimumDelay = Constants.MatterConversion.DecayMinimumDelaySeconds or 8
+	local decayDelay = if options.DecayDelay ~= nil
+		then options.DecayDelay
+		else delaySeconds - (options.DecayLeadSeconds or Constants.MatterConversion.DecayLeadSeconds or 22)
+
+	if options.SkipDecay ~= true and delaySeconds >= decayMinimumDelay and decayDuration > 0 then
+		task.delay(math.max(0, decayDelay), function()
+			if not root or not root.Parent then
+				return
+			end
+
+			local parts = {}
+			for _, instance in ipairs(getInstanceAndDescendants(root)) do
+				if instance:IsA("BasePart") and instance.Parent then
+					table.insert(parts, instance)
+				end
+			end
+
+			if #parts == 0 then
+				return
+			end
+
+			self:_broadcastBunkerReclaimMessage(
+				(options.Key or "matter") .. "_decay",
+				options.DecayMessage or "Released matter loses its color. Somewhere under the floor, machinery gets patient."
+			)
+
+			for _, part in ipairs(parts) do
+				if part.Parent and part:GetAttribute("BunkerMatterDecayStarted") ~= true then
+					part:SetAttribute("BunkerMatterDecayStarted", true)
+					part:SetAttribute("MatterConversionOriginalColor", part.Color)
+					tweenPart(part, decayDuration, {
+						Color = options.DecayColor or Constants.MatterConversion.DecayColor or Color3.fromRGB(42, 43, 42),
+					}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+				end
+			end
+		end)
+	end
+
+	task.delay(delaySeconds, function()
+		if not root or not root.Parent then
+			return
+		end
+
+		local parts = {}
+		for _, instance in ipairs(getInstanceAndDescendants(root)) do
+			if instance:IsA("ProximityPrompt") then
+				instance.Enabled = false
+			elseif instance:IsA("BasePart") then
+				table.insert(parts, instance)
+			end
+		end
+
+		if #parts == 0 then
+			root:Destroy()
+			return
+		end
+
+		self:_broadcastBunkerReclaimMessage(options.Key, options.Message)
+		if self.bunkerEnergyService then
+			self.bunkerEnergyService:RecordMatterReclaimed(options.PowerPartCount or #parts)
+		end
+
+		for index, part in ipairs(parts) do
+			if part.Parent then
+				part.Anchored = true
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = false
+
+				local drift = Vector3.new(
+					math.sin(index * 2.37) * driftDistance,
+					-sinkDistance,
+					math.cos(index * 1.91) * driftDistance
+				)
+				local targetSize = Vector3.new(
+					math.max(0.05, part.Size.X * 0.28),
+					math.max(0.05, part.Size.Y * 0.28),
+					math.max(0.05, part.Size.Z * 0.28)
+				)
+
+				tweenPart(part, duration, {
+					CFrame = part.CFrame + drift,
+					Size = targetSize,
+					Transparency = 1,
+				}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			end
+		end
+
+		task.delay(duration + 0.15, function()
+			if root and root.Parent then
+				root:Destroy()
+			end
+		end)
+	end)
+end
+
+function InteractionService:_getActiveObjectRainParts()
+	local parts = {}
+	for _, part in ipairs(CollectionService:GetTagged(Constants.Tags.ObjectRainObject)) do
+		if part:IsA("BasePart") and part.Parent then
+			table.insert(parts, part)
+		end
+	end
+
+	return parts
+end
+
+function InteractionService:_openObjectRainSortingSlots()
+	local openedCount = 0
+
+	for _, floor in ipairs(CollectionService:GetTagged(Constants.Tags.FloorSection)) do
+		if floor:IsA("BasePart") then
+			if floor.CanCollide then
+				openedCount += 1
+			end
+			floor.Transparency = 1
+			floor.CanCollide = false
+		end
+	end
+
+	return openedCount
+end
+
+function InteractionService:_shakeObjectRainDownstairs(parts)
+	local random = self.objectRainSortRandom or Random.new()
+	local shakenCount = 0
+
+	for _, part in ipairs(parts) do
+		if part:IsA("BasePart") and part.Parent then
+			shakenCount += 1
+			part.Anchored = false
+			part.CanCollide = true
+
+			if part.Position.Y > OBJECT_RAIN_SORT_UPPER_Y then
+				local towardCenter = Vector3.new(-part.Position.X, 0, -part.Position.Z)
+				if towardCenter.Magnitude > 0.1 then
+					towardCenter = towardCenter.Unit * random:NextNumber(5, 13)
+				end
+
+				part.AssemblyLinearVelocity = Vector3.new(
+					random:NextNumber(-22, 22),
+					random:NextNumber(-84, -62),
+					random:NextNumber(-22, 22)
+				) + towardCenter
+			else
+				part.AssemblyLinearVelocity += Vector3.new(
+					random:NextNumber(-28, 28),
+					random:NextNumber(-8, 2),
+					random:NextNumber(-28, 28)
+				)
+			end
+
+			part.AssemblyAngularVelocity = Vector3.new(
+				random:NextNumber(-18, 18),
+				random:NextNumber(-22, 22),
+				random:NextNumber(-18, 18)
+			)
+		end
+	end
+
+	return shakenCount
+end
+
+function InteractionService:_serviceActiveObjectRain()
+	local rainParts = self:_getActiveObjectRainParts()
+	if #rainParts == 0 then
+		return false
+	end
+
+	local now = os.clock()
+	local shouldMessage = now - self.objectRainSortLastAt >= OBJECT_RAIN_SORT_COOLDOWN
+	if shouldMessage then
+		self.objectRainSortLastAt = now
+	end
+
+	self:_openObjectRainSortingSlots()
+	local shakenCount = self:_shakeObjectRainDownstairs(rainParts)
+
+	if shouldMessage then
+		if shakenCount > 0 then
+			self.systemMessageRemote:FireAllClients("The floor opens its sorting slots. Something below hums like it recognizes the mess.")
+		else
+			self.systemMessageRemote:FireAllClients("The floor opens its sorting slots, but the room has already misplaced the evidence.")
+		end
+	end
+
+	return true
+end
+
+function InteractionService:_attachEnergyReservePrompt(primary, itemRoot, options)
+	if not primary or not primary:IsA("BasePart") then
+		return
+	end
+
+	options = options or {}
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = options.PromptName or "PocketEnergyReservePrompt"
+	prompt.ActionText = options.ActionText or "Pocket"
+	prompt.ObjectText = options.ObjectText or "Loose Matter"
+	prompt.HoldDuration = options.HoldDuration or 0.18
+	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
+	prompt.MaxActivationDistance = options.MaxActivationDistance or 9
+	prompt.KeyboardKeyCode = options.KeyboardKeyCode or Enum.KeyCode.F
+	prompt.GamepadKeyCode = options.GamepadKeyCode or Enum.KeyCode.ButtonY
+	prompt.Parent = primary
+
+	self:_connectPrompt(prompt, function(player)
+		if not primary.Parent then
+			return
+		end
+
+		if not self.bunkerEnergyService or not self.bunkerEnergyService.GrantEnergyReserveTool then
+			self.systemMessageRemote:FireClient(player, "This loose matter refuses to fit in a pocket yet.")
+			return
+		end
+
+		local ok, message = self.bunkerEnergyService:GrantEnergyReserveTool(player, {
+			Kind = options.Kind or "Matter",
+			Name = options.Name or "Pocketed Matter",
+				ToolTip = options.ToolTip or "Use to steady your energy when the signal starts to drag.",
+			RestoreAmount = options.RestoreAmount,
+			Color = options.Color or primary.Color,
+			GrantMessage = options.GrantMessage,
+			UseMessage = options.UseMessage,
+		})
+		if not ok then
+			self.systemMessageRemote:FireClient(player, message or "Your pockets are out of arguments.")
+			return
+		end
+
+		prompt.Enabled = false
+		setPromptEnabled(itemRoot or primary, false)
+		playSound(primary, "rbxasset://sounds/snap.wav", 0.42, 1.08)
+		self.systemMessageRemote:FireClient(player, message or "Pocketed for later. It pulses once like it understood.")
+		self:_scheduleBunkerReclaim(itemRoot or primary, {
+			Delay = 0.12,
+			Key = options.ReclaimKey or "pocket_energy",
+			Message = options.ReclaimMessage or "A pocket-sized bit of loose matter leaves almost no crumbs for the floor.",
+			SinkDistance = options.SinkDistance or 1.3,
+			Duration = options.ReclaimDuration or 0.65,
+			SkipDecay = true,
+		})
+	end)
+end
+
+function InteractionService:_attachLooseFruitEatPrompt(primary, fruitRoot)
+	if not primary or not primary:IsA("BasePart") then
+		return
+	end
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "LooseFruitEatPrompt"
+	prompt.ActionText = "Eat"
+	prompt.ObjectText = "Loose Fruit"
+	prompt.HoldDuration = 0.12
+	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
+	prompt.MaxActivationDistance = 9
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
+	prompt.Parent = primary
+
+	self:_connectPrompt(prompt, function(player)
+		if not primary.Parent then
+			return
+		end
+
+		prompt.Enabled = false
+		setPromptEnabled(fruitRoot or primary, false)
+		if self.bunkerEnergyService then
+			self.bunkerEnergyService:RecordFruitEaten(player)
+		end
+
+		playSound(primary, "rbxasset://sounds/snap.wav", 0.48, 1.18)
+		self.systemMessageRemote:FireClient(player, "The fruit helps. Nearby lights react to the leftovers.")
+		self:_scheduleBunkerReclaim(fruitRoot or primary, {
+			Delay = 0.18,
+			Key = "fruit_eaten",
+			Message = "A piece of fruit disappears into the room before anyone can file a snack report.",
+			SinkDistance = 1.7,
+			Duration = 0.8,
+		})
+	end)
+
+	self:_attachEnergyReservePrompt(primary, fruitRoot, {
+		PromptName = "LooseFruitPocketPrompt",
+		ActionText = "Pocket",
+		ObjectText = "Loose Fruit",
+		Kind = "Fruit",
+		Name = "Pocketed Fruit",
+		RestoreAmount = Constants.BunkerEnergy.FruitEnergyRestore or 0.32,
+		Color = primary.Color,
+		GrantMessage = "Fruit pocketed for later. The room signal stays politely neutral.",
+		UseMessage = "The fruit helps your energy. Nearby lights react to the transaction.",
+		ReclaimKey = "fruit_pocketed",
+		ReclaimMessage = "The Snack Lab quietly absorbs the fruit-shaped gap left behind.",
+	})
+end
+
+function InteractionService:_wireLibraryBookStorm(book)
+	local prompt = getPrompt(book)
+	self.libraryBookStormState[book] = self.libraryBookStormState[book] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.libraryBookStormState[book]
+		if not state or state.Reacting or not book:IsA("BasePart") then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryBookStorm.Id)
+		playSound(book, "rbxasset://sounds/snap.wav", 0.65, 0.72)
+		task.delay(0.12, function()
+			if book.Parent then
+				playSound(book, "rbxasset://sounds/button.wav", 0.45, 0.5)
+			end
+		end)
+
+		local origin = book.CFrame
+		for index = 1, 46 do
+			task.delay((index - 1) * 0.015, function()
+				if not book.Parent then
+					return
+				end
+
+				local looseBook = Instance.new("Part")
+				looseBook.Name = "LibraryFlyingBook"
+				looseBook.Anchored = false
+				looseBook.CanCollide = true
+				looseBook.Material = Enum.Material.SmoothPlastic
+				looseBook.Color = Color3.fromRGB(70 + (index * 29) % 160, 42 + (index * 17) % 130, 70 + (index * 41) % 140)
+				looseBook.Size = Vector3.new(0.55 + (index % 3) * 0.08, 0.16, 1.15 + (index % 4) * 0.12)
+				looseBook.CFrame = origin
+					* CFrame.new(((index % 9) - 4) * 0.35, 0.35 + (index % 5) * 0.16, -0.8 - (index % 4) * 0.18)
+					* CFrame.Angles(math.rad(index * 17), math.rad(index * 23), math.rad(index * 31))
+				looseBook.CustomPhysicalProperties = PhysicalProperties.new(0.45, 0.55, 0.35, 1, 1)
+				looseBook.Parent = workspace
+				CollectionService:AddTag(looseBook, Constants.Tags.TemporaryObject)
+
+				looseBook.AssemblyLinearVelocity = Vector3.new(
+					((index % 7) - 3) * 4.5,
+					18 + (index % 6) * 2.2,
+					10 + (index % 8) * 2.4
+				)
+					looseBook.AssemblyAngularVelocity = Vector3.new(index % 5, 7 + index % 4, index % 6) * 2.5
+					self:_scheduleBunkerReclaim(looseBook, {
+						Delay = 118 + (index % 12) * 2,
+						Key = "library_books",
+						Message = "The Library shelves stop asking. A few loose books slide toward seams in the floor.",
+						SinkDistance = 2.2,
+					})
+					Debris:AddItem(looseBook, 160)
+				end)
+			end
+
+		if book.Parent then
+			tweenPart(book, 0.18, {
+				Color = Color3.fromRGB(119, 255, 203),
+			})
+		end
+		self.systemMessageRemote:FireClient(player, "The Library shelves unload several strong opinions at once.")
+		task.delay(2.6, function()
+			state.Reacting = false
+		end)
 	end)
 end
 
@@ -996,6 +1743,7 @@ function InteractionService:_wireSecurityMonitor(monitor)
 		self.securityCameraRemote:FireClient(player, {
 			Action = "Start",
 			CameraCFrame = cameraCFrame,
+			CameraLabel = monitor:GetAttribute("CameraLabel") or "CAM 23 - SECURITY ROOM",
 			Duration = SECURITY_CAMERA_DURATION,
 		})
 		self.systemMessageRemote:FireClient(player, "The monitor changes viewpoint. You appear on the screen with excellent timing.")
@@ -1063,6 +1811,120 @@ function InteractionService:_wireSecurityTapeDeck(tapeDeck)
 	end)
 end
 
+function InteractionService:_wireObservationMirror(mirror)
+	local prompt = getPrompt(mirror)
+
+	self:_connectPrompt(prompt, function(player)
+		local label = mirror:GetAttribute("ObservationLabel") or "OBS-??-01"
+		local placeId = mirror:GetAttribute("ObservationPlaceId")
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityObservationMirror.Id)
+		playSound(mirror, "rbxasset://sounds/electronicpingshort.wav", 0.42, 0.62)
+		if mirror:IsA("BasePart") then
+			tweenPart(mirror, 0.18, {
+				Color = Color3.fromRGB(119, 255, 203),
+				Transparency = 0.28,
+			})
+			task.delay(0.85, function()
+				if mirror.Parent then
+					tweenPart(mirror, 0.45, {
+						Color = mirror:GetAttribute("BaseColor") or Color3.fromRGB(128, 176, 190),
+						Transparency = mirror:GetAttribute("BaseTransparency") or 0.42,
+					})
+				end
+			end)
+		end
+		self.systemMessageRemote:FireClient(
+			player,
+			("The glass reflects a coordinate: %s. The Teleport Key may know what to do with observation rooms now."):format(label)
+		)
+		if placeId then
+			player:SetAttribute("DontTouchItLastObservationCoordinate", placeId)
+		end
+	end)
+end
+
+function InteractionService:_setSecurityControlsPowered(powered, source)
+	self.securityPressurePlateState.Unlocked = powered == true
+
+	for _, console in ipairs(CollectionService:GetTagged(Constants.Tags.SecurityConsole)) do
+		if console:IsA("BasePart") then
+			tweenPart(console, 0.22, {
+				Color = powered and Color3.fromRGB(119, 255, 203) or (console:GetAttribute("BaseColor") or Color3.fromRGB(30, 39, 50)),
+			})
+		end
+	end
+
+	if powered and source then
+		playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.4)
+	end
+end
+
+function InteractionService:_wireSecurityPressurePlate(plate)
+	if not plate:IsA("BasePart") then
+		return
+	end
+
+	plate.Touched:Connect(function(hit)
+		if self.securityPressurePlateState.Unlocked then
+			return
+		end
+
+		local character = hit and hit.Parent
+		if not character then
+			return
+		end
+
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local player = humanoid and Players:GetPlayerFromCharacter(character)
+		if not player then
+			return
+		end
+
+		local plateIndex = plate:GetAttribute("PlateIndex") or 0
+		if plateIndex == 1 then
+			if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id) then
+				self.systemMessageRemote:FireClient(player, "The badge plate wants an ID badge from Sleeping Quarters.")
+				playSound(plate, "rbxasset://sounds/snap.wav", 0.32, 0.56)
+				return
+			end
+			self.securityPressurePlateState.Badge = true
+		elseif plateIndex == 2 then
+			local otherSecurityPlayerPresent = false
+			if self.roomProgressService then
+				for _, otherPlayer in ipairs(Players:GetPlayers()) do
+					if otherPlayer ~= player and self.roomProgressService:GetRoomForPlayer(otherPlayer) == "SecurityRoom" then
+						otherSecurityPlayerPresent = true
+						break
+					end
+				end
+			end
+			local heldRocks = self:_getPocketItemCount(player, "IslandRock", self.islandRockCountByUserId)
+			if heldRocks <= 0 and not otherSecurityPlayerPresent then
+				self.systemMessageRemote:FireClient(player, "The weight plate wants either a helpful teammate or a beach rock.")
+				playSound(plate, "rbxasset://sounds/snap.wav", 0.32, 0.6)
+				return
+			end
+			if not self.securityPressurePlateState.Weight
+				and not otherSecurityPlayerPresent
+				and self:_consumePocketItem(player, "IslandRock", self.islandRockCountByUserId)
+			then
+				self.systemMessageRemote:FireClient(player, "The beach rock sits on the plate with official-looking confidence.")
+			end
+			self.securityPressurePlateState.Weight = true
+		end
+
+		tweenPart(plate, 0.12, {
+			Color = Color3.fromRGB(119, 255, 203),
+			CFrame = (plate:GetAttribute("BaseCFrame") or plate.CFrame) * CFrame.new(0, -0.08, 0),
+		})
+
+		if self.securityPressurePlateState.Badge and self.securityPressurePlateState.Weight then
+			self:_setSecurityControlsPowered(true, plate)
+			self.systemMessageRemote:FireClient(player, "Security controls power up. The room is now officially overprepared.")
+		end
+	end)
+end
+
 function InteractionService:_wireSleepingBunk(bunk)
 	local prompt = getPrompt(bunk)
 
@@ -1071,6 +1933,49 @@ function InteractionService:_wireSleepingBunk(bunk)
 		playSound(bunk, "rbxasset://sounds/button.wav", 0.35, 0.6)
 		local total = bunk:GetAttribute("BunkTotal") or 100
 		self.systemMessageRemote:FireClient(player, ("You count %d bunks. That seems like at least several."):format(total))
+	end)
+end
+
+function InteractionService:_wireSleepingMattress(mattress)
+	if not mattress or not mattress:IsA("BasePart") then
+		return
+	end
+
+	mattress.Touched:Connect(function(hit)
+		local character = hit and hit:FindFirstAncestorOfClass("Model")
+		if not character then
+			return
+		end
+
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if not humanoid or not rootPart then
+			return
+		end
+
+		local player = Players:GetPlayerFromCharacter(character)
+		if not player then
+			return
+		end
+
+		local room = Constants.GetRoom("SleepingQuarters")
+		if not room or not positionInZone(rootPart.Position, room.Zone) then
+			return
+		end
+
+		local now = os.clock()
+		if now - (self.sleepingMattressBounceAtByHumanoid[humanoid] or 0) < 0.72 then
+			return
+		end
+		self.sleepingMattressBounceAtByHumanoid[humanoid] = now
+
+		local velocity = rootPart.AssemblyLinearVelocity
+		if velocity.Y > 34 then
+			return
+		end
+
+		rootPart.AssemblyLinearVelocity = Vector3.new(velocity.X, 58, velocity.Z)
+		playSound(mattress, "rbxasset://sounds/button.wav", 0.14, 1.7)
 	end)
 end
 
@@ -1103,15 +2008,73 @@ function InteractionService:_wireSleepingLocker(locker)
 	local prompt = getPrompt(locker)
 
 	self:_connectPrompt(prompt, function(player)
-		self.discoveryService:Unlock(player, Constants.Discoveries.SleepingLocker.Id)
-		playSound(locker, "rbxasset://sounds/snap.wav", 0.5, 0.75)
-		setTextLabelText(locker, "SleepingLockerText", "LOCKER\nEXTRA SOCKS\nCLASSIFIED")
+		local lockerKind = locker:GetAttribute("LockerKind")
+		if lockerKind == "CleaningSupplies" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.SleepingLocker.Id)
+			playSound(locker, "rbxasset://sounds/snap.wav", 0.5, 0.75)
+			setTextLabelText(locker, "SleepingLockerText", "MOP\nBROOM\nBUCKET")
+			local root = locker:FindFirstAncestor("SleepingCleaningSuppliesLocker") or locker.Parent
+			for _, instance in ipairs(getInstanceAndDescendants(root)) do
+				if instance:IsA("BasePart") and instance:GetAttribute("SleepingCleaningContent") == true then
+					instance.Transparency = 0
+				end
+			end
+			if locker:IsA("BasePart") then
+				tweenPart(locker, 0.18, {
+					Color = Color3.fromRGB(119, 255, 203),
+				})
+			end
+			self.systemMessageRemote:FireClient(player, "The cleaning locker opens: mop, broom, and bucket. Suspiciously practical.")
+			return
+		end
+
+		if lockerKind ~= "Bunk" then
+			return
+		end
+
+		local lockerIndex = math.floor(tonumber(locker:GetAttribute("LockerIndex")) or 0)
+		if lockerIndex <= 0 then
+			return
+		end
+
+		local checked = self.sleepingLockerCheckedByUserId[player.UserId]
+		if not checked then
+			checked = {}
+			self.sleepingLockerCheckedByUserId[player.UserId] = checked
+		end
+
+		local wasNew = checked[lockerIndex] ~= true
+		checked[lockerIndex] = true
+		local checkedCount = countDictionary(checked)
+		local total = math.max(1, math.floor(tonumber(locker:GetAttribute("LockerTotal")) or 100))
+
+		playSound(locker, "rbxasset://sounds/button.wav", 0.28, 0.78 + (lockerIndex % 5) * 0.08)
+		setTextLabelText(locker, "SleepingBunkLockerText", ("OPEN\n#%02d"):format(lockerIndex))
 		if locker:IsA("BasePart") then
-			tweenPart(locker, 0.18, {
+			tweenPart(locker, 0.14, {
 				Color = Color3.fromRGB(119, 255, 203),
 			})
 		end
-		self.systemMessageRemote:FireClient(player, "The locker opens just enough to reveal classified socks.")
+
+		if locker:GetAttribute("HasIdBadge") == true then
+			local badge = locker.Parent and locker.Parent:FindFirstChild("SleepingIdBadge", true)
+			if badge and badge:IsA("BasePart") then
+				badge.Transparency = 0
+				badge.CanCollide = false
+				setPromptEnabled(badge, true)
+				setSurfaceGuiEnabled(badge, "SleepingIdBadgeText", true)
+				self.systemMessageRemote:FireClient(player, "This last locker contains an ID Badge. That feels important.")
+			end
+		elseif wasNew then
+			self.systemMessageRemote:FireClient(player, ("Bunk locker checked: %d / %d."):format(checkedCount, total))
+		else
+			self.systemMessageRemote:FireClient(player, ("Bunk locker %02d is still aggressively empty."):format(lockerIndex))
+		end
+
+		if checkedCount >= total then
+			self.discoveryService:Unlock(player, Constants.Discoveries.SleepingAllLockers.Id)
+			self.systemMessageRemote:FireClient(player, "Every bunk locker has been checked. The room has no remaining privacy.")
+		end
 	end)
 end
 
@@ -1197,9 +2160,656 @@ function InteractionService:_wireSleepingPillowPile(pillow)
 	end)
 end
 
+function InteractionService:_wireSleepingIdBadge(badge)
+	local prompt = getPrompt(badge)
+
+	self:_connectPrompt(prompt, function(player)
+		local unlocked = self.discoveryService:Unlock(player, Constants.Discoveries.SleepingIdBadge.Id)
+		if self.discoveryService.SyncInventoryTools then
+			self.discoveryService:SyncInventoryTools(player)
+		end
+		if unlocked then
+			self.systemMessageRemote:FireClient(player, "ID Badge found. Security plates and one stubborn cave door now have fewer excuses.")
+		else
+			self.systemMessageRemote:FireClient(player, "You already have the ID Badge clearance.")
+		end
+
+		playSound(badge, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.65)
+		if badge:IsA("BasePart") then
+			tweenPart(badge, 0.18, {
+				Transparency = 1,
+				Color = Color3.fromRGB(119, 255, 203),
+			})
+			badge.CanCollide = false
+			setPromptEnabled(badge, false)
+			setSurfaceGuiEnabled(badge, "SleepingIdBadgeText", false)
+		end
+	end)
+end
+
+function InteractionService:_wireInfirmaryRecoveryBed(bed)
+	local prompt = getPrompt(bed)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryRecoveryBed.Id)
+		playSound(bed, "rbxasset://sounds/button.wav", 0.22, 0.62)
+		self.systemMessageRemote:FireClient(player, "The recovery bed is already warm. That feels thoughtful, which is not necessarily better.")
+	end)
+end
+
+function InteractionService:_wireInfirmaryMonitor(monitor)
+	local prompt = getPrompt(monitor)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryMonitor.Id)
+		setTextLabelText(monitor, "InfirmaryMonitorText", "STATUS\nFUNCTIONAL\nFOR NOW")
+		playSound(monitor, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.35)
+		self.systemMessageRemote:FireClient(player, "The monitor reports your condition with the confidence of something that has practiced.")
+	end)
+end
+
+function InteractionService:_wireInfirmaryCabinet(cabinet)
+	local prompt = getPrompt(cabinet)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryCabinet.Id)
+		setTextLabelText(cabinet, "InfirmaryCabinetText", "SUPPLIES\nRESTOCKED\n?")
+		if cabinet:IsA("BasePart") then
+			tweenPart(cabinet, 0.16, {
+				Color = Color3.fromRGB(119, 255, 203),
+			})
+			task.delay(0.45, function()
+				if cabinet.Parent then
+					tweenPart(cabinet, 0.28, {
+						Color = cabinet:GetAttribute("BaseColor") or Color3.fromRGB(215, 226, 229),
+					})
+				end
+			end)
+		end
+		playSound(cabinet, "rbxasset://sounds/snap.wav", 0.38, 0.78)
+		self.systemMessageRemote:FireClient(player, "The cabinet opens onto supplies arranged too neatly for an abandoned place.")
+	end)
+end
+
+function InteractionService:_wireInfirmaryNourishment(tray)
+	local prompt = getPrompt(tray)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryNourishment.Id)
+		if self.bunkerEnergyService and self.bunkerEnergyService.RecordEnergyItemUsed then
+			self.bunkerEnergyService:RecordEnergyItemUsed(player, "Matter", 0.26)
+		end
+		playSound(tray, "rbxasset://sounds/snap.wav", 0.32, 1.08)
+		self.systemMessageRemote:FireClient(player, "The tray steadies you. The nearby readout brightens like it expected that.")
+	end)
+end
+
+function InteractionService:_wireGymTreadmill(treadmill)
+	local prompt = getPrompt(treadmill)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.GymTreadmill.Id)
+		if self.bunkerEnergyService and self.bunkerEnergyService.RecordTrainingActivity then
+			self.bunkerEnergyService:RecordTrainingActivity(player, 0.75, 0.006)
+		end
+		local belt = treadmill.Parent and treadmill.Parent:FindFirstChild("TreadmillBelt")
+		if belt and belt:IsA("BasePart") then
+			tweenPart(belt, 0.12, {
+				Color = Color3.fromRGB(46, 66, 78),
+			})
+			task.delay(0.45, function()
+				if belt.Parent then
+					tweenPart(belt, 0.3, {
+						Color = Color3.fromRGB(12, 16, 18),
+					})
+				end
+			end)
+		end
+		playSound(treadmill, "rbxasset://sounds/electronicpingshort.wav", 0.42, 0.9)
+		self.systemMessageRemote:FireClient(player, "The treadmill logs one very official almost-step.")
+	end)
+end
+
+function InteractionService:_wireGymBike(bikeSeat)
+	local prompt = getPrompt(bikeSeat)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.GymBike.Id)
+		if self.bunkerEnergyService and self.bunkerEnergyService.RecordTrainingActivity then
+			self.bunkerEnergyService:RecordTrainingActivity(player, 0.68, 0.005)
+		end
+		playSound(bikeSeat, "rbxasset://sounds/button.wav", 0.28, 1.45)
+		self.systemMessageRemote:FireClient(player, "The stationary bike goes nowhere with alarming purpose.")
+	end)
+end
+
+function InteractionService:_wireGymWeights(rack)
+	local prompt = getPrompt(rack)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.GymWeights.Id)
+		if self.bunkerEnergyService and self.bunkerEnergyService.RecordTrainingActivity then
+			self.bunkerEnergyService:RecordTrainingActivity(player, 0.82, 0.007)
+		end
+		playSound(rack, "rbxasset://sounds/button.wav", 0.35, 0.72)
+		self.systemMessageRemote:FireClient(player, "The weight rack approves a measurable amount of effort.")
+	end)
+end
+
+function InteractionService:_wireGymWaterStation(station)
+	local prompt = getPrompt(station)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.GymWaterStation.Id)
+		if self.bunkerEnergyService and self.bunkerEnergyService.RecordEnergyItemUsed then
+			self.bunkerEnergyService:RecordEnergyItemUsed(player, "Water", 0.16)
+		end
+		playSound(station, "rbxasset://sounds/snap.wav", 0.26, 1.24)
+		self.systemMessageRemote:FireClient(player, "The water is cool, clean, and slightly too available.")
+	end)
+end
+
+function InteractionService:_formatTopDownScoreboardText()
+	local rows = {}
+	for userId, score in pairs(self.topDownScoresByUserId) do
+		if score and score > 0 then
+			local player = Players:GetPlayerByUserId(userId)
+			table.insert(rows, {
+				Name = player and player.DisplayName or ("USER " .. tostring(userId)),
+				Score = score,
+			})
+		end
+	end
+
+	table.sort(rows, function(left, right)
+		if left.Score == right.Score then
+			return left.Name < right.Name
+		end
+		return left.Score > right.Score
+	end)
+
+	if #rows == 0 then
+		return "SPLASH SCORE\nNO BALLOONS YET"
+	end
+
+	local lines = { "SPLASH SCORE" }
+	for index = 1, math.min(4, #rows) do
+		table.insert(lines, ("%d. %s  %d"):format(index, rows[index].Name, rows[index].Score))
+	end
+
+	return table.concat(lines, "\n")
+end
+
+function InteractionService:_updateTopDownScoreboards()
+	for _, scoreboard in ipairs(CollectionService:GetTagged(Constants.Tags.TopDownScoreboard)) do
+		local label = scoreboard:FindFirstChild("TopDownScoreText", true)
+		if label and label:IsA("TextLabel") then
+			label.Text = self:_formatTopDownScoreboardText()
+		end
+	end
+end
+
+function InteractionService:_incrementTopDownScore(player, amount)
+	if not player then
+		return
+	end
+
+	self.topDownScoresByUserId[player.UserId] = (self.topDownScoresByUserId[player.UserId] or 0) + (amount or 1)
+	self:_updateTopDownScoreboards()
+end
+
+function InteractionService:_startTopDownPracticeTargetMotion()
+	task.spawn(function()
+		while true do
+			for _, target in ipairs(CollectionService:GetTagged(Constants.Tags.TopDownSplashTarget)) do
+				if target:IsA("BasePart") then
+					local startCFrame = target:GetAttribute("TrackStartCFrame") or target:GetAttribute("BaseCFrame") or target.CFrame
+					local endCFrame = target:GetAttribute("TrackEndCFrame") or (startCFrame * CFrame.new(40, 0, 0))
+					local state = self.topDownPracticeTargetState[target]
+					if not state then
+						state = {
+							Direction = 1,
+						}
+						self.topDownPracticeTargetState[target] = state
+					end
+
+					local goal = if state.Direction == 1 then endCFrame else startCFrame
+					tweenPart(target, 4.2, { CFrame = goal }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+					state.Direction *= -1
+				end
+			end
+			task.wait(4.25)
+		end
+	end)
+end
+
+function InteractionService:_findTopDownTargetPlayer(thrower)
+	local throwerRoot = getRootPart(thrower)
+	local bestPlayer = nil
+	local bestDistance = math.huge
+
+	for _, candidate in ipairs(self:_getPlayersInRoom("TopDownArena")) do
+		if candidate ~= thrower then
+			local rootPart = getRootPart(candidate)
+			if rootPart and throwerRoot then
+				local distance = (rootPart.Position - throwerRoot.Position).Magnitude
+				if distance < bestDistance then
+					bestDistance = distance
+					bestPlayer = candidate
+				end
+			end
+		end
+	end
+
+	return bestPlayer
+end
+
+function InteractionService:_getTopDownPracticeTarget()
+	for _, target in ipairs(CollectionService:GetTagged(Constants.Tags.TopDownSplashTarget)) do
+		if target:IsA("BasePart") and target.Parent then
+			return target
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_getTopDownRing()
+	for _, ring in ipairs(CollectionService:GetTagged(Constants.Tags.TopDownTargetRing)) do
+		if ring:IsA("BasePart") and ring.Parent then
+			return ring
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_isPlayerInTopDownArena(player)
+	local rootPart = getRootPart(player)
+	local room = Constants.GetRoom("TopDownArena")
+	return rootPart ~= nil and room ~= nil and positionInZone(rootPart.Position, room.Zone)
+end
+
+function InteractionService:_fireTopDownAmmo(player, message)
+	if not player or not player.Parent then
+		return
+	end
+
+	self.topDownArenaRemote:FireClient(player, {
+		Action = "Ammo",
+		Count = self.topDownLoadedBalloonsByUserId[player.UserId] or 0,
+		Max = TOP_DOWN_MAX_LOADED_BALLOONS,
+		Message = message,
+	})
+end
+
+function InteractionService:_recordTopDownTraining(player, chargeAmount, energyCost)
+	if self.bunkerEnergyService and self.bunkerEnergyService.RecordTrainingActivity then
+		self.bunkerEnergyService:RecordTrainingActivity(player, chargeAmount or 0.55, energyCost or 0.003)
+	end
+end
+
+function InteractionService:_broadcastTopDownCameraMode(message)
+	local mode = self.topDownCameraMode or "Overhead"
+	for _, player in ipairs(self:_getPlayersInRoom("TopDownArena")) do
+		self.topDownArenaRemote:FireClient(player, {
+			Action = "CameraMode",
+			Mode = mode,
+			Message = message,
+		})
+	end
+end
+
+function InteractionService:_flatTopDownDirection(player, direction)
+	local rootPart = getRootPart(player)
+	local fallback = rootPart and rootPart.CFrame.LookVector or Vector3.new(0, 0, -1)
+
+	if typeof(direction) ~= "Vector3" then
+		direction = fallback
+	end
+
+	local flat = Vector3.new(direction.X, 0, direction.Z)
+	if flat.Magnitude < 0.1 then
+		flat = Vector3.new(fallback.X, 0, fallback.Z)
+	end
+
+	if flat.Magnitude < 0.1 then
+		return Vector3.new(0, 0, -1)
+	end
+
+	return flat.Unit
+end
+
+function InteractionService:_makeTopDownSplash(position, color)
+	local splashModel = Instance.new("Model")
+	splashModel.Name = "TopDownWaterSplash"
+	splashModel.Parent = workspace
+
+	for index = 1, 9 do
+		local angle = math.rad(index * 40)
+		local droplet = Instance.new("Part")
+		droplet.Name = "SplashDrop" .. index
+		droplet.Anchored = true
+		droplet.CanCollide = false
+		droplet.CastShadow = false
+		droplet.Shape = Enum.PartType.Ball
+		droplet.Size = Vector3.new(0.42, 0.42, 0.42)
+		droplet.Color = color or Color3.fromRGB(93, 217, 255)
+		droplet.Material = Enum.Material.Neon
+		droplet.CFrame = CFrame.new(position + Vector3.new(math.cos(angle) * 0.4, 0.8, math.sin(angle) * 0.4))
+		droplet.Parent = splashModel
+		tweenPart(droplet, 0.45, {
+			CFrame = droplet.CFrame + Vector3.new(math.cos(angle) * 2.8, 1.2, math.sin(angle) * 2.8),
+			Transparency = 1,
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+
+	Debris:AddItem(splashModel, 1.1)
+end
+
+function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, targetPosition, mode, targetPlayer, startPosition)
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return
+	end
+
+	if not sourcePart or not sourcePart:IsA("BasePart") then
+		sourcePart = rootPart
+	end
+
+	startPosition = startPosition or (sourcePart.Position + Vector3.new(0, 2.6, 0))
+	local balloon = Instance.new("Part")
+	balloon.Name = "TopDownWaterBalloonProjectile"
+	balloon.Shape = Enum.PartType.Ball
+	balloon.Size = Vector3.new(1.05, 1.05, 1.05)
+	balloon.Color = Color3.fromRGB(93, 217, 255)
+	balloon.Material = Enum.Material.SmoothPlastic
+	balloon.CanCollide = true
+	balloon.CFrame = CFrame.new(startPosition)
+	balloon.Parent = workspace
+	CollectionService:AddTag(balloon, Constants.Tags.TemporaryObject)
+
+	local trailAttachment0 = Instance.new("Attachment")
+	trailAttachment0.Name = "BalloonTrail0"
+	trailAttachment0.Position = Vector3.new(0, 0.36, 0)
+	trailAttachment0.Parent = balloon
+	local trailAttachment1 = Instance.new("Attachment")
+	trailAttachment1.Name = "BalloonTrail1"
+	trailAttachment1.Position = Vector3.new(0, -0.36, 0)
+	trailAttachment1.Parent = balloon
+	local trail = Instance.new("Trail")
+	trail.Name = "TopDownBalloonTrail"
+	trail.Attachment0 = trailAttachment0
+	trail.Attachment1 = trailAttachment1
+	trail.Color = ColorSequence.new(Color3.fromRGB(119, 255, 203), Color3.fromRGB(93, 217, 255))
+	trail.Lifetime = 0.24
+	trail.Transparency = NumberSequence.new(0.15, 1)
+	trail.Parent = balloon
+
+	local target = targetPosition or (rootPart.Position + rootPart.CFrame.LookVector * 32)
+	local distance = (target - startPosition).Magnitude
+	local flightTime = math.clamp(distance / 58, 1.0, 2.15)
+	local velocity = (target - startPosition) / flightTime + Vector3.new(0, 0.5 * workspace.Gravity * flightTime, 0)
+	balloon.AssemblyLinearVelocity = velocity
+	balloon.AssemblyAngularVelocity = Vector3.new(8, 14, 2)
+
+	playSound(sourcePart, "rbxasset://sounds/button.wav", 0.36, 1.35)
+
+	local touched = false
+	local connection
+	connection = balloon.Touched:Connect(function(hit)
+		if touched or not hit then
+			return
+		end
+
+		local character = player.Character
+		if character and hit:IsDescendantOf(character) then
+			return
+		end
+
+		local hitPlayer = getPlayerFromHit(hit)
+		if hitPlayer and hitPlayer ~= player then
+			touched = true
+			if connection then
+				connection:Disconnect()
+			end
+			self.discoveryService:Unlock(player, Constants.Discoveries.TopDownPlayerSplash.Id)
+			self:_incrementTopDownScore(player, 2)
+			self:_makeTopDownSplash(balloon.Position, Color3.fromRGB(119, 255, 203))
+			playSound(balloon, "rbxasset://sounds/snap.wav", 0.55, 1.3)
+			self.systemMessageRemote:FireClient(player, ("Direct splash on %s. The scoreboard noticed."):format(hitPlayer.DisplayName))
+			self.systemMessageRemote:FireClient(hitPlayer, ("%s introduced you to a water balloon."):format(player.DisplayName))
+			balloon:Destroy()
+			return
+		end
+
+		if CollectionService:HasTag(hit, Constants.Tags.TopDownSplashTarget) or (mode == "Splash" and targetPlayer == nil and hit.Name == "TopDownPracticeTarget") then
+			touched = true
+			if connection then
+				connection:Disconnect()
+			end
+			self.discoveryService:Unlock(player, Constants.Discoveries.TopDownPlayerSplash.Id)
+			self:_incrementTopDownScore(player, 2)
+			self:_makeTopDownSplash(balloon.Position, Color3.fromRGB(255, 142, 191))
+			playSound(balloon, "rbxasset://sounds/snap.wav", 0.55, 1.2)
+			self.systemMessageRemote:FireClient(player, "Practice target splashed. Technically, it had it coming.")
+			balloon:Destroy()
+		end
+	end)
+
+	task.delay(math.max(0.55, flightTime), function()
+		if not balloon.Parent or touched then
+			return
+		end
+
+		local ring = self:_getTopDownRing()
+		local ringPosition = ring and (ring:GetAttribute("TargetPosition") or ring.Position) or target
+		local scoreRadius = ring and (ring:GetAttribute("ScoreRadius") or TOP_DOWN_RING_SCORE_RADIUS) or TOP_DOWN_RING_SCORE_RADIUS
+		local flatDistance = (Vector3.new(balloon.Position.X, 0, balloon.Position.Z) - Vector3.new(ringPosition.X, 0, ringPosition.Z)).Magnitude
+		if mode == "Ring" or flatDistance <= scoreRadius then
+			if flatDistance <= scoreRadius then
+				self.discoveryService:Unlock(player, Constants.Discoveries.TopDownRingScore.Id)
+				self:_incrementTopDownScore(player, 1)
+				self.systemMessageRemote:FireClient(player, ("Splash ring score: +1. Accuracy %.0f studs from suspicious."):format(flatDistance))
+				self:_makeTopDownSplash(balloon.Position, Color3.fromRGB(93, 217, 255))
+			else
+				self.systemMessageRemote:FireClient(player, "The balloon lands near the ring. The ring declines the paperwork.")
+			end
+		end
+	end)
+
+	Debris:AddItem(balloon, TOP_DOWN_BALLOON_LIFETIME)
+end
+
+function InteractionService:_loadTopDownWaterBalloons(player, bucket)
+	if not self:_isPlayerInTopDownArena(player) then
+		self.systemMessageRemote:FireClient(player, "The bucket waits for you to actually be in the arena.")
+		return
+	end
+
+	local current = self.topDownLoadedBalloonsByUserId[player.UserId] or 0
+	if current >= TOP_DOWN_MAX_LOADED_BALLOONS then
+		self:_fireTopDownAmmo(player, "Already loaded. The balloons are ready to make a point.")
+		return
+	end
+
+	local loadCount = if bucket:GetAttribute("IsRefillBucket") then TOP_DOWN_REFILL_LOAD_COUNT else TOP_DOWN_DEFAULT_LOAD_COUNT
+	local newCount = math.min(TOP_DOWN_MAX_LOADED_BALLOONS, current + loadCount)
+	self.topDownLoadedBalloonsByUserId[player.UserId] = newCount
+
+	if bucket:GetAttribute("IsRefillBucket") then
+		self.discoveryService:Unlock(player, Constants.Discoveries.TopDownBucketRefill.Id)
+	end
+
+	playSound(bucket, "rbxasset://sounds/electronicpingshort.wav", 0.32, 1.55)
+	local message = ("Loaded %d / %d water balloons. Hold LT to paint a target, then RT to throw."):format(newCount, TOP_DOWN_MAX_LOADED_BALLOONS)
+	self.systemMessageRemote:FireClient(player, message)
+	self:_fireTopDownAmmo(player, message)
+end
+
+function InteractionService:_getValidatedTopDownAimTarget(player, direction, targetPosition)
+	if not self:_isPlayerInTopDownArena(player) then
+		return nil
+	end
+
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return nil
+	end
+
+	local aimDirection = self:_flatTopDownDirection(player, direction)
+	if typeof(targetPosition) == "Vector3" then
+		local room = Constants.GetRoom("TopDownArena")
+		local horizontalOffset = Vector3.new(targetPosition.X - rootPart.Position.X, 0, targetPosition.Z - rootPart.Position.Z)
+		local distance = horizontalOffset.Magnitude
+		if room
+			and positionInZone(targetPosition, room.Zone)
+			and distance >= 8
+			and distance <= TOP_DOWN_THROW_DISTANCE + 18
+		then
+			return Vector3.new(targetPosition.X, math.max(rootPart.Position.Y + 0.4, targetPosition.Y), targetPosition.Z)
+		end
+	end
+
+	return rootPart.Position + aimDirection * TOP_DOWN_THROW_DISTANCE
+end
+
+function InteractionService:_throwLoadedTopDownBalloon(player, direction, targetPosition)
+	if not self:_isPlayerInTopDownArena(player) then
+		return
+	end
+
+	local now = os.clock()
+	if now - (self.topDownLastThrowByUserId[player.UserId] or 0) < TOP_DOWN_THROW_COOLDOWN then
+		return
+	end
+
+	local loaded = self.topDownLoadedBalloonsByUserId[player.UserId] or 0
+	if loaded <= 0 then
+		self:_fireTopDownAmmo(player, "Load water balloons at a bucket first.")
+		self.systemMessageRemote:FireClient(player, "No balloons loaded. The throw button produces a very confident shrug.")
+		return
+	end
+
+	local rootPart = getRootPart(player)
+	if not rootPart then
+		return
+	end
+
+	local aimDirection = self:_flatTopDownDirection(player, direction)
+	self.topDownLastThrowByUserId[player.UserId] = now
+	self.topDownLoadedBalloonsByUserId[player.UserId] = loaded - 1
+	self.topDownThrowsByUserId[player.UserId] = (self.topDownThrowsByUserId[player.UserId] or 0) + 1
+	self.discoveryService:Unlock(player, Constants.Discoveries.TopDownWaterBalloon.Id)
+
+	local startPosition = rootPart.Position + Vector3.new(0, 2.35, 0) + aimDirection * 2.6
+	local validatedTarget = self:_getValidatedTopDownAimTarget(player, direction, targetPosition)
+	self:_recordTopDownTraining(player, 0.72, 0.004)
+	self:_spawnTopDownWaterBalloon(player, rootPart, validatedTarget, "Aim", nil, startPosition)
+	self:_fireTopDownAmmo(player)
+end
+
+function InteractionService:_handleTopDownArenaRemote(player, payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	if payload.Action == TOP_DOWN_THROW_ACTION then
+		self:_throwLoadedTopDownBalloon(player, payload.Direction, payload.TargetPosition)
+	end
+end
+
+function InteractionService:_wireTopDownCameraConsole(console)
+	local prompt = getPrompt(console)
+
+	self:_connectPrompt(prompt, function(player)
+		local modes = { "Overhead", "FPV", "Normal" }
+		local currentIndex = table.find(modes, self.topDownCameraMode) or 1
+		self.topDownCameraMode = modes[(currentIndex % #modes) + 1]
+		setTextLabelText(console, "TopDownCameraConsoleText", ("CAMERA\n%s"):format(string.upper(self.topDownCameraMode)))
+		self.discoveryService:Unlock(player, Constants.Discoveries.TopDownCamera.Id)
+		self:_recordTopDownTraining(player, 0.45, 0.002)
+		playSound(console, "rbxasset://sounds/electronicpingshort.wav", 0.42, 1.1)
+		local message = ("Training camera mode: %s."):format(self.topDownCameraMode)
+		self:_broadcastTopDownCameraMode(message)
+		self.systemMessageRemote:FireClient(player, message)
+	end)
+end
+
+function InteractionService:_wireTopDownWaterBalloonBucket(bucket)
+	local prompt = getPrompt(bucket)
+
+	self:_connectPrompt(prompt, function(player)
+		self:_recordTopDownTraining(player, 0.35, 0.002)
+		self:_loadTopDownWaterBalloons(player, bucket)
+	end)
+
+	if bucket:GetAttribute("AutoReloadTouchedWired") then
+		return
+	end
+
+	bucket:SetAttribute("AutoReloadTouchedWired", true)
+	bucket.Touched:Connect(function(hit)
+		local player = getPlayerFromHit(hit)
+		if not player or not self:_isPlayerInTopDownArena(player) then
+			return
+		end
+
+		local lastByBucket = self.topDownBucketTouchAtByUserId[player.UserId]
+		if not lastByBucket then
+			lastByBucket = {}
+			self.topDownBucketTouchAtByUserId[player.UserId] = lastByBucket
+		end
+
+		local now = os.clock()
+		if now - (lastByBucket[bucket] or 0) < 1.15 then
+			return
+		end
+
+		if (self.topDownLoadedBalloonsByUserId[player.UserId] or 0) >= TOP_DOWN_MAX_LOADED_BALLOONS then
+			return
+		end
+
+		lastByBucket[bucket] = now
+		self:_recordTopDownTraining(player, 0.28, 0.0015)
+		self:_loadTopDownWaterBalloons(player, bucket)
+	end)
+end
+
+function InteractionService:_wireTopDownTargetRing(ring)
+	local prompt = getPrompt(ring)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.TopDownRingScore.Id)
+		playSound(ring, "rbxasset://sounds/electronicpingshort.wav", 0.3, 1.6)
+		self.systemMessageRemote:FireClient(player, "The ring prefers balloons from above, but appreciates the inspection.")
+	end)
+end
+
+function InteractionService:_wireTopDownSplashTarget(target)
+	local prompt = getPrompt(target)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.TopDownPlayerSplash.Id)
+		playSound(target, "rbxasset://sounds/button.wav", 0.26, 0.75)
+		self.systemMessageRemote:FireClient(player, "The practice target moves just enough to be annoying.")
+	end)
+end
+
+function InteractionService:_wireTopDownScoreboard(scoreboard)
+	local prompt = getPrompt(scoreboard)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.TopDownScoreboard.Id)
+		self:_updateTopDownScoreboards()
+		playSound(scoreboard, "rbxasset://sounds/electronicpingshort.wav", 0.3, 0.9)
+		self.systemMessageRemote:FireClient(player, "The scoreboard confirms every splash is official enough.")
+	end)
+end
+
 function InteractionService:_setCaveEntranceSealed()
 	if self.caveEntranceSealed then
-		return
+		return false
 	end
 
 	self.caveEntranceSealed = true
@@ -1208,12 +2818,58 @@ function InteractionService:_setCaveEntranceSealed()
 			if instance:IsA("BasePart") then
 				local closedTransparency = instance:GetAttribute("ClosedTransparency")
 				local closedCanCollide = instance:GetAttribute("ClosedCanCollide")
-				instance.Transparency = if closedTransparency ~= nil then closedTransparency else 0.1
+				local closedCanQuery = instance:GetAttribute("ClosedCanQuery")
+				local closedCanTouch = instance:GetAttribute("ClosedCanTouch")
+				instance.Transparency = if closedTransparency ~= nil then closedTransparency else 0
 				instance.CanCollide = closedCanCollide == true
+				instance.CanQuery = closedCanQuery ~= false
+				instance.CanTouch = closedCanTouch == true
 			end
 		end
 		self:_persistResetBaseline(seal)
 	end
+
+	for _, reveal in ipairs(CollectionService:GetTagged(Constants.Tags.CaveLockdownReveal)) do
+		for _, instance in ipairs(getInstanceAndDescendants(reveal)) do
+			if instance:IsA("BasePart") then
+				local closedTransparency = instance:GetAttribute("ClosedTransparency")
+				local closedCanCollide = instance:GetAttribute("ClosedCanCollide")
+				instance.Transparency = if closedTransparency ~= nil then closedTransparency else 0
+				instance.CanCollide = closedCanCollide == true
+			elseif instance:IsA("SurfaceGui") or instance:IsA("BillboardGui") then
+				instance.Enabled = true
+			end
+		end
+		self:_persistResetBaseline(reveal)
+	end
+
+	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.CaveKeyDoor)) do
+		local prompt = getPrompt(door)
+		if prompt then
+			prompt.ActionText = prompt:GetAttribute("LockedActionText") or prompt.ActionText
+			prompt.ObjectText = prompt:GetAttribute("LockedObjectText") or prompt.ObjectText
+		end
+
+		local label = door:FindFirstChild("CaveKeyDoorText", true)
+		if label and label:IsA("TextLabel") then
+			local lockedText = label:GetAttribute("LockedText")
+			local lockedTextColor = label:GetAttribute("LockedTextColor3")
+			local lockedBackgroundColor = label:GetAttribute("LockedBackgroundColor3")
+			if typeof(lockedText) == "string" then
+				label.Text = lockedText
+			end
+			if typeof(lockedTextColor) == "Color3" then
+				label.TextColor3 = lockedTextColor
+			end
+			if typeof(lockedBackgroundColor) == "Color3" then
+				label.BackgroundColor3 = lockedBackgroundColor
+			end
+		end
+
+		self:_persistResetBaseline(door)
+	end
+
+	return true
 end
 
 function InteractionService:_cycleCaveLight(light)
@@ -1240,13 +2896,22 @@ function InteractionService:_wireCaveLight(light)
 
 	self:_connectPrompt(prompt, function(player)
 		self:_cycleCaveLight(light)
-		playSound(light, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.25)
 
 		local lightIndex = light:GetAttribute("CaveLightIndex") or 0
 		if lightIndex == 1 then
 			local alreadyFound = self.discoveryService:HasDiscovery(player, Constants.Discoveries.CaveFirstLight.Id)
 			self.discoveryService:Unlock(player, Constants.Discoveries.CaveFirstLight.Id)
-			self:_setCaveEntranceSealed()
+			local isPrologueOpen =
+				self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
+			if not isPrologueOpen then
+				self:_setCaveEntranceSealed()
+			end
+			playSound(light, "rbxasset://sounds/snap.wav", 0.75, 0.38)
+			task.delay(0.08, function()
+				if light.Parent then
+					playSound(light, "rbxasset://sounds/button.wav", 0.55, 0.42)
+				end
+			end)
 			self.systemMessageRemote:FireClient(
 				player,
 				if alreadyFound
@@ -1256,6 +2921,7 @@ function InteractionService:_wireCaveLight(light)
 			return
 		end
 
+		playSound(light, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.25)
 		self.discoveryService:Unlock(player, Constants.Discoveries.CaveChangedLights.Id)
 		self.systemMessageRemote:FireClient(player, "The cave light changes color. This feels like exactly the sort of thing the sign mentioned.")
 	end)
@@ -1342,7 +3008,19 @@ function InteractionService:_wireCaveKeyDoor(door)
 	local prompt = getPrompt(door)
 
 	self:_connectPrompt(prompt, function(player)
+		local isPrologueOpen =
+			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
 		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.CaveExitKey.Id) then
+			if isPrologueOpen or not self.caveEntranceSealed then
+				local destinationCFrame = door:GetAttribute("DestinationCFrame")
+				if typeof(destinationCFrame) == "CFrame" and self:_canUseTeleport(player) then
+					playSound(door, "rbxasset://sounds/button.wav", 0.45, 0.48)
+					self:_teleportPlayer(player, destinationCFrame, "UntouchedPrologueCaveDoor")
+					self.systemMessageRemote:FireClient(player, "The huge door opens without asking for the key. That is not comforting.")
+				end
+				return
+			end
+
 			playSound(door, "rbxasset://sounds/snap.wav", 0.5, 0.45)
 			self.systemMessageRemote:FireClient(player, "The door has the same key shape, and it is waiting for the actual key.")
 			return
@@ -1368,22 +3046,32 @@ function InteractionService:_wireCaveKeyDoor(door)
 		end
 
 		task.delay(0.18, function()
-			teleportPlayer(player, destinationCFrame)
+			self:_teleportPlayer(player, destinationCFrame, "CaveKeyDoor")
 			self.systemMessageRemote:FireClient(player, "The cave door opens into the hallway. Only the TV Room looks ready to admit anything.")
 		end)
-	end)
+	end, {
+		PrologueSafeNavigation = true,
+	})
 end
 
 function InteractionService:_wireMainButton(button)
 	local prompt = getPrompt(button)
 
 	self:_connectPrompt(prompt, function(player)
-		local accepted = self.eventManager:TriggerRandom(player)
-		if accepted and button:IsA("BasePart") then
-			self:_cycleRoomMood("TVRoom")
-			task.spawn(function()
-				self:_pressButtonVisual(button)
-			end)
+		local servicedRain = self:_serviceActiveObjectRain()
+		local accepted = false
+		local eventManagerActive = self.eventManager and self.eventManager.IsActive and self.eventManager:IsActive()
+		if not (servicedRain and eventManagerActive) then
+			accepted = self.eventManager:TriggerRandom(player)
+		end
+
+			if (accepted or servicedRain) and button:IsA("BasePart") then
+				if accepted then
+					self:_cycleRoomMood("TVRoom")
+				end
+				task.spawn(function()
+					self:_pressButtonVisual(button)
+				end)
 		end
 	end)
 end
@@ -1465,9 +3153,15 @@ function InteractionService:_pressButtonVisual(button)
 		return
 	end
 
+	local visualRoot = button.Parent
+	local basePivot = if visualRoot and visualRoot:IsA("Model") then visualRoot:GetPivot() else nil
 	local baseCFrames = {}
+	local localCFrames = {}
 	for _, part in ipairs(visualParts) do
-		baseCFrames[part] = part:GetAttribute("BaseCFrame") or part.CFrame
+		baseCFrames[part] = part.CFrame
+		if basePivot then
+			localCFrames[part] = basePivot:ToObjectSpace(part.CFrame)
+		end
 	end
 
 	local baseColor = button:GetAttribute("BaseColor") or button.Color
@@ -1477,9 +3171,13 @@ function InteractionService:_pressButtonVisual(button)
 	local motion = Instance.new("Vector3Value")
 	motion.Value = Vector3.zero
 	local motionConnection = motion:GetPropertyChangedSignal("Value"):Connect(function()
+		local currentPivot = if basePivot and visualRoot and visualRoot.Parent then visualRoot:GetPivot() else nil
 		for _, part in ipairs(visualParts) do
 			if part.Parent then
-				part.CFrame = baseCFrames[part] + motion.Value
+				local baseCFrame = if currentPivot and localCFrames[part]
+					then currentPivot * localCFrames[part]
+					else baseCFrames[part]
+				part.CFrame = baseCFrame + motion.Value
 			end
 		end
 	end)
@@ -1558,15 +3256,28 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 
 		if state.IsOn then
 			state.OnCycle += 1
-			local color = SWITCH_ON_COLORS[((state.OnCycle - 1) % #SWITCH_ON_COLORS) + 1]
+			local highlightMode = state.OnCycle % 2 == 1
+			local color = if highlightMode
+				then SWITCH_ON_COLORS[((state.OnCycle - 1) % #SWITCH_ON_COLORS) + 1]
+				else Color3.fromRGB(255, 224, 145)
 			Lighting.Brightness = 2.2
-			Lighting.ClockTime = 16
+			Lighting.ClockTime = highlightMode and 17 or 14
 			Lighting.Ambient = color
-			Lighting.OutdoorAmbient = color:Lerp(Color3.fromRGB(255, 255, 255), 0.22)
+			Lighting.OutdoorAmbient = if highlightMode
+				then color:Lerp(Color3.fromRGB(255, 255, 255), 0.22)
+				else Color3.fromRGB(190, 190, 180)
 			self:_syncLightSwitches(true)
 
-			playSound(plate or lever or lightSwitch, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.1)
-			self.systemMessageRemote:FireClient(player, "The room lights came back in a different mood.")
+			if isControlPanelInteraction(lightSwitch) then
+				playControlPanelSound(plate or lever or lightSwitch, 0.5, 1.05)
+			else
+				playSound(plate or lever or lightSwitch, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.1)
+			end
+			if highlightMode then
+				self.systemMessageRemote:FireClient(player, "The room lights come back in thumbnail mode.")
+			else
+				self.systemMessageRemote:FireClient(player, "The room lights return to normal. Normal is a strong word.")
+			end
 
 			if lightSwitch:GetAttribute("UnlocksGiantDiscovery")
 				and not state.GiantAwardedByUserId[player.UserId]
@@ -1582,7 +3293,11 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 			Lighting.OutdoorAmbient = Color3.fromRGB(5, 6, 10)
 			self:_syncLightSwitches(false)
 
-			playSound(plate or lever or lightSwitch, "rbxasset://sounds/button.wav", 0.45, 0.82)
+			if isControlPanelInteraction(lightSwitch) then
+				playControlPanelSound(plate or lever or lightSwitch, 0.46, 0.95)
+			else
+				playSound(plate or lever or lightSwitch, "rbxasset://sounds/button.wav", 0.45, 0.82)
+			end
 			self.systemMessageRemote:FireClient(player, "The room goes suspiciously dark.")
 		end
 
@@ -1594,7 +3309,10 @@ end
 function InteractionService:_syncLightSwitches(isOn)
 	local state = self.lightSwitchState
 	local colorIndex = math.max(1, state.OnCycle)
-	local onColor = SWITCH_ON_COLORS[((colorIndex - 1) % #SWITCH_ON_COLORS) + 1]
+	local highlightMode = colorIndex % 2 == 1
+	local onColor = if highlightMode
+		then SWITCH_ON_COLORS[((colorIndex - 1) % #SWITCH_ON_COLORS) + 1]
+		else Color3.fromRGB(255, 224, 145)
 	local plateColor = if isOn
 		then onColor:Lerp(Color3.fromRGB(255, 255, 255), 0.7)
 		else Color3.fromRGB(205, 205, 195)
@@ -1639,13 +3357,15 @@ function InteractionService:_lightSwitchGiant(player)
 		end
 	end)
 
-	local snapshot = PlayerScale.Apply(player, 2.25)
+	PlayerScale.ApplyTemporary(player, 2.25, Constants.SizeTransformDuration or Constants.EventDuration)
 	self.discoveryService:Unlock(player, Constants.Discoveries.GiantPlayer.Id)
 	self.systemMessageRemote:FireClient(player, "The light switch made you inconveniently tall.")
-
-	task.delay(Constants.EventDuration, function()
-		PlayerScale.Restore(snapshot)
-	end)
+	self.transformCameraRemote:FireClient(player, {
+		Action = "SizeTransform",
+		Scale = 2.25,
+		Duration = Constants.SizeTransformCameraDuration or 3,
+		Label = "Giant mode",
+	})
 end
 
 function InteractionService:_wireUnderfloorReturn(instance)
@@ -1655,7 +3375,7 @@ function InteractionService:_wireUnderfloorReturn(instance)
 		local destinationCFrame = instance:GetAttribute("DestinationCFrame") or CFrame.new(0, 5, 10)
 		self.discoveryService:Unlock(player, Constants.Discoveries.EscapedUnderfloor.Id)
 		self.systemMessageRemote:FireClient(player, "The room underside sent you back upstairs.")
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "UnderfloorReturn")
 	end)
 end
 
@@ -1663,6 +3383,7 @@ function InteractionService:_wireReferenceBook(bookPart)
 	local prompt = getPrompt(bookPart)
 
 	self:_connectPrompt(prompt, function(player)
+		playControlPanelSound(bookPart, 0.42, 1.02)
 		local roomId = bookPart:GetAttribute("RoomId") or "TVRoom"
 		if self.roomProgressService then
 			self.roomProgressService:ShowReferenceBook(player, roomId)
@@ -1674,6 +3395,7 @@ function InteractionService:_wireStoreButton(button)
 	local prompt = getPrompt(button)
 
 	self:_connectPrompt(prompt, function(player)
+		playControlPanelSound(button, 0.46, 1)
 		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
 		if self.roomProgressService then
 			self.roomProgressService:ShowStore(player, roomId)
@@ -1685,6 +3407,7 @@ function InteractionService:_wireTeleportButton(button)
 	local prompt = getPrompt(button)
 
 	self:_connectPrompt(prompt, function(player)
+		playControlPanelSound(button, 0.46, 1)
 		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
 		if not self.discoveryService:HasTeleportKey(player) then
 			self.systemMessageRemote:FireClient(player, "The Teleport control blinks: key required.")
@@ -1694,6 +3417,18 @@ function InteractionService:_wireTeleportButton(button)
 
 		if self.roomProgressService then
 			self.roomProgressService:ShowTeleportMenu(player, roomId)
+		end
+	end)
+end
+
+function InteractionService:_wireFieldButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		playControlPanelSound(button, 0.48, 0.96)
+		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
+		if self.roomProgressService then
+			self.roomProgressService:ShowFieldControls(player, roomId)
 		end
 	end)
 end
@@ -1859,7 +3594,7 @@ function InteractionService:_wireSecretRoomDoor(door)
 			task.wait(0.25)
 		end
 
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "SecretRoomDoor")
 		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryEntered.Id)
 		if hasKey then
 			self.discoveryService:ConsumeSecretKey(player, roomId, "The Library Key unlocks the door and politely retires.")
@@ -1882,21 +3617,25 @@ function InteractionService:_wireSecretRoomExit(exitDoor)
 	local prompt = getPrompt(exitDoor)
 
 	self:_connectPrompt(prompt, function(player)
+		local isPrologueOpen =
+			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
 		local destinationCFrame = exitDoor:GetAttribute("DestinationCFrame")
 		if typeof(destinationCFrame) ~= "CFrame" then
 			self.systemMessageRemote:FireClient(player, "The secret exit is having stage fright.")
 			return
 		end
 
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "SecretRoomExit")
 		local unlockDiscoveryId = exitDoor:GetAttribute("UnlockDiscoveryId")
-		if typeof(unlockDiscoveryId) == "string" then
+		if typeof(unlockDiscoveryId) == "string" and not isPrologueOpen then
 			self.discoveryService:Unlock(player, unlockDiscoveryId)
 		end
 		local destinationName = exitDoor:GetAttribute("DestinationName") or "the TV Room"
 		local travelMessage = exitDoor:GetAttribute("TravelMessage")
 		self.systemMessageRemote:FireClient(player, typeof(travelMessage) == "string" and travelMessage or ("Back to %s. Act natural."):format(destinationName))
-	end)
+	end, {
+		PrologueSafeNavigation = true,
+	})
 end
 
 function InteractionService:_wireLibraryLamp(lamp)
@@ -2050,7 +3789,7 @@ function InteractionService:_wireLibraryLoftDoor(door)
 		self.systemMessageRemote:FireClient(player, "The loft door opens onto a very selective reading nook above the Library.")
 
 		local destination = door:GetAttribute("DestinationCFrame") or CFrame.new(-14, 17.6, -45)
-		teleportPlayer(player, destination)
+		self:_teleportPlayer(player, destination, "LibraryLoftDoor")
 		task.wait(0.25)
 		state.Reacting = false
 	end)
@@ -2154,7 +3893,7 @@ function InteractionService:_wireLibraryBookcaseDoor(door)
 			task.wait(0.25)
 		end
 
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "LibraryBookcaseDoor")
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingEntered.Id)
 		self.systemMessageRemote:FireClient(player, "The bookcase opens into a bowling alley. That is not standard library architecture.")
 
@@ -2173,6 +3912,7 @@ end
 
 function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 	self:_setBowlingLanePinsAnchored(laneIndex, false)
+	local subsystemPower = self:_getBunkerSubsystemPower()
 
 	local ball = Instance.new("Part")
 	ball.Name = "BowlingBall"
@@ -2185,7 +3925,7 @@ function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 	ball.CustomPhysicalProperties = PhysicalProperties.new(4.5, 0.35, 0.35)
 	ball:SetAttribute("LaneIndex", laneIndex)
 	local ballSpawnZ = button:GetAttribute("BallSpawnZ") or (button.Position.Z - 1.3)
-	local ballVelocityZ = button:GetAttribute("BallVelocityZ") or -118
+	local ballVelocityZ = (button:GetAttribute("BallVelocityZ") or -118) * math.clamp(0.42 + subsystemPower * 0.58, 0.42, 1)
 	ball.CFrame = CFrame.new(laneX, 2.05, ballSpawnZ)
 	ball.Parent = workspace:FindFirstChild("InteractiveObjects") or workspace
 	CollectionService:AddTag(ball, Constants.Tags.TemporaryObject)
@@ -2208,9 +3948,16 @@ function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
 		end
 	end)
 
-	ball.AssemblyLinearVelocity = Vector3.new(0, 0, ballVelocityZ)
-	ball.AssemblyAngularVelocity = Vector3.new(-28, 0, 0)
-	Debris:AddItem(ball, 14)
+	ball.AssemblyLinearVelocity = Vector3.new((math.random() - 0.5) * (1 - subsystemPower) * 16, 0, ballVelocityZ)
+	ball.AssemblyAngularVelocity = Vector3.new(-28 * math.clamp(0.5 + subsystemPower * 0.5, 0.5, 1), 0, 0)
+	self:_scheduleBunkerReclaim(ball, {
+		Delay = 13.5,
+		Key = "bowling_balls",
+		Message = "An abandoned bowling ball rolls half an inch, then the lane quietly reclaims it.",
+		SinkDistance = 1.4,
+		Duration = 0.95,
+	})
+	Debris:AddItem(ball, 18)
 
 	return ball
 end
@@ -2272,18 +4019,28 @@ function InteractionService:_updateBowlingAds(step)
 	self.bowlingAdStep = step
 	local showScores = step % 3 == 2
 	local adStep = math.floor(step / 3) * 2 + (step % 3)
+	local powerState, power = self:_getBunkerPowerState()
 
 	for _, instance in ipairs(workspace:GetDescendants()) do
 		if instance:IsA("BasePart") and instance:GetAttribute("BowlingAdScreen") then
 			local ad
-			if showScores then
+			local adOffset = instance:GetAttribute("BowlingAdOffset") or 1
+			local screenFlicker = powerState == "Offline"
+				or (powerState == "Flicker" and ((step + adOffset) % 3 == 0))
+				or (powerState == "Weak" and ((step + adOffset) % 8 == 0))
+			if screenFlicker then
+				ad = {
+					Text = if powerState == "Offline" then "SIGNAL STARVED\nTOUCH INPUT REQUESTED" else "LOW POWER\nPLEASE KEEP BOWLING",
+					Background = Color3.fromRGB(8, 10, 14),
+					TextColor = Color3.fromRGB(255, 132, 140),
+				}
+			elseif showScores then
 				ad = {
 					Text = self:_formatBowlingAdScoreText(),
 					Background = Color3.fromRGB(18, 24, 36),
 					TextColor = Color3.fromRGB(119, 255, 203),
 				}
 			else
-				local adOffset = instance:GetAttribute("BowlingAdOffset") or 1
 				ad = BOWLING_ADS[((adStep + adOffset - 1) % #BOWLING_ADS) + 1]
 			end
 
@@ -2294,10 +4051,11 @@ function InteractionService:_updateBowlingAds(step)
 				label.BackgroundColor3 = ad.Background
 			end
 
-			instance.Color = ad.Background
+			instance.Color = ad.Background:Lerp(Color3.fromRGB(3, 4, 8), math.clamp((1 - power) * 0.38, 0, 0.38))
 			local light = instance:FindFirstChild("BowlingAdLight", true)
 			if light and light:IsA("SurfaceLight") then
 				light.Color = ad.Background
+				light.Brightness = if screenFlicker then 0.05 else 0.28 + power * 1.22
 			end
 		end
 	end
@@ -2325,6 +4083,13 @@ function InteractionService:_startBowlingMaintenanceMotion()
 	local startedAt = os.clock()
 	self.bowlingMaintenanceMotionConnection = RunService.Heartbeat:Connect(function()
 		local elapsed = os.clock() - startedAt
+		local belt = workspace:FindFirstChild("MaintenanceConveyor", true)
+		local beltCFrame = if belt and belt:IsA("BasePart") then belt.CFrame else nil
+		local beltLength = if belt and belt:IsA("BasePart") then math.max(8, belt.Size.X) else 15.8
+		local beltStart = -beltLength / 2 - 2.8
+		local beltTravel = beltLength + 5.6
+		local subsystemPower = self:_getBunkerSubsystemPower()
+		local beltSpeed = 0.32 + 1.93 * (subsystemPower ^ 0.85)
 
 		for _, mover in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingMaintenanceMover)) do
 			if not mover.Parent then
@@ -2333,17 +4098,19 @@ function InteractionService:_startBowlingMaintenanceMotion()
 
 			local kind = mover:GetAttribute("MaintenanceMotionKind") or "Ball"
 			local index = mover:GetAttribute("MaintenanceMotionIndex") or 1
-			local wobble = elapsed + index * 0.67
-			local offset
-			local rotation
-
-			if kind == "Pin" then
-				offset = Vector3.new(math.sin(wobble * 0.92) * 1.8, math.sin(wobble * 2.1) * 0.08, math.cos(wobble * 0.75) * 1.05)
-				rotation = CFrame.Angles(math.sin(wobble * 1.4) * 0.06, math.rad(elapsed * 28 + index * 18), math.sin(wobble) * 0.16)
-			else
-				offset = Vector3.new(math.sin(wobble * 0.8) * 5.5, math.abs(math.cos(wobble * 1.45)) * 0.18, math.cos(wobble * 0.8) * 0.48)
-				rotation = CFrame.Angles(math.rad(elapsed * 95 + index * 31), math.rad(elapsed * 42), math.rad(elapsed * 73))
-			end
+			local laneOffset = if kind == "Pin" then 0.55 else -0.42
+			local spacing = 2.18
+			local phase = (elapsed * beltSpeed + index * spacing) % beltTravel
+			local x = beltStart + phase
+			local skipCycle = math.floor((elapsed * beltSpeed + index * spacing) / beltTravel)
+			local lowPowerSkip = subsystemPower < 0.32 and ((skipCycle + index) % 3 == 0)
+			local hiddenPass = ((skipCycle + index * 3) % 7) == 0 or lowPowerSkip
+			local edgeFade = math.clamp(math.min(phase, beltTravel - phase) / 1.35, 0, 1)
+			local yLift = if kind == "Pin" then 1.17 else 0.96
+			local beltOffset = Vector3.new(x, yLift, laneOffset)
+			local beltRotation = if kind == "Pin"
+				then CFrame.Angles(0, math.rad(90), math.rad(math.sin(elapsed * 4 + index) * 0.025))
+				else CFrame.Angles(math.rad(elapsed * 80 + index * 31), math.rad(elapsed * 22), math.rad(elapsed * 38))
 
 			if mover:IsA("Model") then
 				local basePivot = mover:GetAttribute("MaintenanceBasePivot")
@@ -2351,14 +4118,25 @@ function InteractionService:_startBowlingMaintenanceMotion()
 					basePivot = mover:GetPivot()
 					mover:SetAttribute("MaintenanceBasePivot", basePivot)
 				end
-				mover:PivotTo(basePivot * CFrame.new(offset) * rotation)
+				local targetCFrame = if beltCFrame then beltCFrame * CFrame.new(beltOffset) * beltRotation else basePivot * CFrame.new(beltOffset) * beltRotation
+				mover:PivotTo(targetCFrame)
+				for _, descendant in ipairs(mover:GetDescendants()) do
+					if descendant:IsA("BasePart") then
+						local baseTransparency = descendant:GetAttribute("BaseTransparency")
+						local visibleTransparency = if baseTransparency ~= nil then baseTransparency else 0
+						descendant.Transparency = if hiddenPass then 1 else visibleTransparency + (1 - visibleTransparency) * (1 - edgeFade)
+					end
+				end
 			elseif mover:IsA("BasePart") then
 				local baseCFrame = mover:GetAttribute("MaintenanceBaseCFrame") or mover:GetAttribute("BaseCFrame")
 				if typeof(baseCFrame) ~= "CFrame" then
 					baseCFrame = mover.CFrame
 					mover:SetAttribute("MaintenanceBaseCFrame", baseCFrame)
 				end
-				mover.CFrame = baseCFrame * CFrame.new(offset) * rotation
+				mover.CFrame = if beltCFrame then beltCFrame * CFrame.new(beltOffset) * beltRotation else baseCFrame * CFrame.new(beltOffset) * beltRotation
+				local baseTransparency = mover:GetAttribute("BaseTransparency")
+				local visibleTransparency = if baseTransparency ~= nil then baseTransparency else 0
+				mover.Transparency = if hiddenPass then 1 else visibleTransparency + (1 - visibleTransparency) * (1 - edgeFade)
 			end
 		end
 	end)
@@ -2400,6 +4178,15 @@ function InteractionService:_wireBowlingLaneButton(button)
 
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingFirstBall.Id)
+		local powerState, power = self:_getBunkerPowerState()
+		if powerState == "Offline" then
+			self:_bunkerSputter(button, "The lane button clicks, but the room grid does not have enough charge to roll anything yet.")
+			task.delay(0.9, function()
+				state.Reacting = false
+			end)
+			return
+		end
+
 		playSound(button, "rbxasset://sounds/button.wav", 0.55, 0.75)
 
 		if button:IsA("BasePart") then
@@ -2417,7 +4204,11 @@ function InteractionService:_wireBowlingLaneButton(button)
 
 		self:_spawnBowlingBall(button, laneIndex, laneX, player)
 		self:_incrementBowlingLaneCount(laneIndex)
-		self.systemMessageRemote:FireClient(player, ("Lane %d accepts your bowling-related decision."):format(laneIndex))
+		if powerState == "Flicker" or powerState == "Weak" then
+			self.systemMessageRemote:FireClient(player, ("Lane %d coughs up a low-power roll. The room grid likes the effort."):format(laneIndex))
+		else
+			self.systemMessageRemote:FireClient(player, ("Lane %d accepts your bowling-related decision."):format(laneIndex))
+		end
 
 		task.delay(2.8, function()
 			local knocked = self:_countKnockedBowlingPins(laneIndex)
@@ -2474,11 +4265,13 @@ function InteractionService:_setBowlingCosmic(active, source)
 	self.bowlingCosmicActive = active
 	local token = {}
 	self.bowlingCosmicToken = token
+	local subsystemPower = self:_getBunkerSubsystemPower()
+	local cosmicScale = math.clamp((subsystemPower - (Constants.BunkerEnergy.CosmicMinimumPower or 0.2)) / math.max(0.05, 1 - (Constants.BunkerEnergy.CosmicMinimumPower or 0.2)), 0, 1)
 
 	if active then
-		Lighting.Brightness = 1.1
+		Lighting.Brightness = 0.45 + cosmicScale * 0.65
 		Lighting.ClockTime = 0
-		Lighting.Ambient = Color3.fromRGB(44, 18, 80)
+		Lighting.Ambient = Color3.fromRGB(44, 18, 80):Lerp(Color3.fromRGB(6, 4, 12), 1 - cosmicScale)
 		Lighting.OutdoorAmbient = Color3.fromRGB(15, 8, 38)
 	else
 		self.resetService.RestoreLighting()
@@ -2524,7 +4317,7 @@ function InteractionService:_setBowlingCosmic(active, source)
 
 		local light = disco:FindFirstChild("DiscoLight", true)
 		if light and light:IsA("PointLight") then
-			light.Brightness = active and 5.6 or 0
+			light.Brightness = active and (0.35 + cosmicScale * 5.25) or 0
 			light.Color = BOWLING_COSMIC_COLORS[1]
 		end
 	end
@@ -2538,10 +4331,15 @@ function InteractionService:_setBowlingCosmic(active, source)
 		while self.bowlingCosmicActive and self.bowlingCosmicToken == token do
 			step += 1
 			local color = BOWLING_COSMIC_COLORS[((step - 1) % #BOWLING_COSMIC_COLORS) + 1]
+			local livePower = self:_getBunkerSubsystemPower()
+			local flickering = livePower < (Constants.BunkerEnergy.CosmicWeakPower or 0.5)
+			local pulseOn = not flickering or (step % 4 ~= 0 and (livePower > 0.24 or step % 7 ~= 0))
+			local pulseScale = if pulseOn then math.clamp(0.22 + livePower * 0.78, 0.12, 1) else 0.04
 
 			for _, instance in ipairs(workspace:GetDescendants()) do
 				if instance:IsA("BasePart") and instance:GetAttribute("CosmicSurface") then
 					instance.Color = BOWLING_COSMIC_COLORS[((step + math.floor(math.abs(instance.Position.X))) % #BOWLING_COSMIC_COLORS) + 1]
+					instance.Transparency = if pulseOn then instance:GetAttribute("BaseTransparency") or 0 else 0.48
 				end
 			end
 
@@ -2553,12 +4351,14 @@ function InteractionService:_setBowlingCosmic(active, source)
 				local light = disco:FindFirstChild("DiscoLight", true)
 				if light and light:IsA("PointLight") then
 					light.Color = color
+					light.Brightness = 0.2 + pulseScale * 5.4
 				end
 			end
 
-			self:_updateBowlingLaserBeams(step, true)
+			self:_setBowlingCosmicFog(pulseOn and livePower > 0.28)
+			self:_updateBowlingLaserBeams(step, pulseOn and livePower > 0.2)
 
-			task.wait(0.28)
+			task.wait(if flickering then 0.34 + (1 - livePower) * 0.26 else 0.28)
 		end
 	end)
 
@@ -2567,11 +4367,52 @@ function InteractionService:_setBowlingCosmic(active, source)
 	end
 end
 
+function InteractionService:_startCaveAmbientSounds()
+	if self.caveAmbientSoundsStarted then
+		return
+	end
+
+	self.caveAmbientSoundsStarted = true
+	local prologueAudio = Constants.AudioAssets and Constants.AudioAssets.Prologue
+	if not prologueAudio then
+		return
+	end
+
+	local outsideSource = workspace:FindFirstChild("OutsideCaveSoundSource", true)
+	if outsideSource then
+		playLoopedSpatialSound(outsideSource, "OutsideCaveLoop", prologueAudio.OutsideCaveAmbienceId, {
+			Volume = 0.48,
+			RollOffMinDistance = 8,
+			RollOffMaxDistance = 38,
+			RollOffMode = Enum.RollOffMode.InverseTapered,
+		})
+	end
+
+	local insideSource = workspace:FindFirstChild("InsideCaveSoundSource", true)
+	if insideSource then
+		playLoopedSpatialSound(insideSource, "InsideCaveLoop", prologueAudio.InsideCaveAmbienceId, {
+			Volume = 0.34,
+			RollOffMinDistance = 10,
+			RollOffMaxDistance = 64,
+			RollOffMode = Enum.RollOffMode.InverseTapered,
+		})
+	end
+end
+
 function InteractionService:_wireBowlingCosmicSwitch(switch)
 	local prompt = getPrompt(switch)
 
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingCosmic.Id)
+		local powerState, power = self:_getBunkerPowerState()
+		if not self.bowlingCosmicActive and power < (Constants.BunkerEnergy.CosmicMinimumPower or 0.2) then
+			self:_bunkerSputter(switch, "The disco ball tries once, then remembers the room grid is undercharged.")
+			if prompt then
+				prompt.ActionText = "Cosmic"
+			end
+			return
+		end
+
 		self:_setBowlingCosmic(not self.bowlingCosmicActive, switch)
 		if prompt then
 			prompt.ActionText = self.bowlingCosmicActive and "Normalize" or "Cosmic"
@@ -2579,7 +4420,12 @@ function InteractionService:_wireBowlingCosmicSwitch(switch)
 
 		self.systemMessageRemote:FireClient(
 			player,
-			self.bowlingCosmicActive and "Cosmic Bowling is on. The floor is taking lighting personally." or "Cosmic Bowling is off. The alley returns to regular questionable bowling."
+			self.bowlingCosmicActive
+				and (powerState == "Weak" or powerState == "Flicker")
+					and "Cosmic Bowling sputters awake. The room grid is doing its best with crumbs."
+				or self.bowlingCosmicActive
+					and "Cosmic Bowling is on. The floor is taking lighting personally."
+				or "Cosmic Bowling is off. The alley returns to regular questionable bowling."
 		)
 	end)
 end
@@ -2603,7 +4449,7 @@ function InteractionService:_wireBowlingMaintenanceDoor(door)
 		end
 
 		playSound(door, "rbxasset://sounds/button.wav", 0.42, 0.65)
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "BowlingMaintenanceDoor")
 		self.systemMessageRemote:FireClient(player, "The pin machinery allows a supervised maintenance detour.")
 	end)
 end
@@ -2683,6 +4529,12 @@ function InteractionService:_wireBowlingResetLever(lever)
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingResetLever.Id)
 		local laneIndex = lever:GetAttribute("LaneIndex")
+		local powerState = self:_getBunkerPowerState()
+		if powerState == "Offline" then
+			self:_bunkerSputter(lever, "The pinsetter clicks twice and gives up. The room grid needs activity before it can tidy the lane.")
+			return
+		end
+
 		self:_resetBowlingPins(laneIndex)
 		playSound(lever, "rbxasset://sounds/button.wav", 0.5, 0.58)
 
@@ -2699,7 +4551,9 @@ function InteractionService:_wireBowlingResetLever(lever)
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end
 
-		if laneIndex then
+		if powerState == "Flicker" then
+			self.systemMessageRemote:FireClient(player, ("Lane %d pinsetter stutters, then barely resets."):format(laneIndex or 0))
+		elseif laneIndex then
 			self.systemMessageRemote:FireClient(player, ("Lane %d pinsetter resets the pins with suspicious accuracy."):format(laneIndex))
 		else
 			self.systemMessageRemote:FireClient(player, "The pinsetter resets the pins and quietly refuses overtime.")
@@ -2713,6 +4567,12 @@ function InteractionService:_wireBowlingBallReturn(ballReturn)
 
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingBallReturn.Id)
+		local powerState = self:_getBunkerPowerState()
+		if powerState == "Offline" then
+			self:_bunkerSputter(ballReturn, "The lane reset button glows weakly. It needs a few more terrible decisions to wake up.")
+			return
+		end
+
 		self:_resetBowlingPins(laneIndex)
 		self:_incrementBowlingLaneCount(laneIndex)
 		playSound(ballReturn, "rbxasset://sounds/button.wav", 0.45, 0.72)
@@ -2734,7 +4594,9 @@ function InteractionService:_wireBowlingBallReturn(ballReturn)
 			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end
 
-		if laneIndex then
+		if powerState == "Flicker" then
+			self.systemMessageRemote:FireClient(player, ("Lane %d resets with a tired mechanical sigh."):format(laneIndex or 0))
+		elseif laneIndex then
 			self.systemMessageRemote:FireClient(player, ("Lane %d resets the ball and pins. The scoreboard counts the paperwork."):format(laneIndex))
 		else
 			self.systemMessageRemote:FireClient(player, "The lane resets the balls, pins, and most of its dignity.")
@@ -2892,6 +4754,7 @@ function InteractionService:_wireTreetopZipline(zipline)
 		if humanoid then
 			humanoid.AutoRotate = false
 		end
+		self:_beginScriptedMotion(player, "TreetopZipline")
 		rootPart.AssemblyLinearVelocity = Vector3.zero
 		rootPart.AssemblyAngularVelocity = Vector3.zero
 		rootPart.Anchored = true
@@ -2967,8 +4830,9 @@ function InteractionService:_wireTreetopZipline(zipline)
 			rootPart.Anchored = previousAnchored
 			rootPart.AssemblyLinearVelocity = Vector3.zero
 			rootPart.AssemblyAngularVelocity = Vector3.zero
-			teleportPlayer(player, finalCFrame)
+			self:_teleportPlayer(player, finalCFrame, "TreetopZipline")
 		end
+		self:_endScriptedMotion(player)
 
 		if awardsVoid then
 			self.discoveryService:Unlock(player, Constants.Discoveries.VoidEntered.Id)
@@ -3042,7 +4906,7 @@ function InteractionService:_wireVoidGravityOrb(orb)
 		force.Force = Vector3.new(0, rootPart.AssemblyMass * workspace.Gravity * 2.15, 0)
 		force.Parent = rootPart
 
-		rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, 76, 0)
+		self:_addImpulse(player, Vector3.new(0, 76, 0), "VoidGravityFlip")
 		Debris:AddItem(force, 7)
 		Debris:AddItem(attachment, 7)
 
@@ -3265,6 +5129,53 @@ function InteractionService:_fireFreezeRay(player)
 	end
 end
 
+function InteractionService:_buildFreezeRayToolVisual(tool)
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Anchored = false
+	handle.CanCollide = false
+	handle.Massless = true
+	handle.Material = Enum.Material.Metal
+	handle.Color = Color3.fromRGB(18, 52, 112)
+	handle.Size = Vector3.new(0.52, 1.35, 0.52)
+	handle.CFrame = CFrame.new()
+	handle.Parent = tool
+
+	local function addPiece(name, size, offset, color, material, shape)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Anchored = false
+		part.CanCollide = false
+		part.Massless = true
+		part.Material = material or Enum.Material.Metal
+		part.Color = color
+		part.Size = size
+		part.CFrame = handle.CFrame * offset
+		if shape then
+			part.Shape = shape
+		end
+		part.Parent = tool
+
+		local weld = Instance.new("WeldConstraint")
+		weld.Name = name .. "Weld"
+		weld.Part0 = handle
+		weld.Part1 = part
+		weld.Parent = part
+		return part
+	end
+
+	addPiece("FreezeRayBody", Vector3.new(1.05, 0.8, 1.36), CFrame.new(0, 0.78, -0.55), Color3.fromRGB(36, 116, 210), Enum.Material.Metal)
+	addPiece("FreezeRayRearOrb", Vector3.new(0.82, 0.82, 0.82), CFrame.new(0, 0.83, 0.3), Color3.fromRGB(84, 219, 255), Enum.Material.Glass, Enum.PartType.Ball)
+	addPiece("FreezeRayBarrel", Vector3.new(0.38, 1.9, 0.38), CFrame.new(0, 0.8, -1.55) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(72, 189, 255), Enum.Material.Neon, Enum.PartType.Cylinder)
+	addPiece("FreezeRayMuzzle", Vector3.new(0.7, 0.26, 0.7), CFrame.new(0, 0.8, -2.55) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(216, 249, 255), Enum.Material.Metal, Enum.PartType.Cylinder)
+	addPiece("FreezeRayMuzzleGlow", Vector3.new(0.48, 0.48, 0.48), CFrame.new(0, 0.8, -2.72), Color3.fromRGB(210, 255, 255), Enum.Material.Neon, Enum.PartType.Ball)
+	addPiece("FreezeRayTopFin", Vector3.new(0.18, 0.58, 0.82), CFrame.new(0, 1.42, -0.32) * CFrame.Angles(math.rad(-18), 0, 0), Color3.fromRGB(98, 204, 255), Enum.Material.Neon)
+	addPiece("FreezeRayTrigger", Vector3.new(0.18, 0.42, 0.22), CFrame.new(0, 0.02, -0.42) * CFrame.Angles(math.rad(-18), 0, 0), Color3.fromRGB(7, 18, 42), Enum.Material.Metal)
+	addPiece("FreezeRayPommel", Vector3.new(0.72, 0.22, 0.58), CFrame.new(0, -0.78, 0.12), Color3.fromRGB(10, 30, 66), Enum.Material.Metal)
+
+	tool.Grip = CFrame.new(0, -0.18, 0.16) * CFrame.Angles(math.rad(-12), 0, 0)
+end
+
 function InteractionService:_grantFreezeRay(player)
 	if self:_hasFreezeRay(player) then
 		return
@@ -3278,9 +5189,10 @@ function InteractionService:_grantFreezeRay(player)
 	local tool = Instance.new("Tool")
 	tool.Name = "Void Freeze Ray"
 	tool.ToolTip = "Briefly chills players and freezes loose objects."
-	tool.RequiresHandle = false
+	tool.RequiresHandle = true
 	tool.CanBeDropped = false
 	tool:SetAttribute("VoidFreezeRay", true)
+	self:_buildFreezeRayToolVisual(tool)
 	tool.Activated:Connect(function()
 		if player.Parent then
 			self:_fireFreezeRay(player)
@@ -3304,7 +5216,7 @@ function InteractionService:_wireResetRoomButton(button)
 	local prompt = getPrompt(button)
 
 	self:_connectPrompt(prompt, function(player)
-		playSound(button, "rbxasset://sounds/button.wav", 0.5, 0.75)
+		playControlPanelSound(button, 0.5, 0.92)
 
 		if button:IsA("BasePart") then
 			local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
@@ -3504,7 +5416,7 @@ function InteractionService:_wireAppliance(appliance)
 		end
 
 		self.discoveryService:Unlock(player, Constants.Discoveries.RanAppliance.Id)
-		self.systemMessageRemote:FireClient(player, "The tiny appliance is reheating time.")
+		self.systemMessageRemote:FireClient(player, "The microwave is reheating time.")
 
 		for seconds = 3, 1, -1 do
 			if textLabel and textLabel:IsA("TextLabel") then
@@ -3534,7 +5446,7 @@ function InteractionService:_wireAppliance(appliance)
 		end
 
 		local spark = Instance.new("Part")
-		spark.Name = "TinyApplianceSpark"
+		spark.Name = "MicrowaveSpark"
 		spark.Anchored = true
 		spark.CanCollide = false
 		spark.Shape = Enum.PartType.Ball
@@ -3607,9 +5519,7 @@ function InteractionService:_sitOnCouch(couch, sitTarget, humanoid, player, prom
 
 	local rootPart = getRootPart(player)
 	if rootPart then
-		rootPart.AssemblyLinearVelocity = Vector3.zero
-		rootPart.AssemblyAngularVelocity = Vector3.zero
-		rootPart.CFrame = sitTarget.CFrame + Vector3.new(0, 1.8, 0)
+		self:_teleportPlayer(player, sitTarget.CFrame + Vector3.new(0, 1.8, 0), "CouchSit")
 	end
 
 	sitTarget.CanTouch = true
@@ -4142,18 +6052,27 @@ function InteractionService:_wireExitDoor(door)
 
 	local prompt = getPrompt(door)
 	self:_connectPrompt(prompt, function(player)
-		if not self.exitUnlocked then
+		local isPrologueOpen =
+			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
+		if isPrologueOpen and door:GetAttribute("LockedDuringPrologue") == true then
+			self.systemMessageRemote:FireClient(player, door:GetAttribute("PrologueLockedMessage") or "That door is not awake yet.")
+			return
+		end
+
+		if not self.exitUnlocked and not isPrologueOpen then
 			self:_checkExitUnlock(player)
 		end
 
-		if not self.exitUnlocked then
+		if not self.exitUnlocked and not isPrologueOpen then
 			self.systemMessageRemote:FireClient(player, self.discoveryService:GetHallUnlockRequirementText(player))
 			return
 		end
 
-		teleportPlayer(player, door:GetAttribute("DestinationCFrame"))
+		self:_teleportPlayer(player, door:GetAttribute("DestinationCFrame"), "ExitDoor")
 		self.systemMessageRemote:FireClient(player, "The hallway smells like choices.")
-	end)
+	end, {
+		PrologueSafeNavigation = true,
+	})
 end
 
 function InteractionService:_unlockExitDoor(door)
@@ -4187,19 +6106,36 @@ function InteractionService:_wireHallDoor(door)
 	local prompt = getPrompt(door)
 
 	self:_connectPrompt(prompt, function(player)
+		local isPrologueOpen =
+			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
+		if isPrologueOpen and door:GetAttribute("LockedDuringPrologue") == true then
+			self.systemMessageRemote:FireClient(player, door:GetAttribute("PrologueLockedMessage") or "That door is not awake yet.")
+			return
+		end
+
 		local lockedMessage = door:GetAttribute("LockedMessage")
-		if lockedMessage then
+		if lockedMessage and not isPrologueOpen then
 			self.systemMessageRemote:FireClient(player, lockedMessage)
 			return
 		end
 
-		local roomId = door:GetAttribute("RoomId")
-		if roomId and not self.discoveryService:IsRoomUnlocked(player, roomId) then
-			self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
-			return
-		end
+			local roomId = door:GetAttribute("RoomId")
+			if roomId and not isPrologueOpen and not self.discoveryService:IsRoomUnlocked(player, roomId) then
+				self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
+				return
+			end
 
-		local destinationCFrame = door:GetAttribute("DestinationCFrame")
+			if door:GetAttribute("RequiresIdBadgeAfterUse")
+				and not isPrologueOpen
+				and self.caveHallDoorLockedByUserId[player.UserId]
+				and not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id)
+			then
+				self.systemMessageRemote:FireClient(player, "The cave door locked itself again. It now wants an ID Badge from Sleeping Quarters.")
+				playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
+				return
+			end
+
+			local destinationCFrame = door:GetAttribute("DestinationCFrame")
 		if typeof(destinationCFrame) ~= "CFrame" then
 			self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
 			return
@@ -4209,18 +6145,24 @@ function InteractionService:_wireHallDoor(door)
 			return
 		end
 
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "HallDoor")
 
 		local unlockDiscoveryId = door:GetAttribute("UnlockDiscoveryId")
-		if typeof(unlockDiscoveryId) == "string" then
-			self.discoveryService:Unlock(player, unlockDiscoveryId)
-		end
+			if typeof(unlockDiscoveryId) == "string" and not isPrologueOpen then
+				self.discoveryService:Unlock(player, unlockDiscoveryId)
+			end
 
-		local travelMessage = door:GetAttribute("TravelMessage")
+			if door:GetAttribute("RequiresIdBadgeAfterUse") and not isPrologueOpen then
+				self.caveHallDoorLockedByUserId[player.UserId] = true
+			end
+
+			local travelMessage = door:GetAttribute("TravelMessage")
 		if typeof(travelMessage) == "string" then
 			self.systemMessageRemote:FireClient(player, travelMessage)
 		end
-	end)
+	end, {
+		PrologueSafeNavigation = true,
+	})
 end
 
 function InteractionService:_getRoomDoorRequirementText(player, roomId)
@@ -4277,10 +6219,13 @@ function InteractionService:_triggerSnackFlight(triggeringPlayer)
 	end
 
 	for _, player in ipairs(targets) do
-		local rootPart = getRootPart(player)
-		if rootPart then
-			rootPart.AssemblyLinearVelocity = rootPart.AssemblyLinearVelocity + Vector3.new(0, SNACK_FLIGHT_INITIAL_BOOST, 0)
+		if self.movementAuthorityService and self.movementAuthorityService.SetSnackFlight then
+			self.movementAuthorityService:SetSnackFlight(player, true, {
+				Duration = SNACK_FLIGHT_DURATION,
+				CeilingY = SNACK_FLIGHT_CEILING_Y,
+			})
 		end
+		self:_addImpulse(player, Vector3.new(0, SNACK_FLIGHT_INITIAL_BOOST, 0), "SnackFlight")
 
 		self.snackEffectRemote:FireClient(player, {
 			Action = "Flight",
@@ -4395,6 +6340,9 @@ function InteractionService:_stopSnackFlightForRoom(triggeringPlayer)
 	end
 
 	for _, player in ipairs(targets) do
+		if self.movementAuthorityService and self.movementAuthorityService.SetSnackFlight then
+			self.movementAuthorityService:SetSnackFlight(player, false)
+		end
 		self.snackEffectRemote:FireClient(player, {
 			Action = "StopFlight",
 		})
@@ -4462,7 +6410,7 @@ function InteractionService:_pushSnackPlayersToWalls(level)
 			local direction = self:_getSnackWindDirection(rootPart.Position)
 			local horizontalForce = 68 + level * 28
 			local lift = 7 + level * 6
-			rootPart.AssemblyLinearVelocity = direction * horizontalForce + Vector3.new(0, lift, 0)
+			self:_applyImpulse(player, direction * horizontalForce + Vector3.new(0, lift, 0), "SnackWind")
 			rootPart.AssemblyAngularVelocity += Vector3.new(0, 2 + level, 0)
 		end
 	end
@@ -4521,7 +6469,7 @@ function InteractionService:_applySnackWindStormToPlayer(player, level, duration
 			local currentRoot = getRootPart(player)
 			if currentRoot then
 				local direction = self:_getSnackWindDirection(currentRoot.Position)
-				currentRoot.AssemblyLinearVelocity += direction * (5 + level * 4) + Vector3.new(0, 2 + level * 0.9, 0)
+				self:_addImpulse(player, direction * (5 + level * 4) + Vector3.new(0, 2 + level * 0.9, 0), "SnackWindStorm")
 			end
 			task.wait(0.28)
 		end
@@ -4841,6 +6789,12 @@ function InteractionService:_playBloxyColaSound(parent)
 	end)
 end
 
+function InteractionService:_recordBloxyColaSip(player)
+	if self.bunkerEnergyService and self.bunkerEnergyService.RecordEnergyItemUsed then
+		self.bunkerEnergyService:RecordEnergyItemUsed(player, "Cola", Constants.BunkerEnergy.ColaEnergyRestore or 0.24)
+	end
+end
+
 function InteractionService:_wireFridgePizza(pizza)
 	local prompt = getPrompt(pizza)
 
@@ -4857,7 +6811,8 @@ function InteractionService:_wireFridgeBloxyCola(cola)
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.FridgeBloxyCola.Id)
 		self:_playBloxyColaSound(cola)
-		self.systemMessageRemote:FireClient(player, "The fridge Bloxy Cola opens with suspicious confidence.")
+		self:_recordBloxyColaSip(player)
+		self.systemMessageRemote:FireClient(player, "The fridge Bloxy Cola restores a little energy. The room signal brightens like it was your idea.")
 	end)
 end
 
@@ -4952,6 +6907,19 @@ function InteractionService:_wireSnackToaster(toaster)
 		end
 
 		CollectionService:AddTag(toast, Constants.Tags.TemporaryObject)
+		self:_attachEnergyReservePrompt(toast, toastModel, {
+			PromptName = "ToastPocketPrompt",
+			ActionText = "Pocket",
+			ObjectText = "Toast",
+			Kind = "Toast",
+			Name = "Pocketed Toast",
+			RestoreAmount = 0.16,
+			Color = toast.Color,
+			GrantMessage = "Toast pocketed. Warm carbs count as field equipment.",
+			UseMessage = "The toast helps a little. Nearby lights react to the crumbs.",
+			ReclaimKey = "toast_pocketed",
+			ReclaimMessage = "The Snack Lab accepts the missing toast without making eye contact.",
+		})
 		toast.AssemblyLinearVelocity = Vector3.new(0, 72, 0)
 		toast.AssemblyAngularVelocity = Vector3.new(8, 2, 12)
 		Debris:AddItem(toastModel, 6)
@@ -4993,7 +6961,7 @@ function InteractionService:_wireSnackSink(sink)
 			end
 
 			state.LaunchDebounceByCharacter[character] = true
-			rootPart.AssemblyLinearVelocity = Vector3.new(0, 92, 0) + rootPart.CFrame.LookVector * 16
+			self:_applyImpulse(player, Vector3.new(0, 92, 0) + rootPart.CFrame.LookVector * 16, "SnackSinkGeyser")
 			playSound(launchPart, "rbxasset://sounds/electronicpingshort.wav", 0.55, 1.35)
 			self.systemMessageRemote:FireClient(player, "The sink launches you because geyser mode has no workplace safety plan.")
 
@@ -5300,6 +7268,168 @@ function InteractionService:_wireSnackRack(rack)
 	end)
 end
 
+function InteractionService:_wireSnackPopcornMachine(button)
+	local prompt = getPrompt(button)
+	local machine = button:FindFirstAncestor("SnackLabPopcornMachine") or button.Parent
+
+	self.snackPopcornState[button] = self.snackPopcornState[button] or {
+		Reacting = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.snackPopcornState[button]
+		if not state or state.Reacting or not button:IsA("BasePart") then
+			return
+		end
+
+		state.Reacting = true
+		self.discoveryService:Unlock(player, Constants.Discoveries.SnackPopcorn.Id)
+		self.systemMessageRemote:FireClient(player, "The popcorn machine makes a persuasive argument for snack weather.")
+		playSound(button, "rbxasset://sounds/button.wav", 0.45, 1.3)
+
+		local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
+		tweenPart(button, 0.08, {
+			CFrame = baseCFrame * CFrame.new(0, -0.08, 0),
+			Color = Color3.fromRGB(255, 232, 92),
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		for popIndex = 1, 34 do
+			task.delay((popIndex - 1) * 0.025, function()
+				if not machine or not machine.Parent then
+					return
+				end
+
+				local kernel = Instance.new("Part")
+				kernel.Name = "SnackPopcornPoppedKernel"
+				kernel.Anchored = false
+				kernel.CanCollide = true
+				kernel.Shape = Enum.PartType.Ball
+				kernel.Size = Vector3.new(0.22, 0.18, 0.22) * (1 + (popIndex % 3) * 0.18)
+				kernel.Color = Color3.fromRGB(255, 238, 156)
+				kernel.Material = Enum.Material.SmoothPlastic
+				kernel.CFrame = button.CFrame * CFrame.new(
+					math.sin(popIndex) * 0.55,
+					2.6 + (popIndex % 6) * 0.08,
+					0.7 + math.cos(popIndex * 0.7) * 0.45
+				)
+				kernel.Parent = workspace
+					CollectionService:AddTag(kernel, Constants.Tags.TemporaryObject)
+					self:_attachEnergyReservePrompt(kernel, kernel, {
+						PromptName = "PopcornPocketPrompt",
+						ActionText = "Pocket",
+						ObjectText = "Popcorn",
+						Kind = "Popcorn",
+						Name = "Pocketed Popcorn",
+						RestoreAmount = Constants.BunkerEnergy.PopcornEnergyRestore or 0.12,
+						Color = kernel.Color,
+						GrantMessage = "Pocketed popcorn for later. Emergency cuisine has entered the inventory.",
+						UseMessage = "The popcorn helps a little. The floor signal reacts to every crumb.",
+						ReclaimKey = "popcorn_pocketed",
+						ReclaimMessage = "The Snack Lab absorbs a kernel-sized absence.",
+					})
+					kernel.AssemblyLinearVelocity = Vector3.new(
+						math.sin(popIndex * 1.7) * 8,
+						16 + (popIndex % 5) * 2.5,
+					math.cos(popIndex * 1.2) * 8
+				)
+					kernel.AssemblyAngularVelocity = Vector3.new(popIndex % 5, popIndex % 7, popIndex % 3) * 2.3
+					self:_scheduleBunkerReclaim(kernel, {
+						Delay = 38 + (popIndex % 10) * 1.5,
+						Key = "snack_popcorn",
+						Message = "Tiny kernels vanish into floor seams that were not there a second ago.",
+						SinkDistance = 1.6,
+						Duration = 0.8,
+					})
+					Debris:AddItem(kernel, 70)
+				end)
+			end
+
+		task.delay(0.45, function()
+			if button.Parent then
+				tweenPart(button, 0.16, {
+					CFrame = baseCFrame,
+					Color = Color3.fromRGB(119, 255, 203),
+				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			end
+		end)
+
+		task.delay(1.6, function()
+			state.Reacting = false
+		end)
+	end)
+end
+
+function InteractionService:_wireContributorDuckStand(stand)
+	local prompt = getPrompt(stand)
+
+	self:_connectPrompt(prompt, function(player)
+		playSound(stand, "rbxasset://sounds/electronicpingshort.wav", 0.35, 1.15)
+		self.systemMessageRemote:FireClient(
+			player,
+			("Duck Founder naming is staged here at %d R$. Product ID and moderated name entry still need to be configured before charging."):format(Constants.NoTouch.DuckFounderRobux or 80000)
+		)
+	end)
+end
+
+function InteractionService:_wireVictoryBrick(brick)
+	local prompt = getPrompt(brick)
+
+	self:_connectPrompt(prompt, function(player)
+		local slotIndex = brick:GetAttribute("VictoryBrickSlotIndex")
+		local displayName = brick:GetAttribute("VictoryBrickDisplayName")
+		local tier = brick:GetAttribute("VictoryBrickTier")
+		playSound(brick, "rbxasset://sounds/electronicpingshort.wav", 0.32, 1.18)
+
+		if typeof(displayName) == "string" and displayName ~= "" then
+			if string.lower(tostring(tier or "")) == "deluxe" then
+				self.systemMessageRemote:FireClient(player, ("%s claimed this deluxe victory brick."):format(displayName))
+			else
+				self.systemMessageRemote:FireClient(player, ("%s completed the bunker and signed this victory brick."):format(displayName))
+			end
+			return
+		end
+
+		if not self.victoryBrickService then
+			self.systemMessageRemote:FireClient(player, "Deluxe brick spot choice is not available in this server yet.")
+			return
+		end
+
+		local ok, message = self.victoryBrickService:PromptDeluxePurchase(player, slotIndex)
+		if not message then
+			message = if ok then "Deluxe brick spot selected." else "Deluxe brick spot could not be selected."
+		end
+		self.systemMessageRemote:FireClient(player, message)
+	end, {
+		PrologueSafeNavigation = true,
+		DoNotRecordInteraction = true,
+	})
+end
+
+function InteractionService:_wireVictoryBrickStand(stand)
+	local prompt = getPrompt(stand)
+
+	self:_connectPrompt(prompt, function(player)
+		local complete = self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
+		local eligible = complete and not self.discoveryService:IsDevOverrideActive(player)
+		playSound(stand, "rbxasset://sounds/button.wav", 0.35, eligible and 1.15 or 0.72)
+
+		if eligible and self.victoryBrickService then
+			local ok, message = self.victoryBrickService:SignStandard(player)
+			if not message then
+				message = if ok then "Victory brick signed." else "Victory brick signing needs a little more progress."
+			end
+			self.systemMessageRemote:FireClient(player, message)
+		elseif eligible then
+			self.systemMessageRemote:FireClient(player, "Victory brick eligibility confirmed, but the walkway registry is not available in this server.")
+		else
+			self.systemMessageRemote:FireClient(player, "Victory bricks unlock after finishing the game on normal progress.")
+		end
+	end, {
+		PrologueSafeNavigation = true,
+		DoNotRecordInteraction = true,
+	})
+end
+
 function InteractionService:_getSnackPackCount()
 	local count = 0
 	for _, pack in ipairs(CollectionService:GetTagged(Constants.Tags.SnackPack)) do
@@ -5434,10 +7564,11 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 				CollectionService:AddTag(clone, Constants.Tags.LooseFruit)
 
 				local primary = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
-				if primary then
-					clone.PrimaryPart = primary
-					CollectionService:AddTag(primary, Constants.Tags.LooseFruit)
-				end
+					if primary then
+						clone.PrimaryPart = primary
+						CollectionService:AddTag(primary, Constants.Tags.LooseFruit)
+						self:_attachLooseFruitEatPrompt(primary, clone)
+					end
 
 				clone:PivotTo(
 					originCFrame
@@ -5474,15 +7605,23 @@ function InteractionService:_wireFruitBowl(fruitBowl)
 
 					primary.AssemblyLinearVelocity = horizontal.Unit * random:NextNumber(76, 118)
 						+ Vector3.new(0, random:NextNumber(32, 54), 0)
-					primary.AssemblyAngularVelocity = Vector3.new(
-						random:NextNumber(-22, 22),
-						random:NextNumber(-22, 22),
-						random:NextNumber(-22, 22)
-					)
-				end
-			end
+						primary.AssemblyAngularVelocity = Vector3.new(
+							random:NextNumber(-22, 22),
+							random:NextNumber(-22, 22),
+							random:NextNumber(-22, 22)
+						)
+					end
 
-			task.wait(0.08)
+					self:_scheduleBunkerReclaim(clone, {
+						Delay = 105 + wave * 5 + random:NextNumber(0, 18),
+						Key = "snack_fruit",
+						Message = "The Snack Lab floor takes a quiet interest in fruit that landed where fruit should not.",
+						SinkDistance = 2.4,
+					})
+					Debris:AddItem(clone, 210)
+				end
+
+				task.wait(0.08)
 		end
 
 		for _, template in ipairs(fruitTemplates) do
@@ -5524,8 +7663,14 @@ function InteractionService:_wireIslandWarningSign(sign, discoveryId, message)
 end
 
 function InteractionService:_spawnIslandSharkFin(source)
-	local sourcePosition = source:IsA("BasePart") and source.Position or Constants.GetRoomSpawnCFrame("Island").Position
-	local origin = Vector3.new(24, 0.22, math.clamp(sourcePosition.Z - 1.5, 137, 148))
+	local sourcePosition = source and source:IsA("BasePart") and source.Position or Vector3.new(
+		self.islandResourceRandom:NextNumber(-36, 36),
+		0.22,
+		self.islandResourceRandom:NextNumber(180, 210)
+	)
+	local origin = if source
+		then Vector3.new(24, 0.22, math.clamp(sourcePosition.Z - 1.5, 137, 148))
+		else sourcePosition
 	local finModel = Instance.new("Model")
 	finModel.Name = "IslandSharkFinWarning"
 	finModel.Parent = workspace
@@ -5546,15 +7691,17 @@ function InteractionService:_spawnIslandSharkFin(source)
 		return part
 	end
 
-	local travel = Vector3.new(-20, 0, 14)
-	local startCFrame = CFrame.new(origin + Vector3.new(5, 0, -8), origin + Vector3.new(-13, 0, 8))
+	local travel = if source then Vector3.new(-20, 0, 14) else Vector3.new(self.islandResourceRandom:NextNumber(-18, 18), 0, self.islandResourceRandom:NextNumber(-18, 2))
+	local startCFrame = CFrame.new(origin + Vector3.new(5, 0, -8), origin + travel)
 	local fin = makeFinPart("WarningFin", Vector3.new(2.4, 3.6, 0.75), startCFrame * CFrame.Angles(0, 0, math.rad(-8)), Color3.fromRGB(47, 61, 73), Enum.Material.SmoothPlastic, "WedgePart")
 	local wakeA = makeFinPart("WakeA", Vector3.new(4.6, 0.16, 0.5), startCFrame * CFrame.new(-1.8, -1.0, 0.55), Color3.fromRGB(180, 242, 255), Enum.Material.Neon)
 	local wakeB = makeFinPart("WakeB", Vector3.new(4.6, 0.16, 0.5), startCFrame * CFrame.new(-1.8, -1.0, -0.55), Color3.fromRGB(180, 242, 255), Enum.Material.Neon)
 	wakeA.Transparency = 0.2
 	wakeB.Transparency = 0.2
 
-	playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.5, 0.36)
+	if source then
+		playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.5, 0.36)
+	end
 	for _, part in ipairs(finModel:GetChildren()) do
 		if part:IsA("BasePart") then
 			tweenPart(part, 3.4, {
@@ -5743,9 +7890,16 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 		return part
 	end
 
-	local attackPoint = Vector3.new(20, 2.0, 142.5)
-	local targetCFrame = CFrame.new(attackPoint, Vector3.new(0, 2.0, 150)) * CFrame.Angles(0, math.rad(90), 0)
-	local baseCFrame = targetCFrame * CFrame.new(0, -4.8, 11)
+	local islandCenter = Vector3.new(0, 2.0, 150)
+	local attackDirection = rootPart and (rootPart.Position - islandCenter) or Vector3.new(1, 0, -0.25)
+	attackDirection = Vector3.new(attackDirection.X, 0, attackDirection.Z)
+	if attackDirection.Magnitude < 1 then
+		attackDirection = Vector3.new(1, 0, -0.25)
+	end
+	attackDirection = attackDirection.Unit
+	local attackPoint = islandCenter + attackDirection * 28
+	local targetCFrame = CFrame.new(attackPoint, islandCenter) * CFrame.Angles(0, math.rad(90), 0)
+	local baseCFrame = targetCFrame * CFrame.new(0, -6.2, 14)
 	local body = makeSharkPart("SharkBody", "Part", Vector3.new(4.1, 3.2, 11.5), baseCFrame, Color3.fromRGB(89, 103, 116))
 	body.Shape = Enum.PartType.Ball
 	makeSharkPart("SharkFin", "WedgePart", Vector3.new(2.6, 3.6, 1.6), baseCFrame * CFrame.new(0, 2.2, 0.55), Color3.fromRGB(55, 67, 78))
@@ -5780,19 +7934,19 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 
 	for _, part in ipairs(sharkModel:GetChildren()) do
 		if part:IsA("BasePart") then
-			tweenPart(part, 0.34, {
-				CFrame = targetCFrame * baseCFrame:ToObjectSpace(part.CFrame),
-			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				tweenPart(part, 0.72, {
+					CFrame = targetCFrame * baseCFrame:ToObjectSpace(part.CFrame),
+				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end
 	end
 
-	task.delay(0.38, function()
-		if upperMouth.Parent and lowerMouth.Parent then
-			tweenPart(upperMouth, 0.16, { CFrame = upperMouth.CFrame * CFrame.Angles(math.rad(-15), 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			tweenPart(lowerMouth, 0.16, { CFrame = lowerMouth.CFrame * CFrame.Angles(math.rad(13), 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			playSound(exitGate, "rbxasset://sounds/snap.wav", 0.95, 0.48)
-		end
-	end)
+		task.delay(0.82, function()
+			if upperMouth.Parent and lowerMouth.Parent then
+				tweenPart(upperMouth, 0.22, { CFrame = upperMouth.CFrame * CFrame.Angles(math.rad(-18), 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				tweenPart(lowerMouth, 0.22, { CFrame = lowerMouth.CFrame * CFrame.Angles(math.rad(16), 0, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				playSound(exitGate, "rbxasset://sounds/snap.wav", 0.95, 0.48)
+			end
+		end)
 
 	if rootPart then
 		local destination = CFrame.new(Vector3.new(0, 3, 154), Vector3.new(0, 3, 166))
@@ -5802,23 +7956,23 @@ function InteractionService:_spawnIslandShark(exitGate, player)
 		else
 			pushDirection = pushDirection.Unit
 		end
-		rootPart.AssemblyLinearVelocity = pushDirection * 88 + Vector3.new(0, 38, 0)
-		task.delay(0.28, function()
-			if rootPart.Parent then
-				rootPart.CFrame = destination
-				rootPart.AssemblyLinearVelocity = Vector3.new(0, 18, 0)
+		self:_applyImpulse(player, pushDirection * 88 + Vector3.new(0, 38, 0), "IslandSharkAttack")
+			task.delay(0.78, function()
+				if rootPart.Parent then
+					self:_teleportPlayer(player, destination, "IslandSharkAttack")
+					self:_applyImpulse(player, Vector3.new(0, 18, 0), "IslandSharkRecovery")
 			end
 		end)
 	end
 
-	task.delay(1.6, function()
-		for _, part in ipairs(sharkModel:GetChildren()) do
-			if part:IsA("BasePart") then
-				tweenPart(part, 0.65, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		task.delay(4.8, function()
+			for _, part in ipairs(sharkModel:GetChildren()) do
+				if part:IsA("BasePart") then
+					tweenPart(part, 0.85, { Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				end
 			end
-		end
-	end)
-	Debris:AddItem(sharkModel, 2.6)
+		end)
+		Debris:AddItem(sharkModel, 6.2)
 end
 
 function InteractionService:_wireIslandExit(exitGate)
@@ -5836,7 +7990,7 @@ function InteractionService:_wireIslandExit(exitGate)
 
 		self.islandExitWarningsByUserId[player.UserId] = nil
 		local destinationCFrame = exitGate:GetAttribute("DestinationCFrame") or Constants.Hallway.SpawnCFrame
-		teleportPlayer(player, destinationCFrame)
+		self:_teleportPlayer(player, destinationCFrame, "IslandReturn")
 		self.systemMessageRemote:FireClient(player, "The island lets you return to the hallway.")
 	end
 
@@ -5881,7 +8035,9 @@ function InteractionService:_wireIslandExit(exitGate)
 	end
 
 	if exitMode == "Door" then
-		self:_connectPrompt(prompt, returnToHallway)
+		self:_connectPrompt(prompt, returnToHallway, {
+			PrologueSafeNavigation = true,
+		})
 		return
 	end
 
@@ -5945,6 +8101,7 @@ function InteractionService:_wireIslandShovel(shovel)
 
 	self.islandShovelState[shovel] = self.islandShovelState[shovel] or {
 		Reacting = false,
+		Used = false,
 	}
 
 	self:_connectPrompt(prompt, function(player)
@@ -5952,8 +8109,14 @@ function InteractionService:_wireIslandShovel(shovel)
 		if not state or state.Reacting then
 			return
 		end
+		if state.Used then
+			self.systemMessageRemote:FireClient(player, "The shovel has already retired into several smaller shovel opinions.")
+			playSound(shovel, "rbxasset://sounds/snap.wav", 0.28, 0.5)
+			return
+		end
 
 		state.Reacting = true
+		state.Used = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.DugTreasure.Id)
 		playSound(shovel, "rbxasset://sounds/snap.wav", 0.45, 0.58)
 
@@ -5993,14 +8156,31 @@ function InteractionService:_wireIslandShovel(shovel)
 		end
 
 		local treasure = self:_revealIslandTreasure()
-		if treasure then
-			self.systemMessageRemote:FireClient(player, "The shovel found a treasure box in the sand.")
-		else
-			self.systemMessageRemote:FireClient(player, "The shovel found a treasure box, but the box forgot to exist.")
-		end
+			if treasure then
+				self.systemMessageRemote:FireClient(player, "The shovel found a treasure box in the sand.")
+			else
+				self.systemMessageRemote:FireClient(player, "The shovel found a treasure box, but the box forgot to exist.")
+			end
 
-		task.wait(0.2)
-		state.Reacting = false
+			local shovelModel = shovel:IsA("BasePart") and shovel:FindFirstAncestor("IslandShovel")
+			if shovelModel then
+				setPromptEnabled(shovelModel, false)
+				for index, part in ipairs(shovelModel:GetDescendants()) do
+					if part:IsA("BasePart") then
+						local baseCFrame = part:GetAttribute("BaseCFrame") or part.CFrame
+						part.CanCollide = true
+						tweenPart(part, 0.42, {
+							CFrame = baseCFrame
+								* CFrame.new((index % 3 - 1) * 0.55, -0.35 - (index % 2) * 0.08, (index % 4 - 1.5) * 0.4)
+								* CFrame.Angles(math.rad(index * 17), math.rad(index * 31), math.rad(index * 13)),
+							Color = if part.Material == Enum.Material.Wood then Color3.fromRGB(104, 61, 35) else Color3.fromRGB(154, 160, 164),
+						}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+					end
+				end
+			end
+
+			task.wait(0.2)
+			state.Reacting = false
 	end)
 end
 
@@ -6062,6 +8242,7 @@ function InteractionService:_wireIslandBloxyCola(cola)
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.IslandBloxyCola.Id)
 		self:_playBloxyColaSound(cola)
+		self:_recordBloxyColaSip(player)
 
 		if cola:IsA("BasePart") then
 			local baseCFrame = cola:GetAttribute("BaseCFrame") or cola.CFrame
@@ -6074,7 +8255,7 @@ function InteractionService:_wireIslandBloxyCola(cola)
 			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		end
 
-		self.systemMessageRemote:FireClient(player, "The island Bloxy Cola makes the correct soda noise.")
+		self.systemMessageRemote:FireClient(player, "The island Bloxy Cola restores a little energy and makes the correct soda noise.")
 		task.wait(0.25)
 		state.Reacting = false
 	end)
@@ -6532,12 +8713,234 @@ function InteractionService:_wireIslandSpaceLadder(ladder)
 		self.systemMessageRemote:FireClient(player, "The ladder takes the scenic route directly to orbit.")
 		task.delay(0.25, function()
 			if player.Parent then
-				teleportPlayer(player, Constants.GetRoomSpawnCFrame("SpaceStation"))
+				self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame("SpaceStation"), "IslandSpaceLadder")
 			end
 			task.delay(1, function()
 				state.TransportingByUserId[player.UserId] = nil
 			end)
 		end)
+		end)
+	end
+
+function InteractionService:_isIslandOccupied()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player) == "Island" then
+			return true
+		end
+	end
+
+	return false
+end
+
+function InteractionService:_isPickupVisible(part)
+	if not part or not part:IsA("BasePart") then
+		return false
+	end
+
+	local prompt = getPrompt(part)
+	return part.Transparency < 0.95 and (not prompt or prompt.Enabled)
+end
+
+function InteractionService:_setIslandPickupVisible(part, visible, cframe)
+	if not part or not part:IsA("BasePart") then
+		return
+	end
+
+	if cframe then
+		part.CFrame = cframe
+	end
+	part.Transparency = visible and 0 or 1
+	part.CanCollide = visible
+	setPromptEnabled(part, visible)
+end
+
+function InteractionService:_getRandomIslandWoodCFrame()
+	local points = {
+		{ X = -17.2, Z = -7.6 },
+		{ X = 18.4, Z = -8.7 },
+		{ X = -14.8, Z = 14.8 },
+		{ X = 15.5, Z = 13.6 },
+		{ X = 1.5, Z = 18.6 },
+		{ X = -6.4, Z = -10.2 },
+		{ X = 8.6, Z = 19.8 },
+	}
+	local choice = points[self.islandResourceRandom:NextInteger(1, #points)]
+	return CFrame.new(choice.X, 1.0, 150 + choice.Z)
+		* CFrame.Angles(0, math.rad(self.islandResourceRandom:NextNumber(0, 360)), math.rad(self.islandResourceRandom:NextNumber(-8, 8)))
+end
+
+function InteractionService:_getRandomIslandRockCFrame()
+	local points = {
+		{ X = -19.0, Z = 4.2 },
+		{ X = 18.5, Z = 2.5 },
+		{ X = -8.5, Z = 18.7 },
+		{ X = 10.8, Z = 17.8 },
+		{ X = 3.2, Z = -9.8 },
+	}
+	local choice = points[self.islandResourceRandom:NextInteger(1, #points)]
+	return CFrame.new(choice.X, 1.03, 150 + choice.Z)
+		* CFrame.Angles(0, math.rad(self.islandResourceRandom:NextNumber(0, 360)), math.rad(self.islandResourceRandom:NextNumber(-12, 12)))
+end
+
+function InteractionService:_respawnIslandWoodIfNeeded()
+	local visibleCount = 0
+	local candidates = {}
+
+	for _, wood in ipairs(CollectionService:GetTagged(Constants.Tags.IslandScrapWood)) do
+		if wood:IsA("BasePart") then
+			if self:_isPickupVisible(wood) then
+				visibleCount += 1
+			else
+				table.insert(candidates, wood)
+			end
+		end
+	end
+
+	if visibleCount >= 5 or #candidates == 0 then
+		return false
+	end
+
+	local wood = candidates[self.islandResourceRandom:NextInteger(1, #candidates)]
+	local state = self.islandScrapWoodState[wood]
+	if state then
+		state.Collected = false
+		state.Reacting = false
+	end
+	self:_setIslandPickupVisible(wood, true, self:_getRandomIslandWoodCFrame())
+	return true
+end
+
+function InteractionService:_respawnIslandRockIfNeeded()
+	local visibleRespawnRock = false
+	local candidates = {}
+
+	for _, rock in ipairs(CollectionService:GetTagged(Constants.Tags.IslandRock)) do
+		if rock:IsA("BasePart") and rock:GetAttribute("RespawnOnly") == true then
+			if self:_isPickupVisible(rock) then
+				visibleRespawnRock = true
+			else
+				table.insert(candidates, rock)
+			end
+		end
+	end
+
+	if visibleRespawnRock or #candidates == 0 then
+		return false
+	end
+
+	local rock = candidates[self.islandResourceRandom:NextInteger(1, #candidates)]
+	local state = self.islandRockState[rock]
+	if state then
+		state.Collected = false
+		state.Reacting = false
+	end
+	self:_setIslandPickupVisible(rock, true, self:_getRandomIslandRockCFrame())
+	return true
+end
+
+function InteractionService:_getPocketItemCount(player, kind, fallbackCounts)
+	local toolCount = 0
+	if self.bunkerEnergyService and self.bunkerEnergyService.GetPocketItemCount then
+		toolCount = self.bunkerEnergyService:GetPocketItemCount(player, kind)
+	end
+
+	local fallbackCount = 0
+	if fallbackCounts and player then
+		fallbackCount = fallbackCounts[player.UserId] or 0
+	end
+
+	return math.max(toolCount, fallbackCount)
+end
+
+function InteractionService:_grantPocketItem(player, options)
+	if not self.bunkerEnergyService or not self.bunkerEnergyService.GrantPocketItemTool then
+		return false, "Your pockets are not accepting supplies right now."
+	end
+
+	return self.bunkerEnergyService:GrantPocketItemTool(player, options)
+end
+
+function InteractionService:_consumePocketItem(player, kind, fallbackCounts)
+	if self.bunkerEnergyService and self.bunkerEnergyService.ConsumePocketItem then
+		if self.bunkerEnergyService:ConsumePocketItem(player, kind, 1) then
+			if fallbackCounts and player then
+				fallbackCounts[player.UserId] = math.max(0, (fallbackCounts[player.UserId] or 0) - 1)
+			end
+			return true
+		end
+	end
+
+	if fallbackCounts and player and (fallbackCounts[player.UserId] or 0) > 0 then
+		fallbackCounts[player.UserId] -= 1
+		return true
+	end
+
+	return false
+end
+
+function InteractionService:_spawnIslandResourceWave()
+	local wave = Instance.new("Part")
+	wave.Name = "IslandRespawnWave"
+	wave.Anchored = true
+	wave.CanCollide = false
+	wave.Material = Enum.Material.Glass
+	wave.Color = Color3.fromRGB(122, 220, 255)
+	wave.Transparency = 0.44
+	wave.Size = Vector3.new(44, 0.08, 5.8)
+	wave.CFrame = CFrame.new(0, 1.12, 134)
+	wave.Parent = workspace
+	CollectionService:AddTag(wave, Constants.Tags.TemporaryObject)
+
+	local wetSand = Instance.new("Part")
+	wetSand.Name = "IslandWetSandFade"
+	wetSand.Anchored = true
+	wetSand.CanCollide = false
+	wetSand.Material = Enum.Material.SmoothPlastic
+	wetSand.Color = Color3.fromRGB(176, 178, 148)
+	wetSand.Transparency = 0.62
+	wetSand.Size = Vector3.new(35, 0.05, 23)
+	wetSand.CFrame = CFrame.new(0, 1.075, 154)
+	wetSand.Parent = workspace
+	CollectionService:AddTag(wetSand, Constants.Tags.TemporaryObject)
+
+	tweenPart(wave, 4.2, {
+		CFrame = CFrame.new(0, 1.14, 174),
+		Transparency = 0.78,
+	}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	tweenPart(wetSand, 5.2, {
+		Transparency = 1,
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	Debris:AddItem(wave, 4.8)
+	Debris:AddItem(wetSand, 5.6)
+
+	task.delay(1.2, function()
+		self:_respawnIslandWoodIfNeeded()
+		self:_respawnIslandRockIfNeeded()
+	end)
+end
+
+function InteractionService:_startIslandAmbientResources()
+	if self.islandResourceLoopStarted then
+		return
+	end
+
+	self.islandResourceLoopStarted = true
+	task.spawn(function()
+		while true do
+			task.wait(60)
+			if self:_isIslandOccupied() then
+				self:_spawnIslandResourceWave()
+			end
+		end
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(self.islandResourceRandom:NextNumber(24, 52))
+			if self:_isIslandOccupied() then
+				self:_spawnIslandSharkFin(nil)
+			end
+		end
 	end)
 end
 
@@ -6556,8 +8959,23 @@ function InteractionService:_wireIslandScrapWood(wood)
 		end
 
 		state.Reacting = true
+		local ok, message = self:_grantPocketItem(player, {
+			Kind = "IslandWood",
+			Name = "Driftwood",
+			ToolTip = "Carry to the island rock ring to feed the fire.",
+			Color = wood.Color,
+			GrantMessage = "Driftwood pocketed. The fire ring looks ready.",
+		})
+		if not ok then
+			self.systemMessageRemote:FireClient(player, message or "Your pockets are full. The driftwood stays where the tide left it.")
+			playSound(wood, "rbxasset://sounds/snap.wav", 0.28, 0.55)
+			task.wait(0.15)
+			state.Reacting = false
+			return
+		end
+
 		state.Collected = true
-		self.islandWoodCountByUserId[player.UserId] = (self.islandWoodCountByUserId[player.UserId] or 0) + 1
+		self.islandWoodCountByUserId[player.UserId] = self:_getPocketItemCount(player, "IslandWood", self.islandWoodCountByUserId)
 		self.discoveryService:Unlock(player, Constants.Discoveries.IslandDriftwood.Id)
 		playSound(wood, "rbxasset://sounds/button.wav", 0.33, 0.78)
 		if wood:IsA("BasePart") then
@@ -6568,7 +8986,57 @@ function InteractionService:_wireIslandScrapWood(wood)
 			wood.CanCollide = false
 		end
 		setPromptEnabled(wood, false)
-		self.systemMessageRemote:FireClient(player, ("Scrap wood collected: %d. The fire ring looks interested."):format(self.islandWoodCountByUserId[player.UserId]))
+		self.systemMessageRemote:FireClient(player, ("%s Driftwood carried: %d."):format(message or "Driftwood pocketed.", self.islandWoodCountByUserId[player.UserId]))
+		task.wait(0.15)
+		state.Reacting = false
+	end)
+end
+
+function InteractionService:_wireIslandRock(rock)
+	local prompt = getPrompt(rock)
+
+	self.islandRockState[rock] = self.islandRockState[rock] or {
+		Reacting = false,
+		Collected = false,
+	}
+
+	self:_connectPrompt(prompt, function(player)
+		local state = self.islandRockState[rock]
+		if not state or state.Reacting or state.Collected then
+			return
+		end
+
+		state.Reacting = true
+		local ok, message = self:_grantPocketItem(player, {
+			Kind = "IslandRock",
+			Name = "Beach Rock",
+			ToolTip = "Useful for pressure plates that want proof of weight.",
+			Color = rock.Color,
+			GrantMessage = "Beach rock pocketed. Your inventory has chosen responsibility.",
+		})
+		if not ok then
+			self.systemMessageRemote:FireClient(player, message or "Your pockets are full. The rock refuses to become a lifestyle.")
+			playSound(rock, "rbxasset://sounds/snap.wav", 0.28, 0.55)
+			task.wait(0.15)
+			state.Reacting = false
+			return
+		end
+
+		state.Collected = true
+		self.islandRockCountByUserId[player.UserId] = self:_getPocketItemCount(player, "IslandRock", self.islandRockCountByUserId)
+		self.discoveryService:Unlock(player, Constants.Discoveries.IslandCollectedRock.Id)
+		playSound(rock, "rbxasset://sounds/button.wav", 0.32, 0.68)
+
+		if rock:IsA("BasePart") then
+			tweenPart(rock, 0.18, {
+				Transparency = 1,
+				CFrame = rock.CFrame + Vector3.new(0, 0.42, 0),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			rock.CanCollide = false
+		end
+		setPromptEnabled(rock, false)
+		self.systemMessageRemote:FireClient(player, ("%s Rocks carried: %d."):format(message or "Beach rock pocketed.", self.islandRockCountByUserId[player.UserId]))
+
 		task.wait(0.15)
 		state.Reacting = false
 	end)
@@ -6678,14 +9146,19 @@ function InteractionService:_addIslandFirewood(fireRingPart, player)
 		return false
 	end
 
-	local heldWood = self.islandWoodCountByUserId[player.UserId] or 0
+	local heldWood = self:_getPocketItemCount(player, "IslandWood", self.islandWoodCountByUserId)
 	if heldWood <= 0 then
 		local needed = math.max(1, math.min(requiredWood, maxWood) - state.Deposited)
 		self.systemMessageRemote:FireClient(player, ("The rock ring wants %d more piece%s of driftwood. You are carrying none."):format(needed, needed == 1 and "" or "s"))
 		return false
 	end
 
-	self.islandWoodCountByUserId[player.UserId] = heldWood - 1
+	if not self:_consumePocketItem(player, "IslandWood", self.islandWoodCountByUserId) then
+		self.systemMessageRemote:FireClient(player, "The rock ring reaches for driftwood, but your pockets come up empty.")
+		return false
+	end
+
+	self.islandWoodCountByUserId[player.UserId] = self:_getPocketItemCount(player, "IslandWood", self.islandWoodCountByUserId)
 	state.Deposited += 1
 	self:_setIslandFireWoodVisible(fireRingPart, state.Deposited)
 	self:_setIslandFireEmitters(fireRingPart, state.Burning, state.Smoking)
@@ -6949,9 +9422,9 @@ function InteractionService:_wireSpaceStationFoodPrinter(printer)
 					lift = 0.46
 				end
 
-				tweenPart(part, 0.18, {
-					CFrame = baseCFrame + Vector3.new(0, lift, -0.22),
-				}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+					tweenPart(part, 0.18, {
+						CFrame = baseCFrame + Vector3.new(0, lift, 0),
+					}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 				task.delay(0.42, function()
 					if part.Parent then
 						tweenPart(part, 0.2, { CFrame = baseCFrame }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)

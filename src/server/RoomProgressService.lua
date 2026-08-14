@@ -2,9 +2,13 @@ local CollectionService = game:GetService("CollectionService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
+local PlayerScale = require(script.Parent:WaitForChild("PlayerScale"))
+local LowGravityEvent = require(script.Parent:WaitForChild("Events"):WaitForChild("LowGravity"))
 
 local RoomProgressService = {}
 RoomProgressService.__index = RoomProgressService
@@ -18,7 +22,17 @@ local STORE_PRICE_KEYS = {
 	SecretKeyClueCost = true,
 	TeleportKeyClueCost = true,
 	TeleportKeyRobux = true,
+	DuckFounderRobux = true,
+	VictoryBrickRobux = true,
 }
+local FALL_RECOVERY_Y = -160
+local FALL_RECOVERY_COOLDOWN_SECONDS = 1.5
+local TELEPORT_LANDING_LIFT = Vector3.new(0, 2.6, 0)
+local TOP_DOWN_ARENA_MUSIC_ID = "rbxassetid://1846912254"
+local TOP_DOWN_ARENA_MUSIC_NAME = "TopDownArenaMusic"
+local TOP_DOWN_ARENA_MUSIC_VOLUME = 0.5
+local TOP_DOWN_ARENA_MUSIC_FADE_SECONDS = 1.5
+local TOP_DOWN_ARENA_MUSIC_MIN_PLAYERS = 2
 
 local function getRootPart(player)
 	local character = player.Character
@@ -43,7 +57,7 @@ local function teleportPlayer(player, destinationCFrame)
 
 	rootPart.AssemblyLinearVelocity = Vector3.zero
 	rootPart.AssemblyAngularVelocity = Vector3.zero
-	rootPart.CFrame = destinationCFrame
+	rootPart.CFrame = destinationCFrame + TELEPORT_LANDING_LIFT
 end
 
 local function positionInZone(position, zone)
@@ -59,6 +73,33 @@ local function positionInZone(position, zone)
 		and position.Z <= zone.Max.Z
 end
 
+local function getTopDownArenaMusic()
+	local existing = SoundService:FindFirstChild(TOP_DOWN_ARENA_MUSIC_NAME)
+	if existing and existing:IsA("Sound") then
+		existing.SoundId = TOP_DOWN_ARENA_MUSIC_ID
+		existing.Looped = true
+		return existing
+	end
+
+	local sound = Instance.new("Sound")
+	sound.Name = TOP_DOWN_ARENA_MUSIC_NAME
+	sound.SoundId = TOP_DOWN_ARENA_MUSIC_ID
+	sound.Volume = 0
+	sound.Looped = true
+	sound.Parent = SoundService
+	return sound
+end
+
+local function fadeSoundVolume(sound, targetVolume)
+	local tween = TweenService:Create(
+		sound,
+		TweenInfo.new(TOP_DOWN_ARENA_MUSIC_FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Volume = targetVolume }
+	)
+	tween:Play()
+	return tween
+end
+
 function RoomProgressService.new(discoveryService)
 	local self = setmetatable({}, RoomProgressService)
 	self.discoveryService = discoveryService
@@ -68,10 +109,56 @@ function RoomProgressService.new(discoveryService)
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.roomStatusRemote = RemoteService.GetRemote(Constants.Remotes.RoomStatus)
 	self.sparkleRemote = RemoteService.GetRemote(Constants.Remotes.SparkleHint)
+	self.prologueRemote = RemoteService.GetRemote(Constants.Remotes.Prologue)
+	self.transformCameraRemote = RemoteService.GetRemote(Constants.Remotes.TransformCamera)
+	self.movementAuthorityService = nil
 	self.stateByUserId = {}
 	self.pendingHintPurchaseByUserId = {}
 	self.storePriceOverrides = {}
+	self.topDownArenaMusic = nil
+	self.topDownArenaMusicActive = false
 	return self
+end
+
+function RoomProgressService:SetMovementAuthorityService(movementAuthorityService)
+	self.movementAuthorityService = movementAuthorityService
+end
+
+function RoomProgressService:_teleportPlayer(player, destinationCFrame, reason)
+	if self.movementAuthorityService and self.movementAuthorityService.TeleportPlayer then
+		local success = self.movementAuthorityService:TeleportPlayer(player, destinationCFrame, reason)
+		if success then
+			self:RememberSafeSpawn(player, destinationCFrame)
+		end
+		return success
+	end
+
+	teleportPlayer(player, destinationCFrame)
+	self:RememberSafeSpawn(player, destinationCFrame)
+	return true
+end
+
+function RoomProgressService:RememberSafeSpawn(player, destinationCFrame)
+	if not player or not player.Parent or typeof(destinationCFrame) ~= "CFrame" then
+		return false
+	end
+
+	local state = self:_getState(player)
+	state.LastSafeSpawnCFrame = destinationCFrame
+	return true
+end
+
+function RoomProgressService:_getRecoveryCFrame(player, state)
+	if state and typeof(state.LastSafeSpawnCFrame) == "CFrame" then
+		return state.LastSafeSpawnCFrame
+	end
+
+	local roomId = self:GetRoomForPlayer(player)
+	if roomId and Constants.GetRoom(roomId) then
+		return Constants.GetRoomSpawnCFrame(roomId)
+	end
+
+	return Constants.GetRoomSpawnCFrame(Constants.Prologue.StartRoomId or "CaveEntrance")
 end
 
 function RoomProgressService:Initialize()
@@ -132,11 +219,16 @@ function RoomProgressService:_getState(player)
 			TimerStartedAt = now,
 			PlayStartedAt = now,
 			LastRoomTickAt = nil,
+			LastSafeSpawnCFrame = nil,
+			LastFallRecoveryAt = 0,
+			OutsideCaveAudioStopped = false,
 			RoomPlaySecondsByRoomId = {},
 			RoomPlayRewardsByRoomId = {},
 			SparkleStateByRoomId = {},
 			StartOptionsSent = false,
 			StartChoiceHandled = false,
+			UntouchedPrologueActive = false,
+			UntouchedPrologueTriggered = false,
 			TwoMinuteAwarded = {},
 			BonusAwarded = {},
 		}
@@ -144,6 +236,52 @@ function RoomProgressService:_getState(player)
 	end
 
 	return state
+end
+
+function RoomProgressService:_hasAnyProgress(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
+	local hintCount = self.discoveryService:GetHintCount(player)
+	local clueCount = self.discoveryService:GetClueCount(player)
+	return discoveryCount > 0 or hintCount > 0 or clueCount > 0
+end
+
+function RoomProgressService:IsUntouchedPrologueActive(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local state = self:_getState(player)
+	return state.UntouchedPrologueActive == true and state.UntouchedPrologueTriggered ~= true
+end
+
+function RoomProgressService:IsUntouchedProloguePending(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local state = self:_getState(player)
+	return state.UntouchedPrologueActive == true or state.UntouchedPrologueTriggered == true
+end
+
+function RoomProgressService:StopOutsideCaveAudioForPlayer(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local state = self:_getState(player)
+	if state.OutsideCaveAudioStopped then
+		return false
+	end
+
+	state.OutsideCaveAudioStopped = true
+	self.prologueRemote:FireClient(player, {
+		Action = "StopOutsideCaveAudio",
+	})
+	return true
 end
 
 function RoomProgressService:GetRoomForPlayer(player)
@@ -184,6 +322,140 @@ function RoomProgressService:RecordInteraction(player)
 	state.TimerStartedAt = os.clock()
 end
 
+function RoomProgressService:_beginUntouchedPrologue(player)
+	local state = self:_getState(player)
+	local startRoomId = Constants.Prologue.StartRoomId or "CaveEntrance"
+	local startCFrame = Constants.GetRoomSpawnCFrame(startRoomId)
+	local now = os.clock()
+
+	state.StartChoiceHandled = true
+	state.UntouchedPrologueActive = true
+	state.UntouchedPrologueTriggered = false
+	state.OutsideCaveAudioStopped = false
+	state.CurrentRoomId = nil
+	state.TimerStartedAt = now
+	state.LastRoomTickAt = nil
+	state.LastSafeSpawnCFrame = startCFrame
+
+	self:_teleportPlayer(player, startCFrame, "UntouchedPrologueStart")
+	self.prologueRemote:FireClient(player, {
+		Action = "Begin",
+		FlashlightRange = Constants.Prologue.FlashlightRange,
+		InspectRange = Constants.Prologue.InspectRange,
+		InspectIntervalSeconds = Constants.Prologue.InspectIntervalSeconds,
+		DarkLighting = Constants.Prologue.DarkLighting,
+		Message = "You wake up under the trees. The cave ahead should not have electric lights.",
+	})
+	self.systemMessageRemote:FireClient(player, "You wake up in the forest. You have a flashlight. The cave lights are already on.")
+end
+
+function RoomProgressService:TryTriggerUntouchedPrologue(player, sourceInstance, isSafeNavigation)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local state = self:_getState(player)
+	if state.UntouchedPrologueTriggered then
+		return true
+	end
+
+	if not state.UntouchedPrologueActive then
+		return false
+	end
+
+	if isSafeNavigation then
+		return false
+	end
+
+	state.UntouchedPrologueTriggered = true
+	state.UntouchedPrologueActive = false
+	state.TimerStartedAt = os.clock()
+
+	local objectName = "something"
+	if sourceInstance and sourceInstance.Parent then
+		local prompt = if sourceInstance:IsA("ProximityPrompt") then sourceInstance else sourceInstance:FindFirstChildOfClass("ProximityPrompt")
+		if prompt and prompt.ObjectText ~= "" then
+			objectName = prompt.ObjectText
+		elseif sourceInstance.Name ~= "" then
+			objectName = sourceInstance.Name
+		end
+	end
+
+	local countdownSeconds = Constants.Prologue.CountdownSeconds or 3
+	self.prologueRemote:FireClient(player, {
+		Action = "Lockdown",
+		ObjectName = objectName,
+		CountdownSeconds = countdownSeconds,
+		SpinUpSeconds = Constants.Prologue.LightSpinUpSeconds or 30,
+		Message = "Forced teleportation of unknown personnel in",
+	})
+
+	task.spawn(function()
+		for remaining = countdownSeconds, 1, -1 do
+			if not player.Parent then
+				return
+			end
+
+			self.systemMessageRemote:FireClient(
+				player,
+				("Forced teleportation of unknown personnel in %d..."):format(remaining)
+			)
+			task.wait(1)
+		end
+
+		if not player.Parent then
+			return
+		end
+
+		self:_teleportPlayer(
+			player,
+			Constants.GetRoomSpawnCFrame(Constants.Prologue.ContainmentRoomId or "TVRoom"),
+			"UntouchedPrologueContainment"
+		)
+
+		local containedState = self:_getState(player)
+		containedState.CurrentRoomId = nil
+		containedState.UntouchedPrologueActive = false
+		containedState.UntouchedPrologueTriggered = false
+		containedState.TimerStartedAt = os.clock()
+		containedState.LastRoomTickAt = nil
+
+		self.prologueRemote:FireClient(player, {
+			Action = "Contained",
+			SpinUpSeconds = Constants.Prologue.LightSpinUpSeconds or 30,
+			Message = "Containment complete. Lights returning to normal.",
+		})
+		self.systemMessageRemote:FireClient(player, "Containment complete. The room slowly remembers how lights work.")
+	end)
+
+	return true
+end
+
+function RoomProgressService:StartFreshDevSession(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local state = self:_getState(player)
+	local now = os.clock()
+	state.CurrentRoomId = nil
+	state.TimerStartedAt = now
+	state.PlayStartedAt = now
+	state.LastRoomTickAt = nil
+	state.RoomPlaySecondsByRoomId = {}
+	state.RoomPlayRewardsByRoomId = {}
+	state.SparkleStateByRoomId = {}
+	state.StartOptionsSent = true
+	state.StartChoiceHandled = true
+	state.UntouchedPrologueActive = false
+	state.UntouchedPrologueTriggered = false
+	state.TwoMinuteAwarded = {}
+	state.BonusAwarded = {}
+
+	self:_beginUntouchedPrologue(player)
+	return true
+end
+
 function RoomProgressService:GetStorePrices()
 	return {
 		HintPackSize = Constants.NoTouch.HintPackSize,
@@ -198,6 +470,10 @@ function RoomProgressService:GetStorePrices()
 		SecretKeyClueCost = self.storePriceOverrides.SecretKeyClueCost or Constants.NoTouch.SecretKeyClueCost or Constants.NoTouch.RevealClueCost or 3,
 		TeleportKeyClueCost = self.storePriceOverrides.TeleportKeyClueCost or Constants.NoTouch.TeleportKeyClueCost or Constants.NoTouch.RevealClueCost or 3,
 		TeleportKeyRobux = self.storePriceOverrides.TeleportKeyRobux or Constants.NoTouch.TeleportKeyRobux or 5,
+		DuckFounderRobux = self.storePriceOverrides.DuckFounderRobux or Constants.NoTouch.DuckFounderRobux or 80000,
+		DuckFounderProductId = Constants.NoTouch.DuckFounderProductId or 0,
+		VictoryBrickRobux = self.storePriceOverrides.VictoryBrickRobux or Constants.NoTouch.VictoryBrickRobux or 8000,
+		VictoryBrickProductId = Constants.NoTouch.VictoryBrickProductId or 0,
 	}
 end
 
@@ -216,7 +492,7 @@ function RoomProgressService:AdjustStorePrice(key, delta)
 	end
 
 	local current = self:GetStorePrice(key) or 0
-	self.storePriceOverrides[key] = math.clamp(current + amount, 0, 999)
+	self.storePriceOverrides[key] = math.clamp(current + amount, 0, 1000000000)
 	return true
 end
 
@@ -249,6 +525,7 @@ end
 
 function RoomProgressService:_buildUnlockedTeleportRooms(player)
 	local rooms = {}
+	local observationPlaces = {}
 
 	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 		if self.discoveryService:IsRoomUnlocked(player, roomId) then
@@ -262,13 +539,33 @@ function RoomProgressService:_buildUnlockedTeleportRooms(player)
 		end
 	end
 
+	for _, place in pairs(Constants.NamedPlaces or {}) do
+		if place.TeleportGroup == "Observation" then
+			local requirement = place.RequiresDiscoveryId
+			if not requirement or self.discoveryService:HasDiscovery(player, requirement) then
+				table.insert(observationPlaces, {
+					RoomId = place.Id,
+					Name = place.Name,
+					IsNamedPlace = true,
+					TeleportGroup = place.TeleportGroup,
+				})
+			end
+		end
+	end
+	table.sort(observationPlaces, function(left, right)
+		return (left.Name or left.RoomId or "") < (right.Name or right.RoomId or "")
+	end)
+	for _, place in ipairs(observationPlaces) do
+		table.insert(rooms, place)
+	end
+
 	return rooms
 end
 
 function RoomProgressService:ShowStore(player, roomId)
 	self:ShowReferenceBook(player, roomId, {
 		Mode = "Store",
-		StatusText = "Everything here can be earned through play time or bought if you are in a hurry.",
+		StatusText = "Time, restraint, and secret work earn rewards here. Purchases only rush what play can still earn.",
 		StorePrices = self:GetStorePrices(),
 	})
 end
@@ -281,8 +578,16 @@ function RoomProgressService:ShowTeleportMenu(player, roomId)
 
 	self:ShowReferenceBook(player, roomId, {
 		Mode = "Teleport",
-		StatusText = "Teleport Key active. Pick any room you have already opened.",
+		StatusText = "Teleport Key active. Pick any opened room or learned coordinate.",
 		TeleportRooms = self:_buildUnlockedTeleportRooms(player),
+	})
+end
+
+function RoomProgressService:ShowFieldControls(player, roomId)
+	self:ShowReferenceBook(player, roomId, {
+		Mode = "Field",
+		StatusText = "Temporary field adjustments. Discoveries and rewards still follow the room rules.",
+		FieldControls = Constants.FieldControls,
 	})
 end
 
@@ -308,6 +613,10 @@ function RoomProgressService:_sendStartOptions(player)
 	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
 	local hintCount = self.discoveryService:GetHintCount(player)
 	local clueCount = self.discoveryService:GetClueCount(player)
+	local savedProgress = self.discoveryService.GetSavedProgressSummary
+		and self.discoveryService:GetSavedProgressSummary(player)
+		or nil
+	local hasProgress = discoveryCount > 0 or hintCount > 0 or clueCount > 0 or resumeRoomId ~= Constants.RoomOrder[1]
 	local unlockedRooms = {}
 
 	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
@@ -325,7 +634,8 @@ function RoomProgressService:_sendStartOptions(player)
 
 	self.sessionStartRemote:FireClient(player, {
 		Action = "Show",
-		HasProgress = discoveryCount > 0 or hintCount > 0 or clueCount > 0 or resumeRoomId ~= Constants.RoomOrder[1],
+		HasProgress = hasProgress,
+		FreshStartRoomName = "Forest Cave",
 		ResumeRoomId = resumeRoomId,
 		ResumeRoomName = resumeRoom and resumeRoom.Name or "TV Room",
 		UnlockedRooms = unlockedRooms,
@@ -335,6 +645,7 @@ function RoomProgressService:_sendStartOptions(player)
 		Clues = clueCount,
 		BuildVersion = Constants.BuildVersion,
 		IntroText = Constants.GameIntro,
+		SavedProgress = savedProgress,
 	})
 end
 
@@ -344,10 +655,26 @@ function RoomProgressService:_handleSessionStart(player, payload)
 	end
 
 	local action = payload.Action
-	local roomId = Constants.RoomOrder[1]
-	local message = "Starting from the TV Room. The book remembers what you found."
+	if action == "RequestOptions" then
+		local state = self:_getState(player)
+		if state.StartChoiceHandled then
+			return
+		end
+
+		state.StartOptionsSent = false
+		self:_sendStartOptions(player)
+		return
+	end
+
+	local roomId = Constants.Prologue.StartRoomId or "CaveEntrance"
+	local message = "Starting from the forest. The cave lights are waiting."
 
 	if action == "Resume" then
+		if not self:_hasAnyProgress(player) then
+			self:_beginUntouchedPrologue(player)
+			return
+		end
+
 		roomId = self.discoveryService:GetLastUnlockedRoomId(player)
 		local room = Constants.GetRoom(roomId)
 		message = ("Returning to %s. Try to look innocent."):format(room and room.Name or "the room")
@@ -368,16 +695,62 @@ function RoomProgressService:_handleSessionStart(player, payload)
 		roomId = requestedRoomId
 		local room = Constants.GetRoom(roomId)
 		message = ("Starting in %s. Please continue not touching things there."):format(room and room.Name or "the room")
-	elseif action ~= "Restart" then
+	elseif action == "Restart" then
+		if self.discoveryService.StartFreshRunSession then
+			self.discoveryService:StartFreshRunSession(player)
+		end
+		self:_beginUntouchedPrologue(player)
+		self.systemMessageRemote:FireClient(player, "Fresh run started. Your prior progress is still on file, which is not suspicious at all.")
+		return
+	else
 		return
 	end
 
 	local state = self:_getState(player)
 	state.StartChoiceHandled = true
+	state.UntouchedPrologueActive = false
+	state.UntouchedPrologueTriggered = false
 	state.TimerStartedAt = os.clock()
 
-	teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId))
+	self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId), "SessionStart")
 	self.systemMessageRemote:FireClient(player, message)
+end
+
+function RoomProgressService:_getTopDownArenaPlayerCount()
+	local playerCount = 0
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if self:GetRoomForPlayer(player) == "TopDownArena" then
+			playerCount += 1
+		end
+	end
+
+	return playerCount
+end
+
+function RoomProgressService:_updateTopDownArenaMusic()
+	local shouldPlayMusic = self:_getTopDownArenaPlayerCount() >= TOP_DOWN_ARENA_MUSIC_MIN_PLAYERS
+
+	if shouldPlayMusic and not self.topDownArenaMusic then
+		self.topDownArenaMusic = getTopDownArenaMusic()
+	end
+
+	if shouldPlayMusic and self.topDownArenaMusic and not self.topDownArenaMusicActive then
+		self.topDownArenaMusicActive = true
+		if not self.topDownArenaMusic.IsPlaying then
+			self.topDownArenaMusic:Play()
+		end
+		fadeSoundVolume(self.topDownArenaMusic, TOP_DOWN_ARENA_MUSIC_VOLUME)
+	elseif not shouldPlayMusic and self.topDownArenaMusic and self.topDownArenaMusicActive then
+		self.topDownArenaMusicActive = false
+		local sound = self.topDownArenaMusic
+		fadeSoundVolume(sound, 0)
+		task.delay(TOP_DOWN_ARENA_MUSIC_FADE_SECONDS, function()
+			if sound.Parent and not self.topDownArenaMusicActive and sound.Volume <= 0.001 then
+				sound:Stop()
+			end
+		end)
+	end
 end
 
 function RoomProgressService:_tick(now)
@@ -395,11 +768,31 @@ function RoomProgressService:_tick(now)
 	elseif workspace.Gravity == (Constants.SpaceStationGravity or 24) then
 		workspace.Gravity = Constants.NormalGravity
 	end
+
+	self:_updateTopDownArenaMusic()
 end
 
 function RoomProgressService:_tickPlayer(player, now)
 	local roomId = self:GetRoomForPlayer(player)
 	local state = self:_getState(player)
+	local rootPart = getRootPart(player)
+
+	if rootPart and rootPart.Position.Y < FALL_RECOVERY_Y then
+		if now - (state.LastFallRecoveryAt or 0) >= FALL_RECOVERY_COOLDOWN_SECONDS then
+			state.LastFallRecoveryAt = now
+			self:_teleportPlayer(player, self:_getRecoveryCFrame(player, state), "FallRecovery")
+			self.systemMessageRemote:FireClient(player, "The floor lost track of you. Returning to the last stable spot.")
+		end
+		return
+	end
+
+	local inHallway = rootPart and positionInZone(rootPart.Position, Constants.Hallway.Zone)
+	if inHallway then
+		state.LastSafeSpawnCFrame = Constants.Hallway.SpawnCFrame
+		if state.CurrentRoomId == "CaveEntrance" or self:IsUntouchedProloguePending(player) then
+			self:StopOutsideCaveAudioForPlayer(player)
+		end
+	end
 
 	if not roomId then
 		state.CurrentRoomId = nil
@@ -413,27 +806,45 @@ function RoomProgressService:_tickPlayer(player, now)
 		state.CurrentRoomId = roomId
 		state.TimerStartedAt = now
 		state.LastRoomTickAt = now
+		state.LastSafeSpawnCFrame = Constants.GetRoomSpawnCFrame(roomId)
 		state.SparkleStateByRoomId[roomId] = {
 			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
 		}
 
-		if roomId == "Island" then
+		if self:IsUntouchedProloguePending(player) then
+			-- In the opening forest/cave walk, looking around is still a clean record.
+		elseif roomId == "CaveEntrance" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.CaveEntered.Id)
+		elseif roomId == "Island" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.ReachedIsland.Id)
+		elseif roomId == "TopDownArena" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.TopDownEntered.Id)
 		elseif roomId == "TreetopZipline" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.TreetopZiplineEntered.Id)
 		elseif roomId == "SpaceStation" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.SpaceStationEntered.Id)
 		elseif roomId == "Void" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.VoidEntered.Id)
+		elseif roomId == "Infirmary" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryEntered.Id)
+		elseif roomId == "Gym" then
+			self.discoveryService:Unlock(player, Constants.Discoveries.GymEntered.Id)
 		end
 	else
 		local delta = math.max(0, now - (state.LastRoomTickAt or now))
-		state.RoomPlaySecondsByRoomId[roomId] = (state.RoomPlaySecondsByRoomId[roomId] or 0) + delta
+		if not self:IsUntouchedProloguePending(player) then
+			state.RoomPlaySecondsByRoomId[roomId] = (state.RoomPlaySecondsByRoomId[roomId] or 0) + delta
+		end
 		state.LastRoomTickAt = now
 	end
 
 	local room = Constants.GetRoom(roomId)
 	if not room then
+		self:_sendRoomStatus(player, now)
+		return
+	end
+
+	if self:IsUntouchedProloguePending(player) then
 		self:_sendRoomStatus(player, now)
 		return
 	end
@@ -614,6 +1025,81 @@ function RoomProgressService:_handleHintRequest(player, payload)
 		self:_requestTeleportKey(player, roomId)
 	elseif action == "TeleportRoom" then
 		self:_requestTeleportRoom(player, roomId, payload.TargetRoomId)
+	elseif action == "FieldEffect" then
+		self:_requestFieldEffect(player, roomId, payload.EffectId)
+	end
+end
+
+function RoomProgressService:_runLowGravityFromField(player)
+	if workspace.Gravity <= 50 then
+		self.systemMessageRemote:FireClient(player, "The field is already light enough to make furniture suspicious.")
+		return
+	end
+
+	task.spawn(function()
+		local ok, errorMessage = pcall(function()
+			LowGravityEvent.Run({
+				DiscoveryService = self.discoveryService,
+				Players = Players:GetPlayers(),
+				BroadcastMessage = function(text)
+					self.systemMessageRemote:FireAllClients(text)
+				end,
+			})
+		end)
+
+		if not ok then
+			warn("[RoomProgressService] Field low gravity failed:", errorMessage)
+			if player.Parent then
+				self.systemMessageRemote:FireClient(player, "The field control tries to lower gravity, then thinks better of it.")
+			end
+		end
+	end)
+end
+
+function RoomProgressService:_applyPlayerScaleField(player, scale, discoveryId, label, message)
+	local snapshot = PlayerScale.ApplyTemporary(player, scale, Constants.SizeTransformDuration or Constants.EventDuration)
+	if not snapshot then
+		self.systemMessageRemote:FireClient(player, "The field control hums, but your character refuses to recalibrate.")
+		return
+	end
+
+	if self.transformCameraRemote then
+		self.transformCameraRemote:FireClient(player, {
+			Action = "SizeTransform",
+			Scale = scale,
+			Duration = Constants.SizeTransformCameraDuration or 3,
+			Label = label,
+		})
+	end
+
+	if self.discoveryService and discoveryId then
+		self.discoveryService:Unlock(player, discoveryId)
+	end
+
+	self.systemMessageRemote:FireClient(player, message)
+end
+
+function RoomProgressService:_requestFieldEffect(player, roomId, effectId)
+	if effectId == "LowGravity" then
+		self:_runLowGravityFromField(player)
+	elseif effectId == "TinyPlayer" then
+		self:_applyPlayerScaleField(
+			player,
+			0.45,
+			Constants.Discoveries.TinyPlayers.Id,
+			"Tiny mode",
+			"Field control engaged: travel-size. RESET can end it early."
+		)
+	elseif effectId == "GiantPlayer" then
+		self:_applyPlayerScaleField(
+			player,
+			2.25,
+			Constants.Discoveries.GiantPlayer.Id,
+			"Giant mode",
+			"Field control engaged: problem-size. RESET can end it early."
+		)
+	else
+		self.systemMessageRemote:FireClient(player, "That field setting is not wired yet.")
 	end
 end
 
@@ -849,7 +1335,7 @@ function RoomProgressService:_requestTeleportKey(player, roomId)
 end
 
 function RoomProgressService:_requestTeleportRoom(player, sourceRoomId, targetRoomId)
-	if typeof(targetRoomId) ~= "string" or not Constants.GetRoom(targetRoomId) then
+	if typeof(targetRoomId) ~= "string" then
 		self:_showHintResult(player, sourceRoomId, nil, "That teleport destination does not exist.")
 		return
 	end
@@ -859,14 +1345,32 @@ function RoomProgressService:_requestTeleportRoom(player, sourceRoomId, targetRo
 		return
 	end
 
-	if not self.discoveryService:IsRoomUnlocked(player, targetRoomId) then
-		self:_showHintResult(player, sourceRoomId, nil, "Teleport only accepts rooms you have already opened.")
+	local room = Constants.GetRoom(targetRoomId)
+	if room then
+		if not self.discoveryService:IsRoomUnlocked(player, targetRoomId) then
+			self:_showHintResult(player, sourceRoomId, nil, "Teleport only accepts rooms you have already opened.")
+			return
+		end
+
+		self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(targetRoomId), "TeleportKey")
+		self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(room.Name or "the room"))
 		return
 	end
 
-	local room = Constants.GetRoom(targetRoomId)
-	teleportPlayer(player, Constants.GetRoomSpawnCFrame(targetRoomId))
-	self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(room and room.Name or "the room"))
+	local place = Constants.GetNamedPlace and Constants.GetNamedPlace(targetRoomId)
+	if place then
+		local requirement = place.RequiresDiscoveryId
+		if requirement and not self.discoveryService:HasDiscovery(player, requirement) then
+			self:_showHintResult(player, sourceRoomId, nil, "Those coordinates have not been learned yet.")
+			return
+		end
+
+		self:_teleportPlayer(player, Constants.GetNamedPlaceCFrame(targetRoomId), "TeleportKey")
+		self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(place.Name or "the coordinates"))
+		return
+	end
+
+	self:_showHintResult(player, sourceRoomId, nil, "That teleport destination does not exist.")
 end
 
 function RoomProgressService:_installReceiptHandler()

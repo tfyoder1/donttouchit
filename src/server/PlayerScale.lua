@@ -1,4 +1,5 @@
 local PlayerScale = {}
+local activeScalesByUserId = {}
 
 local SCALE_VALUE_NAMES = {
 	"BodyDepthScale",
@@ -73,6 +74,55 @@ function PlayerScale.Restore(snapshot)
 	elseif snapshot.ModelScale and snapshot.Character.ScaleTo then
 		snapshot.Character:ScaleTo(snapshot.ModelScale)
 	end
+end
+
+function PlayerScale.RestoreActive(player)
+	if not player then
+		return
+	end
+
+	local active = activeScalesByUserId[player.UserId]
+	if not active then
+		return
+	end
+
+	activeScalesByUserId[player.UserId] = nil
+	PlayerScale.Restore(active.Snapshot)
+end
+
+function PlayerScale.RestoreAllActive()
+	for userId, active in pairs(activeScalesByUserId) do
+		activeScalesByUserId[userId] = nil
+		PlayerScale.Restore(active.Snapshot)
+	end
+end
+
+function PlayerScale.ApplyTemporary(player, scaleMultiplier, duration)
+	if not player then
+		return nil
+	end
+
+	PlayerScale.RestoreActive(player)
+
+	local snapshot = PlayerScale.Apply(player, scaleMultiplier)
+	if not snapshot then
+		return nil
+	end
+
+	local token = {}
+	activeScalesByUserId[player.UserId] = {
+		Snapshot = snapshot,
+		Token = token,
+	}
+
+	task.delay(math.max(0.1, duration or 10), function()
+		local active = activeScalesByUserId[player.UserId]
+		if active and active.Token == token then
+			PlayerScale.RestoreActive(player)
+		end
+	end)
+
+	return snapshot
 end
 
 return PlayerScale

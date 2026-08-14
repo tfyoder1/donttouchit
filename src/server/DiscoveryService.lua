@@ -85,6 +85,7 @@ function DiscoveryService.new()
 	self.secretDoorRevealsByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
 	self.devOverrideByUserId = {}
+	self.freshRunByUserId = {}
 	self.hasSavedDataByUserId = {}
 	self.loadedByUserId = {}
 	self.saveQueuedByUserId = {}
@@ -137,6 +138,7 @@ function DiscoveryService:Initialize()
 		self.secretDoorRevealsByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
 		self.devOverrideByUserId[player.UserId] = nil
+		self.freshRunByUserId[player.UserId] = nil
 		self.hasSavedDataByUserId[player.UserId] = nil
 		self.loadedByUserId[player.UserId] = nil
 		self.saveQueuedByUserId[player.UserId] = nil
@@ -276,6 +278,7 @@ function DiscoveryService:RestoreNormalProgressState(player)
 
 	self:_applyRuntimeState(player, override.RealState)
 	self.devOverrideByUserId[player.UserId] = nil
+	self.freshRunByUserId[player.UserId] = nil
 	self:_syncSecretKeyTools(player)
 	self:_sendSnapshot(player)
 	self._secretDoorChangedEvent:Fire(player)
@@ -424,6 +427,88 @@ function DiscoveryService:UnlockAllDiscoveriesForDevSession(player)
 
 	self:_finalizeDevStateChange(player)
 	return true
+end
+
+function DiscoveryService:_applyFreshRuntimeProgress(player, options)
+	options = options or {}
+	local preserveKnowledge = options.PreserveKnowledge == true
+	local realState = self.devOverrideByUserId[player.UserId] and self.devOverrideByUserId[player.UserId].RealState
+
+	self.discoveryByUserId[player.UserId] = {}
+	self.hintsByUserId[player.UserId] = if preserveKnowledge and realState then realState.Hints or 0 else 0
+	self.cluesByUserId[player.UserId] = if preserveKnowledge and realState then realState.Clues or 0 else 0
+	self.cluedDiscoveriesByUserId[player.UserId] = if preserveKnowledge and realState
+		then cloneDictionary(realState.CluedDiscoveriesById)
+		else {}
+	self.revealedDiscoveriesByUserId[player.UserId] = if preserveKnowledge and realState
+		then cloneDictionary(realState.RevealedDiscoveriesById)
+		else {}
+	self.secretKeysByUserId[player.UserId] = {}
+	self.teleportKeyByUserId[player.UserId] = false
+	self.secretDoorRevealsByUserId[player.UserId] = if preserveKnowledge and realState
+		then cloneDictionary(realState.SecretDoorRevealsByRoomId)
+		else {}
+	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
+
+	self:_syncSecretKeyTools(player)
+	self:_sendSnapshot(player)
+	self._secretDoorChangedEvent:Fire(player)
+	self._unlockedEvent:Fire(player)
+end
+
+function DiscoveryService:StartFreshDevSession(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:EnableDevOverride(player)
+	self.freshRunByUserId[player.UserId] = nil
+	self:_applyFreshRuntimeProgress(player)
+	return true
+end
+
+function DiscoveryService:StartFreshRunSession(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:EnableDevOverride(player)
+	self.freshRunByUserId[player.UserId] = true
+	self:_applyFreshRuntimeProgress(player, {
+		PreserveKnowledge = true,
+	})
+	return true
+end
+
+function DiscoveryService:GetSavedProgressSummary(player)
+	if not player or not player.Parent then
+		return nil
+	end
+
+	local override = self.devOverrideByUserId[player.UserId]
+	local realState = override and override.RealState
+	if not realState or self.freshRunByUserId[player.UserId] ~= true then
+		return nil
+	end
+
+	local savedDiscoveries = realState.DiscoveryById or {}
+	local count = 0
+	for _, discoveryId in ipairs(Constants.DiscoveryOrder) do
+		if savedDiscoveries[discoveryId] then
+			count += 1
+		end
+	end
+
+	local lastRoomId = realState.LastUnlockedRoomId or DEFAULT_ROOM_ID
+	local lastRoom = Constants.GetRoom(lastRoomId)
+	return {
+		Count = count,
+		Total = Constants.TotalDiscoveries,
+		Hints = realState.Hints or 0,
+		Clues = realState.Clues or 0,
+		LastUnlockedRoomId = lastRoomId,
+		LastUnlockedRoomName = lastRoom and lastRoom.Name or "TV Room",
+	}
 end
 
 function DiscoveryService:_warnSaveIssue(player)
@@ -697,7 +782,7 @@ function DiscoveryService:IsRoomUnlocked(player, roomId)
 	end
 
 	local resumeDiscoveryId = Constants.RoomResumeDiscoveries and Constants.RoomResumeDiscoveries[roomId]
-	if resumeDiscoveryId then
+	if resumeDiscoveryId and self:HasDiscovery(player, resumeDiscoveryId) then
 		return self:HasDiscovery(player, resumeDiscoveryId)
 	end
 
@@ -804,6 +889,11 @@ function DiscoveryService:_syncSecretKeyTools(player)
 				item:Destroy()
 			elseif item:IsA("Tool") and item:GetAttribute("TeleportKey") == true and self.teleportKeyByUserId[player.UserId] ~= true then
 				item:Destroy()
+			elseif item:IsA("Tool")
+				and item:GetAttribute("SleepingIdBadge") == true
+				and not self.discoveryByUserId[player.UserId][Constants.Discoveries.SleepingIdBadge.Id]
+			then
+				item:Destroy()
 			end
 		end
 	end
@@ -841,6 +931,24 @@ function DiscoveryService:_syncSecretKeyTools(player)
 			teleportTool.Parent = backpack
 		end
 	end
+
+	if Constants.Discoveries.SleepingIdBadge and self.discoveryByUserId[player.UserId][Constants.Discoveries.SleepingIdBadge.Id] == true then
+		local character = player.Character
+		local existing = backpack:FindFirstChild("ID Badge") or (character and character:FindFirstChild("ID Badge"))
+		if not existing then
+			local badgeTool = Instance.new("Tool")
+			badgeTool.Name = "ID Badge"
+			badgeTool.ToolTip = "Security clearance for badge plates and stubborn cave doors."
+			badgeTool.RequiresHandle = false
+			badgeTool.CanBeDropped = false
+			badgeTool:SetAttribute("SleepingIdBadge", true)
+			badgeTool.Parent = backpack
+		end
+	end
+end
+
+function DiscoveryService:SyncInventoryTools(player)
+	self:_syncSecretKeyTools(player)
 end
 
 function DiscoveryService:HasTeleportKey(player)
@@ -1045,6 +1153,7 @@ end
 function DiscoveryService:_sendSnapshot(player)
 	local lastUnlockedRoomId = self:GetLastUnlockedRoomId(player)
 	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
+	local savedProgress = self:GetSavedProgressSummary(player)
 
 	self.remote:FireClient(player, {
 		Type = "Snapshot",
@@ -1059,6 +1168,7 @@ function DiscoveryService:_sendSnapshot(player)
 		HasSavedData = self.hasSavedDataByUserId[player.UserId] == true,
 		LastUnlockedRoomId = lastUnlockedRoomId,
 		LastUnlockedRoomName = lastUnlockedRoom and lastUnlockedRoom.Name or "TV Room",
+		SavedProgress = savedProgress,
 	})
 end
 
@@ -1099,9 +1209,13 @@ function DiscoveryService:Unlock(player, discoveryId)
 	end
 
 	self:_grantRoomCompletionSecretKeys(player)
+	if Constants.Discoveries.SleepingIdBadge and discoveryId == Constants.Discoveries.SleepingIdBadge.Id then
+		self:_syncSecretKeyTools(player)
+	end
 
 	local lastUnlockedRoomId = self:GetLastUnlockedRoomId(player)
 	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
+	local savedProgress = self:GetSavedProgressSummary(player)
 
 	self.remote:FireClient(player, {
 		Type = "Unlocked",
@@ -1118,6 +1232,7 @@ function DiscoveryService:Unlock(player, discoveryId)
 		HasSavedData = true,
 		LastUnlockedRoomId = lastUnlockedRoomId,
 		LastUnlockedRoomName = lastUnlockedRoom and lastUnlockedRoom.Name or "TV Room",
+		SavedProgress = savedProgress,
 	})
 
 	self._unlockedEvent:Fire(player, discovery.Id)

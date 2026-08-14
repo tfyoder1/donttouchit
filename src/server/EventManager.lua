@@ -10,12 +10,13 @@ EventManager.__index = EventManager
 
 local OBJECT_RAIN_BUTTON_INTERVAL = 8
 
-function EventManager.new(discoveryService, resetService, roomReferences, roomProgressService)
+function EventManager.new(discoveryService, resetService, roomReferences, roomProgressService, bunkerEnergyService)
 	local self = setmetatable({}, EventManager)
 	self.discoveryService = discoveryService
 	self.resetService = resetService
 	self.roomReferences = roomReferences
 	self.roomProgressService = roomProgressService
+	self.bunkerEnergyService = bunkerEnergyService
 	self.random = Random.new()
 	self.active = false
 	self.buttonPressCount = 0
@@ -94,6 +95,21 @@ function EventManager:_buildContext(triggeringPlayer, eventDefinition)
 			if self.roomProgressService then
 				self.roomProgressService:RecordInteraction(player)
 			end
+			if self.bunkerEnergyService then
+				self.bunkerEnergyService:RecordInteraction(player)
+			end
+		end,
+		RecordMatterReclaimed = function(partCount)
+			if self.bunkerEnergyService then
+				self.bunkerEnergyService:RecordMatterReclaimed(partCount)
+			end
+		end,
+		GrantEnergyReserveTool = function(player, options)
+			if self.bunkerEnergyService and self.bunkerEnergyService.GrantEnergyReserveTool then
+				return self.bunkerEnergyService:GrantEnergyReserveTool(player, options)
+			end
+
+			return false, "The bunker has not enabled portable matter yet."
 		end,
 	}
 end
