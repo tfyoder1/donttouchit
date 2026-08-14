@@ -58,6 +58,8 @@ local ID_LABEL_UPDATE_INTERVAL = 0.9
 local DOUBLE_JUMP_MIN_SECONDS = 0.08
 local DOUBLE_JUMP_MAX_SECONDS = 0.45
 local DOUBLE_JUMP_FLY_COOLDOWN_SECONDS = 1
+local BUTTON_ACTIVATION_DEBOUNCE_SECONDS = 0.25
+local TOUCH_TAP_MAX_DRAG_PIXELS = 18
 local currentDeviceProfile = DeviceProfile.Get()
 local showDevInfo
 local rebuildPanel
@@ -65,13 +67,13 @@ local lastJumpRequestAt = 0
 local lastDoubleJumpFlyRequestAt = 0
 
 local sectionExpanded = {
-	Locations = true,
-	SessionSimulation = true,
-	RoomState = true,
+	Locations = false,
+	SessionSimulation = false,
+	RoomState = false,
 	Events = false,
-	SecretAreas = true,
-	SessionTools = true,
-	EnergyRecovery = true,
+	SecretAreas = false,
+	SessionTools = false,
+	EnergyRecovery = false,
 	StorePrices = false,
 	RoomLogOverrides = false,
 }
@@ -113,7 +115,73 @@ local function makeSection(parent, titleText)
 end
 
 local function isSectionExpanded(sectionKey)
-	return sectionExpanded[sectionKey] ~= false
+	return sectionExpanded[sectionKey] == true
+end
+
+local function isButtonVisibleForActivation(button)
+	local current = button
+	while current and current ~= game do
+		if current:IsA("GuiObject") and not current.Visible then
+			return false
+		end
+		if current:IsA("ScreenGui") and not current.Enabled then
+			return false
+		end
+		current = current.Parent
+	end
+
+	return button.Parent ~= nil
+end
+
+local function wireButtonActivation(button, onActivate)
+	button.Active = true
+	button.AutoButtonColor = true
+	button.Selectable = true
+
+	local lastActivationAt = 0
+	local touchStartByInput = {}
+
+	local function activate()
+		if not isButtonVisibleForActivation(button) then
+			return
+		end
+
+		local now = os.clock()
+		if now - lastActivationAt < BUTTON_ACTIVATION_DEBOUNCE_SECONDS then
+			return
+		end
+		lastActivationAt = now
+
+		local ok, err = pcall(onActivate)
+		if not ok then
+			warn(("[DON'T TOUCH IT] Dev tool button failed: %s"):format(tostring(err)))
+			if showDevInfo then
+				showDevInfo("Dev tool action failed. Check the output log for details.", 6)
+			end
+		end
+	end
+
+	button.Activated:Connect(activate)
+	button.MouseButton1Click:Connect(activate)
+	button.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			touchStartByInput[input] = input.Position
+		end
+	end)
+	button.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			local startPosition = touchStartByInput[input]
+			touchStartByInput[input] = nil
+			if startPosition and (input.Position - startPosition).Magnitude <= TOUCH_TAP_MAX_DRAG_PIXELS then
+				activate()
+			end
+		elseif input.UserInputType == Enum.UserInputType.Gamepad1
+			and input.KeyCode == Enum.KeyCode.ButtonA
+			and GuiService.SelectedObject == button
+			and isButtonVisibleForActivation(button) then
+			activate()
+		end
+	end)
 end
 
 local function makeCollapseHeader(parent, sectionKey, titleText, count)
@@ -135,7 +203,7 @@ local function makeCollapseHeader(parent, sectionKey, titleText, count)
 	padding.PaddingRight = UDim.new(0, 8)
 	padding.Parent = header
 
-	header.Activated:Connect(function()
+	wireButtonActivation(header, function()
 		sectionExpanded[sectionKey] = not isSectionExpanded(sectionKey)
 		if rebuildPanel then
 			rebuildPanel()
@@ -158,7 +226,7 @@ local function makeButton(parent, text, color, onClick)
 	button.Parent = parent
 	makeCorner(button, 5)
 
-	button.Activated:Connect(onClick)
+	wireButtonActivation(button, onClick)
 	return button
 end
 
@@ -197,6 +265,13 @@ local function preserveGamepadSelection(previousText)
 			GuiService.SelectedObject = selectedObject
 		end
 	end)
+end
+
+local function clearPanelSelection()
+	local selectedObject = GuiService.SelectedObject
+	if selectedObject and panel and selectedObject:IsDescendantOf(panel) then
+		GuiService.SelectedObject = nil
+	end
 end
 
 local function applyDevLayout(profile)
@@ -779,6 +854,10 @@ local function isFlyAscendPressed()
 end
 
 local function isAirborneForDoubleJump()
+	if flyEnabled then
+		return true
+	end
+
 	local humanoid = getHumanoid()
 	if not humanoid then
 		return false
@@ -795,7 +874,7 @@ local function requestDevFlyFromDoubleJump()
 	local delta = now - lastJumpRequestAt
 	lastJumpRequestAt = now
 
-	if not authorized or flyEnabled then
+	if not authorized then
 		return
 	end
 	if delta < DOUBLE_JUMP_MIN_SECONDS or delta > DOUBLE_JUMP_MAX_SECONDS then
@@ -809,12 +888,13 @@ local function requestDevFlyFromDoubleJump()
 	end
 
 	lastDoubleJumpFlyRequestAt = now
+	local nextFlyEnabled = not flyEnabled
 	send({
 		Action = "SetMovement",
-		Fly = true,
+		Fly = nextFlyEnabled,
 		Noclip = noclipEnabled,
 	})
-	showDevInfo("Double jump detected. Dev fly requested.", 4)
+	showDevInfo(if nextFlyEnabled then "Double jump detected. Dev fly requested." else "Double jump detected. Dev fly stop requested.", 4)
 end
 
 local function setCharacterCollision(enabled)
@@ -873,6 +953,7 @@ local function setMovementState(fly, noclip)
 
 	if flyEnabled and not wasFlyEnabled then
 		if panel then
+			clearPanelSelection()
 			panel.Visible = false
 		end
 		showDevInfo(getFlightControlsText(), 14)
@@ -1398,7 +1479,7 @@ local function buildGui()
 	inspectCloseButton.ZIndex = 92
 	inspectCloseButton.Parent = gui
 	makeCorner(inspectCloseButton, 6)
-	inspectCloseButton.Activated:Connect(function()
+	wireButtonActivation(inspectCloseButton, function()
 		setInspectState(false)
 		if latestState then
 			rebuildPanel()
@@ -1490,18 +1571,22 @@ local function buildGui()
 	discoveryList = makeList(scroll)
 	applyDevLayout(currentDeviceProfile)
 
-	toggleButton.Activated:Connect(function()
+	wireButtonActivation(toggleButton, function()
 		panel.Visible = not panel.Visible
 		if panel.Visible then
 			dismissStartOverlayForDevSession()
+			preserveGamepadSelection(nil)
 			send({
 				Action = "Refresh",
 				RoomId = selectedRoomId,
 			})
+		else
+			clearPanelSelection()
 		end
 	end)
 
-	close.Activated:Connect(function()
+	wireButtonActivation(close, function()
+		clearPanelSelection()
 		panel.Visible = false
 	end)
 end
