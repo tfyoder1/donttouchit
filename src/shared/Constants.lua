@@ -374,6 +374,13 @@ Constants.AudioAssets = {
 	Events = {
 		ObjectRainCollectId = "rbxassetid://98585875176475",
 	},
+	Inventory = {
+		RockDropSoundIds = {
+			"rbxassetid://9125869797",
+			"rbxassetid://9118587698",
+		},
+		RockDropVolume = 0.62,
+	},
 	Music = {
 		IntroMusicId = "rbxassetid://138890398994853",
 		EndingCreditsId = "rbxassetid://139436746292079",
@@ -382,6 +389,27 @@ Constants.AudioAssets = {
 		StaticId = "rbxassetid://140708560546036",
 		TestToneId = "rbxassetid://99709938803492",
 		PleaseStopId = "rbxassetid://72577143736585",
+	},
+	Bowling = {
+		CosmicActiveAttribute = "DontTouchItBowlingCosmicActive",
+		CosmicMusicAttribute = "DontTouchItBowlingCosmicMusicId",
+		CosmicMusicIds = {
+			"rbxassetid://9038367768",
+			"rbxassetid://87335378694883",
+			"rbxassetid://137370718943178",
+			"rbxassetid://140712674948564",
+		},
+		CosmicMusicVolume = 0.35,
+		CosmicMusicFadeSeconds = 1.5,
+		StrikeSoundIds = {
+			"rbxassetid://4692687595",
+			"rbxassetid://128237818020429",
+		},
+		StrikeVolume = 0.72,
+	},
+	BunkerEnergy = {
+		ShutdownSoundId = "rbxassetid://1842440874",
+		ShutdownSoundVolume = 0.58,
 	},
 	RoomAmbience = {
 		TVRoom = {

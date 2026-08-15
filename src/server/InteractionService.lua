@@ -89,6 +89,31 @@ local TV_SOUND_IDS = {
 }
 local TV_EYE_DURATION = 10
 local TV_EYE_FADE_DURATION = 2.25
+local bowlingAudio = Constants.AudioAssets and Constants.AudioAssets.Bowling
+local BOWLING_COSMIC_ACTIVE_ATTRIBUTE = (bowlingAudio and bowlingAudio.CosmicActiveAttribute)
+	or "DontTouchItBowlingCosmicActive"
+local BOWLING_COSMIC_MUSIC_ATTRIBUTE = (bowlingAudio and bowlingAudio.CosmicMusicAttribute)
+	or "DontTouchItBowlingCosmicMusicId"
+local BOWLING_COSMIC_MUSIC_IDS = (bowlingAudio and bowlingAudio.CosmicMusicIds) or {
+	"rbxassetid://9038367768",
+	"rbxassetid://87335378694883",
+	"rbxassetid://137370718943178",
+	"rbxassetid://140712674948564",
+}
+local BOWLING_STRIKE_SOUND_IDS = (bowlingAudio and bowlingAudio.StrikeSoundIds) or {
+	"rbxassetid://4692687595",
+	"rbxassetid://128237818020429",
+}
+local BOWLING_STRIKE_SOUND_VOLUME = (bowlingAudio and bowlingAudio.StrikeVolume) or 0.72
+local bunkerEnergyAudio = Constants.AudioAssets and Constants.AudioAssets.BunkerEnergy
+local BUNKER_SHUTDOWN_SOUND_ID = (bunkerEnergyAudio and bunkerEnergyAudio.ShutdownSoundId) or "rbxassetid://1842440874"
+local BUNKER_SHUTDOWN_SOUND_VOLUME = (bunkerEnergyAudio and bunkerEnergyAudio.ShutdownSoundVolume) or 0.58
+local inventoryAudio = Constants.AudioAssets and Constants.AudioAssets.Inventory
+local ROCK_DROP_SOUND_IDS = (inventoryAudio and inventoryAudio.RockDropSoundIds) or {
+	"rbxassetid://9125869797",
+	"rbxassetid://9118587698",
+}
+local ROCK_DROP_VOLUME = (inventoryAudio and inventoryAudio.RockDropVolume) or 0.62
 local CONTROL_PANEL_SOUND_ID = if Constants.AudioAssets and Constants.AudioAssets.Interface
 	then Constants.AudioAssets.Interface.ControlPanelInteractionId
 	else "rbxassetid://112555741154994"
@@ -375,6 +400,26 @@ local function playControlPanelSound(parent, volume, playbackSpeed)
 	playSound(parent, CONTROL_PANEL_SOUND_ID, volume or 0.48, playbackSpeed or 1)
 end
 
+local function chooseRandomAudioId(soundIds, random, previousSoundId)
+	if typeof(soundIds) ~= "table" or #soundIds <= 0 then
+		return nil
+	end
+
+	if #soundIds == 1 then
+		return soundIds[1]
+	end
+
+	random = random or Random.new()
+	for _ = 1, 5 do
+		local candidate = soundIds[random:NextInteger(1, #soundIds)]
+		if candidate ~= previousSoundId then
+			return candidate
+		end
+	end
+
+	return soundIds[random:NextInteger(1, #soundIds)]
+end
+
 local function playLoopedSpatialSound(parent, name, soundId, options)
 	if not parent or not parent.Parent or not soundId then
 		return nil
@@ -561,6 +606,11 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	}
 	self.bowlingCosmicActive = false
 	self.bowlingCosmicToken = nil
+	self.bowlingAudioRandom = Random.new()
+	self.lastBowlingCosmicMusicId = nil
+	self.lastBowlingStrikeSoundId = nil
+	self.inventoryAudioRandom = Random.new()
+	self.lastRockDropSoundId = nil
 	self.bowlingAdToken = nil
 	self.bowlingMaintenanceMotionConnection = nil
 	self.treetopZiplineStateByUserId = {}
@@ -1281,12 +1331,7 @@ end
 
 function InteractionService:_bunkerSputter(part, message)
 	if part then
-		playSound(part, "rbxasset://sounds/snap.wav", 0.42, 0.45 + math.random() * 0.18)
-		task.delay(0.12, function()
-			if part.Parent then
-				playSound(part, "rbxasset://sounds/electronicpingshort.wav", 0.22, 0.32 + math.random() * 0.12)
-			end
-		end)
+		playSound(part, BUNKER_SHUTDOWN_SOUND_ID, BUNKER_SHUTDOWN_SOUND_VOLUME, 1)
 	end
 
 	if message then
@@ -1772,6 +1817,16 @@ function InteractionService:_createDroppedInventoryPart(itemData, cframe)
 	return part
 end
 
+function InteractionService:_playRockDropSound(parent)
+	local soundId = chooseRandomAudioId(ROCK_DROP_SOUND_IDS, self.inventoryAudioRandom, self.lastRockDropSoundId)
+	if not soundId then
+		return
+	end
+
+	self.lastRockDropSoundId = soundId
+	playSound(parent, soundId, ROCK_DROP_VOLUME, 1)
+end
+
 function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
 	if not primary or not primary:IsA("BasePart") then
 		return
@@ -1910,7 +1965,11 @@ function InteractionService:_spawnDroppedInventoryItem(player, itemData, cframe)
 		self:_attachDroppedPocketItemPrompt(part, itemData)
 	end
 
-	playSound(part, "rbxasset://sounds/button.wav", 0.25, 0.72)
+	if itemData.Kind == "IslandRock" then
+		self:_playRockDropSound(part)
+	else
+		playSound(part, "rbxasset://sounds/button.wav", 0.25, 0.72)
+	end
 	self.systemMessageRemote:FireClient(player, ("%s dropped."):format(itemData.Name or "Item"))
 	return true
 end
@@ -1959,7 +2018,7 @@ function InteractionService:_placeDroppedRockOnSecurityPlate(player, itemData, p
 		Color = Color3.fromRGB(119, 255, 203),
 		CFrame = baseCFrame * CFrame.new(0, -0.08, 0),
 	})
-	playSound(plate, "rbxasset://sounds/button.wav", 0.36, 0.72)
+	self:_playRockDropSound(rock)
 
 	if self.securityPressurePlateState.Badge then
 		self:_setSecurityControlsPowered(true, plate)
@@ -4659,6 +4718,26 @@ function InteractionService:_startBowlingMaintenanceMotion()
 	end)
 end
 
+function InteractionService:_getBowlingLaneSoundSource(laneIndex, fallback)
+	for _, pin in ipairs(CollectionService:GetTagged(Constants.Tags.BowlingPin)) do
+		if pin:IsA("BasePart") and pin:GetAttribute("LaneIndex") == laneIndex then
+			return pin
+		end
+	end
+
+	return fallback
+end
+
+function InteractionService:_playBowlingStrikeSound(laneIndex, fallback)
+	local soundId = chooseRandomAudioId(BOWLING_STRIKE_SOUND_IDS, self.bowlingAudioRandom, self.lastBowlingStrikeSoundId)
+	if not soundId then
+		return
+	end
+
+	self.lastBowlingStrikeSoundId = soundId
+	playSound(self:_getBowlingLaneSoundSource(laneIndex, fallback), soundId, BOWLING_STRIKE_SOUND_VOLUME, 1)
+end
+
 function InteractionService:_countKnockedBowlingPins(laneIndex)
 	local knocked = 0
 
@@ -4731,6 +4810,7 @@ function InteractionService:_wireBowlingLaneButton(button)
 			local knocked = self:_countKnockedBowlingPins(laneIndex)
 			if knocked >= 8 then
 				self.discoveryService:Unlock(player, Constants.Discoveries.BowlingStrike.Id)
+				self:_playBowlingStrikeSound(laneIndex, button)
 				self.systemMessageRemote:FireClient(player, ("Lane %d calls that close enough to a strike: %d pins."):format(laneIndex, knocked))
 			elseif knocked > 0 then
 				self.systemMessageRemote:FireClient(player, ("Lane %d reports %d pins down. The rest are being stubborn."):format(laneIndex, knocked))
@@ -4786,11 +4866,17 @@ function InteractionService:_setBowlingCosmic(active, source)
 	local cosmicScale = math.clamp((subsystemPower - (Constants.BunkerEnergy.CosmicMinimumPower or 0.2)) / math.max(0.05, 1 - (Constants.BunkerEnergy.CosmicMinimumPower or 0.2)), 0, 1)
 
 	if active then
+		local musicId = chooseRandomAudioId(BOWLING_COSMIC_MUSIC_IDS, self.bowlingAudioRandom, self.lastBowlingCosmicMusicId)
+		self.lastBowlingCosmicMusicId = musicId or self.lastBowlingCosmicMusicId
+		workspace:SetAttribute(BOWLING_COSMIC_MUSIC_ATTRIBUTE, musicId)
+		workspace:SetAttribute(BOWLING_COSMIC_ACTIVE_ATTRIBUTE, true)
 		Lighting.Brightness = 0.45 + cosmicScale * 0.65
 		Lighting.ClockTime = 0
 		Lighting.Ambient = Color3.fromRGB(44, 18, 80):Lerp(Color3.fromRGB(6, 4, 12), 1 - cosmicScale)
 		Lighting.OutdoorAmbient = Color3.fromRGB(15, 8, 38)
 	else
+		workspace:SetAttribute(BOWLING_COSMIC_ACTIVE_ATTRIBUTE, false)
+		workspace:SetAttribute(BOWLING_COSMIC_MUSIC_ATTRIBUTE, nil)
 		self.resetService.RestoreLighting()
 	end
 
@@ -5780,6 +5866,8 @@ end
 function InteractionService:_afterRoomReset()
 	self.bowlingCosmicActive = false
 	self.bowlingCosmicToken = {}
+	workspace:SetAttribute(BOWLING_COSMIC_ACTIVE_ATTRIBUTE, false)
+	workspace:SetAttribute(BOWLING_COSMIC_MUSIC_ATTRIBUTE, nil)
 	self:_setBowlingCosmicFog(false)
 	self:_updateBowlingLaserBeams(0, false)
 

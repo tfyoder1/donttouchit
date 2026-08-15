@@ -15,9 +15,15 @@ if not roomAmbienceConfig then
 	return
 end
 
+local bowlingAudioConfig = Constants.AudioAssets and Constants.AudioAssets.Bowling
 local SOUND_NAME = "DontTouchItRoomAmbience"
 local CHECK_INTERVAL_SECONDS = 0.25
 local CONTAINMENT_ROOM_ID = (Constants.Prologue and Constants.Prologue.ContainmentRoomId) or "TVRoom"
+local BOWLING_ROOM_ID = (Constants.Rooms and Constants.Rooms.BowlingAlley and Constants.Rooms.BowlingAlley.Id) or "BowlingAlley"
+local BOWLING_COSMIC_ACTIVE_ATTRIBUTE = (bowlingAudioConfig and bowlingAudioConfig.CosmicActiveAttribute)
+	or "DontTouchItBowlingCosmicActive"
+local BOWLING_COSMIC_MUSIC_ATTRIBUTE = (bowlingAudioConfig and bowlingAudioConfig.CosmicMusicAttribute)
+	or "DontTouchItBowlingCosmicMusicId"
 
 local character = nil
 local rootPart = nil
@@ -27,6 +33,11 @@ local fadeTween = nil
 local fadeToken = 0
 local checkAccumulator = 0
 local containmentIntroState = nil
+local activeSoundEndedConnection = nil
+local cosmicAttributeSoundId = nil
+local cosmicMusicSoundId = nil
+local cosmicMusicRandom = Random.new()
+local updateAmbience = nil
 
 local existingSound = SoundService:FindFirstChild(SOUND_NAME)
 if existingSound and existingSound:IsA("Sound") then
@@ -47,6 +58,37 @@ local function normalizeSoundId(soundId)
 	end
 
 	return soundId
+end
+
+local function chooseRandomSoundId(soundIds, previousSoundId)
+	if typeof(soundIds) ~= "table" or #soundIds <= 0 then
+		return nil
+	end
+
+	local normalizedSoundIds = {}
+	for _, soundId in ipairs(soundIds) do
+		local normalizedSoundId = normalizeSoundId(soundId)
+		if normalizedSoundId then
+			table.insert(normalizedSoundIds, normalizedSoundId)
+		end
+	end
+
+	if #normalizedSoundIds <= 0 then
+		return nil
+	end
+
+	if #normalizedSoundIds == 1 then
+		return normalizedSoundIds[1]
+	end
+
+	for _ = 1, 5 do
+		local candidate = normalizedSoundIds[cosmicMusicRandom:NextInteger(1, #normalizedSoundIds)]
+		if candidate ~= previousSoundId then
+			return candidate
+		end
+	end
+
+	return normalizedSoundIds[cosmicMusicRandom:NextInteger(1, #normalizedSoundIds)]
 end
 
 local function positionInZone(position, zone)
@@ -85,6 +127,39 @@ local function getRoomConfig(roomId)
 	end
 
 	return config, soundId
+end
+
+local function getBowlingCosmicConfig(roomId)
+	if not bowlingAudioConfig or roomId ~= BOWLING_ROOM_ID then
+		return nil, nil
+	end
+
+	if workspace:GetAttribute(BOWLING_COSMIC_ACTIVE_ATTRIBUTE) ~= true then
+		cosmicAttributeSoundId = nil
+		cosmicMusicSoundId = nil
+		return nil, nil
+	end
+
+	local selectedSoundId = normalizeSoundId(workspace:GetAttribute(BOWLING_COSMIC_MUSIC_ATTRIBUTE))
+		or chooseRandomSoundId(bowlingAudioConfig.CosmicMusicIds)
+	if not selectedSoundId then
+		return nil, nil
+	end
+
+	if cosmicAttributeSoundId ~= selectedSoundId then
+		cosmicAttributeSoundId = selectedSoundId
+		cosmicMusicSoundId = selectedSoundId
+	elseif not cosmicMusicSoundId then
+		cosmicMusicSoundId = selectedSoundId
+	end
+
+	return {
+		SoundId = cosmicMusicSoundId,
+		Volume = bowlingAudioConfig.CosmicMusicVolume or 0.35,
+		FadeSeconds = bowlingAudioConfig.CosmicMusicFadeSeconds or 1.5,
+		Looped = false,
+		CycleSoundIds = bowlingAudioConfig.CosmicMusicIds,
+	}, cosmicMusicSoundId
 end
 
 local function getContainmentIntroConfig(roomId)
@@ -131,6 +206,11 @@ local function getActiveRoomConfig(roomId)
 
 			consumeContainmentIntro()
 		end
+	end
+
+	local cosmicConfig, cosmicSoundId = getBowlingCosmicConfig(roomId)
+	if cosmicConfig then
+		return cosmicConfig, cosmicSoundId, false
 	end
 
 	local config, soundId = getRoomConfig(roomId)
@@ -201,11 +281,19 @@ local function fadeSound(sound, targetVolume, fadeSeconds, destroyWhenDone)
 	tween:Play()
 end
 
+local function disconnectActiveSoundEnded()
+	if activeSoundEndedConnection then
+		activeSoundEndedConnection:Disconnect()
+		activeSoundEndedConnection = nil
+	end
+end
+
 local function stopAmbience(fadeSeconds)
 	if not activeSound then
 		return
 	end
 
+	disconnectActiveSoundEnded()
 	local sound = activeSound
 	local config = roomAmbienceConfig[activeRoomId] or {}
 	activeSound = nil
@@ -240,16 +328,34 @@ local function startAmbience(roomId, config, soundId)
 	sound.Name = SOUND_NAME
 	sound.SoundId = soundId
 	sound.Volume = 0
-	sound.Looped = true
+	sound.Looped = config.Looped ~= false
 	sound.Parent = SoundService
 
 	activeSound = sound
 	activeRoomId = roomId
+	disconnectActiveSoundEnded()
+	if sound.Looped == false and typeof(config.CycleSoundIds) == "table" then
+		activeSoundEndedConnection = sound.Ended:Connect(function()
+			if activeSound ~= sound or activeRoomId ~= roomId then
+				return
+			end
+
+			local nextSoundId = chooseRandomSoundId(config.CycleSoundIds, sound.SoundId)
+			if nextSoundId then
+				cosmicMusicSoundId = nextSoundId
+				task.defer(function()
+					if updateAmbience then
+						updateAmbience()
+					end
+				end)
+			end
+		end)
+	end
 	sound:Play()
 	fadeSound(sound, volume, fadeSeconds, false)
 end
 
-local function updateAmbience()
+function updateAmbience()
 	if not rootPart or shouldSuppressAmbience() then
 		stopAmbience()
 		return
@@ -268,6 +374,20 @@ local function updateAmbience()
 		stopAmbience()
 	end
 end
+
+workspace:GetAttributeChangedSignal(BOWLING_COSMIC_ACTIVE_ATTRIBUTE):Connect(function()
+	if workspace:GetAttribute(BOWLING_COSMIC_ACTIVE_ATTRIBUTE) ~= true then
+		cosmicAttributeSoundId = nil
+		cosmicMusicSoundId = nil
+	end
+	updateAmbience()
+end)
+
+workspace:GetAttributeChangedSignal(BOWLING_COSMIC_MUSIC_ATTRIBUTE):Connect(function()
+	cosmicAttributeSoundId = nil
+	cosmicMusicSoundId = nil
+	updateAmbience()
+end)
 
 local function setCharacter(nextCharacter)
 	character = nextCharacter
