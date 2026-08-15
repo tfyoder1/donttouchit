@@ -13,6 +13,19 @@ local OPTIONS_GUI_ORDER = 155
 local BUTTON_Z_INDEX = 10
 local PANEL_Z_INDEX = 50
 local DRAG_MARGIN = 8
+local TOUCH_BUTTON_SIZE = UDim2.fromOffset(80, 52)
+local TOUCH_ICON_DISK_SIZE = 32
+local TOUCH_ICON_COLOR = Color3.fromRGB(246, 249, 255)
+local TOUCH_ICON_DISABLED_COLOR = Color3.fromRGB(156, 164, 178)
+local TOUCH_ICON_DISK_COLOR = Color3.fromRGB(86, 90, 100)
+local TOUCH_ICON_DISK_DISABLED_COLOR = Color3.fromRGB(57, 62, 72)
+
+local ICON_KIND_BY_ID = {
+	Run = "Run",
+	Drop = "Drop",
+	Ping = "Ping",
+	CrouchSlide = "Crouch",
+}
 
 local controlsById = {}
 local orderedIds = {}
@@ -85,6 +98,139 @@ local function setStroke(instance, color, thickness, transparency)
 	return stroke
 end
 
+local function clearIconLayer(layer)
+	for _, child in ipairs(layer:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+local function addIconPart(parent, name, x, y, width, height, rotation, color)
+	local part = Instance.new("Frame")
+	part.Name = name
+	part.Active = false
+	part.AnchorPoint = Vector2.new(0.5, 0.5)
+	part.BackgroundColor3 = color
+	part.BorderSizePixel = 0
+	part.Position = UDim2.fromScale(x, y)
+	part.Rotation = rotation or 0
+	part.Size = UDim2.fromScale(width, height)
+	part.ZIndex = parent.ZIndex + 1
+	part.Parent = parent
+	setRounded(part, 999)
+	return part
+end
+
+local function drawRunIcon(layer, color)
+	addIconPart(layer, "Head", 0.58, 0.25, 0.22, 0.22, 0, color)
+	addIconPart(layer, "Torso", 0.51, 0.45, 0.11, 0.34, -22, color)
+	addIconPart(layer, "ArmForward", 0.39, 0.43, 0.09, 0.31, 52, color)
+	addIconPart(layer, "ArmBack", 0.61, 0.49, 0.08, 0.27, -52, color)
+	addIconPart(layer, "LegForward", 0.62, 0.72, 0.10, 0.39, 48, color)
+	addIconPart(layer, "LegBack", 0.41, 0.73, 0.10, 0.36, -42, color)
+end
+
+local function drawPingIcon(layer, color, cutoutColor)
+	addIconPart(layer, "PinHead", 0.5, 0.34, 0.38, 0.38, 0, color)
+	addIconPart(layer, "PinHole", 0.5, 0.34, 0.15, 0.15, 0, cutoutColor)
+	addIconPart(layer, "PinStem", 0.5, 0.61, 0.18, 0.42, 45, color)
+	addIconPart(layer, "PinPoint", 0.5, 0.79, 0.15, 0.15, 45, color)
+end
+
+local function drawDropIcon(layer, color)
+	addIconPart(layer, "Palm", 0.38, 0.55, 0.31, 0.20, -12, color)
+	addIconPart(layer, "Thumb", 0.24, 0.54, 0.09, 0.23, 34, color)
+	addIconPart(layer, "FingerOne", 0.31, 0.40, 0.08, 0.26, -12, color)
+	addIconPart(layer, "FingerTwo", 0.42, 0.38, 0.08, 0.25, -6, color)
+	addIconPart(layer, "FingerThree", 0.53, 0.40, 0.08, 0.22, 8, color)
+	addIconPart(layer, "DropLine", 0.68, 0.49, 0.07, 0.23, 0, color)
+	addIconPart(layer, "FallingObject", 0.68, 0.73, 0.17, 0.17, 0, color)
+end
+
+local function drawCrouchIcon(layer, color)
+	addIconPart(layer, "Head", 0.34, 0.31, 0.23, 0.23, 0, color)
+	addIconPart(layer, "Back", 0.49, 0.49, 0.11, 0.34, 42, color)
+	addIconPart(layer, "Arm", 0.50, 0.59, 0.09, 0.28, 72, color)
+	addIconPart(layer, "UpperLeg", 0.62, 0.68, 0.12, 0.39, 80, color)
+	addIconPart(layer, "LowerLeg", 0.44, 0.78, 0.11, 0.32, -32, color)
+end
+
+local function drawDefaultIcon(layer, color)
+	addIconPart(layer, "Dot", 0.5, 0.5, 0.38, 0.38, 0, color)
+end
+
+local function drawTouchIcon(layer, kind, color, cutoutColor)
+	clearIconLayer(layer)
+	if kind == "Run" then
+		drawRunIcon(layer, color)
+	elseif kind == "Ping" then
+		drawPingIcon(layer, color, cutoutColor)
+	elseif kind == "Drop" then
+		drawDropIcon(layer, color)
+	elseif kind == "Crouch" then
+		drawCrouchIcon(layer, color)
+	else
+		drawDefaultIcon(layer, color)
+	end
+end
+
+local function ensureTouchButtonVisual(button)
+	local iconDisk = button:FindFirstChild("TouchControlIconDisk")
+	if not iconDisk or not iconDisk:IsA("Frame") then
+		iconDisk = Instance.new("Frame")
+		iconDisk.Name = "TouchControlIconDisk"
+		iconDisk.Active = false
+		iconDisk.AnchorPoint = Vector2.new(0, 0.5)
+		iconDisk.BorderSizePixel = 0
+		iconDisk.ZIndex = button.ZIndex + 1
+		iconDisk.Parent = button
+		setRounded(iconDisk, 999)
+	end
+
+	local diskStroke = iconDisk:FindFirstChild("TouchControlIconDiskStroke")
+	if not diskStroke or not diskStroke:IsA("UIStroke") then
+		diskStroke = setStroke(iconDisk, Color3.fromRGB(255, 255, 255), 1, 0.82)
+		diskStroke.Name = "TouchControlIconDiskStroke"
+	end
+
+	local iconLayer = iconDisk:FindFirstChild("TouchControlIconLayer")
+	if not iconLayer or not iconLayer:IsA("Frame") then
+		iconLayer = Instance.new("Frame")
+		iconLayer.Name = "TouchControlIconLayer"
+		iconLayer.Active = false
+		iconLayer.BackgroundTransparency = 1
+		iconLayer.BorderSizePixel = 0
+		iconLayer.Position = UDim2.fromScale(0.14, 0.14)
+		iconLayer.Size = UDim2.fromScale(0.72, 0.72)
+		iconLayer.ZIndex = iconDisk.ZIndex + 1
+		iconLayer.Parent = iconDisk
+	end
+
+	local label = button:FindFirstChild("TouchControlLabel")
+	if not label or not label:IsA("TextLabel") then
+		label = Instance.new("TextLabel")
+		label.Name = "TouchControlLabel"
+		label.Active = false
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBlack
+		label.TextScaled = true
+		label.TextWrapped = false
+		label.TextXAlignment = Enum.TextXAlignment.Center
+		label.TextYAlignment = Enum.TextYAlignment.Center
+		label.ZIndex = button.ZIndex + 1
+		label.Parent = button
+
+		local sizeConstraint = Instance.new("UITextSizeConstraint")
+		sizeConstraint.Name = "TouchControlTextSize"
+		sizeConstraint.MinTextSize = 8
+		sizeConstraint.MaxTextSize = 14
+		sizeConstraint.Parent = label
+	end
+
+	return iconDisk, iconLayer, label, diskStroke
+end
+
 local function upsertOrderedId(id)
 	if table.find(orderedIds, id) then
 		return
@@ -133,7 +279,7 @@ local function applyButtonState(state)
 	end
 
 	local enabled = state.Enabled ~= false
-	button.Text = state.Text
+	button.Text = ""
 	button.Size = state.Size
 	button.Position = getButtonPosition(state)
 	button.BackgroundColor3 = state.Color
@@ -144,6 +290,26 @@ local function applyButtonState(state)
 	button.Visible = UserInputService.TouchEnabled and (editMode or state.Visible ~= false)
 	button.Selectable = true
 	button.Active = true
+
+	local iconDisk, iconLayer, label, diskStroke = ensureTouchButtonVisual(button)
+	local iconDiskColor = if enabled then TOUCH_ICON_DISK_COLOR else TOUCH_ICON_DISK_DISABLED_COLOR
+	iconDisk.BackgroundColor3 = iconDiskColor
+	iconDisk.BackgroundTransparency = if enabled then 0.08 else 0.18
+	iconDisk.Position = UDim2.new(0, 6, 0.5, 0)
+	iconDisk.Size = UDim2.fromOffset(TOUCH_ICON_DISK_SIZE, TOUCH_ICON_DISK_SIZE)
+	iconDisk.ZIndex = button.ZIndex + 1
+	iconLayer.ZIndex = iconDisk.ZIndex + 1
+	label.Position = UDim2.new(0, TOUCH_ICON_DISK_SIZE + 12, 0, 4)
+	label.Size = UDim2.new(1, -(TOUCH_ICON_DISK_SIZE + 17), 1, -8)
+	label.Text = state.Text
+	label.TextColor3 = if enabled then state.TextColor else TOUCH_ICON_DISABLED_COLOR
+	label.TextTransparency = if enabled then 0 else 0.22
+
+	diskStroke.Color = if editMode then Color3.fromRGB(255, 255, 255) else state.StrokeColor
+	diskStroke.Transparency = if editMode then 0.12 else 0.58
+
+	local iconColor = if enabled then TOUCH_ICON_COLOR else TOUCH_ICON_DISABLED_COLOR
+	drawTouchIcon(iconLayer, ICON_KIND_BY_ID[state.Id], iconColor, iconDiskColor)
 
 	local stroke = button:FindFirstChild("TouchControlStroke")
 	if stroke and stroke:IsA("UIStroke") then
@@ -535,12 +701,12 @@ local function register(config, hasTouchButton)
 	state.Touch = tostring(config.Touch or state.Text)
 	state.Order = tonumber(config.Order) or 100
 	state.DefaultPosition = config.Position or config.DefaultPosition or UDim2.new(1, -92, 1, -176)
-	state.Size = config.Size or UDim2.fromOffset(70, 44)
+	state.Size = config.Size or TOUCH_BUTTON_SIZE
 	state.Color = config.Color or Color3.fromRGB(18, 23, 29)
 	state.TextColor = config.TextColor or Color3.fromRGB(224, 236, 245)
 	state.StrokeColor = config.StrokeColor or Color3.fromRGB(102, 217, 255)
 	state.BackgroundTransparency = if config.BackgroundTransparency ~= nil then config.BackgroundTransparency else 0.08
-	state.CornerRadius = config.CornerRadius or 9
+	state.CornerRadius = config.CornerRadius or 8
 	state.OnActivated = config.OnActivated
 	state.OnBegan = config.OnBegan
 	state.OnEnded = config.OnEnded

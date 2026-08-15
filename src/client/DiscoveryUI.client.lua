@@ -20,6 +20,7 @@ local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
 local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
+local START_PRELOAD_ROOM_ATTRIBUTE = "DontTouchItStartPreloadRoomId"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
 local playerGui = player:WaitForChild("PlayerGui")
@@ -2011,11 +2012,35 @@ local function closeReferenceBook()
 	setOverlayMouse(false)
 end
 
+local function getStartChoicePreloadRoomId(action, roomId)
+	if action == "Room" and typeof(roomId) == "string" then
+		return roomId
+	elseif action == "Restart" then
+		return (Constants.Prologue and Constants.Prologue.StartRoomId) or "CaveEntrance"
+	elseif action == "Resume" then
+		if pendingStartOptions and pendingStartOptions.HasProgress and typeof(pendingStartOptions.ResumeRoomId) == "string" then
+			return pendingStartOptions.ResumeRoomId
+		end
+
+		return (Constants.Prologue and Constants.Prologue.StartRoomId) or "CaveEntrance"
+	end
+
+	return nil
+end
+
+local function setStartChoicePreloadRoom(action, roomId)
+	local preloadRoomId = getStartChoicePreloadRoomId(action, roomId)
+	if typeof(preloadRoomId) == "string" and Constants.GetRoom(preloadRoomId) then
+		playerGui:SetAttribute(START_PRELOAD_ROOM_ATTRIBUTE, preloadRoomId)
+	end
+end
+
 local function sendStartChoice(action, roomId)
 	setStartOverlayVisible(false)
 	continueButton.Modal = false
 	restartButton.Modal = false
 	setOverlayMouse(false)
+	setStartChoicePreloadRoom(action, roomId)
 	pendingStartOptions = nil
 	local request = {
 		Action = action,
@@ -2719,6 +2744,11 @@ bunkerEnergyPanel:GetAttributeChangedSignal("Compact"):Connect(updateBunkerEnerg
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)
+task.defer(function()
+	sessionStartRemote:FireServer({
+		Action = "RequestOptions",
+	})
+end)
 roomStatusRemote.OnClientEvent:Connect(updateRoomStatus)
 sparkleRemote.OnClientEvent:Connect(showSparkleHint)
 feedbackRemote.OnClientEvent:Connect(function(payload)
