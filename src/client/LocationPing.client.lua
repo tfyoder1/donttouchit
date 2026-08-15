@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local TouchControls = require(script.Parent:WaitForChild("TouchControls"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local pingRemote = remotes:WaitForChild(Constants.Remotes.LocationPing)
 
@@ -270,6 +271,22 @@ local function showPing(payload)
 	end)
 end
 
+local function setupTouchPingButton()
+	TouchControls.RegisterAction({
+		Id = "Ping",
+		Label = "Ping",
+		Text = "Ping",
+		Order = 30,
+		Desktop = "G",
+		Xbox = "D-pad left",
+		Touch = "Ping button",
+		Position = UDim2.new(1, -170, 1, -176),
+		TextColor = Color3.fromRGB(216, 245, 255),
+		StrokeColor = Color3.fromRGB(102, 217, 255),
+		OnActivated = sendPing,
+	})
+end
+
 ContextActionService:UnbindAction(PING_ACTION)
 ContextActionService:BindAction(PING_ACTION, function(_, inputState)
 	if inputState ~= Enum.UserInputState.Begin then
@@ -278,11 +295,13 @@ ContextActionService:BindAction(PING_ACTION, function(_, inputState)
 
 	sendPing()
 	return Enum.ContextActionResult.Sink
-end, true, Enum.KeyCode.DPadLeft, Enum.KeyCode.G)
+end, false, Enum.KeyCode.DPadLeft, Enum.KeyCode.G)
 
 pcall(function()
 	ContextActionService:SetTitle(PING_ACTION, "Ping")
 	ContextActionService:SetPosition(PING_ACTION, UDim2.fromScale(0.72, 0.42))
 end)
+
+setupTouchPingButton()
 
 pingRemote.OnClientEvent:Connect(showPing)

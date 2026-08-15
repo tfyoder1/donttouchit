@@ -5,11 +5,11 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local TouchControls = require(script.Parent:WaitForChild("TouchControls"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local movementRemote = remotes:WaitForChild(Constants.Remotes.MovementAuthority)
 
 local FLIGHT_ACTIVE_ATTRIBUTE = "DontTouchItSnackFlightActive"
-local SLIDE_KEY = Enum.KeyCode.ButtonB
 local SLIDE_MIN_WALK_SPEED = 21
 local SLIDE_MIN_HORIZONTAL_SPEED = 18
 local CROUCH_KEYS = {
@@ -82,17 +82,38 @@ local function beginCrouch()
 	requestCrouch(true)
 end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if not CROUCH_KEYS[input.KeyCode] or gameProcessed then
-		return
-	end
-
-	if input.KeyCode == SLIDE_KEY and shouldSlide() then
+local function beginCrouchOrSlide()
+	if shouldSlide() then
 		requestSlide()
 		return
 	end
 
 	beginCrouch()
+end
+
+local function setupTouchCrouchButton()
+	TouchControls.RegisterAction({
+		Id = "CrouchSlide",
+		Label = "Crouch / Slide",
+		Text = "Crouch",
+		Order = 20,
+		Desktop = "C",
+		Xbox = "B",
+		Touch = "Crouch button",
+		Position = UDim2.new(1, -92, 1, -230),
+		TextColor = Color3.fromRGB(231, 224, 255),
+		StrokeColor = Color3.fromRGB(173, 145, 255),
+		OnBegan = beginCrouchOrSlide,
+		OnEnded = restoreCrouch,
+	})
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if not CROUCH_KEYS[input.KeyCode] or gameProcessed then
+		return
+	end
+
+	beginCrouchOrSlide()
 end)
 
 UserInputService.InputEnded:Connect(function(input)
@@ -106,6 +127,8 @@ end)
 player.CharacterAdded:Connect(function()
 	restoreCrouch()
 end)
+
+setupTouchCrouchButton()
 
 playerGui:GetAttributeChangedSignal(FLIGHT_ACTIVE_ATTRIBUTE):Connect(function()
 	if playerGui:GetAttribute(FLIGHT_ACTIVE_ATTRIBUTE) == true then

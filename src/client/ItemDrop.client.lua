@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local TouchControls = require(script.Parent:WaitForChild("TouchControls"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local inventoryRemote = remotes:WaitForChild(Constants.Remotes.InventoryAction)
 
@@ -18,6 +19,7 @@ local CLIENT_DROP_COOLDOWN = 0.25
 local lastDropAt = 0
 local holdToken = 0
 local characterConnections = {}
+local dropControl = nil
 
 local function getEquippedDroppableTool()
 	local character = player.Character
@@ -63,17 +65,12 @@ local function isBlockingUiOpen()
 	return false
 end
 
-local function setTouchButtonVisible(visible)
-	pcall(function()
-		local button = ContextActionService:GetButton(DROP_ACTION)
-		if button then
-			button.Visible = visible
-		end
-	end)
-end
-
 local function updateDropButtonVisibility()
-	setTouchButtonVisible(getEquippedDroppableTool() ~= nil)
+	if dropControl then
+		local enabled = getEquippedDroppableTool() ~= nil
+		dropControl:SetVisible(true)
+		dropControl:SetEnabled(enabled)
+	end
 end
 
 local function requestDrop()
@@ -152,13 +149,33 @@ local function watchCharacter(character)
 	task.defer(updateDropButtonVisibility)
 end
 
+local function setupTouchDropButton()
+	dropControl = TouchControls.RegisterAction({
+		Id = "Drop",
+		Label = "Drop",
+		Text = "Drop",
+		Order = 40,
+		Desktop = "Backspace",
+		Xbox = "Hold B",
+		Touch = "Drop button",
+		Position = UDim2.new(1, -248, 1, -176),
+		TextColor = Color3.fromRGB(255, 235, 194),
+		StrokeColor = Color3.fromRGB(255, 211, 102),
+		Enabled = getEquippedDroppableTool() ~= nil,
+		OnActivated = requestDrop,
+	})
+	updateDropButtonVisibility()
+end
+
 ContextActionService:UnbindAction(DROP_ACTION)
-ContextActionService:BindAction(DROP_ACTION, handleDropAction, true, DROP_KEYBOARD_KEY, DROP_GAMEPAD_KEY)
+ContextActionService:BindAction(DROP_ACTION, handleDropAction, false, DROP_KEYBOARD_KEY, DROP_GAMEPAD_KEY)
 
 pcall(function()
 	ContextActionService:SetTitle(DROP_ACTION, "Drop")
 	ContextActionService:SetPosition(DROP_ACTION, UDim2.fromScale(0.58, 0.42))
 end)
+
+setupTouchDropButton()
 
 watchCharacter(player.Character)
 player.CharacterAdded:Connect(watchCharacter)
