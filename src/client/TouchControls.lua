@@ -20,11 +20,11 @@ local TOUCH_ICON_DISABLED_COLOR = Color3.fromRGB(156, 164, 178)
 local TOUCH_ICON_DISK_COLOR = Color3.fromRGB(86, 90, 100)
 local TOUCH_ICON_DISK_DISABLED_COLOR = Color3.fromRGB(57, 62, 72)
 
-local ICON_KIND_BY_ID = {
-	Run = "Run",
-	Drop = "Drop",
-	Ping = "Ping",
-	CrouchSlide = "Crouch",
+local TOUCH_BADGE_TEXT_BY_ID = {
+	Run = "R",
+	Drop = "D",
+	Ping = "P",
+	CrouchSlide = "C",
 }
 
 local controlsById = {}
@@ -106,73 +106,32 @@ local function clearIconLayer(layer)
 	end
 end
 
-local function addIconPart(parent, name, x, y, width, height, rotation, color)
-	local part = Instance.new("Frame")
-	part.Name = name
-	part.Active = false
-	part.AnchorPoint = Vector2.new(0.5, 0.5)
-	part.BackgroundColor3 = color
-	part.BorderSizePixel = 0
-	part.Position = UDim2.fromScale(x, y)
-	part.Rotation = rotation or 0
-	part.Size = UDim2.fromScale(width, height)
-	part.ZIndex = parent.ZIndex + 1
-	part.Parent = parent
-	setRounded(part, 999)
-	return part
-end
-
-local function drawRunIcon(layer, color)
-	addIconPart(layer, "Head", 0.58, 0.25, 0.22, 0.22, 0, color)
-	addIconPart(layer, "Torso", 0.51, 0.45, 0.11, 0.34, -22, color)
-	addIconPart(layer, "ArmForward", 0.39, 0.43, 0.09, 0.31, 52, color)
-	addIconPart(layer, "ArmBack", 0.61, 0.49, 0.08, 0.27, -52, color)
-	addIconPart(layer, "LegForward", 0.62, 0.72, 0.10, 0.39, 48, color)
-	addIconPart(layer, "LegBack", 0.41, 0.73, 0.10, 0.36, -42, color)
-end
-
-local function drawPingIcon(layer, color, cutoutColor)
-	addIconPart(layer, "PinHead", 0.5, 0.34, 0.38, 0.38, 0, color)
-	addIconPart(layer, "PinHole", 0.5, 0.34, 0.15, 0.15, 0, cutoutColor)
-	addIconPart(layer, "PinStem", 0.5, 0.61, 0.18, 0.42, 45, color)
-	addIconPart(layer, "PinPoint", 0.5, 0.79, 0.15, 0.15, 45, color)
-end
-
-local function drawDropIcon(layer, color)
-	addIconPart(layer, "Palm", 0.38, 0.55, 0.31, 0.20, -12, color)
-	addIconPart(layer, "Thumb", 0.24, 0.54, 0.09, 0.23, 34, color)
-	addIconPart(layer, "FingerOne", 0.31, 0.40, 0.08, 0.26, -12, color)
-	addIconPart(layer, "FingerTwo", 0.42, 0.38, 0.08, 0.25, -6, color)
-	addIconPart(layer, "FingerThree", 0.53, 0.40, 0.08, 0.22, 8, color)
-	addIconPart(layer, "DropLine", 0.68, 0.49, 0.07, 0.23, 0, color)
-	addIconPart(layer, "FallingObject", 0.68, 0.73, 0.17, 0.17, 0, color)
-end
-
-local function drawCrouchIcon(layer, color)
-	addIconPart(layer, "Head", 0.34, 0.31, 0.23, 0.23, 0, color)
-	addIconPart(layer, "Back", 0.49, 0.49, 0.11, 0.34, 42, color)
-	addIconPart(layer, "Arm", 0.50, 0.59, 0.09, 0.28, 72, color)
-	addIconPart(layer, "UpperLeg", 0.62, 0.68, 0.12, 0.39, 80, color)
-	addIconPart(layer, "LowerLeg", 0.44, 0.78, 0.11, 0.32, -32, color)
-end
-
-local function drawDefaultIcon(layer, color)
-	addIconPart(layer, "Dot", 0.5, 0.5, 0.38, 0.38, 0, color)
-end
-
-local function drawTouchIcon(layer, kind, color, cutoutColor)
+local function drawTouchBadge(layer, text, color)
 	clearIconLayer(layer)
-	if kind == "Run" then
-		drawRunIcon(layer, color)
-	elseif kind == "Ping" then
-		drawPingIcon(layer, color, cutoutColor)
-	elseif kind == "Drop" then
-		drawDropIcon(layer, color)
-	elseif kind == "Crouch" then
-		drawCrouchIcon(layer, color)
-	else
-		drawDefaultIcon(layer, color)
-	end
+
+	local badge = Instance.new("TextLabel")
+	badge.Name = "TouchControlBadgeText"
+	badge.Active = false
+	badge.BackgroundTransparency = 1
+	badge.Font = Enum.Font.GothamBlack
+	badge.Position = UDim2.fromScale(0, 0)
+	badge.Size = UDim2.fromScale(1, 1)
+	badge.Text = text
+	badge.TextColor3 = color
+	badge.TextScaled = true
+	badge.TextStrokeColor3 = Color3.fromRGB(10, 12, 16)
+	badge.TextStrokeTransparency = 0.45
+	badge.TextWrapped = false
+	badge.TextXAlignment = Enum.TextXAlignment.Center
+	badge.TextYAlignment = Enum.TextYAlignment.Center
+	badge.ZIndex = layer.ZIndex + 1
+	badge.Parent = layer
+
+	local constraint = Instance.new("UITextSizeConstraint")
+	constraint.Name = "TouchControlBadgeTextSize"
+	constraint.MinTextSize = 12
+	constraint.MaxTextSize = 22
+	constraint.Parent = badge
 end
 
 local function ensureTouchButtonVisual(button)
@@ -309,7 +268,8 @@ local function applyButtonState(state)
 	diskStroke.Transparency = if editMode then 0.12 else 0.58
 
 	local iconColor = if enabled then TOUCH_ICON_COLOR else TOUCH_ICON_DISABLED_COLOR
-	drawTouchIcon(iconLayer, ICON_KIND_BY_ID[state.Id], iconColor, iconDiskColor)
+	local badgeText = TOUCH_BADGE_TEXT_BY_ID[state.Id] or string.sub(state.Text or state.Label or state.Id, 1, 1)
+	drawTouchBadge(iconLayer, string.upper(badgeText), iconColor)
 
 	local stroke = button:FindFirstChild("TouchControlStroke")
 	if stroke and stroke:IsA("UIStroke") then
@@ -399,6 +359,9 @@ local function setEditMode(active)
 	end
 	if resetButton then
 		resetButton.Visible = UserInputService.TouchEnabled
+	end
+	if editMode and UserInputService.TouchEnabled and optionsPanel then
+		optionsPanel.Visible = false
 	end
 	applyAllButtonStates()
 end

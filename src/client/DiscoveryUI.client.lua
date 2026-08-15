@@ -19,24 +19,53 @@ local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
+local DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE = "DontTouchItDevTitleSequenceEnabled"
+local DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE = "DontTouchItDevShowTitleSequenceNonce"
 local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
 local START_PRELOAD_ROOM_ATTRIBUTE = "DontTouchItStartPreloadRoomId"
+local TITLE_SPLASH_ADVANCE_ATTRIBUTE = "DontTouchItTitleSplashAdvanceNonce"
+local TITLE_SPLASH_READY_ATTRIBUTE = "DontTouchItTitleSplashMenuReady"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
+local DEFAULT_UI_DISPLAY_ORDER = 10
+local START_OVERLAY_DISPLAY_ORDER = 180
 local playerGui = player:WaitForChild("PlayerGui")
 local introMusicSound = nil
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItUI"
 gui.IgnoreGuiInset = false
-gui.DisplayOrder = 10
+gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
 pcall(function()
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 end)
 
+if playerGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE) == nil then
+	playerGui:SetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, true)
+end
+gui:SetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, playerGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE) ~= false)
+
+local function isTitleSequenceEnabledForDevSession()
+	local guiValue = gui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE)
+	if guiValue ~= nil then
+		return guiValue ~= false
+	end
+
+	local playerGuiValue = playerGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE)
+	if playerGuiValue ~= nil then
+		return playerGuiValue ~= false
+	end
+
+	return true
+end
+
 local function isStartOverlayDismissedForDevSession()
+	if isTitleSequenceEnabledForDevSession() then
+		return false
+	end
+
 	return gui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true or playerGui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true
 end
 
@@ -1145,6 +1174,7 @@ local setStartPhase = nil
 
 local function setStartOverlayVisible(visible)
 	startOverlay.Visible = visible
+	gui.DisplayOrder = visible and START_OVERLAY_DISPLAY_ORDER or DEFAULT_UI_DISPLAY_ORDER
 	startBlur.Enabled = visible
 	startBlur.Size = visible and 24 or 0
 	gui:SetAttribute("GameplayHudSuppressed", visible == true)
@@ -1564,6 +1594,9 @@ local activeSecretDoorAction = "RevealSecretDoor"
 local currentStatusType = nil
 local currentStatusRoomId = nil
 local pendingStartOptions = nil
+local lastStartOptionsPayload = nil
+local startChoiceSent = false
+local clearDevStartDismiss = nil
 local sessionStartIntroText = nil
 local startRoomButtons = {}
 local overlayMouseDepth = 0
@@ -2036,6 +2069,7 @@ local function setStartChoicePreloadRoom(action, roomId)
 end
 
 local function sendStartChoice(action, roomId)
+	startChoiceSent = true
 	setStartOverlayVisible(false)
 	continueButton.Modal = false
 	restartButton.Modal = false
@@ -2177,6 +2211,8 @@ local function renderStartOptions(payload)
 		return
 	end
 
+	lastStartOptionsPayload = payload
+
 	if isStartOverlayDismissedForDevSession() then
 		pendingStartOptions = nil
 		setStartOverlayVisible(false)
@@ -2228,6 +2264,151 @@ local function renderStartOptions(payload)
 	renderStartRoomChoices(payload)
 end
 
+local function getFallbackStartRoom()
+	local roomId = if currentStatusType == "Room" then currentStatusRoomId else nil
+	local hasCurrentRoom = typeof(roomId) == "string" and Constants.GetRoom(roomId) ~= nil
+	if not hasCurrentRoom then
+		roomId = (Constants.Prologue and Constants.Prologue.ContainmentRoomId)
+			or (Constants.RoomOrder and Constants.RoomOrder[1])
+			or "TVRoom"
+	end
+
+	local room = Constants.GetRoom(roomId)
+	return roomId, room and room.Name or "TV Room", hasCurrentRoom
+end
+
+local function buildFallbackStartOptionsPayload()
+	local roomId, roomName, hasCurrentRoom = getFallbackStartRoom()
+
+	return {
+		Action = "Show",
+		HasProgress = hasCurrentRoom,
+		FreshStartRoomName = "Forest Cave",
+		ResumeRoomId = roomId,
+		ResumeRoomName = roomName,
+		UnlockedRooms = {},
+		DiscoveryCount = 0,
+		TotalDiscoveries = Constants.TotalDiscoveries,
+		Hints = 0,
+		Clues = 0,
+		BuildVersion = Constants.BuildVersion,
+		IntroText = Constants.GameIntro,
+		DevFallback = true,
+	}
+end
+
+local function getFallbackReplayPayload()
+	if lastStartOptionsPayload and lastStartOptionsPayload.DevFallback ~= true then
+		return lastStartOptionsPayload
+	end
+
+	return buildFallbackStartOptionsPayload()
+end
+
+local function renderFallbackStartOptions()
+	if startChoiceSent or startOverlay.Visible or not isTitleSequenceEnabledForDevSession() then
+		return false
+	end
+
+	renderStartOptions(getFallbackReplayPayload())
+
+	return true
+end
+
+local lastHandledShowTitleSequenceNonce = 0
+
+local function renderForcedStartTitleOptions()
+	if not isTitleSequenceEnabledForDevSession() then
+		return false
+	end
+
+	clearDevStartDismiss()
+	renderStartOptions(getFallbackReplayPayload())
+	return true
+end
+
+local function handleShowTitleSequenceNonceChanged()
+	local nonce = math.max(
+		tonumber(gui:GetAttribute(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE)) or 0,
+		tonumber(playerGui:GetAttribute(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE)) or 0
+	)
+	if nonce <= lastHandledShowTitleSequenceNonce then
+		return
+	end
+
+	lastHandledShowTitleSequenceNonce = nonce
+	renderForcedStartTitleOptions()
+end
+
+local lastHandledTitleSplashAdvanceNonce = 0
+
+local function handleTitleSplashAdvanceChanged()
+	local nonce = tonumber(playerGui:GetAttribute(TITLE_SPLASH_ADVANCE_ATTRIBUTE)) or 0
+	if nonce <= lastHandledTitleSplashAdvanceNonce then
+		return
+	end
+
+	lastHandledTitleSplashAdvanceNonce = nonce
+	if not startOverlay.Visible then
+		renderStartOptions(getFallbackReplayPayload())
+	elseif startOverlayPhase ~= "Title" then
+		setStartPhase("Title")
+	end
+
+	revealStartMenuFromIntro()
+	playerGui:SetAttribute(TITLE_SPLASH_READY_ATTRIBUTE, true)
+end
+
+local function queueStartOptionsFallback(delaySeconds)
+	task.delay(delaySeconds, renderFallbackStartOptions)
+end
+
+local function requestStartOptionsIfPending()
+	if startChoiceSent then
+		return
+	end
+
+	task.defer(function()
+		if startChoiceSent then
+			return
+		end
+
+		sessionStartRemote:FireServer({
+			Action = "RequestOptions",
+		})
+	end)
+end
+
+clearDevStartDismiss = function()
+	gui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, false)
+	playerGui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, false)
+end
+
+local function handleTitleSequencePreferenceChanged()
+	gui:SetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, playerGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE) ~= false)
+
+	if isTitleSequenceEnabledForDevSession() then
+		clearDevStartDismiss()
+		if not startChoiceSent then
+			if lastStartOptionsPayload then
+				renderStartOptions(lastStartOptionsPayload)
+			else
+				requestStartOptionsIfPending()
+				queueStartOptionsFallback(1.25)
+			end
+		end
+		return
+	end
+
+	if isStartOverlayDismissedForDevSession() then
+		pendingStartOptions = nil
+		setStartOverlayVisible(false)
+		continueButton.Modal = false
+		restartButton.Modal = false
+		setOverlayMouse(false)
+	end
+end
+
 gui:GetAttributeChangedSignal(DEV_DISMISS_START_ATTRIBUTE):Connect(function()
 	if isStartOverlayDismissedForDevSession() then
 		pendingStartOptions = nil
@@ -2247,6 +2428,14 @@ playerGui:GetAttributeChangedSignal(DEV_DISMISS_START_ATTRIBUTE):Connect(functio
 		setOverlayMouse(false)
 	end
 end)
+
+gui:GetAttributeChangedSignal(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE):Connect(handleTitleSequencePreferenceChanged)
+playerGui:GetAttributeChangedSignal(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE):Connect(handleTitleSequencePreferenceChanged)
+gui:GetAttributeChangedSignal(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE):Connect(handleShowTitleSequenceNonceChanged)
+playerGui:GetAttributeChangedSignal(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE):Connect(handleShowTitleSequenceNonceChanged)
+task.defer(handleShowTitleSequenceNonceChanged)
+playerGui:GetAttributeChangedSignal(TITLE_SPLASH_ADVANCE_ATTRIBUTE):Connect(handleTitleSplashAdvanceChanged)
+task.defer(handleTitleSplashAdvanceChanged)
 
 local function getSparklePart(target)
 	if not target then
@@ -2744,11 +2933,9 @@ bunkerEnergyPanel:GetAttributeChangedSignal("Compact"):Connect(updateBunkerEnerg
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)
-task.defer(function()
-	sessionStartRemote:FireServer({
-		Action = "RequestOptions",
-	})
-end)
+requestStartOptionsIfPending()
+queueStartOptionsFallback(1.25)
+queueStartOptionsFallback(3)
 roomStatusRemote.OnClientEvent:Connect(updateRoomStatus)
 sparkleRemote.OnClientEvent:Connect(showSparkleHint)
 feedbackRemote.OnClientEvent:Connect(function(payload)

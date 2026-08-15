@@ -47,6 +47,9 @@ local idLabelsEnabled = false
 local idLabelFolder = nil
 local lastIdLabelsUpdateAt = 0
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
+local DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE = "DontTouchItDevTitleSequenceEnabled"
+local DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE = "DontTouchItDevShowTitleSequenceNonce"
+local playerGui = player:WaitForChild("PlayerGui")
 local FLY_SPEED = 55
 local GAMEPAD_STICK_DEADZONE = 0.16
 local INSPECT_RANGE = 700
@@ -230,27 +233,56 @@ local function makeButton(parent, text, color, onClick)
 	return button
 end
 
-local function findFirstSelectableButton(root, preferredText)
+local function findFirstSelectableButton(root, selectionSnapshot)
 	if not root then
 		return nil
 	end
 
+	local preferredText = selectionSnapshot and selectionSnapshot.Text
+	local preferredPosition = selectionSnapshot and selectionSnapshot.Position
 	local fallback = nil
+	local closest = nil
+	local closestDistance = math.huge
 	for _, descendant in ipairs(root:GetDescendants()) do
-		if descendant:IsA("TextButton") and descendant.Visible and descendant.Selectable then
+		if descendant:IsA("TextButton") and descendant.Selectable and isButtonVisibleForActivation(descendant) then
 			if not fallback then
 				fallback = descendant
 			end
 			if preferredText and descendant.Text == preferredText then
 				return descendant
 			end
+			if preferredPosition then
+				local center = descendant.AbsolutePosition + (descendant.AbsoluteSize * 0.5)
+				local distance = (center - preferredPosition).Magnitude
+				if distance < closestDistance then
+					closestDistance = distance
+					closest = descendant
+				end
+			end
 		end
 	end
 
-	return fallback
+	return closest or fallback
 end
 
-local function preserveGamepadSelection(previousText)
+local function getGamepadSelectionSnapshot()
+	if not panel or not panel.Visible or not UserInputService.GamepadEnabled then
+		return nil
+	end
+
+	local snapshot = {
+		ScrollPosition = panelScroll and panelScroll.CanvasPosition or nil,
+	}
+	local selectedObject = GuiService.SelectedObject
+	if selectedObject and panel and selectedObject:IsDescendantOf(panel) and selectedObject:IsA("TextButton") then
+		snapshot.Text = selectedObject.Text
+		snapshot.Position = selectedObject.AbsolutePosition + (selectedObject.AbsoluteSize * 0.5)
+	end
+
+	return snapshot
+end
+
+local function preserveGamepadSelection(selectionSnapshot)
 	if not panel or not panel.Visible or not UserInputService.GamepadEnabled then
 		return
 	end
@@ -260,9 +292,22 @@ local function preserveGamepadSelection(previousText)
 			return
 		end
 
-		local selectedObject = findFirstSelectableButton(panel, previousText)
+		local scrollPosition = selectionSnapshot and selectionSnapshot.ScrollPosition
+		if panelScroll and scrollPosition then
+			panelScroll.CanvasPosition = scrollPosition
+		end
+
+		local selectedObject = findFirstSelectableButton(panel, selectionSnapshot)
 		if selectedObject then
 			GuiService.SelectedObject = selectedObject
+		end
+
+		if panelScroll and scrollPosition then
+			task.defer(function()
+				if panel and panel.Visible and panelScroll then
+					panelScroll.CanvasPosition = scrollPosition
+				end
+			end)
 		end
 	end)
 end
@@ -379,22 +424,214 @@ local function send(payload)
 	end
 end
 
-local function dismissStartOverlayForDevSession()
-	local playerGui = player:FindFirstChild("PlayerGui")
-	if not playerGui then
-		return
-	end
+local function getMainUi()
+	return playerGui:FindFirstChild("DontTouchItUI")
+end
 
-	playerGui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, true)
-
-	local mainGui = playerGui:FindFirstChild("DontTouchItUI")
+local function waitForMainUi(timeoutSeconds)
+	local mainGui = getMainUi()
 	if mainGui then
-		mainGui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, true)
+		return mainGui
 	end
 
+	mainGui = playerGui:WaitForChild("DontTouchItUI", timeoutSeconds)
+	if mainGui and mainGui:IsA("ScreenGui") then
+		return mainGui
+	end
+
+	return nil
+end
+
+local function setDevUiAttribute(attributeName, value)
+	playerGui:SetAttribute(attributeName, value)
+
+	local mainGui = getMainUi()
+	if mainGui then
+		mainGui:SetAttribute(attributeName, value)
+	end
+end
+
+if playerGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE) == nil then
+	playerGui:SetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, true)
+end
+
+local function isTitleSequenceEnabledForDev()
+	local value = playerGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE)
+	if value ~= nil then
+		return value ~= false
+	end
+
+	local mainGui = getMainUi()
+	if mainGui then
+		local mainValue = mainGui:GetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE)
+		if mainValue ~= nil then
+			return mainValue ~= false
+		end
+	end
+
+	return true
+end
+
+local function dismissStartOverlayForDevSession(force)
+	if not force and isTitleSequenceEnabledForDev() then
+		return false
+	end
+
+	setDevUiAttribute(DEV_DISMISS_START_ATTRIBUTE, true)
+
+	local mainGui = getMainUi()
 	local startOverlay = mainGui and mainGui:FindFirstChild("StartChoiceOverlay")
 	if startOverlay and startOverlay:IsA("GuiObject") then
 		startOverlay.Visible = false
+	end
+
+	return true
+end
+
+local function setTitleSequenceEnabledForDev(enabled)
+	enabled = enabled == true
+	setDevUiAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, enabled)
+
+	if enabled then
+		setDevUiAttribute(DEV_DISMISS_START_ATTRIBUTE, false)
+		if showDevInfo then
+			showDevInfo("Title sequence ON. Dev tools will not bypass the start intro.", 5)
+		end
+	else
+		dismissStartOverlayForDevSession(true)
+		if showDevInfo then
+			showDevInfo("Title sequence OFF. Dev tools will bypass the start intro.", 5)
+		end
+	end
+end
+
+local function getShowTitleSequenceNonce()
+	local nonce = tonumber(playerGui:GetAttribute(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE)) or 0
+	local mainGui = getMainUi()
+	if mainGui then
+		nonce = math.max(nonce, tonumber(mainGui:GetAttribute(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE)) or 0)
+	end
+
+	return nonce
+end
+
+local function showEmergencyTitleOverlay()
+	local existing = playerGui:FindFirstChild("DontTouchItDevTitleOverlay")
+	if existing then
+		existing:Destroy()
+	end
+
+	local overlayGui = Instance.new("ScreenGui")
+	overlayGui.Name = "DontTouchItDevTitleOverlay"
+	overlayGui.DisplayOrder = 250
+	overlayGui.IgnoreGuiInset = false
+	overlayGui.ResetOnSpawn = false
+	overlayGui.Parent = playerGui
+
+	pcall(function()
+		overlayGui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+	end)
+
+	local root = Instance.new("TextButton")
+	root.Name = "OverlayRoot"
+	root.AutoButtonColor = false
+	root.BackgroundColor3 = Color3.fromRGB(6, 8, 12)
+	root.BackgroundTransparency = 0.08
+	root.BorderSizePixel = 0
+	root.Modal = true
+	root.Size = UDim2.fromScale(1, 1)
+	root.Text = ""
+	root.Parent = overlayGui
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "Title"
+	titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Font = Enum.Font.GothamBlack
+	titleLabel.Position = UDim2.fromScale(0.5, 0.42)
+	titleLabel.Size = UDim2.new(0.9, 0, 0, 72)
+	titleLabel.Text = "DON'T TOUCH IT"
+	titleLabel.TextColor3 = Color3.fromRGB(255, 242, 181)
+	titleLabel.TextScaled = true
+	titleLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	titleLabel.TextStrokeTransparency = 0.22
+	titleLabel.TextWrapped = true
+	titleLabel.Parent = root
+
+	local statusText = Instance.new("TextLabel")
+	statusText.Name = "Status"
+	statusText.AnchorPoint = Vector2.new(0.5, 0.5)
+	statusText.BackgroundTransparency = 1
+	statusText.Font = Enum.Font.GothamSemibold
+	statusText.Position = UDim2.fromScale(0.5, 0.56)
+	statusText.Size = UDim2.new(0.82, 0, 0, 44)
+	statusText.Text = "Dev title overlay\nv" .. tostring(Constants.BuildVersion or "?")
+	statusText.TextColor3 = Color3.fromRGB(206, 222, 238)
+	statusText.TextScaled = true
+	statusText.TextWrapped = true
+	statusText.Parent = root
+
+	local prompt = Instance.new("TextLabel")
+	prompt.Name = "Prompt"
+	prompt.AnchorPoint = Vector2.new(0.5, 0.5)
+	prompt.BackgroundTransparency = 1
+	prompt.Font = Enum.Font.GothamBold
+	prompt.Position = UDim2.fromScale(0.5, 0.76)
+	prompt.Size = UDim2.new(0.82, 0, 0, 30)
+	prompt.Text = "Tap, click, or press any button to close"
+	prompt.TextColor3 = Color3.fromRGB(174, 190, 210)
+	prompt.TextScaled = true
+	prompt.TextWrapped = true
+	prompt.Parent = root
+
+	local closed = false
+	local inputConnection = nil
+	local function closeOverlay()
+		if closed then
+			return
+		end
+		closed = true
+		if inputConnection then
+			inputConnection:Disconnect()
+		end
+		if overlayGui.Parent then
+			overlayGui:Destroy()
+		end
+	end
+
+	root.Activated:Connect(closeOverlay)
+	inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.Keyboard
+			or input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+			or input.UserInputType == Enum.UserInputType.Gamepad1
+		then
+			closeOverlay()
+		end
+	end)
+end
+
+local function showTitleSequenceNowForDev()
+	showEmergencyTitleOverlay()
+	setDevUiAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, true)
+	setDevUiAttribute(DEV_DISMISS_START_ATTRIBUTE, false)
+	local nextNonce = getShowTitleSequenceNonce() + 1
+	playerGui:SetAttribute(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE, nextNonce)
+	local mainGui = waitForMainUi(2)
+	if mainGui then
+		mainGui:SetAttribute(DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE, true)
+		mainGui:SetAttribute(DEV_DISMISS_START_ATTRIBUTE, false)
+		mainGui:SetAttribute(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE, nextNonce)
+	end
+	clearPanelSelection()
+	if panel then
+		panel.Visible = false
+	end
+	if showDevInfo then
+		showDevInfo("Title sequence requested. First action opens the start menu.", 5)
 	end
 end
 
@@ -1199,11 +1436,7 @@ rebuildPanel = function()
 		return
 	end
 
-	local selectedObject = GuiService.SelectedObject
-	local previousSelectionText = nil
-	if selectedObject and panel and selectedObject:IsDescendantOf(panel) and selectedObject:IsA("TextButton") then
-		previousSelectionText = selectedObject.Text
-	end
+	local selectionSnapshot = getGamepadSelectionSnapshot()
 
 	selectedRoomId = selectedRoomId or latestState.CurrentRoomId or Constants.RoomOrder[1]
 
@@ -1290,7 +1523,18 @@ rebuildPanel = function()
 		end
 	end
 
-	if makeCollapseHeader(toolsList, "SessionTools", "Session Tools", 5) then
+	if makeCollapseHeader(toolsList, "SessionTools", "Session Tools", 7) then
+		local titleSequenceEnabled = isTitleSequenceEnabledForDev()
+		makeButton(
+			toolsList,
+			titleSequenceEnabled and "Title Sequence: ON" or "Title Sequence: OFF",
+			titleSequenceEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(116, 48, 52),
+			function()
+				setTitleSequenceEnabledForDev(not isTitleSequenceEnabledForDev())
+				rebuildPanel()
+			end
+		)
+		makeButton(toolsList, "Show Title Now", Color3.fromRGB(47, 85, 102), showTitleSequenceNowForDev)
 		makeButton(toolsList, "Unlock All This Session", Color3.fromRGB(35, 103, 68), function()
 			send({
 				Action = "UnlockAllSession",
@@ -1396,7 +1640,7 @@ rebuildPanel = function()
 	rebuildStorePrices()
 	rebuildDiscoveries()
 	updateStatus()
-	preserveGamepadSelection(previousSelectionText)
+	preserveGamepadSelection(selectionSnapshot)
 end
 
 local function buildGui()
@@ -1517,7 +1761,7 @@ local function buildGui()
 	title.Font = Enum.Font.GothamBlack
 	title.Position = UDim2.fromOffset(12, 8)
 	title.Size = UDim2.new(1, -78, 0, 30)
-	title.Text = "DEV TOOLS"
+	title.Text = ("DEV TOOLS  v%s"):format(tostring(Constants.BuildVersion or "?"))
 	title.TextColor3 = Color3.fromRGB(154, 255, 192)
 	title.TextScaled = true
 	title.TextXAlignment = Enum.TextXAlignment.Left
