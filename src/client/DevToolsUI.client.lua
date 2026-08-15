@@ -897,6 +897,11 @@ local function requestDevFlyFromDoubleJump()
 	showDevInfo(if nextFlyEnabled then "Double jump detected. Dev fly requested." else "Double jump detected. Dev fly stop requested.", 4)
 end
 
+local function isJumpLikeInput(input)
+	return input.KeyCode == Enum.KeyCode.Space
+		or input.KeyCode == Enum.KeyCode.ButtonA
+end
+
 local function setCharacterCollision(enabled)
 	local character = player.Character
 	if not character then
@@ -984,6 +989,10 @@ local function connectMovementLoops()
 		end
 
 		pressedKeys[input.KeyCode] = true
+
+		if flyEnabled and isJumpLikeInput(input) then
+			requestDevFlyFromDoubleJump()
+		end
 	end))
 
 	table.insert(flyConnections, UserInputService.InputEnded:Connect(function(input)
