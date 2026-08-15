@@ -1074,6 +1074,10 @@ function InteractionService:Initialize()
 		self:_wireSecurityTapeDeck(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.BunkerPowerMeter, function(instance)
+		self:_wireBunkerPowerMeter(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.SecurityPressurePlate, function(instance)
 		self:_wireSecurityPressurePlate(instance)
 	end)
@@ -2204,6 +2208,47 @@ function InteractionService:_wireSecurityTapeDeck(tapeDeck)
 	end)
 end
 
+local function setBunkerEnergyMonitorUnlocked(player)
+	player:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
+
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if playerGui then
+		playerGui:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
+	end
+end
+
+local function formatBunkerDrawText(hunger)
+	if hunger >= 0.66 then
+		return "irregular"
+	elseif hunger >= 0.33 then
+		return "active"
+	end
+
+	return "quiet"
+end
+
+function InteractionService:_wireBunkerPowerMeter(meter)
+	local prompt = getPrompt(meter)
+
+	self:_connectPrompt(prompt, function(player)
+		if self.discoveryService then
+			self.discoveryService:Unlock(player, Constants.Discoveries.SecurityBunkerEnergy.Id)
+		end
+
+		setBunkerEnergyMonitorUnlocked(player)
+
+		local power = math.clamp(tonumber(player:GetAttribute("DontTouchItBunkerPower")) or 0, 0, 1)
+		local hunger = math.clamp(tonumber(player:GetAttribute("DontTouchItBunkerHunger")) or 0, 0, 1)
+		self.systemMessageRemote:FireClient(
+			player,
+			("Bunker energy monitor mirrored below your energy readout. Power %d%%, draw %s."):format(
+				math.floor(power * 100 + 0.5),
+				formatBunkerDrawText(hunger)
+			)
+		)
+	end)
+end
+
 function InteractionService:_wireObservationMirror(mirror)
 	local prompt = getPrompt(mirror)
 
@@ -2397,6 +2442,58 @@ function InteractionService:_wireSleepingAlarmClock(clock)
 	end)
 end
 
+local function findSleepingLockerHandle(locker, lockerIndex)
+	local root = locker and locker.Parent
+	if not root then
+		return nil
+	end
+
+	for _, instance in ipairs(root:GetChildren()) do
+		if instance:IsA("BasePart")
+			and instance:GetAttribute("SleepingLockerHandle") == true
+			and math.floor(tonumber(instance:GetAttribute("LockerIndex")) or 0) == lockerIndex
+		then
+			return instance
+		end
+	end
+
+	return nil
+end
+
+local function tweenSleepingLockerOpenState(locker, open)
+	if not locker or not locker:IsA("BasePart") then
+		return
+	end
+
+	local closedCFrame = locker:GetAttribute("SleepingLockerClosedCFrame")
+	local openCFrame = locker:GetAttribute("SleepingLockerOpenCFrame")
+	local targetCFrame = if open and typeof(openCFrame) == "CFrame" then openCFrame else closedCFrame
+	if typeof(targetCFrame) ~= "CFrame" then
+		targetCFrame = locker.CFrame
+	end
+
+	local closedColor = locker:GetAttribute("SleepingLockerClosedColor")
+	local openColor = locker:GetAttribute("SleepingLockerOpenColor")
+	local targetColor = if open and typeof(openColor) == "Color3" then openColor else closedColor
+	if typeof(targetColor) ~= "Color3" then
+		targetColor = locker.Color
+	end
+
+	tweenPart(locker, 0.22, {
+		CFrame = targetCFrame,
+		Color = targetColor,
+	}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+	local lockerIndex = math.floor(tonumber(locker:GetAttribute("LockerIndex")) or 0)
+	local handle = findSleepingLockerHandle(locker, lockerIndex)
+	local handleOffset = handle and handle:GetAttribute("SleepingLockerHandleOffset")
+	if handle and handle:IsA("BasePart") and typeof(handleOffset) == "CFrame" then
+		tweenPart(handle, 0.22, {
+			CFrame = targetCFrame * handleOffset,
+		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+end
+
 function InteractionService:_wireSleepingLocker(locker)
 	local prompt = getPrompt(locker)
 
@@ -2430,6 +2527,36 @@ function InteractionService:_wireSleepingLocker(locker)
 			return
 		end
 
+		local isOpen = locker:GetAttribute("SleepingLockerOpen") == true
+		local closedCFrame = locker:GetAttribute("SleepingLockerClosedCFrame")
+		if isOpen and typeof(closedCFrame) == "CFrame" and (locker.CFrame.Position - closedCFrame.Position).Magnitude < 0.05 then
+			isOpen = false
+			locker:SetAttribute("SleepingLockerOpen", false)
+		end
+
+		local shouldOpen = not isOpen
+		locker:SetAttribute("SleepingLockerOpen", shouldOpen)
+		if prompt then
+			prompt.ActionText = if shouldOpen then "Close" else "Open"
+		end
+
+		playSound(locker, "rbxasset://sounds/button.wav", 0.28, if shouldOpen then 0.78 + (lockerIndex % 5) * 0.08 else 0.58)
+		tweenSleepingLockerOpenState(locker, shouldOpen)
+		setTextLabelText(locker, "SleepingBunkLockerText", if shouldOpen then ("OPEN\n#%02d"):format(lockerIndex) else ("CHEST\n#%02d"):format(lockerIndex))
+
+		if not shouldOpen then
+			if locker:GetAttribute("HasIdBadge") == true then
+				local badge = locker.Parent and locker.Parent:FindFirstChild("SleepingIdBadge", true)
+				if badge and badge:IsA("BasePart") then
+					badge.Transparency = 1
+					setPromptEnabled(badge, false)
+					setSurfaceGuiEnabled(badge, "SleepingIdBadgeText", false)
+				end
+			end
+			self.systemMessageRemote:FireClient(player, ("Bunk locker %02d clicks closed."):format(lockerIndex))
+			return
+		end
+
 		local checked = self.sleepingLockerCheckedByUserId[player.UserId]
 		if not checked then
 			checked = {}
@@ -2441,22 +2568,19 @@ function InteractionService:_wireSleepingLocker(locker)
 		local checkedCount = countDictionary(checked)
 		local total = math.max(1, math.floor(tonumber(locker:GetAttribute("LockerTotal")) or 100))
 
-		playSound(locker, "rbxasset://sounds/button.wav", 0.28, 0.78 + (lockerIndex % 5) * 0.08)
-		setTextLabelText(locker, "SleepingBunkLockerText", ("OPEN\n#%02d"):format(lockerIndex))
-		if locker:IsA("BasePart") then
-			tweenPart(locker, 0.14, {
-				Color = Color3.fromRGB(119, 255, 203),
-			})
-		end
-
 		if locker:GetAttribute("HasIdBadge") == true then
+			local alreadyHasBadge = self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id)
 			local badge = locker.Parent and locker.Parent:FindFirstChild("SleepingIdBadge", true)
-			if badge and badge:IsA("BasePart") then
+			if badge and badge:IsA("BasePart") and not alreadyHasBadge then
 				badge.Transparency = 0
 				badge.CanCollide = false
 				setPromptEnabled(badge, true)
 				setSurfaceGuiEnabled(badge, "SleepingIdBadgeText", true)
 				self.systemMessageRemote:FireClient(player, "This last locker contains an ID Badge. That feels important.")
+			elseif wasNew then
+				self.systemMessageRemote:FireClient(player, ("Bunk locker checked: %d / %d."):format(checkedCount, total))
+			else
+				self.systemMessageRemote:FireClient(player, ("Bunk locker %02d is still aggressively empty."):format(lockerIndex))
 			end
 		elseif wasNew then
 			self.systemMessageRemote:FireClient(player, ("Bunk locker checked: %d / %d."):format(checkedCount, total))

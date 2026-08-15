@@ -3,6 +3,7 @@ local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -18,6 +19,7 @@ local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
+local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
 local playerGui = player:WaitForChild("PlayerGui")
@@ -56,6 +58,42 @@ end
 local function getIntroMusicId()
 	local music = Constants.AudioAssets and Constants.AudioAssets.Music
 	return music and normalizeSoundId(music.IntroMusicId)
+end
+
+local function getInterfaceAudio()
+	return Constants.AudioAssets and Constants.AudioAssets.Interface
+end
+
+local function getMenuMoveSoundId()
+	local interfaceAudio = getInterfaceAudio()
+	return interfaceAudio and normalizeSoundId(interfaceAudio.MenuMoveSoundId)
+end
+
+local function getMenuMoveVolume()
+	local interfaceAudio = getInterfaceAudio()
+	return math.clamp(tonumber(interfaceAudio and interfaceAudio.MenuMoveVolume) or 0.18, 0, 1)
+end
+
+local lastMenuMoveSoundAt = 0
+local function playMenuMoveSound()
+	local soundId = getMenuMoveSoundId()
+	if not soundId then
+		return
+	end
+
+	local now = os.clock()
+	if now - lastMenuMoveSoundAt < 0.06 then
+		return
+	end
+	lastMenuMoveSoundAt = now
+
+	local sound = Instance.new("Sound")
+	sound.Name = "DontTouchItMenuMove"
+	sound.SoundId = soundId
+	sound.Volume = getMenuMoveVolume()
+	sound.Parent = gui
+	sound:Play()
+	Debris:AddItem(sound, 2)
 end
 
 local function stopIntroMusic(fadeSeconds)
@@ -110,7 +148,7 @@ local function startIntroMusic()
 	TweenService:Create(
 		sound,
 		TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Volume = 0.34 }
+		{ Volume = 0.31 }
 	):Play()
 end
 
@@ -127,6 +165,133 @@ end
 local function isTouchLandscape()
 	local viewport = getViewportSize()
 	return UserInputService.TouchEnabled and viewport.X > viewport.Y
+end
+
+local START_CAMERA_RENDER_STEP = "DontTouchItStartCameraPan"
+local START_CAMERA_FIELD_OF_VIEW = 54
+local START_CAMERA_WAYPOINTS = {
+	{
+		CFrame = CFrame.new(Vector3.new(-76, 18, 68), Vector3.new(-48, 5, 45)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(-16, 14, 30), Vector3.new(0, 5, 0)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(108, 13, -46), Vector3.new(82, 4.4, -44)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(50, 16, -130), Vector3.new(82, 5, -122)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(20, 13, 70), Vector3.new(48, 4.5, 44)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(-32, 22, 132), Vector3.new(0, 7, 154)),
+		Duration = 8,
+	},
+}
+
+local startCameraState = nil
+local startCameraToken = 0
+
+local function captureStartCameraState(camera)
+	return {
+		Camera = camera,
+		CameraType = camera.CameraType,
+		CameraSubject = camera.CameraSubject,
+		FieldOfView = camera.FieldOfView,
+		CFrame = camera.CFrame,
+	}
+end
+
+local function smoothCameraAlpha(alpha)
+	alpha = math.clamp(alpha, 0, 1)
+	return alpha * alpha * (3 - 2 * alpha)
+end
+
+local function getStartCameraCFrame(elapsed)
+	local totalDuration = 0
+	for _, waypoint in ipairs(START_CAMERA_WAYPOINTS) do
+		totalDuration += waypoint.Duration or 7
+	end
+
+	if totalDuration <= 0 then
+		return START_CAMERA_WAYPOINTS[1].CFrame
+	end
+
+	local timeInLoop = elapsed % totalDuration
+	for index, waypoint in ipairs(START_CAMERA_WAYPOINTS) do
+		local segmentDuration = waypoint.Duration or 7
+		if timeInLoop <= segmentDuration then
+			local nextWaypoint = START_CAMERA_WAYPOINTS[(index % #START_CAMERA_WAYPOINTS) + 1]
+			local alpha = smoothCameraAlpha(timeInLoop / segmentDuration)
+			return waypoint.CFrame:Lerp(nextWaypoint.CFrame, alpha)
+		end
+
+		timeInLoop -= segmentDuration
+	end
+
+	return START_CAMERA_WAYPOINTS[#START_CAMERA_WAYPOINTS].CFrame
+end
+
+local function stopStartCameraPan()
+	local state = startCameraState
+	startCameraToken += 1
+	startCameraState = nil
+	RunService:UnbindFromRenderStep(START_CAMERA_RENDER_STEP)
+
+	local camera = workspace.CurrentCamera
+	if not camera or not state then
+		return
+	end
+
+	camera.CameraType = state.CameraType or Enum.CameraType.Custom
+	camera.CameraSubject = state.CameraSubject
+	camera.FieldOfView = state.FieldOfView or 70
+	if state.CFrame then
+		camera.CFrame = state.CFrame
+	end
+end
+
+local function beginStartCameraPan()
+	if startCameraState then
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	startCameraToken += 1
+	local token = startCameraToken
+	startCameraState = captureStartCameraState(camera)
+	local startedAt = os.clock()
+
+	RunService:BindToRenderStep(START_CAMERA_RENDER_STEP, Enum.RenderPriority.Camera.Value + 30, function()
+		if token ~= startCameraToken then
+			return
+		end
+
+		local activeCamera = workspace.CurrentCamera
+		if not activeCamera then
+			return
+		end
+
+		if not startCameraState or startCameraState.Camera ~= activeCamera then
+			startCameraState = captureStartCameraState(activeCamera)
+		end
+
+		activeCamera.CameraType = Enum.CameraType.Scriptable
+		activeCamera.CameraSubject = nil
+		activeCamera.FieldOfView = START_CAMERA_FIELD_OF_VIEW
+		activeCamera.CFrame = getStartCameraCFrame(os.clock() - startedAt)
+	end)
 end
 
 local title = Instance.new("TextLabel")
@@ -319,7 +484,60 @@ local energyFillCorner = Instance.new("UICorner")
 energyFillCorner.CornerRadius = UDim.new(0, 4)
 energyFillCorner.Parent = energyFill
 
+local bunkerEnergyPanel = Instance.new("Frame")
+bunkerEnergyPanel.Name = "BunkerEnergyMonitor"
+bunkerEnergyPanel.AnchorPoint = Vector2.new(1, 0)
+bunkerEnergyPanel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+bunkerEnergyPanel.BackgroundTransparency = 0.18
+bunkerEnergyPanel.BorderSizePixel = 0
+bunkerEnergyPanel.Position = UDim2.new(1, -18, 0, 176)
+bunkerEnergyPanel.Size = UDim2.fromOffset(250, 42)
+bunkerEnergyPanel.Visible = false
+bunkerEnergyPanel.Parent = gui
+
+local bunkerEnergyCorner = Instance.new("UICorner")
+bunkerEnergyCorner.CornerRadius = UDim.new(0, 7)
+bunkerEnergyCorner.Parent = bunkerEnergyPanel
+
+local bunkerEnergyLabel = Instance.new("TextLabel")
+bunkerEnergyLabel.Name = "BunkerEnergyLabel"
+bunkerEnergyLabel.BackgroundTransparency = 1
+bunkerEnergyLabel.Font = Enum.Font.GothamBlack
+bunkerEnergyLabel.Position = UDim2.fromOffset(10, 3)
+bunkerEnergyLabel.Size = UDim2.new(1, -20, 0, 22)
+bunkerEnergyLabel.Text = "Bunker: 0%"
+bunkerEnergyLabel.TextColor3 = Color3.fromRGB(236, 246, 255)
+bunkerEnergyLabel.TextScaled = true
+bunkerEnergyLabel.TextXAlignment = Enum.TextXAlignment.Left
+bunkerEnergyLabel.Parent = bunkerEnergyPanel
+
+local bunkerEnergyTrack = Instance.new("Frame")
+bunkerEnergyTrack.Name = "BunkerEnergyTrack"
+bunkerEnergyTrack.BackgroundColor3 = Color3.fromRGB(42, 47, 56)
+bunkerEnergyTrack.BorderSizePixel = 0
+bunkerEnergyTrack.Position = UDim2.fromOffset(10, 30)
+bunkerEnergyTrack.Size = UDim2.new(1, -20, 0, 8)
+bunkerEnergyTrack.Parent = bunkerEnergyPanel
+
+local bunkerEnergyTrackCorner = Instance.new("UICorner")
+bunkerEnergyTrackCorner.CornerRadius = UDim.new(0, 4)
+bunkerEnergyTrackCorner.Parent = bunkerEnergyTrack
+
+local bunkerEnergyFill = Instance.new("Frame")
+bunkerEnergyFill.Name = "BunkerEnergyFill"
+bunkerEnergyFill.BackgroundColor3 = Color3.fromRGB(119, 255, 203)
+bunkerEnergyFill.BorderSizePixel = 0
+bunkerEnergyFill.Size = UDim2.fromScale(0, 1)
+bunkerEnergyFill.Parent = bunkerEnergyTrack
+
+local bunkerEnergyFillCorner = Instance.new("UICorner")
+bunkerEnergyFillCorner.CornerRadius = UDim.new(0, 4)
+bunkerEnergyFillCorner.Parent = bunkerEnergyFill
+
 noTouchPanel:SetAttribute("ShouldShow", false)
+
+local bunkerEnergyMonitorUnlocked = player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
+	or playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 
 local function isGameplayHudSuppressed()
 	return gui:GetAttribute("GameplayHudSuppressed") == true
@@ -333,6 +551,7 @@ local function applyHudVisibility()
 	totalProgressPanel.Visible = not suppressed
 	counter.Visible = not suppressed
 	energyPanel.Visible = not suppressed
+	bunkerEnergyPanel.Visible = not suppressed and bunkerEnergyMonitorUnlocked
 	noTouchPanel.Visible = not suppressed and noTouchPanel:GetAttribute("ShouldShow") == true
 end
 
@@ -371,6 +590,13 @@ local function updateHudLayout()
 		energyLabel.Size = UDim2.new(1, -16, 0, 18)
 		energyTrack.Position = UDim2.fromOffset(8, 24)
 		energyTrack.Size = UDim2.new(1, -16, 0, 6)
+
+		bunkerEnergyPanel.Position = UDim2.new(1, -sideInset, 0, 137)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(136, 30)
+		bunkerEnergyLabel.Position = UDim2.fromOffset(8, 2)
+		bunkerEnergyLabel.Size = UDim2.new(1, -16, 0, 16)
+		bunkerEnergyTrack.Position = UDim2.fromOffset(8, 23)
+		bunkerEnergyTrack.Size = UDim2.new(1, -16, 0, 5)
 	else
 		title.Visible = true
 		totalProgressPanel.Position = UDim2.new(0.5, 0, 0, 74)
@@ -397,8 +623,16 @@ local function updateHudLayout()
 		energyLabel.Size = UDim2.new(1, -20, 0, 23)
 		energyTrack.Position = UDim2.fromOffset(10, 31)
 		energyTrack.Size = UDim2.new(1, -20, 0, 8)
+
+		bunkerEnergyPanel.Position = UDim2.new(1, -18, 0, 176)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(250, 42)
+		bunkerEnergyLabel.Position = UDim2.fromOffset(10, 3)
+		bunkerEnergyLabel.Size = UDim2.new(1, -20, 0, 22)
+		bunkerEnergyTrack.Position = UDim2.fromOffset(10, 30)
+		bunkerEnergyTrack.Size = UDim2.new(1, -20, 0, 8)
 	end
 
+	bunkerEnergyPanel:SetAttribute("Compact", compact)
 	applyHudVisibility()
 end
 
@@ -905,18 +1139,93 @@ end
 startBlur.Enabled = false
 startBlur.Size = 0
 
+local startOverlayPhase = "Hidden"
+local setStartPhase = nil
+
 local function setStartOverlayVisible(visible)
 	startOverlay.Visible = visible
 	startBlur.Enabled = visible
-	startBlur.Size = visible and 18 or 0
+	startBlur.Size = visible and 24 or 0
 	gui:SetAttribute("GameplayHudSuppressed", visible == true)
 	if visible then
 		startIntroMusic()
+		beginStartCameraPan()
 	else
 		stopIntroMusic(0.45)
+		stopStartCameraPan()
+		if setStartPhase then
+			setStartPhase("Hidden")
+		end
 	end
 	applyHudVisibility()
 end
+
+local startCinematicLayer = Instance.new("Frame")
+startCinematicLayer.Name = "StartCinematicLayer"
+startCinematicLayer.BackgroundTransparency = 1
+startCinematicLayer.Size = UDim2.fromScale(1, 1)
+startCinematicLayer.Visible = false
+startCinematicLayer.ZIndex = 21
+startCinematicLayer.Parent = startOverlay
+
+local startCinematicButton = Instance.new("TextButton")
+startCinematicButton.Name = "StartCinematicAdvance"
+startCinematicButton.Active = true
+startCinematicButton.AutoButtonColor = false
+startCinematicButton.BackgroundTransparency = 1
+startCinematicButton.BorderSizePixel = 0
+startCinematicButton.Font = Enum.Font.Gotham
+startCinematicButton.Modal = false
+startCinematicButton.Size = UDim2.fromScale(1, 1)
+startCinematicButton.Text = ""
+startCinematicButton.ZIndex = 21
+startCinematicButton.Parent = startCinematicLayer
+
+local startCinematicTitle = Instance.new("TextLabel")
+startCinematicTitle.Name = "StartCinematicTitle"
+startCinematicTitle.AnchorPoint = Vector2.new(0.5, 0.5)
+startCinematicTitle.BackgroundTransparency = 1
+startCinematicTitle.Font = Enum.Font.GothamBlack
+startCinematicTitle.Position = UDim2.fromScale(0.5, 0.34)
+startCinematicTitle.Size = UDim2.new(0.9, 0, 0, 64)
+startCinematicTitle.Text = "DON'T TOUCH IT"
+startCinematicTitle.TextColor3 = Color3.fromRGB(255, 242, 181)
+startCinematicTitle.TextSize = 42
+startCinematicTitle.TextStrokeColor3 = Color3.fromRGB(6, 8, 12)
+startCinematicTitle.TextStrokeTransparency = 0.22
+startCinematicTitle.TextWrapped = true
+startCinematicTitle.ZIndex = 22
+startCinematicTitle.Parent = startCinematicLayer
+
+local startCinematicStory = Instance.new("TextLabel")
+startCinematicStory.Name = "StartCinematicStory"
+startCinematicStory.AnchorPoint = Vector2.new(0.5, 0.5)
+startCinematicStory.BackgroundTransparency = 1
+startCinematicStory.Font = Enum.Font.GothamSemibold
+startCinematicStory.Position = UDim2.fromScale(0.5, 0.51)
+startCinematicStory.Size = UDim2.new(0.74, 0, 0, 116)
+startCinematicStory.Text = "The lights were already on.\nSome doors remember being opened.\nThe quiet things are not asleep."
+startCinematicStory.TextColor3 = Color3.fromRGB(224, 236, 245)
+startCinematicStory.TextSize = 24
+startCinematicStory.TextStrokeColor3 = Color3.fromRGB(6, 8, 12)
+startCinematicStory.TextStrokeTransparency = 0.45
+startCinematicStory.TextWrapped = true
+startCinematicStory.ZIndex = 22
+startCinematicStory.Parent = startCinematicLayer
+
+local startCinematicPrompt = Instance.new("TextLabel")
+startCinematicPrompt.Name = "StartCinematicPrompt"
+startCinematicPrompt.AnchorPoint = Vector2.new(0.5, 0.5)
+startCinematicPrompt.BackgroundTransparency = 1
+startCinematicPrompt.Font = Enum.Font.GothamBold
+startCinematicPrompt.Position = UDim2.fromScale(0.5, 0.76)
+startCinematicPrompt.Size = UDim2.new(0.82, 0, 0, 32)
+startCinematicPrompt.Text = "Tap, click, or press any button"
+startCinematicPrompt.TextColor3 = Color3.fromRGB(192, 205, 218)
+startCinematicPrompt.TextSize = 18
+startCinematicPrompt.TextWrapped = true
+startCinematicPrompt.ZIndex = 22
+startCinematicPrompt.Parent = startCinematicLayer
 
 local startPanel = Instance.new("Frame")
 startPanel.Name = "StartChoicePanel"
@@ -926,6 +1235,7 @@ startPanel.BackgroundTransparency = 1
 startPanel.BorderSizePixel = 0
 startPanel.Position = UDim2.fromScale(0.5, 0.52)
 startPanel.Size = UDim2.new(0.92, 0, 0.84, 0)
+startPanel.Visible = false
 startPanel.ZIndex = 21
 startPanel.Parent = startOverlay
 
@@ -1072,12 +1382,66 @@ local restartCorner = Instance.new("UICorner")
 restartCorner.CornerRadius = UDim.new(0, 6)
 restartCorner.Parent = restartButton
 
+setStartPhase = function(phase)
+	startOverlayPhase = phase
+
+	local cinematicVisible = phase == "Title"
+	local menuVisible = phase == "Menu"
+
+	startCinematicLayer.Visible = cinematicVisible
+	startCinematicButton.Visible = cinematicVisible
+	startCinematicButton.Active = cinematicVisible
+	startCinematicButton.Modal = cinematicVisible
+	startPanel.Visible = menuVisible
+
+	if not menuVisible then
+		continueButton.Modal = false
+		restartButton.Modal = false
+	end
+
+	if startOverlay.Visible then
+		startBlur.Enabled = true
+		startBlur.Size = cinematicVisible and 28 or 18
+	end
+end
+
+local function updateStartCinematicLayout(compact, touchLandscape)
+	if compact then
+		startCinematicTitle.Position = UDim2.fromScale(0.5, touchLandscape and 0.29 or 0.33)
+		startCinematicTitle.Size = UDim2.new(0.88, 0, 0, touchLandscape and 44 or 52)
+		startCinematicTitle.TextSize = touchLandscape and 30 or 32
+
+		startCinematicStory.Position = UDim2.fromScale(0.5, touchLandscape and 0.49 or 0.51)
+		startCinematicStory.Size = UDim2.new(touchLandscape and 0.72 or 0.8, 0, 0, touchLandscape and 78 or 100)
+		startCinematicStory.TextSize = touchLandscape and 17 or 19
+
+		startCinematicPrompt.Position = UDim2.fromScale(0.5, touchLandscape and 0.77 or 0.78)
+		startCinematicPrompt.Size = UDim2.new(0.82, 0, 0, 30)
+		startCinematicPrompt.TextSize = touchLandscape and 15 or 16
+		return
+	end
+
+	startCinematicTitle.Position = UDim2.fromScale(0.5, 0.34)
+	startCinematicTitle.Size = UDim2.new(0.9, 0, 0, 64)
+	startCinematicTitle.TextSize = 42
+
+	startCinematicStory.Position = UDim2.fromScale(0.5, 0.51)
+	startCinematicStory.Size = UDim2.new(0.74, 0, 0, 116)
+	startCinematicStory.TextSize = 24
+
+	startCinematicPrompt.Position = UDim2.fromScale(0.5, 0.76)
+	startCinematicPrompt.Size = UDim2.new(0.82, 0, 0, 32)
+	startCinematicPrompt.TextSize = 18
+end
+
 local function updateStartLayout()
 	local compact = isCompactHud()
 	local touchLandscape = isTouchLandscape()
+	local cinematicVisible = startOverlayPhase == "Title"
 
 	if compact then
-		startOverlay.BackgroundTransparency = touchLandscape and 0.72 or 0.62
+		startOverlay.BackgroundTransparency = if cinematicVisible then 0.64 elseif touchLandscape then 0.72 else 0.62
+		updateStartCinematicLayout(true, touchLandscape)
 		startPanel.BackgroundTransparency = 1
 		startPanel.Position = UDim2.fromScale(touchLandscape and 0.42 or 0.5, touchLandscape and 0.55 or 0.53)
 		startPanel.Size = UDim2.new(touchLandscape and 0.54 or 0.74, 0, touchLandscape and 0.76 or 0.8, 0)
@@ -1127,7 +1491,8 @@ local function updateStartLayout()
 		return
 	end
 
-	startOverlay.BackgroundTransparency = 0.5
+	startOverlay.BackgroundTransparency = cinematicVisible and 0.58 or 0.5
+	updateStartCinematicLayout(false, false)
 	startPanel.BackgroundTransparency = 1
 	startPanel.Position = UDim2.fromScale(0.5, 0.52)
 	startPanel.Size = UDim2.new(0.92, 0, 0.84, 0)
@@ -1174,6 +1539,20 @@ workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateStartLayout)
 if workspace.CurrentCamera then
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateStartLayout)
 end
+
+local function revealStartMenuFromIntro()
+	if startOverlayPhase ~= "Title" or not startOverlay.Visible then
+		return
+	end
+
+	setStartPhase("Menu")
+	continueButton.Modal = true
+	restartButton.Modal = restartButton.Visible
+	updateStartLayout()
+	GuiService.SelectedObject = continueButton
+end
+
+startCinematicButton.MouseButton1Click:Connect(revealStartMenuFromIntro)
 
 local activeToastTween = nil
 local activeMessageTween = nil
@@ -1462,6 +1841,62 @@ local function updateEnergyBar()
 		else Color3.fromRGB(119, 255, 203)
 end
 
+local function getBunkerDrawText(hunger)
+	if hunger >= 0.66 then
+		return "irregular"
+	elseif hunger >= 0.33 then
+		return "active"
+	end
+
+	return "quiet"
+end
+
+local function getBunkerMonitorColor(power, hunger)
+	if hunger >= 0.66 then
+		return Color3.fromRGB(255, 96, 102)
+	elseif hunger >= 0.33 then
+		return Color3.fromRGB(255, 198, 82)
+	elseif power <= 0.28 then
+		return Color3.fromRGB(255, 221, 84)
+	end
+
+	return Color3.fromRGB(119, 255, 203)
+end
+
+local function updateBunkerEnergyBar()
+	local power = math.clamp(getReplicatedEnergyAttribute("DontTouchItBunkerPower", 0), 0, 1)
+	local hunger = math.clamp(getReplicatedEnergyAttribute("DontTouchItBunkerHunger", 0), 0, 1)
+	local percent = math.floor(power * 100 + 0.5)
+	local compact = bunkerEnergyPanel:GetAttribute("Compact") == true
+	local drawText = getBunkerDrawText(hunger)
+	local color = getBunkerMonitorColor(power, hunger)
+
+	if compact then
+		bunkerEnergyLabel.Text = ("Bunker %d%% %s"):format(percent, drawText)
+	else
+		bunkerEnergyLabel.Text = ("Bunker: %d%%  Draw: %s"):format(percent, drawText)
+	end
+
+	bunkerEnergyPanel.BackgroundColor3 = if hunger >= 0.66
+		then Color3.fromRGB(48, 16, 22)
+		elseif hunger >= 0.33
+		then Color3.fromRGB(45, 35, 22)
+		else Color3.fromRGB(18, 20, 24)
+	bunkerEnergyFill.Size = UDim2.fromScale(power, 1)
+	bunkerEnergyFill.BackgroundColor3 = color
+	bunkerEnergyLabel.TextColor3 = color
+end
+
+local function setBunkerEnergyMonitorUnlocked(unlocked)
+	if not unlocked or bunkerEnergyMonitorUnlocked then
+		return
+	end
+
+	bunkerEnergyMonitorUnlocked = true
+	updateBunkerEnergyBar()
+	applyHudVisibility()
+end
+
 local function updateCounter(payload)
 	if currentStatusType == "Hallway" then
 		return
@@ -1601,6 +2036,67 @@ local function clearStartRoomChoices()
 	startRoomButtons = {}
 end
 
+local lastStartMenuSelectedObject = nil
+local lastStartMenuHoverObject = nil
+
+local function isStartMenuMoveActive()
+	return startOverlay.Visible and startOverlayPhase == "Menu"
+end
+
+local function isStartMenuMoveTarget(guiObject)
+	if typeof(guiObject) ~= "Instance" or not guiObject:IsA("GuiButton") then
+		return false
+	end
+
+	if guiObject == continueButton then
+		return true
+	end
+
+	if guiObject == restartButton then
+		return restartButton.Visible
+	end
+
+	return guiObject:IsDescendantOf(startRoomList)
+end
+
+local function hookStartMenuMoveSound(button)
+	button.MouseEnter:Connect(function()
+		if not isStartMenuMoveActive() or not isStartMenuMoveTarget(button) then
+			return
+		end
+
+		if lastStartMenuHoverObject == button then
+			return
+		end
+
+		lastStartMenuHoverObject = button
+		playMenuMoveSound()
+	end)
+end
+
+GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(function()
+	local selectedObject = GuiService.SelectedObject
+	if selectedObject == lastStartMenuSelectedObject then
+		return
+	end
+
+	local previousObject = lastStartMenuSelectedObject
+	lastStartMenuSelectedObject = selectedObject
+
+	if isStartMenuMoveActive() and isStartMenuMoveTarget(selectedObject) and isStartMenuMoveTarget(previousObject) then
+		playMenuMoveSound()
+	end
+end)
+
+hookStartMenuMoveSound(continueButton)
+hookStartMenuMoveSound(restartButton)
+
+startOverlay:GetPropertyChangedSignal("Visible"):Connect(function()
+	if not startOverlay.Visible then
+		lastStartMenuHoverObject = nil
+	end
+end)
+
 local function renderStartRoomChoices(payload)
 	clearStartRoomChoices()
 
@@ -1638,6 +2134,8 @@ local function renderStartRoomChoices(payload)
 		roomCorner.CornerRadius = UDim.new(0, 5)
 		roomCorner.Parent = roomButton
 
+		hookStartMenuMoveSound(roomButton)
+
 		local targetRoomId = room.RoomId
 		roomButton.MouseButton1Click:Connect(function()
 			sendStartChoice("Room", targetRoomId)
@@ -1663,11 +2161,17 @@ local function renderStartOptions(payload)
 		return
 	end
 
+	local wasStartOverlayVisible = startOverlay.Visible
 	pendingStartOptions = payload
 	setStartOverlayVisible(true)
-	continueButton.Modal = true
-	restartButton.Modal = true
-	setOverlayMouse(true, continueButton)
+	setStartPhase("Title")
+	continueButton.Modal = false
+	restartButton.Modal = false
+	if wasStartOverlayVisible then
+		GuiService.SelectedObject = startCinematicButton
+	else
+		setOverlayMouse(true, startCinematicButton)
+	end
 	setStartIntro(payload)
 	updateTotalProgress(payload)
 	if isCompactHud() then
@@ -2136,6 +2640,18 @@ for _, entry in ipairs(feedbackCategoryButtons) do
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if startOverlay.Visible and startOverlayPhase == "Title" then
+		local inputType = input.UserInputType
+		if inputType == Enum.UserInputType.Keyboard
+			or inputType == Enum.UserInputType.MouseButton1
+			or inputType == Enum.UserInputType.Touch
+			or inputType == Enum.UserInputType.Gamepad1
+		then
+			revealStartMenuFromIntro()
+			return
+		end
+	end
+
 	if gameProcessed then
 		return
 	end
@@ -2147,7 +2663,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		else
 			closeReferenceBook()
 		end
-	elseif startOverlay.Visible and input.KeyCode == Enum.KeyCode.ButtonA then
+	elseif startOverlay.Visible and startOverlayPhase == "Menu" and input.KeyCode == Enum.KeyCode.ButtonA then
 		if GuiService.SelectedObject and GuiService.SelectedObject ~= continueButton then
 			return
 		end
@@ -2167,6 +2683,12 @@ discoveryRemote.OnClientEvent:Connect(function(payload)
 	if payload.Type == "Unlocked" and payload.Name then
 		showDiscoveryToast(payload.Name)
 	end
+	if payload.Type == "Unlocked"
+		and Constants.Discoveries.SecurityBunkerEnergy
+		and payload.Id == Constants.Discoveries.SecurityBunkerEnergy.Id
+	then
+		setBunkerEnergyMonitorUnlocked(true)
+	end
 end)
 
 updateTotalProgress({
@@ -2174,12 +2696,26 @@ updateTotalProgress({
 	Total = Constants.TotalDiscoveries,
 })
 updateEnergyBar()
+updateBunkerEnergyBar()
+setBunkerEnergyMonitorUnlocked(player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true)
+setBunkerEnergyMonitorUnlocked(playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true)
 
 player:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEnergyBar)
 player:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateEnergyBar)
+player:GetAttributeChangedSignal("DontTouchItBunkerPower"):Connect(updateBunkerEnergyBar)
+player:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBunkerEnergyBar)
+player:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(function()
+	setBunkerEnergyMonitorUnlocked(player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true)
+end)
 playerGui:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEnergyBar)
 playerGui:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateEnergyBar)
+playerGui:GetAttributeChangedSignal("DontTouchItBunkerPower"):Connect(updateBunkerEnergyBar)
+playerGui:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBunkerEnergyBar)
+playerGui:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(function()
+	setBunkerEnergyMonitorUnlocked(playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true)
+end)
 energyPanel:GetAttributeChangedSignal("Compact"):Connect(updateEnergyBar)
+bunkerEnergyPanel:GetAttributeChangedSignal("Compact"):Connect(updateBunkerEnergyBar)
 
 referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)

@@ -16,6 +16,8 @@ local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(93, 217, 255),
 }
 local SNACK_DONUT_ASSET_ID = 13742217239
+local SLEEPING_REPLACEMENT_TENT_ASSET_ID = 140322654375696
+local MAIN_HALLWAY_WALL_TEXTURE_ID = "rbxassetid://12813020091"
 local ATOMIC_COLORS = {
 	Pink = Color3.fromRGB(255, 102, 176),
 	Orange = Color3.fromRGB(255, 134, 58),
@@ -46,6 +48,18 @@ local function createPart(parent, name, size, cframe, color, material, className
 	part.Parent = parent
 	mark(part)
 	return part
+end
+
+local function applyTextureToFace(part, name, textureId, face, studsPerTile)
+	local texture = Instance.new("Texture")
+	texture.Name = name
+	texture.Texture = textureId
+	texture.Face = face
+	texture.StudsPerTileU = studsPerTile
+	texture.StudsPerTileV = studsPerTile
+	texture.Parent = part
+	mark(texture)
+	return texture
 end
 
 local function createSoundSourceAnchor(parent, name, cframe)
@@ -1209,6 +1223,7 @@ local function makeBunkerPowerMeter(parent, cframe, face)
 	local panel = createPart(meter, "BunkerPowerMeterPanel", Vector3.new(0.36, 5.4, 7.6), cframe, Color3.fromRGB(13, 18, 21), Enum.Material.Metal)
 	panel:SetAttribute("BunkerEnergyIgnored", true)
 	tag(panel, Constants.Tags.BunkerPowerMeter)
+	createPrompt(panel, "Inspect", "Bunker Energy", 0.1)
 
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = "BunkerPowerMeterSurfaceGui"
@@ -2577,6 +2592,108 @@ local function makeSecurityRoom(roomFolder)
 	}
 end
 
+local function prepareSleepingReplacementTentAssetModel(model)
+	local visualParts = {}
+
+	for _, descendant in ipairs(model:GetDescendants()) do
+		if descendant:IsA("LuaSourceContainer")
+			or descendant:IsA("Constraint")
+			or descendant:IsA("BodyMover")
+			or descendant:IsA("Humanoid")
+		then
+			descendant:Destroy()
+		elseif descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			descendant:SetAttribute("SleepingReplacementTentCandidate", true)
+			descendant:SetAttribute("BaseCanCollide", false)
+			descendant:SetAttribute("BaseCanQuery", false)
+			descendant:SetAttribute("BaseCanTouch", false)
+			table.insert(visualParts, descendant)
+		end
+	end
+
+	return visualParts
+end
+
+local function makeProceduralSleepingReplacementTent(parent, tentCFrame)
+	local tent = makeModel(parent, "SleepingReplacementTentCandidate")
+	tent:SetAttribute("CandidateReplacementFor", "SleepingBlanketFort")
+	tent:SetAttribute("RoomId", "SleepingQuarters")
+	tent:SetAttribute("SourceAssetId", SLEEPING_REPLACEMENT_TENT_ASSET_ID)
+	tent:SetAttribute("SourceAssetUrl", ("https://create.roblox.com/store/asset/%d"):format(SLEEPING_REPLACEMENT_TENT_ASSET_ID))
+	tent:SetAttribute("AssetFallbackUsed", true)
+
+	local groundCloth = createPart(tent, "TentGroundCloth", Vector3.new(8.8, 0.14, 5.8), tentCFrame * CFrame.new(0, 0.07, 0), Color3.fromRGB(57, 67, 74), Enum.Material.Fabric)
+	local leftPanel = createPart(tent, "TentLeftFabricPanel", Vector3.new(8.4, 0.24, 5.4), tentCFrame * CFrame.new(0, 1.45, -1.28) * CFrame.Angles(math.rad(-28), 0, 0), Color3.fromRGB(92, 132, 112), Enum.Material.Fabric)
+	local rightPanel = createPart(tent, "TentRightFabricPanel", Vector3.new(8.4, 0.24, 5.4), tentCFrame * CFrame.new(0, 1.45, 1.28) * CFrame.Angles(math.rad(28), 0, 0), Color3.fromRGB(67, 102, 95), Enum.Material.Fabric)
+	local ridgePole = createPart(tent, "TentRidgePole", Vector3.new(0.22, 8.8, 0.22), tentCFrame * CFrame.new(0, 2.85, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(118, 82, 55), Enum.Material.Wood)
+	local frontTie = createPart(tent, "TentFrontTie", Vector3.new(0.18, 2.6, 0.18), tentCFrame * CFrame.new(4.35, 1.35, 0) * CFrame.Angles(0, 0, math.rad(10)), Color3.fromRGB(181, 121, 67), Enum.Material.Wood)
+	local backTie = createPart(tent, "TentBackTie", Vector3.new(0.18, 2.6, 0.18), tentCFrame * CFrame.new(-4.35, 1.35, 0) * CFrame.Angles(0, 0, math.rad(-10)), Color3.fromRGB(181, 121, 67), Enum.Material.Wood)
+
+	for _, part in ipairs({ groundCloth, leftPanel, rightPanel, ridgePole, frontTie, backTie }) do
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part:SetAttribute("SleepingReplacementTentCandidate", true)
+		part:SetAttribute("BaseCanCollide", false)
+		part:SetAttribute("BaseCanQuery", false)
+		part:SetAttribute("BaseCanTouch", false)
+	end
+
+	tent.PrimaryPart = groundCloth
+	return tent
+end
+
+local function makeSleepingReplacementTent(parent, tentCFrame)
+	local tent = makeModel(parent, "SleepingReplacementTentCandidate")
+	tent:SetAttribute("CandidateReplacementFor", "SleepingBlanketFort")
+	tent:SetAttribute("RoomId", "SleepingQuarters")
+	tent:SetAttribute("SourceAssetId", SLEEPING_REPLACEMENT_TENT_ASSET_ID)
+	tent:SetAttribute("SourceAssetUrl", ("https://create.roblox.com/store/asset/%d"):format(SLEEPING_REPLACEMENT_TENT_ASSET_ID))
+
+	local success, assetModel = pcall(AssetService.LoadAssetAsync, AssetService, SLEEPING_REPLACEMENT_TENT_ASSET_ID)
+	if not success or not assetModel then
+		warn(("[DON'T TOUCH IT] Could not load Sleeping replacement tent asset %d: %s"):format(SLEEPING_REPLACEMENT_TENT_ASSET_ID, tostring(assetModel)))
+		tent:Destroy()
+		return makeProceduralSleepingReplacementTent(parent, tentCFrame)
+	end
+
+	assetModel.Name = "PbrTentByArSolusAsset"
+	assetModel.Parent = tent
+
+	local visualParts = prepareSleepingReplacementTentAssetModel(assetModel)
+	if #visualParts == 0 then
+		warn(("[DON'T TOUCH IT] Sleeping replacement tent asset %d loaded without visible parts."):format(SLEEPING_REPLACEMENT_TENT_ASSET_ID))
+		tent:Destroy()
+		return makeProceduralSleepingReplacementTent(parent, tentCFrame)
+	end
+
+	local _, currentSize = assetModel:GetBoundingBox()
+	local largestAxis = math.max(currentSize.X, currentSize.Y, currentSize.Z)
+	if largestAxis > 0 then
+		assetModel:ScaleTo(9.2 / largestAxis)
+	end
+
+	assetModel:PivotTo(tentCFrame)
+	local boundsCFrame, boundsSize = assetModel:GetBoundingBox()
+	local bottomY = boundsCFrame.Position.Y - boundsSize.Y / 2
+	assetModel:PivotTo(assetModel:GetPivot() + Vector3.new(
+		tentCFrame.Position.X - boundsCFrame.Position.X,
+		tentCFrame.Position.Y - bottomY,
+		tentCFrame.Position.Z - boundsCFrame.Position.Z
+	))
+
+	for _, part in ipairs(visualParts) do
+		mark(part)
+	end
+
+	tent.PrimaryPart = visualParts[1]
+	return tent
+end
+
 local function makeSleepingQuartersRoom(roomFolder)
 	local room = makeModel(roomFolder, "SleepingQuartersRoom")
 	local origin = SLEEPING_QUARTERS_ORIGIN
@@ -2658,6 +2775,21 @@ local function makeSleepingQuartersRoom(roomFolder)
 		local lockerPosition = origin + Vector3.new(sideSign * 15.75, 1.04, zOffset - 2.12)
 		local lockerCFrame = CFrame.new(lockerPosition, origin + Vector3.new(0, 1.04, zOffset - 2.12))
 		local lockerColor = if lockerIndex % 2 == 0 then Color3.fromRGB(70, 91, 111) else Color3.fromRGB(84, 76, 104)
+		local lockerOpenCFrame = lockerCFrame * CFrame.new(0, 0.58, -0.46) * CFrame.Angles(math.rad(-64), 0, 0)
+		local lockerOpenColor = Color3.fromRGB(119, 255, 203)
+		local tray = createPart(
+			bunk,
+			sideName .. "BunkLockerTray" .. index,
+			Vector3.new(3.08, 0.34, 1.52),
+			lockerCFrame * CFrame.new(0, -0.27, 0),
+			Color3.fromRGB(30, 35, 46),
+			Enum.Material.Metal
+		)
+		tray.CanCollide = false
+		tray:SetAttribute("BaseCanCollide", false)
+		tray:SetAttribute("LockerKind", "BunkTray")
+		tray:SetAttribute("LockerIndex", lockerIndex)
+
 		local locker = createPart(
 			bunk,
 			sideName .. "BunkLocker" .. index,
@@ -2669,8 +2801,13 @@ local function makeSleepingQuartersRoom(roomFolder)
 		locker:SetAttribute("LockerKind", "Bunk")
 		locker:SetAttribute("LockerIndex", lockerIndex)
 		locker:SetAttribute("LockerTotal", 100)
+		locker:SetAttribute("SleepingLockerClosedCFrame", lockerCFrame)
+		locker:SetAttribute("SleepingLockerOpenCFrame", lockerOpenCFrame)
+		locker:SetAttribute("SleepingLockerClosedColor", lockerColor)
+		locker:SetAttribute("SleepingLockerOpenColor", lockerOpenColor)
+		locker:SetAttribute("SleepingLockerOpen", false)
 		createSurfaceText(locker, "SleepingBunkLockerText", ("CHEST\n#%02d"):format(lockerIndex), Enum.NormalId.Top, Color3.fromRGB(229, 246, 255), lockerColor)
-		createPrompt(locker, "Check", ("Foot Chest %02d"):format(lockerIndex), 0)
+		createPrompt(locker, "Open", ("Foot Chest %02d"):format(lockerIndex), 0)
 		tag(locker, Constants.Tags.SleepingLocker)
 
 		local handle = createPart(
@@ -2683,6 +2820,9 @@ local function makeSleepingQuartersRoom(roomFolder)
 		)
 		handle.CanCollide = false
 		handle:SetAttribute("BaseCanCollide", false)
+		handle:SetAttribute("SleepingLockerHandle", true)
+		handle:SetAttribute("LockerIndex", lockerIndex)
+		handle:SetAttribute("SleepingLockerHandleOffset", lockerCFrame:ToObjectSpace(handle.CFrame))
 
 		if lockerIndex == 100 then
 			locker:SetAttribute("HasIdBadge", true)
@@ -2690,7 +2830,7 @@ local function makeSleepingQuartersRoom(roomFolder)
 				bunk,
 				"SleepingIdBadge",
 				Vector3.new(1.12, 0.1, 0.72),
-				lockerCFrame * CFrame.new(0, 0.48, -0.12) * CFrame.Angles(math.rad(90), 0, math.rad(-7)),
+				lockerCFrame * CFrame.new(0, -0.02, -0.12) * CFrame.Angles(math.rad(90), 0, math.rad(-7)),
 				Color3.fromRGB(238, 245, 255),
 				Enum.Material.SmoothPlastic
 			)
@@ -2838,6 +2978,8 @@ local function makeSleepingQuartersRoom(roomFolder)
 	fortRight:SetAttribute("BaseCanCollide", false)
 	fort.PrimaryPart = fortSign
 
+	makeSleepingReplacementTent(room, cframeAt(origin, 8.6, 0.56, 10.2) * CFrame.Angles(0, math.rad(-14), 0))
+
 	local pillowPile = makeModel(room, "SleepingPillowPile")
 	local pillowColors = {
 		Color3.fromRGB(245, 248, 255),
@@ -2894,8 +3036,14 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 	local branchLeftWallX = 134.4
 	local branchRightWallX = 157.6
 	local branchUsableWidth = branchRightWallX - branchLeftWallX - 0.6
+	local branchConnectorNorthWallZ = -179.2
+	local branchConnectorSouthWallZ = -196.8
+	local connectorOpeningWallClearance = 0.4
 	local infirmaryApproachNorthZ = -188
 	local infirmaryDoorNorthEdgeZ = INFIRMARY_ORIGIN.Z - 6
+	local infirmaryApproachLeftWallSouthZ = branchConnectorNorthWallZ + connectorOpeningWallClearance
+	local infirmaryApproachLeftWallDepth = infirmaryDoorNorthEdgeZ - infirmaryApproachLeftWallSouthZ
+	local infirmaryApproachLeftWallCenterZ = (infirmaryApproachLeftWallSouthZ + infirmaryDoorNorthEdgeZ) / 2
 	local infirmaryApproachRightWallDepth = infirmaryDoorNorthEdgeZ - infirmaryApproachNorthZ
 	local infirmaryApproachRightWallCenterZ = (infirmaryApproachNorthZ + infirmaryDoorNorthEdgeZ) / 2
 	local connectorWallLeftEdgeX = 115
@@ -2909,8 +3057,11 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 	local gymEntranceSouthZ = GYM_ORIGIN.Z + 6
 	local gymRampSouthZ = -188
 	local gymRampOpenTurnZ = gymEntranceSouthZ
-	local gymRampLeftWallDepth = gymRampSouthZ - gymEntranceNorthZ
-	local gymRampLeftWallCenterZ = (gymEntranceNorthZ + gymRampSouthZ) / 2
+	local gymRampLeftWallNorthZ = branchConnectorSouthWallZ - connectorOpeningWallClearance
+	local gymRampLeftWallDepth = gymRampLeftWallNorthZ - gymEntranceNorthZ
+	local gymRampLeftWallCenterZ = (gymEntranceNorthZ + gymRampLeftWallNorthZ) / 2
+	local gymRampCeilingDepth = gymRampSouthZ - gymEntranceNorthZ
+	local gymRampCeilingCenterZ = (gymEntranceNorthZ + gymRampSouthZ) / 2
 	local gymRampRightWallDepth = gymRampSouthZ - gymRampOpenTurnZ
 	local gymRampRightWallCenterZ = (gymRampOpenTurnZ + gymRampSouthZ) / 2
 	local gymEntryReturnWallMinX = gymRampLeftWallX - gymRampWallThickness / 2
@@ -2924,12 +3075,12 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 
 	createPart(branch, "BranchConnectorFloor", Vector3.new(34, 0.42, 18), CFrame.new(131, 0.38, -188), floorColor, Enum.Material.Metal)
 	createPart(branch, "BranchConnectorCeiling", Vector3.new(34, 0.36, 18), CFrame.new(131, hallHeight, -188), ceilingColor, Enum.Material.Concrete)
-	createPart(branch, "BranchConnectorNorthWall", Vector3.new(connectorWallLength, hallHeight, 0.42), CFrame.new(connectorWallCenterX, hallHeight / 2, -179.2), wallColor, Enum.Material.SmoothPlastic)
-	createPart(branch, "BranchConnectorSouthWall", Vector3.new(connectorWallLength, hallHeight, 0.42), CFrame.new(connectorWallCenterX, hallHeight / 2, -196.8), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "BranchConnectorNorthWall", Vector3.new(connectorWallLength, hallHeight, 0.42), CFrame.new(connectorWallCenterX, hallHeight / 2, branchConnectorNorthWallZ), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "BranchConnectorSouthWall", Vector3.new(connectorWallLength, hallHeight, 0.42), CFrame.new(connectorWallCenterX, hallHeight / 2, branchConnectorSouthWallZ), wallColor, Enum.Material.SmoothPlastic)
 
 	createPart(branch, "BranchJunctionFloor", Vector3.new(branchUsableWidth, 0.42, 72), CFrame.new(branchCenterX, 0.4, -189), floorColor, Enum.Material.Metal)
 	createPart(branch, "BranchJunctionCeiling", Vector3.new(branchUsableWidth, 0.36, 42), CFrame.new(branchCenterX, hallHeight, -171), ceilingColor, Enum.Material.Concrete)
-	createPart(branch, "InfirmaryApproachLeftWall", Vector3.new(0.42, hallHeight, 34), CFrame.new(branchLeftWallX, hallHeight / 2, -171), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "InfirmaryApproachLeftWall", Vector3.new(0.42, hallHeight, infirmaryApproachLeftWallDepth), CFrame.new(branchLeftWallX, hallHeight / 2, infirmaryApproachLeftWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "InfirmaryApproachRightWall", Vector3.new(0.42, hallHeight, infirmaryApproachRightWallDepth), CFrame.new(branchRightWallX, hallHeight / 2, infirmaryApproachRightWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "InfirmaryEntryThresholdFloor", Vector3.new(10.2, 0.42, 7.2), CFrame.new(139.3, 0.42, -150.4), floorColor, Enum.Material.Metal)
 	createPart(branch, "InfirmaryEntryOuterSafetyWall", Vector3.new(0.42, hallHeight, 7.8), CFrame.new(branchLeftWallX, hallHeight / 2, -150.1), wallColor, Enum.Material.SmoothPlastic)
@@ -2952,7 +3103,7 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 	createPart(branch, "GymEntrySideLandingFloor", Vector3.new(gymEntryLandingFloorWidth, 0.38, 8.4), CFrame.new(gymEntryLandingFloorCenterX, 6.45, gymEntranceNorthZ + 4.2), floorColor, Enum.Material.Metal)
 	createPart(branch, "GymRampLeftWall", Vector3.new(gymRampWallThickness, 14, gymRampLeftWallDepth), CFrame.new(gymRampLeftWallX, 6.8, gymRampLeftWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "GymRampRightWall", Vector3.new(0.42, 14, gymRampRightWallDepth), CFrame.new(branchRightWallX, 6.8, gymRampRightWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
-	createPart(branch, "GymRampCeiling", Vector3.new(branchUsableWidth, 0.36, gymRampLeftWallDepth), CFrame.new(branchCenterX, 16.8, gymRampLeftWallCenterZ), ceilingColor, Enum.Material.Concrete)
+	createPart(branch, "GymRampCeiling", Vector3.new(branchUsableWidth, 0.36, gymRampCeilingDepth), CFrame.new(branchCenterX, 16.8, gymRampCeilingCenterZ), ceilingColor, Enum.Material.Concrete)
 	createPart(branch, "GymEntryNorthReturnWall", Vector3.new(gymEntryReturnWallLength, 14, 0.42), CFrame.new(gymEntryReturnWallCenterX, 6.8, gymEntranceNorthZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "GymEntrySouthReturnWall", Vector3.new(gymEntryReturnWallLength, 14, 0.42), CFrame.new(gymEntryReturnWallCenterX, 6.8, gymEntranceSouthZ), wallColor, Enum.Material.SmoothPlastic)
 
@@ -2988,18 +3139,18 @@ local function makeInfirmaryRoom(roomFolder)
 	local width = 52
 	local depth = 48
 	local height = 17
-	local wallColor = Color3.fromRGB(176, 194, 198)
+	local wallColor = Color3.fromRGB(158, 175, 178)
 	local trimColor = Color3.fromRGB(119, 255, 203)
 
-	createPart(room, "InfirmaryFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(206, 216, 214), Enum.Material.SmoothPlastic)
-	createPart(room, "InfirmaryCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(214, 222, 221), Enum.Material.SmoothPlastic)
+	createPart(room, "InfirmaryFloor", Vector3.new(width, 1, depth), cframeAt(origin, 0, 0, 0), Color3.fromRGB(185, 194, 193), Enum.Material.SmoothPlastic)
+	createPart(room, "InfirmaryCeiling", Vector3.new(width, 1, depth), cframeAt(origin, 0, height, 0), Color3.fromRGB(193, 200, 199), Enum.Material.SmoothPlastic)
 	createPart(room, "InfirmaryNorthWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, -depth / 2), wallColor, Enum.Material.SmoothPlastic)
 	createPart(room, "InfirmarySouthWall", Vector3.new(width, height, 1), cframeAt(origin, 0, height / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
-	createPart(room, "InfirmaryEastWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(165, 183, 190), Enum.Material.SmoothPlastic)
+	createPart(room, "InfirmaryEastWall", Vector3.new(1, height, depth), cframeAt(origin, width / 2, height / 2, 0), Color3.fromRGB(149, 165, 171), Enum.Material.SmoothPlastic)
 	local westWallDepth = (depth - 12) / 2
-	createPart(room, "InfirmaryWestWallNorth", Vector3.new(1, height, westWallDepth), cframeAt(origin, -width / 2, height / 2, -15), Color3.fromRGB(165, 183, 190), Enum.Material.SmoothPlastic)
-	createPart(room, "InfirmaryWestWallSouth", Vector3.new(1, height, westWallDepth), cframeAt(origin, -width / 2, height / 2, 15), Color3.fromRGB(165, 183, 190), Enum.Material.SmoothPlastic)
-	createPart(room, "InfirmaryDoorHeader", Vector3.new(1, height - 8.4, 12), cframeAt(origin, -width / 2, 12.8, 0), Color3.fromRGB(153, 172, 181), Enum.Material.SmoothPlastic)
+	createPart(room, "InfirmaryWestWallNorth", Vector3.new(1, height, westWallDepth), cframeAt(origin, -width / 2, height / 2, -15), Color3.fromRGB(149, 165, 171), Enum.Material.SmoothPlastic)
+	createPart(room, "InfirmaryWestWallSouth", Vector3.new(1, height, westWallDepth), cframeAt(origin, -width / 2, height / 2, 15), Color3.fromRGB(149, 165, 171), Enum.Material.SmoothPlastic)
+	createPart(room, "InfirmaryDoorHeader", Vector3.new(1, height - 8.4, 12), cframeAt(origin, -width / 2, 12.8, 0), Color3.fromRGB(138, 155, 163), Enum.Material.SmoothPlastic)
 
 	createSpawnLocation(room, "InfirmarySpawn", "Infirmary", INFIRMARY_SPAWN_CFRAME, Color3.fromRGB(119, 255, 203), false)
 	local controls = makeRoomControlPanel(
@@ -3029,18 +3180,18 @@ local function makeInfirmaryRoom(roomFolder)
 	)
 
 	local recovery = makeModel(room, "PrimaryRecoveryBed")
-	local recoveryBed = createPart(recovery, "InfirmaryRecoveryBed", Vector3.new(7.4, 0.7, 3.4), cframeAt(origin, 9.5, 1.35, 0), Color3.fromRGB(230, 241, 240), Enum.Material.SmoothPlastic)
+	local recoveryBed = createPart(recovery, "InfirmaryRecoveryBed", Vector3.new(7.4, 0.7, 3.4), cframeAt(origin, 9.5, 1.35, 0), Color3.fromRGB(207, 217, 216), Enum.Material.SmoothPlastic)
 	createPart(recovery, "RecoveryBedBase", Vector3.new(7.9, 0.55, 3.9), cframeAt(origin, 9.5, 0.78, 0), Color3.fromRGB(77, 91, 101), Enum.Material.Metal)
-	createPart(recovery, "RecoveryPillow", Vector3.new(1.45, 0.35, 2.8), cframeAt(origin, 6.15, 1.92, 0), Color3.fromRGB(244, 248, 246), Enum.Material.Fabric)
+	createPart(recovery, "RecoveryPillow", Vector3.new(1.45, 0.35, 2.8), cframeAt(origin, 6.15, 1.92, 0), Color3.fromRGB(220, 223, 221), Enum.Material.Fabric)
 	local recoveryPrompt = createPrompt(recoveryBed, "Inspect", "Recovery Bed", 0)
 	recoveryPrompt.MaxActivationDistance = 12
 	tag(recoveryBed, Constants.Tags.InfirmaryRecoveryBed)
 	recovery.PrimaryPart = recoveryBed
 
-	local ceilingLight = createPart(room, "RecoveryCeilingLight", Vector3.new(5.2, 0.22, 2.7), cframeAt(origin, 9.5, height - 1.1, 0), Color3.fromRGB(255, 247, 206), Enum.Material.Neon)
+	local ceilingLight = createPart(room, "RecoveryCeilingLight", Vector3.new(5.2, 0.22, 2.7), cframeAt(origin, 9.5, height - 1.1, 0), Color3.fromRGB(230, 222, 185), Enum.Material.Neon)
 	local light = Instance.new("PointLight")
 	light.Name = "RecoveryBedLight"
-	light.Brightness = 1.9
+	light.Brightness = 1.71
 	light.Color = Color3.fromRGB(255, 244, 205)
 	light.Range = 18
 	light.Parent = ceilingLight
@@ -3052,7 +3203,7 @@ local function makeInfirmaryRoom(roomFolder)
 	tag(monitor, Constants.Tags.InfirmaryMonitor)
 
 	for bedIndex, zOffset in ipairs({ -14, 14 }) do
-		local bed = createPart(room, "InfirmarySideBed" .. bedIndex, Vector3.new(6.5, 0.6, 3.0), cframeAt(origin, -7.5, 1.25, zOffset), Color3.fromRGB(229, 239, 238), Enum.Material.SmoothPlastic)
+		local bed = createPart(room, "InfirmarySideBed" .. bedIndex, Vector3.new(6.5, 0.6, 3.0), cframeAt(origin, -7.5, 1.25, zOffset), Color3.fromRGB(206, 215, 214), Enum.Material.SmoothPlastic)
 		createPart(room, "InfirmarySideBedBase" .. bedIndex, Vector3.new(6.9, 0.5, 3.4), cframeAt(origin, -7.5, 0.76, zOffset), Color3.fromRGB(83, 94, 104), Enum.Material.Metal)
 		local curtain = createPart(room, "InfirmaryPrivacyCurtain" .. bedIndex, Vector3.new(0.18, 5.2, 7.2), cframeAt(origin, -2.8, 4.1, zOffset), Color3.fromRGB(141, 229, 219), Enum.Material.Fabric)
 		curtain.Transparency = 0.22
@@ -3064,18 +3215,18 @@ local function makeInfirmaryRoom(roomFolder)
 		{ X = 19.8, Z = 13.2, Label = "STERILE\nENOUGH" },
 		{ X = 20.2, Z = -14.0, Label = "CABINET\n03" },
 	}) do
-		local cabinet = createPart(room, "InfirmaryCabinet" .. cabinetIndex, Vector3.new(3.4, 5.8, 1.2), cframeAt(origin, data.X, 3.2, data.Z), Color3.fromRGB(215, 226, 229), Enum.Material.Metal)
-		createSurfaceText(cabinet, "InfirmaryCabinetText", data.Label, Enum.NormalId.Front, Color3.fromRGB(64, 86, 92), Color3.fromRGB(215, 226, 229))
+		local cabinet = createPart(room, "InfirmaryCabinet" .. cabinetIndex, Vector3.new(3.4, 5.8, 1.2), cframeAt(origin, data.X, 3.2, data.Z), Color3.fromRGB(194, 203, 206), Enum.Material.Metal)
+		createSurfaceText(cabinet, "InfirmaryCabinetText", data.Label, Enum.NormalId.Front, Color3.fromRGB(64, 86, 92), Color3.fromRGB(194, 203, 206))
 		createPrompt(cabinet, "Open", "Medical Cabinet", 0)
 		tag(cabinet, Constants.Tags.InfirmaryCabinet)
 	end
 
-	local sink = createPart(room, "InfirmarySink", Vector3.new(4.6, 1.4, 2.2), cframeAt(origin, -18.8, 2.2, -15.8), Color3.fromRGB(225, 233, 234), Enum.Material.Metal)
+	local sink = createPart(room, "InfirmarySink", Vector3.new(4.6, 1.4, 2.2), cframeAt(origin, -18.8, 2.2, -15.8), Color3.fromRGB(203, 210, 211), Enum.Material.Metal)
 	createPart(room, "InfirmaryFaucet", Vector3.new(0.34, 1.25, 0.34), cframeAt(origin, -18.8, 3.28, -16.7), Color3.fromRGB(148, 162, 170), Enum.Material.Metal)
 	sink:SetAttribute("BunkerEnergyIgnored", true)
 
 	local tray = makeModel(room, "InfirmaryNourishmentTray")
-	local trayBase = createPart(tray, "InfirmarySnackTray", Vector3.new(3.6, 0.22, 1.8), cframeAt(origin, 4.6, 2.35, 3.6), Color3.fromRGB(218, 224, 226), Enum.Material.Metal)
+	local trayBase = createPart(tray, "InfirmarySnackTray", Vector3.new(3.6, 0.22, 1.8), cframeAt(origin, 4.6, 2.35, 3.6), Color3.fromRGB(196, 202, 203), Enum.Material.Metal)
 	local cup = createPart(tray, "InfirmaryWaterCup", Vector3.new(0.72, 0.82, 0.72), trayBase.CFrame * CFrame.new(-0.9, 0.52, 0), Color3.fromRGB(134, 238, 255), Enum.Material.Glass)
 	cup.Shape = Enum.PartType.Cylinder
 	local ration = createPart(tray, "InfirmaryRationBar", Vector3.new(1.35, 0.28, 0.62), trayBase.CFrame * CFrame.new(0.75, 0.35, 0), Color3.fromRGB(255, 202, 103), Enum.Material.SmoothPlastic)
@@ -3389,8 +3540,10 @@ local function makeHallway(roomFolder)
 	local hallway = makeModel(roomFolder, "DoorHallway")
 
 	createPart(hallway, "HallwayFloor", Vector3.new(13, 1, 56), CFrame.new(0, 0, 45), Color3.fromRGB(92, 101, 112), Enum.Material.Concrete)
-	createPart(hallway, "HallwayLeftWall", Vector3.new(1, 10, 56), CFrame.new(-6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
-	createPart(hallway, "HallwayRightWall", Vector3.new(1, 10, 56), CFrame.new(6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	local hallwayLeftWall = createPart(hallway, "HallwayLeftWall", Vector3.new(1, 10, 56), CFrame.new(-6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	local hallwayRightWall = createPart(hallway, "HallwayRightWall", Vector3.new(1, 10, 56), CFrame.new(6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	applyTextureToFace(hallwayLeftWall, "HallwayLeftWallTexture", MAIN_HALLWAY_WALL_TEXTURE_ID, Enum.NormalId.Right, 8)
+	applyTextureToFace(hallwayRightWall, "HallwayRightWallTexture", MAIN_HALLWAY_WALL_TEXTURE_ID, Enum.NormalId.Left, 8)
 	createPart(hallway, "HallwayCeiling", Vector3.new(13, 1, 56), CFrame.new(0, 10, 45), Color3.fromRGB(116, 119, 128), Enum.Material.Concrete)
 	createPart(hallway, "IslandApproachFloor", Vector3.new(9, 1, 48), CFrame.new(0, 0, 97), Color3.fromRGB(65, 84, 104), Enum.Material.Concrete)
 	createPart(hallway, "IslandApproachLeftWallBeforeStair", Vector3.new(1, 9, 5.8), CFrame.new(-4.5, 4.5, 75.9), Color3.fromRGB(76, 103, 130), Enum.Material.SmoothPlastic)
@@ -3905,46 +4058,46 @@ local function makeSnackFridge(objectsFolder)
 		return cframeAt(origin, x + fridgeOffset.X, y, z + fridgeOffset.Z)
 	end
 
-	local body = createPart(fridge, "FridgeBody", Vector3.new(6.4, 9.2, 0.34), fridgeCFrame(-13, 4.9, -10.92), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
-	createPart(fridge, "FridgeLeftWall", Vector3.new(0.36, 9.2, 4), fridgeCFrame(-16.02, 4.9, -8.95), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
-	createPart(fridge, "FridgeRightWall", Vector3.new(0.36, 9.2, 4), fridgeCFrame(-9.98, 4.9, -8.95), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
-	createPart(fridge, "FridgeTopCap", Vector3.new(6.4, 0.36, 4), fridgeCFrame(-13, 9.32, -8.95), Color3.fromRGB(213, 225, 228), Enum.Material.Metal)
-	createPart(fridge, "FridgeBottomCap", Vector3.new(6.4, 0.36, 4), fridgeCFrame(-13, 0.48, -8.95), Color3.fromRGB(190, 205, 208), Enum.Material.Metal)
+	local body = createPart(fridge, "FridgeBody", Vector3.new(6.4, 9.2, 0.34), fridgeCFrame(-13, 4.9, -10.92), Color3.fromRGB(192, 203, 205), Enum.Material.Metal)
+	createPart(fridge, "FridgeLeftWall", Vector3.new(0.36, 9.2, 4), fridgeCFrame(-16.02, 4.9, -8.95), Color3.fromRGB(192, 203, 205), Enum.Material.Metal)
+	createPart(fridge, "FridgeRightWall", Vector3.new(0.36, 9.2, 4), fridgeCFrame(-9.98, 4.9, -8.95), Color3.fromRGB(192, 203, 205), Enum.Material.Metal)
+	createPart(fridge, "FridgeTopCap", Vector3.new(6.4, 0.36, 4), fridgeCFrame(-13, 9.32, -8.95), Color3.fromRGB(192, 203, 205), Enum.Material.Metal)
+	createPart(fridge, "FridgeBottomCap", Vector3.new(6.4, 0.36, 4), fridgeCFrame(-13, 0.48, -8.95), Color3.fromRGB(171, 185, 187), Enum.Material.Metal)
 
 	local interior = makeModel(fridge, "FridgeInteriorDetails")
 	createPart(interior, "FridgeInteriorBack", Vector3.new(5.45, 7.65, 0.22), fridgeCFrame(-13, 4.9, -10.62), Color3.fromRGB(55, 78, 92), Enum.Material.SmoothPlastic)
 	createPart(interior, "FridgeInteriorLeft", Vector3.new(0.18, 7.65, 3.2), fridgeCFrame(-15.68, 4.9, -8.95), Color3.fromRGB(72, 95, 108), Enum.Material.SmoothPlastic)
 	createPart(interior, "FridgeInteriorRight", Vector3.new(0.18, 7.65, 3.2), fridgeCFrame(-10.32, 4.9, -8.95), Color3.fromRGB(72, 95, 108), Enum.Material.SmoothPlastic)
-	createPart(interior, "FridgeShelfTop", Vector3.new(5.1, 0.18, 2.85), fridgeCFrame(-13, 6.32, -8.95), Color3.fromRGB(185, 244, 255), Enum.Material.Glass).Transparency = 0.34
-	createPart(interior, "FridgeShelfBottom", Vector3.new(5.1, 0.18, 2.85), fridgeCFrame(-13, 4.1, -8.95), Color3.fromRGB(185, 244, 255), Enum.Material.Glass).Transparency = 0.34
-	createPart(interior, "FridgeShelfTopLip", Vector3.new(5.15, 0.24, 0.12), fridgeCFrame(-13, 6.45, -7.48), Color3.fromRGB(212, 250, 255), Enum.Material.Glass).Transparency = 0.22
-	createPart(interior, "FridgeShelfBottomLip", Vector3.new(5.15, 0.24, 0.12), fridgeCFrame(-13, 4.23, -7.48), Color3.fromRGB(212, 250, 255), Enum.Material.Glass).Transparency = 0.22
-	local crisper = createPart(interior, "FridgeCrisperDrawer", Vector3.new(4.85, 1.25, 2.65), fridgeCFrame(-13, 2.25, -8.95), Color3.fromRGB(185, 244, 255), Enum.Material.Glass)
+	createPart(interior, "FridgeShelfTop", Vector3.new(5.1, 0.18, 2.85), fridgeCFrame(-13, 6.32, -8.95), Color3.fromRGB(167, 220, 230), Enum.Material.Glass).Transparency = 0.34
+	createPart(interior, "FridgeShelfBottom", Vector3.new(5.1, 0.18, 2.85), fridgeCFrame(-13, 4.1, -8.95), Color3.fromRGB(167, 220, 230), Enum.Material.Glass).Transparency = 0.34
+	createPart(interior, "FridgeShelfTopLip", Vector3.new(5.15, 0.24, 0.12), fridgeCFrame(-13, 6.45, -7.48), Color3.fromRGB(191, 225, 230), Enum.Material.Glass).Transparency = 0.22
+	createPart(interior, "FridgeShelfBottomLip", Vector3.new(5.15, 0.24, 0.12), fridgeCFrame(-13, 4.23, -7.48), Color3.fromRGB(191, 225, 230), Enum.Material.Glass).Transparency = 0.22
+	local crisper = createPart(interior, "FridgeCrisperDrawer", Vector3.new(4.85, 1.25, 2.65), fridgeCFrame(-13, 2.25, -8.95), Color3.fromRGB(167, 220, 230), Enum.Material.Glass)
 	crisper.Transparency = 0.55
-	local crisperFront = createPart(interior, "FridgeCrisperFront", Vector3.new(4.85, 1.12, 0.12), fridgeCFrame(-13, 2.25, -7.48), Color3.fromRGB(202, 250, 255), Enum.Material.Glass)
+	local crisperFront = createPart(interior, "FridgeCrisperFront", Vector3.new(4.85, 1.12, 0.12), fridgeCFrame(-13, 2.25, -7.48), Color3.fromRGB(182, 225, 230), Enum.Material.Glass)
 	crisperFront.Transparency = 0.32
-	createSurfaceText(crisperFront, "CrisperText", "IDEAS\nCRISPER", Enum.NormalId.Front, Color3.fromRGB(36, 84, 92), Color3.fromRGB(202, 250, 255))
-	local lightPanel = createPart(interior, "FridgeLightPanel", Vector3.new(1.4, 0.22, 0.18), fridgeCFrame(-13, 8.45, -7.55), Color3.fromRGB(255, 249, 196), Enum.Material.Neon)
+	createSurfaceText(crisperFront, "CrisperText", "IDEAS\nCRISPER", Enum.NormalId.Front, Color3.fromRGB(36, 84, 92), Color3.fromRGB(182, 225, 230))
+	local lightPanel = createPart(interior, "FridgeLightPanel", Vector3.new(1.4, 0.22, 0.18), fridgeCFrame(-13, 8.45, -7.55), Color3.fromRGB(230, 224, 176), Enum.Material.Neon)
 	local fridgeLight = Instance.new("PointLight")
 	fridgeLight.Name = "FridgeInteriorLight"
-	fridgeLight.Brightness = 2.5
+	fridgeLight.Brightness = 2.25
 	fridgeLight.Color = Color3.fromRGB(210, 248, 255)
 	fridgeLight.Range = 10
 	fridgeLight.Parent = lightPanel
 	mark(fridgeLight)
 
-	local milk = createPart(interior, "FridgeMilkCarton", Vector3.new(0.95, 1.8, 0.9), fridgeCFrame(-14.45, 5.15, -9.05), Color3.fromRGB(245, 248, 250), Enum.Material.SmoothPlastic)
-	createSurfaceText(milk, "MilkText", "MILK?", Enum.NormalId.Front, Color3.fromRGB(72, 118, 205), Color3.fromRGB(245, 248, 250))
+	local milk = createPart(interior, "FridgeMilkCarton", Vector3.new(0.95, 1.8, 0.9), fridgeCFrame(-14.45, 5.15, -9.05), Color3.fromRGB(221, 223, 225), Enum.Material.SmoothPlastic)
+	createSurfaceText(milk, "MilkText", "MILK?", Enum.NormalId.Front, Color3.fromRGB(72, 118, 205), Color3.fromRGB(221, 223, 225))
 	createPart(interior, "FridgeMilkCap", Vector3.new(0.34, 0.2, 0.34), fridgeCFrame(-14.1, 6.15, -8.72), Color3.fromRGB(72, 118, 205), Enum.Material.SmoothPlastic).Shape = Enum.PartType.Cylinder
 
-	local eggTray = createPart(interior, "FridgeEggTray", Vector3.new(2.1, 0.18, 0.75), fridgeCFrame(-11.85, 6.58, -8.65), Color3.fromRGB(235, 226, 202), Enum.Material.SmoothPlastic)
+	local eggTray = createPart(interior, "FridgeEggTray", Vector3.new(2.1, 0.18, 0.75), fridgeCFrame(-11.85, 6.58, -8.65), Color3.fromRGB(212, 203, 182), Enum.Material.SmoothPlastic)
 	for eggIndex = 1, 6 do
 		local egg = createPart(
 			interior,
 			"FridgeEgg" .. eggIndex,
 			Vector3.new(0.32, 0.42, 0.32),
 			eggTray.CFrame * CFrame.new(-0.85 + ((eggIndex - 1) % 3) * 0.58, 0.24, -0.18 + math.floor((eggIndex - 1) / 3) * 0.38),
-			Color3.fromRGB(250, 245, 228),
+			Color3.fromRGB(225, 221, 205),
 			Enum.Material.SmoothPlastic
 		)
 		egg.Shape = Enum.PartType.Ball
@@ -3956,9 +4109,9 @@ local function makeSnackFridge(objectsFolder)
 	}) do
 		local bottle = createPart(interior, "FridgeBottle" .. bottleIndex, Vector3.new(0.5, 1.25, 0.5), fridgeCFrame(bottleData.X, bottleData.Y, bottleData.Z), bottleData.Color, Enum.Material.SmoothPlastic)
 		bottle.Shape = Enum.PartType.Cylinder
-		createPart(interior, "FridgeBottleCap" .. bottleIndex, Vector3.new(0.34, 0.18, 0.34), fridgeCFrame(bottleData.X, bottleData.Y + 0.7, bottleData.Z), Color3.fromRGB(245, 245, 242), Enum.Material.SmoothPlastic).Shape = Enum.PartType.Cylinder
-		local label = createPart(interior, "FridgeBottleLabel" .. bottleIndex, Vector3.new(0.55, 0.42, 0.08), fridgeCFrame(bottleData.X, bottleData.Y, bottleData.Z + 0.28), Color3.fromRGB(255, 255, 245), Enum.Material.SmoothPlastic)
-		createSurfaceText(label, "BottleLabelText", bottleData.Label, Enum.NormalId.Front, bottleData.Color, Color3.fromRGB(255, 255, 245))
+		createPart(interior, "FridgeBottleCap" .. bottleIndex, Vector3.new(0.34, 0.18, 0.34), fridgeCFrame(bottleData.X, bottleData.Y + 0.7, bottleData.Z), Color3.fromRGB(221, 221, 218), Enum.Material.SmoothPlastic).Shape = Enum.PartType.Cylinder
+		local label = createPart(interior, "FridgeBottleLabel" .. bottleIndex, Vector3.new(0.55, 0.42, 0.08), fridgeCFrame(bottleData.X, bottleData.Y, bottleData.Z + 0.28), Color3.fromRGB(230, 230, 221), Enum.Material.SmoothPlastic)
+		createSurfaceText(label, "BottleLabelText", bottleData.Label, Enum.NormalId.Front, bottleData.Color, Color3.fromRGB(230, 230, 221))
 	end
 	hideFridgeContentAtBaseline(interior)
 
@@ -5079,7 +5232,7 @@ local function makeBowlingAlley(roomFolder)
 	local bowlingControls = makeRoomControlPanel(
 		room,
 		"BowlingInsideControlPanel",
-		CFrame.new(origin + Vector3.new(13.2, 4.6, 48.85), origin + Vector3.new(0, 4.6, 0)),
+		CFrame.new(origin + Vector3.new(13.2, 4.6, 48.85), origin + Vector3.new(13.2, 4.6, 0)),
 		"BowlingAlley",
 		"BOWLING",
 		{
@@ -5396,7 +5549,7 @@ local function makeTVSecretRoom(roomFolder)
 	local libraryControls = makeRoomControlPanel(
 		room,
 		"LibraryInsideControlPanel",
-		CFrame.new(origin + Vector3.new(-width / 2 + 5.4, 4.6, depth / 2 - 0.58), origin + Vector3.new(0, 4.6, 0)),
+		CFrame.new(origin + Vector3.new(-width / 2 + 5.4, 4.6, depth / 2 - 0.9), origin + Vector3.new(-width / 2 + 5.4, 4.6, 0)),
 		"Library",
 		"LIBRARY",
 		{
@@ -6071,7 +6224,7 @@ local function makeSpaceStationRoom(roomFolder)
 	local controls = makeRoomControlPanel(
 		room,
 		"SpaceStationInsideControlPanel",
-		CFrame.new(origin + Vector3.new(-12.4, 4.75, depth / 2 - 0.65), origin + Vector3.new(0, 4.75, 0)),
+		CFrame.new(origin + Vector3.new(-12.4, 4.75, depth / 2 - 0.9), origin + Vector3.new(-12.4, 4.75, 0)),
 		"SpaceStation",
 		"SPACE STATION",
 		{

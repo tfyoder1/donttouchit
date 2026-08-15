@@ -8,7 +8,34 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local EventManager = {}
 EventManager.__index = EventManager
 
-local OBJECT_RAIN_BUTTON_INTERVAL = 8
+local RED_BUTTON_DISCOVERY_FORCE_INTERVAL = 6
+local RED_BUTTON_DISCOVERY_CYCLE = {
+	{
+		EventId = "object_rain",
+		DiscoveryId = Constants.Discoveries.ObjectRain.Id,
+	},
+	{
+		EventId = "fake_event",
+		DiscoveryId = Constants.Discoveries.DelayedSurprise.Id,
+	},
+	{
+		EventId = "tiny_players",
+		DiscoveryId = Constants.Discoveries.TinyPlayers.Id,
+	},
+	{
+		EventId = "low_gravity",
+		DiscoveryId = Constants.Discoveries.LowGravity.Id,
+	},
+	{
+		EventId = "giant_player",
+		DiscoveryId = Constants.Discoveries.GiantPlayer.Id,
+	},
+}
+
+local RED_BUTTON_DISCOVERY_BY_EVENT_ID = {}
+for _, entry in ipairs(RED_BUTTON_DISCOVERY_CYCLE) do
+	RED_BUTTON_DISCOVERY_BY_EVENT_ID[entry.EventId] = entry
+end
 
 function EventManager.new(discoveryService, resetService, roomReferences, roomProgressService, bunkerEnergyService)
 	local self = setmetatable({}, EventManager)
@@ -20,8 +47,12 @@ function EventManager.new(discoveryService, resetService, roomReferences, roomPr
 	self.random = Random.new()
 	self.active = false
 	self.buttonPressCount = 0
+	self.redButtonDiscoveryStateByUserId = {}
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.localAudioRemote = RemoteService.GetRemote(Constants.Remotes.LocalAudio)
+	Players.PlayerRemoving:Connect(function(player)
+		self.redButtonDiscoveryStateByUserId[player.UserId] = nil
+	end)
 	return self
 end
 
@@ -91,6 +122,84 @@ function EventManager:_getEventById(eventId)
 	end
 
 	return nil
+end
+
+function EventManager:_hasDiscovery(player, discoveryId)
+	if not player or not player.Parent or not discoveryId then
+		return false
+	end
+
+	if not self.discoveryService or not self.discoveryService.HasDiscovery then
+		return false
+	end
+
+	return self.discoveryService:HasDiscovery(player, discoveryId)
+end
+
+function EventManager:_getRedButtonDiscoveryState(player)
+	if not player or not player.Parent then
+		return nil
+	end
+
+	local state = self.redButtonDiscoveryStateByUserId[player.UserId]
+	if not state then
+		state = {
+			NextCycleIndex = 1,
+			PressesSinceDiscoveryOutcome = 0,
+		}
+		self.redButtonDiscoveryStateByUserId[player.UserId] = state
+	end
+
+	return state
+end
+
+function EventManager:_getNextMissingRedButtonDiscoveryEvent(player, state)
+	if not state then
+		return nil, nil
+	end
+
+	for offset = 0, #RED_BUTTON_DISCOVERY_CYCLE - 1 do
+		local index = ((state.NextCycleIndex + offset - 1) % #RED_BUTTON_DISCOVERY_CYCLE) + 1
+		local entry = RED_BUTTON_DISCOVERY_CYCLE[index]
+		if entry and not self:_hasDiscovery(player, entry.DiscoveryId) then
+			local eventDefinition = self:_getEventById(entry.EventId)
+			if eventDefinition then
+				state.NextCycleIndex = (index % #RED_BUTTON_DISCOVERY_CYCLE) + 1
+				return eventDefinition, entry
+			end
+		end
+	end
+
+	return nil, nil
+end
+
+function EventManager:_chooseRedButtonEvent(triggeringPlayer)
+	local state = self:_getRedButtonDiscoveryState(triggeringPlayer)
+	if state and state.PressesSinceDiscoveryOutcome >= RED_BUTTON_DISCOVERY_FORCE_INTERVAL - 1 then
+		local eventDefinition, entry = self:_getNextMissingRedButtonDiscoveryEvent(triggeringPlayer, state)
+		if eventDefinition then
+			return eventDefinition, entry
+		end
+	end
+
+	local eventDefinition = self:_chooseEvent()
+	return eventDefinition, eventDefinition and RED_BUTTON_DISCOVERY_BY_EVENT_ID[eventDefinition.Id] or nil
+end
+
+function EventManager:_recordAcceptedRedButtonPress(triggeringPlayer, entry)
+	self.buttonPressCount += 1
+
+	local state = self:_getRedButtonDiscoveryState(triggeringPlayer)
+	if not state then
+		return
+	end
+
+	local wasMissingDiscovery = entry and not self:_hasDiscovery(triggeringPlayer, entry.DiscoveryId)
+	if wasMissingDiscovery then
+		state.PressesSinceDiscoveryOutcome = 0
+	else
+		state.PressesSinceDiscoveryOutcome += 1
+	end
 end
 
 function EventManager:_buildContext(triggeringPlayer, eventDefinition)
@@ -176,15 +285,13 @@ function EventManager:TriggerRandom(triggeringPlayer)
 		return false
 	end
 
-	self.buttonPressCount += 1
-
-	local eventDefinition = nil
-	if self.buttonPressCount % OBJECT_RAIN_BUTTON_INTERVAL == 0 then
-		eventDefinition = self:_getEventById("object_rain")
+	local eventDefinition, entry = self:_chooseRedButtonEvent(triggeringPlayer)
+	local accepted = self:_startEvent(triggeringPlayer, eventDefinition, true)
+	if accepted then
+		self:_recordAcceptedRedButtonPress(triggeringPlayer, entry)
 	end
 
-	eventDefinition = eventDefinition or self:_chooseEvent()
-	return self:_startEvent(triggeringPlayer, eventDefinition, true)
+	return accepted
 end
 
 function EventManager:TriggerById(triggeringPlayer, eventId)

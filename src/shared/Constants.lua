@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.154"
+Constants.BuildVersion = "0.5.157"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -368,6 +368,8 @@ Constants.Prologue = {
 Constants.AudioAssets = {
 	Interface = {
 		ControlPanelInteractionId = "rbxassetid://112555741154994",
+		MenuMoveSoundId = "rbxassetid://121855518963050",
+		MenuMoveVolume = 0.18,
 	},
 	Events = {
 		ObjectRainCollectId = "rbxassetid://98585875176475",
@@ -381,8 +383,26 @@ Constants.AudioAssets = {
 		TestToneId = "rbxassetid://99709938803492",
 		PleaseStopId = "rbxassetid://72577143736585",
 	},
+	RoomAmbience = {
+		TVRoom = {
+			SoundId = "rbxassetid://1836487465",
+			Volume = 0.08,
+			FadeSeconds = 1.5,
+			ContainmentIntro = {
+				SoundId = "rbxassetid://9045322527",
+				Volume = 0.08,
+				FadeSeconds = 1.5,
+				StartDelayBufferSeconds = 0.2,
+			},
+		},
+		Library = {
+			SoundId = "rbxassetid://92072185175546",
+			Volume = 0.06,
+			FadeSeconds = 1.5,
+		},
+	},
 	Footsteps = {
-		Volume = 0.32,
+		Volume = 0.37,
 		RollOffMaxDistance = 18,
 		MinIntervalSeconds = 0.24,
 		MaxIntervalSeconds = 0.48,
@@ -576,7 +596,7 @@ Constants.Discoveries = {
 	ObjectRain = {
 		Id = "object_rain",
 		Name = "Survived Object Rain",
-		Hint = "The red button has a reliable bad idea every eighth accepted press.",
+		Hint = "The red button eventually runs out of better ideas.",
 	},
 	DelayedSurprise = {
 		Id = "delayed_surprise",
@@ -1038,6 +1058,11 @@ Constants.Discoveries = {
 		Name = "Watched Yourself Watching",
 		Hint = "One monitor in Security does more than display static.",
 	},
+	SecurityBunkerEnergy = {
+		Id = "security_bunker_energy",
+		Name = "Checked Bunker Energy",
+		Hint = "Inspect the bunker power meter in Security.",
+	},
 	SecurityScreenButton = {
 		Id = "security_screen_button",
 		Name = "Pressed the Screen-Only Button",
@@ -1223,6 +1248,7 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.SecurityEntered.Id,
 		Constants.Discoveries.SecurityMonitorWall.Id,
 		Constants.Discoveries.SecurityCameraView.Id,
+		Constants.Discoveries.SecurityBunkerEnergy.Id,
 		Constants.Discoveries.SecurityScreenButton.Id,
 		Constants.Discoveries.SecurityRedPhone.Id,
 		Constants.Discoveries.SecurityTapeDeck.Id,
@@ -1735,6 +1761,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.SecurityEntered.Id] = Constants.Tags.HallDoor,
 	[Constants.Discoveries.SecurityMonitorWall.Id] = Constants.Tags.SecurityMonitor,
 	[Constants.Discoveries.SecurityCameraView.Id] = Constants.Tags.SecurityMonitor,
+	[Constants.Discoveries.SecurityBunkerEnergy.Id] = Constants.Tags.BunkerPowerMeter,
 	[Constants.Discoveries.SecurityScreenButton.Id] = Constants.Tags.SecurityMonitor,
 	[Constants.Discoveries.SecurityRedPhone.Id] = Constants.Tags.SecurityRedPhone,
 	[Constants.Discoveries.SecurityTapeDeck.Id] = Constants.Tags.SecurityTapeDeck,
