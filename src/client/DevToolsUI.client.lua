@@ -43,6 +43,11 @@ local inspectAutoEnabled = false
 local inspectLabel = nil
 local inspectCloseButton = nil
 local inspectHighlight = nil
+local inspectWindowManuallyPositioned = false
+local inspectDragging = false
+local inspectDragInput = nil
+local inspectDragStartPosition = nil
+local inspectDragStartTopLeft = nil
 local idLabelsEnabled = false
 local idLabelFolder = nil
 local lastIdLabelsUpdateAt = 0
@@ -58,6 +63,7 @@ local MAX_INSPECT_RAYCAST_SKIPS = 8
 local ID_LABEL_RANGE = 52
 local ID_LABEL_MAX_PARTS = 24
 local ID_LABEL_UPDATE_INTERVAL = 0.9
+local ID_LABEL_FOLDER_NAME = "DontTouchItDevIdLabels"
 local DOUBLE_JUMP_MIN_SECONDS = 0.08
 local DOUBLE_JUMP_MAX_SECONDS = 0.45
 local DOUBLE_JUMP_FLY_COOLDOWN_SECONDS = 1
@@ -319,6 +325,169 @@ local function clearPanelSelection()
 	end
 end
 
+local function getInspectViewportSize()
+	local viewport = currentDeviceProfile and currentDeviceProfile.Viewport
+	if viewport then
+		return viewport
+	end
+
+	local camera = Workspace.CurrentCamera
+	return camera and camera.ViewportSize or Vector2.new(1024, 768)
+end
+
+local function clampInspectTopLeft(topLeft, size)
+	local viewport = getInspectViewportSize()
+	local margin = isPhoneProfile() and 6 or 8
+	local maxX = math.max(margin, viewport.X - size.X - margin)
+	local maxY = math.max(margin, viewport.Y - size.Y - margin)
+	return Vector2.new(
+		math.clamp(topLeft.X, margin, maxX),
+		math.clamp(topLeft.Y, margin, maxY)
+	)
+end
+
+local function setInspectTopLeft(topLeft, manual)
+	if not inspectLabel then
+		return
+	end
+
+	local size = inspectLabel.AbsoluteSize
+	if size.X <= 0 or size.Y <= 0 then
+		size = Vector2.new(inspectLabel.Size.X.Offset, inspectLabel.Size.Y.Offset)
+	end
+
+	local clamped = clampInspectTopLeft(topLeft, size)
+	inspectLabel.AnchorPoint = Vector2.zero
+	inspectLabel.Position = UDim2.fromOffset(clamped.X, clamped.Y)
+	if manual then
+		inspectWindowManuallyPositioned = true
+	end
+end
+
+local function applyInspectCloseButtonLayout()
+	if not inspectCloseButton then
+		return
+	end
+
+	local touchLandscape = currentDeviceProfile and currentDeviceProfile.IsTouch == true
+		and currentDeviceProfile.Viewport
+		and currentDeviceProfile.Viewport.X > currentDeviceProfile.Viewport.Y
+	inspectCloseButton.AnchorPoint = Vector2.new(1, 0)
+	inspectCloseButton.Position = UDim2.new(1, -8, 0, 8)
+	inspectCloseButton.Size = UDim2.fromOffset(isPhoneProfile() and (touchLandscape and 22 or 24) or 30, isPhoneProfile() and (touchLandscape and 20 or 22) or 28)
+	inspectCloseButton.TextSize = isPhoneProfile() and (touchLandscape and 10 or 11) or 14
+end
+
+local function applyInspectLayout(touchLandscape)
+	if not inspectLabel then
+		return
+	end
+
+	local viewport = getInspectViewportSize()
+	local size
+	local defaultLeft
+	local defaultBottom
+	local defaultTop
+	if isPhoneProfile() then
+		size = Vector2.new(math.floor(viewport.X * (touchLandscape and 0.29 or 0.48)), touchLandscape and 170 or 128)
+		defaultLeft = touchLandscape and 104 or 20
+		defaultTop = touchLandscape and 92 or nil
+		defaultBottom = (touchLandscape and 138 or 112) + (touchLandscape and 28 or 25) + 10
+		inspectLabel.TextSize = touchLandscape and 7 or 8
+	else
+		size = Vector2.new(330, 196)
+		defaultLeft = 12
+		defaultBottom = 78 + 34 + 10
+		inspectLabel.TextSize = 13
+	end
+
+	inspectLabel.AnchorPoint = Vector2.zero
+	inspectLabel.Size = UDim2.fromOffset(size.X, size.Y)
+	if inspectWindowManuallyPositioned then
+		setInspectTopLeft(inspectLabel.AbsolutePosition, false)
+	elseif defaultTop then
+		setInspectTopLeft(Vector2.new(defaultLeft, defaultTop), false)
+	else
+		setInspectTopLeft(Vector2.new(defaultLeft, viewport.Y - defaultBottom - size.Y), false)
+	end
+	applyInspectCloseButtonLayout()
+end
+
+local function getInputScreenPosition(input)
+	local position = input.Position
+	return Vector2.new(position.X, position.Y)
+end
+
+local function isPointInsideGuiObject(guiObject, position)
+	if not guiObject then
+		return false
+	end
+
+	local topLeft = guiObject.AbsolutePosition
+	local size = guiObject.AbsoluteSize
+	return position.X >= topLeft.X
+		and position.X <= topLeft.X + size.X
+		and position.Y >= topLeft.Y
+		and position.Y <= topLeft.Y + size.Y
+end
+
+local function endInspectDrag()
+	inspectDragging = false
+	inspectDragInput = nil
+	inspectDragStartPosition = nil
+	inspectDragStartTopLeft = nil
+end
+
+local function updateInspectDrag(input)
+	if not inspectDragging or not inspectLabel or not inspectDragStartPosition or not inspectDragStartTopLeft then
+		return
+	end
+	if inspectDragInput == Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.MouseMovement then
+		return
+	end
+	if inspectDragInput == Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
+	local delta = getInputScreenPosition(input) - inspectDragStartPosition
+	setInspectTopLeft(inspectDragStartTopLeft + delta, true)
+end
+
+local function wireInspectRepositioning()
+	if not inspectLabel then
+		return
+	end
+
+	inspectLabel.Active = true
+	inspectLabel.InputBegan:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1
+			and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		local position = getInputScreenPosition(input)
+		if isPointInsideGuiObject(inspectCloseButton, position) then
+			return
+		end
+
+		inspectDragging = true
+		inspectDragInput = input.UserInputType
+		inspectDragStartPosition = position
+		inspectDragStartTopLeft = inspectLabel.AbsolutePosition
+	end)
+
+	UserInputService.InputChanged:Connect(updateInspectDrag)
+	UserInputService.InputEnded:Connect(function(input)
+		if not inspectDragging then
+			return
+		end
+		if input.UserInputType == inspectDragInput
+			or (inspectDragInput == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseMovement) then
+			endInspectDrag()
+		end
+	end)
+end
+
 local function applyDevLayout(profile)
 	currentDeviceProfile = profile or DeviceProfile.Get()
 
@@ -340,28 +509,7 @@ local function applyDevLayout(profile)
 			devInfoLabel.TextScaled = true
 		end
 	end
-	if inspectLabel then
-		if isPhoneProfile() then
-			inspectLabel.Position = UDim2.new(1, touchLandscape and -22 or -8, touchLandscape and 0.48 or 0.5, 0)
-			inspectLabel.Size = UDim2.new(touchLandscape and 0.34 or 0.48, 0, 0, touchLandscape and 116 or 128)
-			inspectLabel.TextSize = touchLandscape and 7 or 8
-		else
-			inspectLabel.Position = UDim2.new(1, -16, 0.5, 0)
-			inspectLabel.Size = UDim2.fromOffset(330, 196)
-			inspectLabel.TextSize = 13
-		end
-	end
-	if inspectCloseButton then
-		if isPhoneProfile() then
-			inspectCloseButton.Position = UDim2.new(1, touchLandscape and -30 or -15, touchLandscape and 0.48 or 0.5, touchLandscape and -66 or -74)
-			inspectCloseButton.Size = UDim2.fromOffset(touchLandscape and 22 or 24, touchLandscape and 20 or 22)
-			inspectCloseButton.TextSize = touchLandscape and 10 or 11
-		else
-			inspectCloseButton.Position = UDim2.new(1, -24, 0.5, -111)
-			inspectCloseButton.Size = UDim2.fromOffset(30, 28)
-			inspectCloseButton.TextSize = 14
-		end
-	end
+	applyInspectLayout(touchLandscape)
 
 	if isPhoneProfile() then
 		toggleButton.AnchorPoint = Vector2.new(0, 1)
@@ -694,6 +842,36 @@ local function formatVector3(value)
 	return ("%s, %s, %s"):format(formatNumber(value.X), formatNumber(value.Y), formatNumber(value.Z))
 end
 
+local function formatHeading(rootPart)
+	if not rootPart then
+		return "-"
+	end
+
+	local lookVector = rootPart.CFrame.LookVector
+	local degrees = (math.deg(math.atan2(lookVector.X, -lookVector.Z)) + 360) % 360
+	local roundedDegrees = math.floor(degrees + 0.5) % 360
+	local headings = {
+		"N",
+		"NE",
+		"E",
+		"SE",
+		"S",
+		"SW",
+		"W",
+		"NW",
+	}
+	local headingIndex = (math.floor((roundedDegrees + 22.5) / 45) % #headings) + 1
+	return ("%s %03d°"):format(headings[headingIndex], roundedDegrees)
+end
+
+local function formatPlayerLocation(rootPart)
+	if not rootPart then
+		return "- | H -\nHeading: -"
+	end
+
+	return ("%s | H %s\nHeading: %s"):format(formatVector3(rootPart.Position), formatNumber(rootPart.Position.Y), formatHeading(rootPart))
+end
+
 local function formatAttributeValue(value)
 	local valueType = typeof(value)
 	if valueType == "Vector3" then
@@ -831,7 +1009,7 @@ local function updateInspectReadout()
 	end
 
 	local rootPart = getRootPart()
-	local playerPositionText = if rootPart then formatVector3(rootPart.Position) else "-"
+	local playerPositionText = formatPlayerLocation(rootPart)
 	local camera = Workspace.CurrentCamera
 	if not camera then
 		inspectLabel.Text = ("DEV INSPECT\nPlayer: %s\nNo camera"):format(playerPositionText)
@@ -908,14 +1086,27 @@ showDevInfo = function(text, durationSeconds)
 end
 
 local function getIdLabelFolder()
-	if not gui then
+	if not gui or not gui.Enabled then
 		return nil
 	end
 
-	if not idLabelFolder then
+	if idLabelFolder and idLabelFolder.Parent then
+		return idLabelFolder
+	end
+
+	local legacyFolder = gui:FindFirstChild("DevIdLabels")
+	if legacyFolder and legacyFolder:IsA("Folder") then
+		legacyFolder:ClearAllChildren()
+		legacyFolder:Destroy()
+	end
+
+	local existingFolder = playerGui:FindFirstChild(ID_LABEL_FOLDER_NAME)
+	if existingFolder and existingFolder:IsA("Folder") then
+		idLabelFolder = existingFolder
+	else
 		idLabelFolder = Instance.new("Folder")
-		idLabelFolder.Name = "DevIdLabels"
-		idLabelFolder.Parent = gui
+		idLabelFolder.Name = ID_LABEL_FOLDER_NAME
+		idLabelFolder.Parent = playerGui
 	end
 
 	return idLabelFolder
@@ -974,6 +1165,11 @@ end
 
 local function updateIdLabels(force)
 	if not idLabelsEnabled then
+		return
+	end
+
+	if not gui or not gui.Enabled then
+		clearIdLabels()
 		return
 	end
 
@@ -1692,12 +1888,13 @@ local function buildGui()
 
 	inspectLabel = Instance.new("TextLabel")
 	inspectLabel.Name = "DevInspectReadout"
-	inspectLabel.AnchorPoint = Vector2.new(1, 0.5)
+	inspectLabel.Active = true
+	inspectLabel.AnchorPoint = Vector2.zero
 	inspectLabel.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
 	inspectLabel.BackgroundTransparency = 0.04
 	inspectLabel.BorderSizePixel = 0
 	inspectLabel.Font = Enum.Font.Code
-	inspectLabel.Position = UDim2.new(1, -16, 0.5, 0)
+	inspectLabel.Position = UDim2.new(0, 12, 1, -318)
 	inspectLabel.Size = UDim2.fromOffset(330, 196)
 	inspectLabel.Text = "DEV INSPECT"
 	inspectLabel.TextColor3 = Color3.fromRGB(188, 246, 255)
@@ -1713,7 +1910,7 @@ local function buildGui()
 	inspectPadding.PaddingTop = UDim.new(0, 8)
 	inspectPadding.PaddingBottom = UDim.new(0, 8)
 	inspectPadding.PaddingLeft = UDim.new(0, 9)
-	inspectPadding.PaddingRight = UDim.new(0, 28)
+	inspectPadding.PaddingRight = UDim.new(0, 58)
 	inspectPadding.Parent = inspectLabel
 
 	inspectCloseButton = Instance.new("TextButton")
@@ -1723,14 +1920,14 @@ local function buildGui()
 	inspectCloseButton.BackgroundTransparency = 0.02
 	inspectCloseButton.BorderSizePixel = 0
 	inspectCloseButton.Font = Enum.Font.GothamBlack
-	inspectCloseButton.Position = UDim2.new(1, -24, 0.5, -111)
+	inspectCloseButton.Position = UDim2.new(1, -8, 0, 8)
 	inspectCloseButton.Size = UDim2.fromOffset(30, 28)
 	inspectCloseButton.Text = "X"
 	inspectCloseButton.TextColor3 = Color3.fromRGB(238, 247, 255)
 	inspectCloseButton.TextSize = 14
 	inspectCloseButton.Visible = false
 	inspectCloseButton.ZIndex = 92
-	inspectCloseButton.Parent = gui
+	inspectCloseButton.Parent = inspectLabel
 	makeCorner(inspectCloseButton, 6)
 	wireButtonActivation(inspectCloseButton, function()
 		setInspectState(false)
@@ -1738,6 +1935,7 @@ local function buildGui()
 			rebuildPanel()
 		end
 	end)
+	wireInspectRepositioning()
 
 	panel = Instance.new("Frame")
 	panel.Name = "DevPanel"

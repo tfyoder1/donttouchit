@@ -651,7 +651,7 @@ function RoomProgressService:_sendStartOptions(player)
 
 	state.StartOptionsSent = true
 
-	local resumeRoomId = self.discoveryService:GetLastUnlockedRoomId(player)
+	local resumeRoomId = self.discoveryService:GetContinueRoomId(player)
 	local resumeRoom = Constants.GetRoom(resumeRoomId)
 	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
 	local hintCount = self.discoveryService:GetHintCount(player)
@@ -718,7 +718,7 @@ function RoomProgressService:_handleSessionStart(player, payload)
 			return
 		end
 
-		roomId = self.discoveryService:GetLastUnlockedRoomId(player)
+		roomId = self.discoveryService:GetContinueRoomId(player)
 		local room = Constants.GetRoom(roomId)
 		message = ("Returning to %s. Try to look innocent."):format(room and room.Name or "the room")
 	elseif action == "Room" then
@@ -755,7 +755,9 @@ function RoomProgressService:_handleSessionStart(player, payload)
 	state.UntouchedPrologueTriggered = false
 	state.TimerStartedAt = os.clock()
 
-	self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId), "SessionStart")
+	if self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId), "SessionStart") then
+		self.discoveryService:SetContinueRoomId(player, roomId, true)
+	end
 	self.systemMessageRemote:FireClient(player, message)
 end
 
@@ -872,6 +874,9 @@ function RoomProgressService:_tickPlayer(player, now)
 			self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryEntered.Id)
 		elseif roomId == "Gym" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.GymEntered.Id)
+		end
+		if not self:IsUntouchedProloguePending(player) then
+			self.discoveryService:SetContinueRoomId(player, roomId, true)
 		end
 	else
 		local delta = math.max(0, now - (state.LastRoomTickAt or now))

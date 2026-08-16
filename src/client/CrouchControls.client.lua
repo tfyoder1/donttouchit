@@ -100,7 +100,7 @@ local function setupTouchCrouchButton()
 		Desktop = "C",
 		Xbox = "B",
 		Touch = "Crouch button",
-		Position = UDim2.new(1, -92, 1, -230),
+		Position = UDim2.new(0, 193, 0, 321),
 		TextColor = Color3.fromRGB(231, 224, 255),
 		StrokeColor = Color3.fromRGB(173, 145, 255),
 		OnBegan = beginCrouchOrSlide,

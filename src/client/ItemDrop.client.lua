@@ -158,7 +158,7 @@ local function setupTouchDropButton()
 		Desktop = "Backspace",
 		Xbox = "Hold B",
 		Touch = "Drop button",
-		Position = UDim2.new(1, -248, 1, -176),
+		Position = UDim2.new(0, 626, 0, 320),
 		TextColor = Color3.fromRGB(255, 235, 194),
 		StrokeColor = Color3.fromRGB(255, 211, 102),
 		Enabled = getEquippedDroppableTool() ~= nil,

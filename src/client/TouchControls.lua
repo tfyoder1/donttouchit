@@ -8,6 +8,7 @@ local TouchControls = {}
 
 local TOUCH_GUI_NAME = "DontTouchItTouchControls"
 local OPTIONS_GUI_NAME = "DontTouchItControlOptions"
+local TOUCH_LAYOUT_VERSION = "touch-cluster-2026-08-15-v5"
 local TOUCH_GUI_ORDER = 145
 local OPTIONS_GUI_ORDER = 155
 local BUTTON_Z_INDEX = 10
@@ -25,6 +26,7 @@ local TOUCH_BADGE_TEXT_BY_ID = {
 	Drop = "D",
 	Ping = "P",
 	CrouchSlide = "C",
+	Action = "A",
 }
 
 local controlsById = {}
@@ -38,6 +40,8 @@ local editButton = nil
 local resetButton = nil
 local editMode = false
 local activeDrag = nil
+local activeControlInputs = {}
+local activeControlInputConnections = {}
 
 local function isTouchPointer(input)
 	return input.UserInputType == Enum.UserInputType.Touch
@@ -61,6 +65,10 @@ local function getTouchGui()
 	local existing = playerGui:FindFirstChild(TOUCH_GUI_NAME)
 	if existing and existing:IsA("ScreenGui") then
 		touchGui = existing
+		if touchGui:GetAttribute("TouchLayoutVersion") ~= TOUCH_LAYOUT_VERSION then
+			table.clear(sessionPositions)
+			touchGui:SetAttribute("TouchLayoutVersion", TOUCH_LAYOUT_VERSION)
+		end
 		return touchGui
 	end
 
@@ -70,6 +78,7 @@ local function getTouchGui()
 	gui.IgnoreGuiInset = true
 	gui.DisplayOrder = TOUCH_GUI_ORDER
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui:SetAttribute("TouchLayoutVersion", TOUCH_LAYOUT_VERSION)
 	gui.Parent = playerGui
 	touchGui = gui
 	return touchGui
@@ -182,12 +191,34 @@ local function ensureTouchButtonVisual(button)
 
 		local sizeConstraint = Instance.new("UITextSizeConstraint")
 		sizeConstraint.Name = "TouchControlTextSize"
-		sizeConstraint.MinTextSize = 8
-		sizeConstraint.MaxTextSize = 14
+		sizeConstraint.MinTextSize = 7
+		sizeConstraint.MaxTextSize = 12
 		sizeConstraint.Parent = label
 	end
 
-	return iconDisk, iconLayer, label, diskStroke
+	local coordinateLabel = button:FindFirstChild("TouchControlCoordinateLabel")
+	if not coordinateLabel or not coordinateLabel:IsA("TextLabel") then
+		coordinateLabel = Instance.new("TextLabel")
+		coordinateLabel.Name = "TouchControlCoordinateLabel"
+		coordinateLabel.Active = false
+		coordinateLabel.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
+		coordinateLabel.BackgroundTransparency = 0.08
+		coordinateLabel.BorderSizePixel = 0
+		coordinateLabel.Font = Enum.Font.Code
+		coordinateLabel.Position = UDim2.new(0, 0, 0, -22)
+		coordinateLabel.Size = UDim2.new(1, 36, 0, 18)
+		coordinateLabel.TextColor3 = Color3.fromRGB(226, 245, 255)
+		coordinateLabel.TextSize = 10
+		coordinateLabel.TextWrapped = false
+		coordinateLabel.TextXAlignment = Enum.TextXAlignment.Center
+		coordinateLabel.TextYAlignment = Enum.TextYAlignment.Center
+		coordinateLabel.ZIndex = button.ZIndex + 4
+		coordinateLabel.Parent = button
+		setRounded(coordinateLabel, 5)
+		setStroke(coordinateLabel, Color3.fromRGB(102, 217, 255), 1, 0.45)
+	end
+
+	return iconDisk, iconLayer, label, diskStroke, coordinateLabel
 end
 
 local function upsertOrderedId(id)
@@ -250,7 +281,7 @@ local function applyButtonState(state)
 	button.Selectable = true
 	button.Active = true
 
-	local iconDisk, iconLayer, label, diskStroke = ensureTouchButtonVisual(button)
+	local iconDisk, iconLayer, label, diskStroke, coordinateLabel = ensureTouchButtonVisual(button)
 	local iconDiskColor = if enabled then TOUCH_ICON_DISK_COLOR else TOUCH_ICON_DISK_DISABLED_COLOR
 	iconDisk.BackgroundColor3 = iconDiskColor
 	iconDisk.BackgroundTransparency = if enabled then 0.08 else 0.18
@@ -258,8 +289,8 @@ local function applyButtonState(state)
 	iconDisk.Size = UDim2.fromOffset(TOUCH_ICON_DISK_SIZE, TOUCH_ICON_DISK_SIZE)
 	iconDisk.ZIndex = button.ZIndex + 1
 	iconLayer.ZIndex = iconDisk.ZIndex + 1
-	label.Position = UDim2.new(0, TOUCH_ICON_DISK_SIZE + 12, 0, 4)
-	label.Size = UDim2.new(1, -(TOUCH_ICON_DISK_SIZE + 17), 1, -8)
+	label.Position = UDim2.new(0, TOUCH_ICON_DISK_SIZE + 8, 0, 4)
+	label.Size = UDim2.new(1, -(TOUCH_ICON_DISK_SIZE + 13), 1, -8)
 	label.Text = state.Text
 	label.TextColor3 = if enabled then state.TextColor else TOUCH_ICON_DISABLED_COLOR
 	label.TextTransparency = if enabled then 0 else 0.22
@@ -268,13 +299,20 @@ local function applyButtonState(state)
 	diskStroke.Transparency = if editMode then 0.12 else 0.58
 
 	local iconColor = if enabled then TOUCH_ICON_COLOR else TOUCH_ICON_DISABLED_COLOR
-	local badgeText = TOUCH_BADGE_TEXT_BY_ID[state.Id] or string.sub(state.Text or state.Label or state.Id, 1, 1)
+	local badgeText = state.BadgeText or TOUCH_BADGE_TEXT_BY_ID[state.Id] or string.sub(state.Text or state.Label or state.Id, 1, 1)
 	drawTouchBadge(iconLayer, string.upper(badgeText), iconColor)
+
+	if coordinateLabel then
+		local anchorPosition = button.AbsolutePosition + button.AbsoluteSize
+		local labelText = state.Text or state.Label or state.Id
+		coordinateLabel.Text = ("%s  x=%d y=%d"):format(labelText, math.floor(anchorPosition.X + 0.5), math.floor(anchorPosition.Y + 0.5))
+		coordinateLabel.Visible = editMode and button.Visible
+	end
 
 	local stroke = button:FindFirstChild("TouchControlStroke")
 	if stroke and stroke:IsA("UIStroke") then
 		stroke.Color = if editMode then Color3.fromRGB(255, 255, 255) else state.StrokeColor
-		stroke.Thickness = if editMode then 3 else 2
+		stroke.Thickness = if editMode then 2 else 1
 		stroke.Transparency = if editMode then 0.06 else 0.25
 	end
 end
@@ -373,6 +411,33 @@ local function finishDrag()
 	activeDrag = nil
 end
 
+local function finishControlInput(input)
+	local state = activeControlInputs[input]
+	if not state then
+		return
+	end
+
+	activeControlInputs[input] = nil
+	local connection = activeControlInputConnections[input]
+	activeControlInputConnections[input] = nil
+	if connection then
+		connection:Disconnect()
+	end
+	if state.OnEnded then
+		state.OnEnded(input)
+	end
+end
+
+local function trackControlInput(input, state)
+	activeControlInputs[input] = state
+	activeControlInputConnections[input] = input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End
+			or input.UserInputState == Enum.UserInputState.Cancel then
+			finishControlInput(input)
+		end
+	end)
+end
+
 local function beginDrag(state, input)
 	if not state.Button then
 		return
@@ -409,7 +474,7 @@ local function ensureTouchButton(state)
 		button.ZIndex = BUTTON_Z_INDEX
 		button.Parent = getTouchGui()
 		setRounded(button, state.CornerRadius)
-		local stroke = setStroke(button, state.StrokeColor, 2, 0.25)
+		local stroke = setStroke(button, state.StrokeColor, 1, 0.25)
 		stroke.Name = "TouchControlStroke"
 	end
 
@@ -430,6 +495,7 @@ local function ensureTouchButton(state)
 		end
 
 		if state.OnBegan then
+			trackControlInput(input, state)
 			state.OnBegan(input)
 		end
 	end)
@@ -441,20 +507,12 @@ local function ensureTouchButton(state)
 
 		if editMode then
 			finishDrag()
-			return
-		end
-
-		if state.OnEnded then
-			state.OnEnded(input)
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if editMode then
 			return
-		end
-		if state.OnEnded then
-			state.OnEnded(nil)
 		end
 	end)
 
@@ -668,7 +726,7 @@ local function register(config, hasTouchButton)
 	state.Color = config.Color or Color3.fromRGB(18, 23, 29)
 	state.TextColor = config.TextColor or Color3.fromRGB(224, 236, 245)
 	state.StrokeColor = config.StrokeColor or Color3.fromRGB(102, 217, 255)
-	state.BackgroundTransparency = if config.BackgroundTransparency ~= nil then config.BackgroundTransparency else 0.08
+	state.BackgroundTransparency = if config.BackgroundTransparency ~= nil then config.BackgroundTransparency else 0.13
 	state.CornerRadius = config.CornerRadius or 8
 	state.OnActivated = config.OnActivated
 	state.OnBegan = config.OnBegan
@@ -694,6 +752,10 @@ local function register(config, hasTouchButton)
 		state.Text = tostring(text or state.Text)
 		applyButtonState(state)
 		renderOptionsRows()
+	end
+	function handle:SetBadgeText(text)
+		state.BadgeText = if text == nil then nil else tostring(text)
+		applyButtonState(state)
 	end
 	function handle:GetButton()
 		return state.Button
@@ -744,12 +806,14 @@ UserInputService.InputChanged:Connect(function(input)
 	nextPosition = clampButtonPosition(activeDrag.State.Button, nextPosition)
 	sessionPositions[activeDrag.State.Id] = nextPosition
 	activeDrag.State.Button.Position = nextPosition
+	applyButtonState(activeDrag.State)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
 	if activeDrag and isTouchPointer(input) then
 		finishDrag()
 	end
+	finishControlInput(input)
 end)
 
 UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(function()

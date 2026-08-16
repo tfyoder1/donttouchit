@@ -25,6 +25,7 @@ local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
 local START_PRELOAD_ROOM_ATTRIBUTE = "DontTouchItStartPreloadRoomId"
 local TITLE_SPLASH_ADVANCE_ATTRIBUTE = "DontTouchItTitleSplashAdvanceNonce"
 local TITLE_SPLASH_READY_ATTRIBUTE = "DontTouchItTitleSplashMenuReady"
+local TITLE_SPLASH_FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
 local DEFAULT_UI_DISPLAY_ORDER = 10
@@ -67,6 +68,11 @@ local function isStartOverlayDismissedForDevSession()
 	end
 
 	return gui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true or playerGui:GetAttribute(DEV_DISMISS_START_ATTRIBUTE) == true
+end
+
+local function isTitleSplashVisible()
+	local splashGui = playerGui:FindFirstChild("DontTouchItTitleSplash")
+	return splashGui and splashGui:IsA("ScreenGui") and splashGui.Enabled ~= false
 end
 
 local function normalizeSoundId(soundId)
@@ -2213,6 +2219,15 @@ local function renderStartOptions(payload)
 
 	lastStartOptionsPayload = payload
 
+	if isTitleSplashVisible() then
+		pendingStartOptions = payload
+		setStartOverlayVisible(false)
+		continueButton.Modal = false
+		restartButton.Modal = false
+		setOverlayMouse(false)
+		return
+	end
+
 	if isStartOverlayDismissedForDevSession() then
 		pendingStartOptions = nil
 		setStartOverlayVisible(false)
@@ -2359,6 +2374,30 @@ local function handleTitleSplashAdvanceChanged()
 	playerGui:SetAttribute(TITLE_SPLASH_READY_ATTRIBUTE, true)
 end
 
+local lastHandledTitleSplashFinishedNonce = 0
+
+local function restoreHudAfterTitleSplash()
+	local nonce = tonumber(playerGui:GetAttribute(TITLE_SPLASH_FINISHED_ATTRIBUTE)) or 0
+	if nonce <= lastHandledTitleSplashFinishedNonce then
+		return
+	end
+
+	lastHandledTitleSplashFinishedNonce = nonce
+	gui.Enabled = true
+	startOverlay.Visible = false
+	gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
+	startBlur.Enabled = false
+	startBlur.Size = 0
+	gui:SetAttribute("GameplayHudSuppressed", false)
+	if setStartPhase then
+		setStartPhase("Hidden")
+	end
+	continueButton.Modal = false
+	restartButton.Modal = false
+	setOverlayMouse(false)
+	applyHudVisibility()
+end
+
 local function queueStartOptionsFallback(delaySeconds)
 	task.delay(delaySeconds, renderFallbackStartOptions)
 end
@@ -2436,6 +2475,8 @@ playerGui:GetAttributeChangedSignal(DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE):Con
 task.defer(handleShowTitleSequenceNonceChanged)
 playerGui:GetAttributeChangedSignal(TITLE_SPLASH_ADVANCE_ATTRIBUTE):Connect(handleTitleSplashAdvanceChanged)
 task.defer(handleTitleSplashAdvanceChanged)
+playerGui:GetAttributeChangedSignal(TITLE_SPLASH_FINISHED_ATTRIBUTE):Connect(restoreHudAfterTitleSplash)
+task.defer(restoreHudAfterTitleSplash)
 
 local function getSparklePart(target)
 	if not target then

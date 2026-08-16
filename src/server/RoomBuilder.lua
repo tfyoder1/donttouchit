@@ -16,6 +16,8 @@ local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(93, 217, 255),
 }
 local SNACK_DONUT_ASSET_ID = 13742217239
+local SNACK_DONUT_MESH_ID = "rbxassetid://13582448483"
+local SNACK_DONUT_TEXTURE_ID = "rbxassetid://13582452879"
 local SLEEPING_REPLACEMENT_TENT_ASSET_ID = 140322654375696
 local MAIN_HALLWAY_WALL_TEXTURE_ID = "rbxassetid://12813020091"
 local ATOMIC_COLORS = {
@@ -3738,147 +3740,35 @@ local function makeSnackDonutMount(parent, wallCFrame)
 	return mount
 end
 
-local function makeFallbackSnackWallDonut(parent, center, wallCFrame)
+local function makeStaticSnackWallDonut(parent, wallCFrame)
 	local donut = makeModel(parent, "SnackLabWallDonut")
-	local frontOffset = Vector3.new(0, 0, -0.36)
-	local pastryColor = Color3.fromRGB(191, 111, 55)
-	local frostingColor = Color3.fromRGB(255, 102, 176)
-
 	makeSnackDonutMount(donut, wallCFrame)
 
-	local pastry
-	for segmentIndex = 1, 24 do
-		local angle = math.rad((segmentIndex - 1) * 15)
-		local pos = center + Vector3.new(math.cos(angle) * 2.52, math.sin(angle) * 2.52, 0)
-		local segment = createPart(
-			donut,
-			"DonutPastrySegment" .. segmentIndex,
-			Vector3.new(1.48, 1.48, 0.72),
-			CFrame.new(pos),
-			pastryColor,
-			Enum.Material.SmoothPlastic
-		)
-		segment.Shape = Enum.PartType.Ball
-		segment.CanCollide = false
-		segment:SetAttribute("BaseCanCollide", false)
-		if not pastry then
-			pastry = segment
-		end
-	end
-
-	for frostingIndex = 1, 24 do
-		local angle = math.rad((frostingIndex - 1) * 15)
-		local wobble = 1 + math.sin(frostingIndex * 1.7) * 0.08
-		local pos = center + Vector3.new(math.cos(angle) * 2.28 * wobble, math.sin(angle) * 2.28 * wobble, 0) + frontOffset
-		local frosting = createPart(
-			donut,
-			"DonutFrostingSegment" .. frostingIndex,
-			Vector3.new(1.26, 1.26, 0.42),
-			CFrame.new(pos),
-			frostingColor,
-			Enum.Material.Neon
-		)
-		frosting.Shape = Enum.PartType.Ball
-		frosting.CanCollide = false
-		frosting:SetAttribute("BaseCanCollide", false)
-	end
-
-	local hole = createPart(
+	local visual = makeDecorPart(
 		donut,
-		"DonutHole",
-		Vector3.new(0.18, 2.32, 2.32),
-		wallCFrame * CFrame.new(0, 0, -0.52) * CFrame.Angles(0, math.rad(90), 0),
-		Color3.fromRGB(186, 187, 174),
+		"ObbySpinningDonutVisual",
+		Vector3.new(1, 1, 1),
+		wallCFrame * CFrame.new(0, 0, -0.58) * CFrame.Angles(math.rad(90), 0, math.rad(180)),
+		Color3.fromRGB(255, 255, 255),
 		Enum.Material.SmoothPlastic
 	)
-	hole.Shape = Enum.PartType.Cylinder
-	hole.CanCollide = false
-	hole:SetAttribute("BaseCanCollide", false)
+	visual.CanQuery = false
+	visual.CanTouch = false
+	visual:SetAttribute("BaseCanQuery", false)
+	visual:SetAttribute("BaseCanTouch", false)
+	visual:SetAttribute("SourceAssetId", SNACK_DONUT_ASSET_ID)
+	visual:SetAttribute("SanitizedDecoration", true)
 
-	local sprinkleColors = {
-		Color3.fromRGB(255, 232, 92),
-		Color3.fromRGB(119, 255, 203),
-		Color3.fromRGB(150, 112, 255),
-		Color3.fromRGB(255, 255, 255),
-		Color3.fromRGB(255, 134, 58),
-	}
-	for sprinkleIndex = 1, 18 do
-		local angle = math.rad(sprinkleIndex * 47)
-		local radius = 1.55 + (sprinkleIndex % 4) * 0.34
-		local pos = center + Vector3.new(math.cos(angle) * radius, math.sin(angle) * radius, -0.76)
-		local sprinkle = createPart(
-			donut,
-			"DonutSprinkle" .. sprinkleIndex,
-			Vector3.new(0.12, 0.58, 0.1),
-			CFrame.new(pos) * CFrame.Angles(0, 0, angle + math.rad(72)),
-			sprinkleColors[((sprinkleIndex - 1) % #sprinkleColors) + 1],
-			Enum.Material.Neon
-		)
-		sprinkle.CanCollide = false
-		sprinkle:SetAttribute("BaseCanCollide", false)
-	end
+	local mesh = Instance.new("SpecialMesh")
+	mesh.Name = "ObbySpinningDonutMesh"
+	mesh.MeshType = Enum.MeshType.FileMesh
+	mesh.MeshId = SNACK_DONUT_MESH_ID
+	mesh.TextureId = SNACK_DONUT_TEXTURE_ID
+	mesh.Scale = Vector3.new(4.48, 4.48, 4.48)
+	mesh.Parent = visual
+	mark(mesh)
 
-	donut.PrimaryPart = pastry
-	return donut
-end
-
-local function prepareSnackDonutAssetModel(model)
-	local visualParts = {}
-
-	for _, descendant in ipairs(model:GetDescendants()) do
-		if descendant:IsA("LuaSourceContainer") or descendant:IsA("Constraint") or descendant:IsA("BodyMover") then
-			descendant:Destroy()
-		elseif descendant:IsA("BasePart") then
-			descendant.Anchored = true
-			descendant.CanCollide = false
-			descendant.CanQuery = false
-			descendant.CanTouch = false
-			descendant:SetAttribute("BaseCanCollide", false)
-			descendant:SetAttribute("BaseCanQuery", false)
-			descendant:SetAttribute("BaseCanTouch", false)
-			table.insert(visualParts, descendant)
-		end
-	end
-
-	return visualParts
-end
-
-local function makeAssetSnackWallDonut(parent, wallCFrame)
-	local success, assetModel = pcall(AssetService.LoadAssetAsync, AssetService, SNACK_DONUT_ASSET_ID)
-	if not success or not assetModel then
-		warn(("[DON'T TOUCH IT] Could not load Snack Lab donut asset %d: %s"):format(SNACK_DONUT_ASSET_ID, tostring(assetModel)))
-		return nil
-	end
-
-	local donut = makeModel(parent, "SnackLabWallDonut")
-	makeSnackDonutMount(donut, wallCFrame)
-
-	assetModel.Name = "ObbySpinningDonutAsset"
-	assetModel.Parent = donut
-
-	local visualParts = prepareSnackDonutAssetModel(assetModel)
-	if #visualParts == 0 then
-		warn(("[DON'T TOUCH IT] Snack Lab donut asset %d loaded without visible parts."):format(SNACK_DONUT_ASSET_ID))
-		donut:Destroy()
-		return nil
-	end
-
-	local _, currentSize = assetModel:GetBoundingBox()
-	local largestAxis = math.max(currentSize.X, currentSize.Y, currentSize.Z)
-	if largestAxis > 0 then
-		assetModel:ScaleTo(6.4 / largestAxis)
-	end
-
-	local targetCFrame = wallCFrame * CFrame.new(0, 0, -0.58) * CFrame.Angles(math.rad(90), 0, 0)
-	assetModel:PivotTo(targetCFrame)
-	local boundsCFrame = assetModel:GetBoundingBox()
-	assetModel:PivotTo(assetModel:GetPivot() + (targetCFrame.Position - boundsCFrame.Position))
-
-	for _, part in ipairs(visualParts) do
-		mark(part)
-	end
-
-	donut.PrimaryPart = visualParts[1]
+	donut.PrimaryPart = visual
 	return donut
 end
 
@@ -3896,10 +3786,7 @@ end
 local function makeSnackWallDonut(parent)
 	local center = SNACK_LAB_ORIGIN + Vector3.new(-7.8, 8.05, Constants.Room.Depth / 2 - 0.74)
 	local wallCFrame = CFrame.new(center)
-	local donut = makeAssetSnackWallDonut(parent, wallCFrame)
-	if not donut then
-		donut = makeFallbackSnackWallDonut(parent, center, wallCFrame)
-	end
+	local donut = makeStaticSnackWallDonut(parent, wallCFrame)
 
 	addSnackDonutHitbox(donut, wallCFrame)
 	return donut

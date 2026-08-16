@@ -84,6 +84,7 @@ function DiscoveryService.new()
 	self.teleportKeyByUserId = {}
 	self.secretDoorRevealsByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
+	self.continueRoomByUserId = {}
 	self.devOverrideByUserId = {}
 	self.freshRunByUserId = {}
 	self.hasSavedDataByUserId = {}
@@ -137,6 +138,7 @@ function DiscoveryService:Initialize()
 		self.teleportKeyByUserId[player.UserId] = nil
 		self.secretDoorRevealsByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
+		self.continueRoomByUserId[player.UserId] = nil
 		self.devOverrideByUserId[player.UserId] = nil
 		self.freshRunByUserId[player.UserId] = nil
 		self.hasSavedDataByUserId[player.UserId] = nil
@@ -205,6 +207,10 @@ function DiscoveryService:_ensurePlayer(player)
 		self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	end
 
+	if not self.continueRoomByUserId[player.UserId] then
+		self.continueRoomByUserId[player.UserId] = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID
+	end
+
 	if self.hasSavedDataByUserId[player.UserId] == nil then
 		self.hasSavedDataByUserId[player.UserId] = false
 	end
@@ -227,6 +233,7 @@ function DiscoveryService:_captureRuntimeState(player)
 		HasTeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 		SecretDoorRevealsByRoomId = cloneDictionary(self.secretDoorRevealsByUserId[player.UserId]),
 		LastUnlockedRoomId = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID,
+		ContinueRoomId = self.continueRoomByUserId[player.UserId] or self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID,
 	}
 end
 
@@ -240,6 +247,7 @@ function DiscoveryService:_applyRuntimeState(player, state)
 	self.teleportKeyByUserId[player.UserId] = state.HasTeleportKey == true
 	self.secretDoorRevealsByUserId[player.UserId] = cloneDictionary(state.SecretDoorRevealsByRoomId)
 	self.lastUnlockedRoomByUserId[player.UserId] = state.LastUnlockedRoomId or DEFAULT_ROOM_ID
+	self.continueRoomByUserId[player.UserId] = state.ContinueRoomId or state.LastUnlockedRoomId or DEFAULT_ROOM_ID
 end
 
 function DiscoveryService:IsDevOverrideActive(player)
@@ -449,6 +457,7 @@ function DiscoveryService:_applyFreshRuntimeProgress(player, options)
 		then cloneDictionary(realState.SecretDoorRevealsByRoomId)
 		else {}
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
+	self.continueRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 
 	self:_syncSecretKeyTools(player)
 	self:_sendSnapshot(player)
@@ -499,15 +508,19 @@ function DiscoveryService:GetSavedProgressSummary(player)
 		end
 	end
 
-	local lastRoomId = realState.LastUnlockedRoomId or DEFAULT_ROOM_ID
-	local lastRoom = Constants.GetRoom(lastRoomId)
+	local lastUnlockedRoomId = realState.LastUnlockedRoomId or DEFAULT_ROOM_ID
+	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
+	local continueRoomId = realState.ContinueRoomId or lastUnlockedRoomId
+	local continueRoom = Constants.GetRoom(continueRoomId)
 	return {
 		Count = count,
 		Total = Constants.TotalDiscoveries,
 		Hints = realState.Hints or 0,
 		Clues = realState.Clues or 0,
-		LastUnlockedRoomId = lastRoomId,
-		LastUnlockedRoomName = lastRoom and lastRoom.Name or "TV Room",
+		LastUnlockedRoomId = lastUnlockedRoomId,
+		LastUnlockedRoomName = lastUnlockedRoom and lastUnlockedRoom.Name or "TV Room",
+		ContinueRoomId = continueRoomId,
+		ContinueRoomName = continueRoom and continueRoom.Name or "TV Room",
 	}
 end
 
@@ -533,6 +546,7 @@ function DiscoveryService:_loadPlayer(player)
 	self.teleportKeyByUserId[player.UserId] = false
 	self.secretDoorRevealsByUserId[player.UserId] = {}
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
+	self.continueRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	self.hasSavedDataByUserId[player.UserId] = false
 	self.loadedByUserId[player.UserId] = false
 
@@ -622,11 +636,23 @@ function DiscoveryService:_loadPlayer(player)
 		self.lastUnlockedRoomByUserId[player.UserId] = data.LastUnlockedRoomId
 	end
 
+	local loadedContinueRoomId = nil
+	if typeof(data.ContinueRoomId) == "string" and Constants.GetRoom(data.ContinueRoomId) then
+		loadedContinueRoomId = data.ContinueRoomId
+	elseif typeof(data.LastUnlockedRoomId) == "string" and Constants.GetRoom(data.LastUnlockedRoomId) then
+		loadedContinueRoomId = data.LastUnlockedRoomId
+	end
+
 	if Constants.Discoveries.LibraryTeleportKey and self.discoveryByUserId[player.UserId][Constants.Discoveries.LibraryTeleportKey.Id] then
 		self.teleportKeyByUserId[player.UserId] = true
 	end
 
 	self:_refreshLastUnlockedRoom(player, false)
+	if loadedContinueRoomId and self:IsRoomUnlocked(player, loadedContinueRoomId) then
+		self.continueRoomByUserId[player.UserId] = loadedContinueRoomId
+	else
+		self.continueRoomByUserId[player.UserId] = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID
+	end
 	self.loadedByUserId[player.UserId] = true
 end
 
@@ -651,6 +677,7 @@ function DiscoveryService:_buildSaveData(player)
 			SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
 		},
 		LastUnlockedRoomId = self:GetLastUnlockedRoomId(player),
+		ContinueRoomId = self:GetContinueRoomId(player),
 	}
 end
 
@@ -847,6 +874,41 @@ end
 function DiscoveryService:GetLastUnlockedRoomId(player)
 	self:_refreshLastUnlockedRoom(player, false)
 	return self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID
+end
+
+function DiscoveryService:GetContinueRoomId(player)
+	self:_ensurePlayer(player)
+
+	local continueRoomId = self.continueRoomByUserId[player.UserId]
+	if typeof(continueRoomId) == "string" and Constants.GetRoom(continueRoomId) and self:IsRoomUnlocked(player, continueRoomId) then
+		return continueRoomId
+	end
+
+	local fallbackRoomId = self:GetLastUnlockedRoomId(player)
+	self.continueRoomByUserId[player.UserId] = fallbackRoomId
+	return fallbackRoomId
+end
+
+function DiscoveryService:SetContinueRoomId(player, roomId, shouldSave)
+	if not player or not player.Parent or typeof(roomId) ~= "string" or not Constants.GetRoom(roomId) then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	if not self:IsRoomUnlocked(player, roomId) then
+		return false
+	end
+
+	if self.continueRoomByUserId[player.UserId] == roomId then
+		return false
+	end
+
+	self.continueRoomByUserId[player.UserId] = roomId
+	if shouldSave then
+		self:_queueSave(player)
+	end
+
+	return true
 end
 
 function DiscoveryService:IsRoomComplete(player, roomId)

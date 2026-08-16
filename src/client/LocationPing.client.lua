@@ -280,7 +280,7 @@ local function setupTouchPingButton()
 		Desktop = "G",
 		Xbox = "D-pad left",
 		Touch = "Ping button",
-		Position = UDim2.new(1, -170, 1, -176),
+		Position = UDim2.new(0, 742, 0, 247),
 		TextColor = Color3.fromRGB(216, 245, 255),
 		StrokeColor = Color3.fromRGB(102, 217, 255),
 		OnActivated = sendPing,

@@ -1,16 +1,19 @@
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 
 local SPLASH_GUI_NAME = "DontTouchItTitleSplash"
-local ADVANCE_ATTRIBUTE = "DontTouchItTitleSplashAdvanceNonce"
-local READY_ATTRIBUTE = "DontTouchItTitleSplashMenuReady"
+local TITLE_MUSIC_NAME = "DontTouchItTitleSplashMusic"
+local FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local sessionStartRemote = nil
 
 local splashGui = Instance.new("ScreenGui")
@@ -28,7 +31,7 @@ local root = Instance.new("Frame")
 root.Name = "SplashRoot"
 root.Active = true
 root.BackgroundColor3 = Color3.fromRGB(7, 9, 13)
-root.BackgroundTransparency = 0.1
+root.BackgroundTransparency = 0.25
 root.BorderSizePixel = 0
 root.Size = UDim2.fromScale(1, 1)
 root.Parent = splashGui
@@ -163,11 +166,75 @@ end
 
 local continueButton = makeMenuButton("ContinueButton", "Continue", Color3.fromRGB(61, 217, 132))
 local restartButton = makeMenuButton("RestartButton", "Start Over", Color3.fromRGB(84, 154, 255))
+local continueButtonColor = continueButton.BackgroundColor3
+local restartButtonColor = restartButton.BackgroundColor3
+local cancelButtonColor = Color3.fromRGB(82, 91, 108)
+local restartConfirmColor = Color3.fromRGB(255, 183, 77)
+local promptText = prompt.Text
+local restartWarningText = "This will lose all progress for the current session.\nOverall accomplishments are still tracked."
 
 local advanced = false
 local choiceSent = false
+local restartConfirming = false
 local topbarRestoreRequested = false
 local splashBlur = nil
+local titleMusic = nil
+local titleMusicTween = nil
+local suppressedGuiStates = {}
+local suppressChildAddedConnection = nil
+local splashFinishedNotified = false
+local titleCameraState = nil
+local titleCameraToken = 0
+
+local SUPPRESSED_PROJECT_GUIS = {
+	DontTouchItUI = true,
+	DontTouchItDevTools = true,
+	DontTouchItTouchControls = true,
+	DontTouchItControlOptions = true,
+	TouchGui = true,
+}
+
+local TITLE_CAMERA_RENDER_STEP = "DontTouchItTitleSplashCameraPan"
+local TITLE_CAMERA_FIELD_OF_VIEW = 54
+local TITLE_CAMERA_WAYPOINTS = {
+	{
+		CFrame = CFrame.new(Vector3.new(-76, 18, 68), Vector3.new(-48, 5, 45)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(-16, 14, 30), Vector3.new(0, 5, 0)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(108, 13, -46), Vector3.new(82, 4.4, -44)),
+		Duration = 7,
+	},
+	{
+		CFrame = CFrame.new(Vector3.new(50, 16, -130), Vector3.new(82, 5, -122)),
+		Duration = 7,
+	},
+}
+
+local function normalizeSoundId(soundId)
+	if typeof(soundId) == "number" then
+		return "rbxassetid://" .. tostring(soundId)
+	end
+
+	if typeof(soundId) ~= "string" or soundId == "" then
+		return nil
+	end
+
+	if string.match(soundId, "^%d+$") then
+		return "rbxassetid://" .. soundId
+	end
+
+	return soundId
+end
+
+local function getIntroMusicId()
+	local music = Constants.AudioAssets and Constants.AudioAssets.Music
+	return music and normalizeSoundId(music.IntroMusicId)
+end
 
 local function setTopbarEnabled(enabled)
 	pcall(function()
@@ -233,6 +300,249 @@ local function restoreSplashBlur()
 	end)
 end
 
+local function suppressProjectGui(instance)
+	if instance == splashGui or not instance:IsA("ScreenGui") then
+		return
+	end
+
+	if not SUPPRESSED_PROJECT_GUIS[instance.Name] then
+		return
+	end
+
+	if suppressedGuiStates[instance] == nil then
+		suppressedGuiStates[instance] = instance.Enabled
+	end
+	instance.Enabled = false
+end
+
+local function suppressProjectGuisDuringSplash()
+	for _, child in ipairs(playerGui:GetChildren()) do
+		suppressProjectGui(child)
+	end
+
+	suppressChildAddedConnection = playerGui.ChildAdded:Connect(function(child)
+		suppressProjectGui(child)
+	end)
+end
+
+local function restoreProjectGuis()
+	if suppressChildAddedConnection then
+		suppressChildAddedConnection:Disconnect()
+		suppressChildAddedConnection = nil
+	end
+
+	for gui, wasEnabled in pairs(suppressedGuiStates) do
+		if gui.Parent then
+			gui.Enabled = wasEnabled
+		end
+	end
+	table.clear(suppressedGuiStates)
+end
+
+local function notifyTitleSplashFinished()
+	if splashFinishedNotified then
+		return
+	end
+
+	splashFinishedNotified = true
+	playerGui:SetAttribute(FINISHED_ATTRIBUTE, (tonumber(playerGui:GetAttribute(FINISHED_ATTRIBUTE)) or 0) + 1)
+end
+
+local function finishSplashCleanup()
+	restoreProjectGuis()
+	notifyTitleSplashFinished()
+end
+
+local function stopTitleMusic(fadeSeconds)
+	local sound = titleMusic
+	titleMusic = nil
+
+	if titleMusicTween then
+		titleMusicTween:Cancel()
+		titleMusicTween = nil
+	end
+
+	if not sound or not sound.Parent then
+		return
+	end
+
+	fadeSeconds = math.max(0, tonumber(fadeSeconds) or 0)
+	if fadeSeconds <= 0 then
+		sound:Stop()
+		sound:Destroy()
+		return
+	end
+
+	titleMusicTween = TweenService:Create(
+		sound,
+		TweenInfo.new(fadeSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Volume = 0 }
+	)
+	titleMusicTween:Play()
+	titleMusicTween.Completed:Connect(function()
+		if sound.Parent then
+			sound:Stop()
+			sound:Destroy()
+		end
+	end)
+end
+
+local function startTitleMusic()
+	local soundId = getIntroMusicId()
+	if not soundId then
+		return
+	end
+
+	local existing = SoundService:FindFirstChild(TITLE_MUSIC_NAME)
+	local sound = if existing and existing:IsA("Sound") then existing else nil
+	if not sound then
+		sound = Instance.new("Sound")
+		sound.Name = TITLE_MUSIC_NAME
+		sound.SoundId = soundId
+		sound.Looped = true
+		sound.Volume = 0
+		sound.Parent = SoundService
+	elseif sound.SoundId == "" then
+		sound.SoundId = soundId
+	end
+
+	sound.Looped = true
+	if not sound.IsPlaying then
+		sound.Volume = 0
+		sound:Play()
+	end
+	titleMusic = sound
+
+	if titleMusicTween then
+		titleMusicTween:Cancel()
+		titleMusicTween = nil
+	end
+
+	titleMusicTween = TweenService:Create(
+		sound,
+		TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Volume = 0.28 }
+	)
+	titleMusicTween:Play()
+end
+
+local function captureTitleCameraState(camera)
+	return {
+		Camera = camera,
+		CameraType = camera.CameraType,
+		CameraSubject = camera.CameraSubject,
+		FieldOfView = camera.FieldOfView,
+		CFrame = camera.CFrame,
+	}
+end
+
+local function smoothCameraAlpha(alpha)
+	alpha = math.clamp(alpha, 0, 1)
+	return alpha * alpha * (3 - 2 * alpha)
+end
+
+local function getTitleCameraCFrame(elapsed)
+	local totalDuration = 0
+	for _, waypoint in ipairs(TITLE_CAMERA_WAYPOINTS) do
+		totalDuration += waypoint.Duration or 7
+	end
+
+	if totalDuration <= 0 then
+		return TITLE_CAMERA_WAYPOINTS[1].CFrame
+	end
+
+	local timeInLoop = elapsed % totalDuration
+	for index, waypoint in ipairs(TITLE_CAMERA_WAYPOINTS) do
+		local segmentDuration = waypoint.Duration or 7
+		if timeInLoop <= segmentDuration then
+			local nextWaypoint = TITLE_CAMERA_WAYPOINTS[(index % #TITLE_CAMERA_WAYPOINTS) + 1]
+			local alpha = smoothCameraAlpha(timeInLoop / segmentDuration)
+			return waypoint.CFrame:Lerp(nextWaypoint.CFrame, alpha)
+		end
+
+		timeInLoop -= segmentDuration
+	end
+
+	return TITLE_CAMERA_WAYPOINTS[#TITLE_CAMERA_WAYPOINTS].CFrame
+end
+
+local function stopTitleCameraPan()
+	local state = titleCameraState
+	titleCameraToken += 1
+	titleCameraState = nil
+	RunService:UnbindFromRenderStep(TITLE_CAMERA_RENDER_STEP)
+
+	local camera = workspace.CurrentCamera
+	if not camera or not state then
+		return
+	end
+
+	camera.CameraType = state.CameraType or Enum.CameraType.Custom
+	camera.CameraSubject = state.CameraSubject
+	camera.FieldOfView = state.FieldOfView or 70
+	if state.CFrame then
+		camera.CFrame = state.CFrame
+	end
+end
+
+local function restoreGameplayCamera()
+	local function apply()
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		camera.CameraType = Enum.CameraType.Custom
+		if humanoid then
+			camera.CameraSubject = humanoid
+		end
+		camera.FieldOfView = 70
+	end
+
+	apply()
+	task.defer(apply)
+	task.delay(0.2, apply)
+	task.delay(0.75, apply)
+end
+
+local function startTitleCameraPan()
+	if titleCameraState then
+		return
+	end
+
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	titleCameraToken += 1
+	local token = titleCameraToken
+	titleCameraState = captureTitleCameraState(camera)
+	local startedAt = os.clock()
+
+	RunService:BindToRenderStep(TITLE_CAMERA_RENDER_STEP, Enum.RenderPriority.Camera.Value + 30, function()
+		if token ~= titleCameraToken or not splashGui.Parent then
+			return
+		end
+
+		local activeCamera = workspace.CurrentCamera
+		if not activeCamera then
+			return
+		end
+
+		if not titleCameraState or titleCameraState.Camera ~= activeCamera then
+			titleCameraState = captureTitleCameraState(activeCamera)
+		end
+
+		activeCamera.CameraType = Enum.CameraType.Scriptable
+		activeCamera.CameraSubject = nil
+		activeCamera.FieldOfView = TITLE_CAMERA_FIELD_OF_VIEW
+		activeCamera.CFrame = getTitleCameraCFrame(os.clock() - startedAt)
+	end)
+end
+
 local function applyLayout()
 	local camera = workspace.CurrentCamera
 	local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
@@ -286,7 +596,10 @@ task.spawn(function()
 	hideTopbarDuringSplash()
 end)
 
+suppressProjectGuisDuringSplash()
+startTitleMusic()
 enableSplashBlur()
+startTitleCameraPan()
 
 task.spawn(function()
 	while splashGui.Parent and not advanced do
@@ -322,6 +635,9 @@ local function fadeAndDestroy()
 
 	restoreTopbar()
 	restoreSplashBlur()
+	stopTitleCameraPan()
+	restoreGameplayCamera()
+	stopTitleMusic(0.55)
 	local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(root, tweenInfo, { BackgroundTransparency = 1 }):Play()
 	TweenService:Create(glowLine, tweenInfo, { BackgroundTransparency = 1 }):Play()
@@ -340,7 +656,44 @@ local function fadeAndDestroy()
 		if splashGui.Parent then
 			splashGui:Destroy()
 		end
+		finishSplashCleanup()
 	end)
+	task.delay(0.6, function()
+		if not choiceSent or splashFinishedNotified then
+			return
+		end
+		if splashGui.Parent then
+			splashGui:Destroy()
+		end
+		finishSplashCleanup()
+	end)
+end
+
+local function showStartChoices()
+	restartConfirming = false
+	prompt.Text = promptText
+	prompt.Visible = false
+	continueButton.Text = "Continue"
+	continueButton.BackgroundColor3 = continueButtonColor
+	restartButton.Text = "Start Over"
+	restartButton.BackgroundColor3 = restartButtonColor
+	applyLayout()
+	menuFrame.Visible = true
+end
+
+local function showRestartConfirmation()
+	restartConfirming = true
+	prompt.Text = restartWarningText
+	prompt.TextTransparency = 0
+	prompt.Visible = true
+	prompt.Position = UDim2.fromScale(0.5, 0.66)
+	prompt.Size = UDim2.new(0.86, 0, 0, 58)
+	menuFrame.Position = UDim2.fromScale(0.5, 0.84)
+	continueButton.Text = "Cancel"
+	continueButton.BackgroundColor3 = cancelButtonColor
+	restartButton.Text = "Start Over"
+	restartButton.BackgroundColor3 = restartConfirmColor
+	menuFrame.Visible = true
 end
 
 local function requestStartMenu()
@@ -349,10 +702,7 @@ local function requestStartMenu()
 	end
 
 	advanced = true
-	prompt.Visible = false
-	menuFrame.Visible = true
-	playerGui:SetAttribute(READY_ATTRIBUTE, false)
-	playerGui:SetAttribute(ADVANCE_ATTRIBUTE, (tonumber(playerGui:GetAttribute(ADVANCE_ATTRIBUTE)) or 0) + 1)
+	showStartChoices()
 end
 
 local function sendStartChoice(action)
@@ -379,10 +729,20 @@ local function sendStartChoice(action)
 end
 
 continueButton.Activated:Connect(function()
+	if restartConfirming then
+		showStartChoices()
+		return
+	end
+
 	sendStartChoice("Resume")
 end)
 
 restartButton.Activated:Connect(function()
+	if not restartConfirming then
+		showRestartConfirmation()
+		return
+	end
+
 	sendStartChoice("Restart")
 end)
 
@@ -409,14 +769,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-playerGui:GetAttributeChangedSignal(READY_ATTRIBUTE):Connect(function()
-	if advanced and playerGui:GetAttribute(READY_ATTRIBUTE) == true then
-		fadeAndDestroy()
-	end
-end)
-
 applyLayout()
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(applyLayout)
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	applyLayout()
+	startTitleCameraPan()
+end)
 if workspace.CurrentCamera then
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(applyLayout)
 end

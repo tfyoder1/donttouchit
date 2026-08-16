@@ -231,8 +231,15 @@ local function isStartOverlayVisible()
 	return overlay and overlay:IsA("GuiObject") and overlay.Visible == true
 end
 
+local function isTitleSplashVisible()
+	local splashGui = playerGui:FindFirstChild("DontTouchItTitleSplash")
+	return splashGui and splashGui:IsA("ScreenGui") and splashGui.Enabled ~= false
+end
+
 local function shouldSuppressAmbience()
-	return playerGui:GetAttribute("DontTouchItPrologueActive") == true or isStartOverlayVisible()
+	return playerGui:GetAttribute("DontTouchItPrologueActive") == true
+		or isStartOverlayVisible()
+		or isTitleSplashVisible()
 end
 
 local function fadeSound(sound, targetVolume, fadeSeconds, destroyWhenDone)
