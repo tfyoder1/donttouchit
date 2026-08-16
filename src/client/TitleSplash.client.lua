@@ -479,9 +479,6 @@ local function stopTitleCameraPan()
 	camera.CameraType = state.CameraType or Enum.CameraType.Custom
 	camera.CameraSubject = state.CameraSubject
 	camera.FieldOfView = state.FieldOfView or 70
-	if state.CFrame then
-		camera.CFrame = state.CFrame
-	end
 end
 
 local function restoreGameplayCamera()

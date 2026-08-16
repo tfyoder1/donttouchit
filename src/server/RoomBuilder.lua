@@ -2777,7 +2777,7 @@ local function makeSleepingQuartersRoom(roomFolder)
 		local lockerPosition = origin + Vector3.new(sideSign * 15.75, 1.04, zOffset - 2.12)
 		local lockerCFrame = CFrame.new(lockerPosition, origin + Vector3.new(0, 1.04, zOffset - 2.12))
 		local lockerColor = if lockerIndex % 2 == 0 then Color3.fromRGB(70, 91, 111) else Color3.fromRGB(84, 76, 104)
-		local lockerOpenCFrame = lockerCFrame * CFrame.new(0, 0.58, -0.46) * CFrame.Angles(math.rad(-64), 0, 0)
+		local lockerOpenCFrame = lockerCFrame * CFrame.new(0, 0.58, 0.46) * CFrame.Angles(math.rad(64), 0, 0)
 		local lockerOpenColor = Color3.fromRGB(119, 255, 203)
 		local tray = createPart(
 			bunk,

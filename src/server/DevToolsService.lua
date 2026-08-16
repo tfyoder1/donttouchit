@@ -419,9 +419,9 @@ function DevToolsService:_getUserManagementState(player, selectedUserId, include
 	}
 end
 
-function DevToolsService:_broadcastUserManagement()
+function DevToolsService:_broadcastUserManagement(exceptPlayer)
 	for _, player in ipairs(Players:GetPlayers()) do
-		if self:IsAuthorized(player) then
+		if player ~= exceptPlayer and self:IsAuthorized(player) then
 			self.remote:FireClient(player, {
 				Type = "UserManagement",
 				UserManagement = self:_getUserManagementState(player),
@@ -619,7 +619,7 @@ function DevToolsService:_handleUserManagementRequest(player, payload)
 		return false
 	end
 
-	self:_broadcastUserManagement()
+	self:_broadcastUserManagement(player)
 	return true
 end
 

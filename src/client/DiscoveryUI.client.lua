@@ -1183,12 +1183,15 @@ local startCinematicButton = nil
 local function setStartOverlayVisible(visible)
 	startOverlay.Visible = visible
 	startOverlay.Active = visible
+	startOverlay.Selectable = visible
 	if startCinematicLayer then
 		startCinematicLayer.Visible = visible and startOverlayPhase == "Title"
 	end
 	if startCinematicButton then
+		startCinematicButton.Visible = visible and startOverlayPhase == "Title"
 		startCinematicButton.Active = visible and startOverlayPhase == "Title"
 		startCinematicButton.Modal = visible and startOverlayPhase == "Title"
+		startCinematicButton.Selectable = visible and startOverlayPhase == "Title"
 	end
 	gui.DisplayOrder = visible and START_OVERLAY_DISPLAY_ORDER or DEFAULT_UI_DISPLAY_ORDER
 	startBlur.Enabled = visible
@@ -2402,8 +2405,13 @@ local function restoreHudAfterTitleSplash()
 	gui.Enabled = true
 	setStartOverlayVisible(false)
 	startOverlay.Active = false
+	startOverlay.Selectable = false
+	startOverlay.Visible = false
+	startCinematicLayer.Visible = false
+	startCinematicButton.Visible = false
 	startCinematicButton.Active = false
 	startCinematicButton.Modal = false
+	startCinematicButton.Selectable = false
 	gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
 	startBlur.Enabled = false
 	startBlur.Size = 0
@@ -2415,6 +2423,34 @@ local function restoreHudAfterTitleSplash()
 	restartButton.Modal = false
 	setOverlayMouse(false)
 	applyHudVisibility()
+	task.defer(function()
+		gui.Enabled = true
+		startOverlay.Visible = false
+		startOverlay.Active = false
+		startOverlay.Selectable = false
+		startCinematicLayer.Visible = false
+		startCinematicButton.Visible = false
+		startCinematicButton.Active = false
+		startCinematicButton.Modal = false
+		startCinematicButton.Selectable = false
+		gui:SetAttribute("GameplayHudSuppressed", false)
+		setOverlayMouse(false)
+		applyHudVisibility()
+	end)
+	task.delay(1, function()
+		gui.Enabled = true
+		startOverlay.Visible = false
+		startOverlay.Active = false
+		startOverlay.Selectable = false
+		startCinematicLayer.Visible = false
+		startCinematicButton.Visible = false
+		startCinematicButton.Active = false
+		startCinematicButton.Modal = false
+		startCinematicButton.Selectable = false
+		gui:SetAttribute("GameplayHudSuppressed", false)
+		setOverlayMouse(false)
+		applyHudVisibility()
+	end)
 end
 
 local function queueStartOptionsFallback(delaySeconds)

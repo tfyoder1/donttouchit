@@ -38,6 +38,7 @@ local cosmicAttributeSoundId = nil
 local cosmicMusicSoundId = nil
 local cosmicMusicRandom = Random.new()
 local updateAmbience = nil
+local stopAmbience = nil
 
 local existingSound = SoundService:FindFirstChild(SOUND_NAME)
 if existingSound and existingSound:IsA("Sound") then
@@ -242,6 +243,12 @@ local function shouldSuppressAmbience()
 		or isTitleSplashVisible()
 end
 
+playerGui.ChildAdded:Connect(function(child)
+	if child.Name == "DontTouchItTitleSplash" and child:IsA("ScreenGui") then
+		stopAmbience(0.1)
+	end
+end)
+
 local function fadeSound(sound, targetVolume, fadeSeconds, destroyWhenDone)
 	fadeToken += 1
 	local token = fadeToken
@@ -295,7 +302,7 @@ local function disconnectActiveSoundEnded()
 	end
 end
 
-local function stopAmbience(fadeSeconds)
+stopAmbience = function(fadeSeconds)
 	if not activeSound then
 		return
 	end

@@ -816,6 +816,22 @@ UserInputService.InputEnded:Connect(function(input)
 	finishControlInput(input)
 end)
 
+UserInputService.TouchEnded:Connect(function(input)
+	if activeDrag then
+		finishDrag()
+	end
+	finishControlInput(input)
+end)
+
+UserInputService.WindowFocusReleased:Connect(function()
+	for input in pairs(activeControlInputs) do
+		finishControlInput(input)
+	end
+	if activeDrag then
+		finishDrag()
+	end
+end)
+
 UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(function()
 	applyAllButtonStates()
 	if editButton then
