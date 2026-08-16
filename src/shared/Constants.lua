@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.182"
+Constants.BuildVersion = "0.5.183"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -635,7 +635,8 @@ Constants.BunkerEnergy = {
 	RecoveryBlackSeconds = 2,
 	RecoveryFadeInSeconds = 2.2,
 	RecoveryBeepSoundId = "rbxassetid://93825496198148",
-	RecoveryBeepVolume = 0.38,
+	RecoveryBeepVolume = 0.3,
+	RecoveryBeepMovingVolume = 0.16,
 	InactivityEnticementHungerThreshold = 0.64,
 	InactivityEnticementCooldownSeconds = 85,
 	FruitEnergyRestore = 0.32,

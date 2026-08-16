@@ -38,6 +38,9 @@ local recoveryLabel = nil
 local recoveryToken = 0
 local recoveryBeepSound = nil
 local recoveryBeepCanStopAt = 0
+local recoveryBeepBaseVolume = 0
+local recoveryBeepMovingVolume = 0
+local recoveryBeepVolumeTween = nil
 local observedAuraByPlayer = {}
 local observedAuraAccumulator = 1
 local getRootPart
@@ -226,11 +229,17 @@ local function isLocalPlayerInInfirmary()
 end
 
 local function stopRecoveryBeep()
+	if recoveryBeepVolumeTween then
+		recoveryBeepVolumeTween:Cancel()
+		recoveryBeepVolumeTween = nil
+	end
 	if recoveryBeepSound then
 		recoveryBeepSound:Stop()
 		recoveryBeepSound:Destroy()
 		recoveryBeepSound = nil
 	end
+	recoveryBeepBaseVolume = 0
+	recoveryBeepMovingVolume = 0
 end
 
 local function startRecoveryBeep(soundId, volume)
@@ -244,7 +253,13 @@ local function startRecoveryBeep(soundId, volume)
 	local sound = Instance.new("Sound")
 	sound.Name = "DontTouchItRecoveryBeep"
 	sound.SoundId = normalizedSoundId
-	sound.Volume = math.clamp(tonumber(volume) or 0.38, 0, 1)
+	recoveryBeepBaseVolume = math.clamp(tonumber(volume) or 0.3, 0, 1)
+	recoveryBeepMovingVolume = math.clamp(
+		tonumber(Constants.BunkerEnergy and Constants.BunkerEnergy.RecoveryBeepMovingVolume) or recoveryBeepBaseVolume * 0.55,
+		0,
+		recoveryBeepBaseVolume
+	)
+	sound.Volume = recoveryBeepBaseVolume
 	sound.Looped = true
 	sound.Parent = SoundService
 	recoveryBeepSound = sound
@@ -252,7 +267,7 @@ local function startRecoveryBeep(soundId, volume)
 	sound:Play()
 end
 
-local function stopRecoveryBeepFromMovement()
+local function updateRecoveryBeepContainment()
 	if not recoveryBeepSound or os.clock() < recoveryBeepCanStopAt then
 		return
 	end
@@ -263,9 +278,24 @@ local function stopRecoveryBeepFromMovement()
 	end
 
 	local humanoid = getHumanoid and getHumanoid()
-	if humanoid and (humanoid.MoveDirection.Magnitude > 0.05 or humanoid.Jump) then
-		stopRecoveryBeep()
+	local isMoving = humanoid and (humanoid.MoveDirection.Magnitude > 0.05 or humanoid.Jump)
+	local targetVolume = if isMoving then recoveryBeepMovingVolume else recoveryBeepBaseVolume
+	if math.abs(recoveryBeepSound.Volume - targetVolume) <= 0.01 then
+		return
 	end
+
+	if recoveryBeepVolumeTween then
+		recoveryBeepVolumeTween:Cancel()
+	end
+	recoveryBeepVolumeTween = TweenService:Create(
+		recoveryBeepSound,
+		TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Volume = targetVolume }
+	)
+	recoveryBeepVolumeTween:Play()
+	recoveryBeepVolumeTween.Completed:Connect(function()
+		recoveryBeepVolumeTween = nil
+	end)
 end
 
 local function playRecoverySequence(payload)
@@ -631,7 +661,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
 	currentEnergy += (targetEnergy - currentEnergy) * smoothing
 	currentHunger += (targetHunger - currentHunger) * smoothing
 	applyGlow(currentGlow, currentEnergy, currentHunger)
-	stopRecoveryBeepFromMovement()
+	updateRecoveryBeepContainment()
 
 	observedAuraAccumulator += deltaTime
 	if observedAuraAccumulator >= 0.2 then
