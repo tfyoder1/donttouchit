@@ -352,6 +352,20 @@ local function finishSplashCleanup()
 	notifyTitleSplashFinished()
 end
 
+local splashCleanupComplete = false
+local function destroySplashGui()
+	if splashCleanupComplete then
+		return
+	end
+
+	splashCleanupComplete = true
+	if splashGui.Parent then
+		splashGui.Enabled = false
+		splashGui:Destroy()
+	end
+	finishSplashCleanup()
+end
+
 local function stopTitleMusic(fadeSeconds)
 	local sound = titleMusic
 	titleMusic = nil
@@ -629,6 +643,7 @@ local function fadeAndDestroy()
 		return
 	end
 
+	root.Active = false
 	notifyTitleSplashFinished()
 	restoreTopbar()
 	restoreSplashBlur()
@@ -650,19 +665,13 @@ local function fadeAndDestroy()
 	local promptTween = TweenService:Create(prompt, tweenInfo, { TextTransparency = 1 })
 	promptTween:Play()
 	promptTween.Completed:Connect(function()
-		if splashGui.Parent then
-			splashGui:Destroy()
-		end
-		finishSplashCleanup()
+		destroySplashGui()
 	end)
 	task.delay(0.6, function()
-		if not choiceSent or splashFinishedNotified then
+		if not choiceSent then
 			return
 		end
-		if splashGui.Parent then
-			splashGui:Destroy()
-		end
-		finishSplashCleanup()
+		destroySplashGui()
 	end)
 end
 
