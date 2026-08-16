@@ -61,6 +61,8 @@ local lastIdLabelsUpdateAt = 0
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
 local DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE = "DontTouchItDevTitleSequenceEnabled"
 local DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE = "DontTouchItDevShowTitleSequenceNonce"
+local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
+local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
 local playerGui = player:WaitForChild("PlayerGui")
 local FLY_SPEED = 55
 local GAMEPAD_STICK_DEADZONE = 0.16
@@ -79,8 +81,12 @@ local TOUCH_TAP_MAX_DRAG_PIXELS = 18
 local currentDeviceProfile = DeviceProfile.Get()
 local showDevInfo
 local rebuildPanel
+local applyDevLayout
 local lastJumpRequestAt = 0
 local lastDoubleJumpFlyRequestAt = 0
+local devToggleManualPosition = nil
+local devPanelManualPosition = nil
+local devLayoutDragging = nil
 
 local sectionExpanded = {
 	Locations = false,
@@ -598,7 +604,114 @@ local function wireInspectRepositioning()
 	end)
 end
 
-local function applyDevLayout(profile)
+local function isTouchEditLayoutActive()
+	return playerGui:GetAttribute(TOUCH_EDIT_MODE_ATTRIBUTE) == true
+end
+
+local function clampGuiPosition(guiObject, position)
+	if not guiObject then
+		return position
+	end
+
+	local viewport = getInspectViewportSize()
+	local size = guiObject.AbsoluteSize
+	if size.X <= 0 or size.Y <= 0 then
+		size = Vector2.new(guiObject.Size.X.Offset, guiObject.Size.Y.Offset)
+	end
+
+	local anchor = guiObject.AnchorPoint
+	local margin = isPhoneProfile() and 6 or 8
+	local minX = margin + size.X * anchor.X
+	local minY = margin + size.Y * anchor.Y
+	local maxX = math.max(minX, viewport.X - margin - size.X * (1 - anchor.X))
+	local maxY = math.max(minY, viewport.Y - margin - size.Y * (1 - anchor.Y))
+
+	local absoluteX = position.X.Scale * viewport.X + position.X.Offset
+	local absoluteY = position.Y.Scale * viewport.Y + position.Y.Offset
+	local clampedX = math.clamp(absoluteX, minX, maxX)
+	local clampedY = math.clamp(absoluteY, minY, maxY)
+	return UDim2.new(position.X.Scale, position.X.Offset + (clampedX - absoluteX), position.Y.Scale, position.Y.Offset + (clampedY - absoluteY))
+end
+
+local function applyDevManualPositions()
+	if toggleButton and devToggleManualPosition then
+		toggleButton.Position = clampGuiPosition(toggleButton, devToggleManualPosition)
+		devToggleManualPosition = toggleButton.Position
+	end
+	if panel and devPanelManualPosition then
+		panel.Position = clampGuiPosition(panel, devPanelManualPosition)
+		devPanelManualPosition = panel.Position
+	end
+end
+
+local function beginDevLayoutDrag(guiObject, input, key)
+	if not isTouchEditLayoutActive() then
+		return
+	end
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
+	devLayoutDragging = {
+		Object = guiObject,
+		Key = key,
+		InputType = input.UserInputType,
+		StartInput = getInputScreenPosition(input),
+		StartPosition = guiObject.Position,
+	}
+end
+
+local function updateDevLayoutDrag(input)
+	if not devLayoutDragging then
+		return
+	end
+	if devLayoutDragging.InputType == Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.MouseMovement then
+		return
+	end
+	if devLayoutDragging.InputType == Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
+	local delta = getInputScreenPosition(input) - devLayoutDragging.StartInput
+	local start = devLayoutDragging.StartPosition
+	local nextPosition = UDim2.new(start.X.Scale, start.X.Offset + delta.X, start.Y.Scale, start.Y.Offset + delta.Y)
+	nextPosition = clampGuiPosition(devLayoutDragging.Object, nextPosition)
+	devLayoutDragging.Object.Position = nextPosition
+	if devLayoutDragging.Key == "Toggle" then
+		devToggleManualPosition = nextPosition
+	elseif devLayoutDragging.Key == "Panel" then
+		devPanelManualPosition = nextPosition
+	end
+end
+
+local function endDevLayoutDrag(input)
+	if not devLayoutDragging then
+		return
+	end
+	if input.UserInputType == devLayoutDragging.InputType
+		or (devLayoutDragging.InputType == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseMovement) then
+		devLayoutDragging = nil
+	end
+end
+
+local function wireDevLayoutDrag(guiObject, key)
+	if not guiObject then
+		return
+	end
+	guiObject.InputBegan:Connect(function(input)
+		beginDevLayoutDrag(guiObject, input, key)
+	end)
+end
+
+local function resetDevLayoutPositions()
+	devToggleManualPosition = nil
+	devPanelManualPosition = nil
+	devLayoutDragging = nil
+	inspectWindowManuallyPositioned = false
+	applyDevLayout(currentDeviceProfile)
+end
+
+applyDevLayout = function(profile)
 	currentDeviceProfile = profile or DeviceProfile.Get()
 
 	if not gui or not toggleButton or not panel then
@@ -637,6 +750,7 @@ local function applyDevLayout(profile)
 			panelScroll.Size = UDim2.new(1, -20, 1, -74)
 			panelScroll.ScrollBarThickness = 5
 		end
+		applyDevManualPositions()
 		return
 	end
 
@@ -655,6 +769,7 @@ local function applyDevLayout(profile)
 		panelScroll.Size = UDim2.new(1, -24, 1, -82)
 		panelScroll.ScrollBarThickness = 6
 	end
+	applyDevManualPositions()
 end
 
 local function makeList(parent)
@@ -2184,6 +2299,7 @@ local function buildGui()
 	toggleButton.TextScaled = true
 	toggleButton.Parent = gui
 	makeCorner(toggleButton, 6)
+	wireDevLayoutDrag(toggleButton, "Toggle")
 
 	devInfoLabel = Instance.new("TextLabel")
 	devInfoLabel.Name = "DevInfoMessage"
@@ -2281,6 +2397,8 @@ local function buildGui()
 	title.TextScaled = true
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = panel
+	wireDevLayoutDrag(title, "Panel")
+	wireDevLayoutDrag(panel, "Panel")
 
 	local close = Instance.new("TextButton")
 	close.BackgroundColor3 = Color3.fromRGB(54, 60, 72)
@@ -2342,6 +2460,9 @@ local function buildGui()
 	applyDevLayout(currentDeviceProfile)
 
 	wireButtonActivation(toggleButton, function()
+		if isTouchEditLayoutActive() then
+			return
+		end
 		panel.Visible = not panel.Visible
 		if panel.Visible then
 			dismissStartOverlayForDevSession()
@@ -2429,6 +2550,21 @@ devRemote.OnClientEvent:Connect(function(payload)
 
 	rebuildPanel()
 	applyDevLayout(currentDeviceProfile)
+end)
+
+UserInputService.InputChanged:Connect(updateDevLayoutDrag)
+UserInputService.InputEnded:Connect(endDevLayoutDrag)
+UserInputService.TouchEnded:Connect(function(input)
+	endDevLayoutDrag(input)
+end)
+UserInputService.WindowFocusReleased:Connect(function()
+	devLayoutDragging = nil
+end)
+playerGui:GetAttributeChangedSignal(DEV_LAYOUT_RESET_ATTRIBUTE):Connect(resetDevLayoutPositions)
+playerGui:GetAttributeChangedSignal(TOUCH_EDIT_MODE_ATTRIBUTE):Connect(function()
+	if not isTouchEditLayoutActive() then
+		devLayoutDragging = nil
+	end
 end)
 
 DeviceProfile.Bind(function(profile)

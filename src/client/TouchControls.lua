@@ -9,6 +9,8 @@ local TouchControls = {}
 local TOUCH_GUI_NAME = "DontTouchItTouchControls"
 local OPTIONS_GUI_NAME = "DontTouchItControlOptions"
 local TOUCH_LAYOUT_VERSION = "touch-cluster-2026-08-15-v5"
+local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
+local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
 local TOUCH_GUI_ORDER = 145
 local OPTIONS_GUI_ORDER = 155
 local BUTTON_Z_INDEX = 10
@@ -389,6 +391,7 @@ end
 
 local function setEditMode(active)
 	editMode = active == true
+	playerGui:SetAttribute(TOUCH_EDIT_MODE_ATTRIBUTE, editMode)
 	activeDrag = nil
 	if editButton then
 		editButton.Text = editMode and "Done" or "Edit Layout"
@@ -693,6 +696,7 @@ local function createOptionsPanel()
 		for id in pairs(controlsById) do
 			sessionPositions[id] = nil
 		end
+		playerGui:SetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE, (tonumber(playerGui:GetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE)) or 0) + 1)
 		applyAllButtonStates()
 	end)
 
@@ -784,6 +788,7 @@ function TouchControls.ResetLayout()
 	for id in pairs(controlsById) do
 		sessionPositions[id] = nil
 	end
+	playerGui:SetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE, (tonumber(playerGui:GetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE)) or 0) + 1)
 	applyAllButtonStates()
 end
 
