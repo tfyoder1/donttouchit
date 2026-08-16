@@ -38,6 +38,7 @@ local function makePanel(name, anchorPoint, position, size)
 	panel.BorderSizePixel = 0
 	panel.Position = position
 	panel.Size = size
+	panel.ZIndex = 2
 	panel.Parent = gui
 
 	local corner = Instance.new("UICorner")
@@ -46,6 +47,27 @@ local function makePanel(name, anchorPoint, position, size)
 
 	return panel
 end
+
+local topInfoBar = Instance.new("Frame")
+topInfoBar.Name = "UnifiedInfoBar"
+topInfoBar.AnchorPoint = Vector2.new(0.5, 0)
+topInfoBar.BackgroundColor3 = Color3.fromRGB(10, 13, 18)
+topInfoBar.BackgroundTransparency = 0.18
+topInfoBar.BorderSizePixel = 0
+topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
+topInfoBar.Size = UDim2.new(0.78, 0, 0, 88)
+topInfoBar.ZIndex = 1
+topInfoBar.Parent = gui
+
+local topInfoCorner = Instance.new("UICorner")
+topInfoCorner.CornerRadius = UDim.new(0, 8)
+topInfoCorner.Parent = topInfoBar
+
+local topInfoStroke = Instance.new("UIStroke")
+topInfoStroke.Color = Color3.fromRGB(226, 238, 246)
+topInfoStroke.Thickness = 1.5
+topInfoStroke.Transparency = 0.18
+topInfoStroke.Parent = topInfoBar
 
 local hudItems = {}
 local sessionPositions = {}
@@ -274,19 +296,23 @@ local function applyLayout()
 	local sideInset = UserInputService.TouchEnabled and 32 or 18
 
 	if touchLandscape then
-		progressPanel.Position = UDim2.new(0.5, 0, 0, 42)
-		progressPanel.Size = UDim2.new(0.56, 0, 0, 30)
-		roomCounter.Position = UDim2.new(0, sideInset, 0, 100)
-		roomCounter.Size = UDim2.fromOffset(180, 30)
-		energyPanel.Position = UDim2.new(1, -sideInset, 0, 100)
-		energyPanel.Size = UDim2.fromOffset(136, 32)
+		topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
+		topInfoBar.Size = UDim2.new(0.82, -12, 0, 88)
+		progressPanel.Position = UDim2.new(0.5, 0, 0, 18)
+		progressPanel.Size = UDim2.new(0.58, 0, 0, 30)
+		roomCounter.Position = UDim2.new(0.09, 0, 0, 58)
+		roomCounter.Size = UDim2.fromOffset(210, 32)
+		energyPanel.Position = UDim2.new(0.91, 0, 0, 58)
+		energyPanel.Size = UDim2.fromOffset(180, 32)
 	else
-		progressPanel.Position = UDim2.new(0.5, 0, 0, 74)
-		progressPanel.Size = UDim2.new(0.72, 0, 0, 36)
-		roomCounter.Position = UDim2.new(0, sideInset, 0, 126)
-		roomCounter.Size = UDim2.fromOffset(240, 34)
-		energyPanel.Position = UDim2.new(1, -sideInset, 0, 126)
-		energyPanel.Size = UDim2.fromOffset(210, 36)
+		topInfoBar.Position = UDim2.new(0.5, 0, 0, 46)
+		topInfoBar.Size = UDim2.new(0.78, 0, 0, 96)
+		progressPanel.Position = UDim2.new(0.5, 0, 0, 58)
+		progressPanel.Size = UDim2.new(0.58, 0, 0, 34)
+		roomCounter.Position = UDim2.new(0.16, 0, 0, 100)
+		roomCounter.Size = UDim2.fromOffset(240, 36)
+		energyPanel.Position = UDim2.new(0.84, 0, 0, 100)
+		energyPanel.Size = UDim2.fromOffset(220, 36)
 	end
 
 	for id, position in pairs(sessionPositions) do
@@ -301,6 +327,7 @@ end
 
 local function applyVisibility()
 	local hidden = isTitleSplashVisible()
+	topInfoBar.Visible = not hidden
 	progressPanel.Visible = not hidden
 	roomCounter.Visible = not hidden
 	energyPanel.Visible = not hidden

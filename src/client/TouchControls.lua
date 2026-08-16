@@ -687,7 +687,7 @@ local function createOptionsPanel()
 		"Controls",
 		Color3.fromRGB(18, 23, 29),
 		Color3.fromRGB(224, 236, 245),
-		UDim2.new(1, -106, 0, 12),
+		UDim2.new(1, -156, 0, 58),
 		UDim2.fromOffset(94, 34)
 	)
 	toggle.AnchorPoint = Vector2.new(0, 0)

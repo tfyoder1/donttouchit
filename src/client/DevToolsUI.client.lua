@@ -782,9 +782,9 @@ applyDevLayout = function(profile)
 	applyInspectLayout(touchLandscape)
 
 	if isPhoneProfile() then
-		toggleButton.AnchorPoint = Vector2.new(0, 1)
-		toggleButton.Position = UDim2.new(0, touchLandscape and 34 or 20, 1, touchLandscape and -138 or -112)
-		toggleButton.Size = UDim2.fromOffset(touchLandscape and 54 or 48, touchLandscape and 28 or 25)
+		toggleButton.AnchorPoint = Vector2.new(0, 0)
+		toggleButton.Position = UDim2.new(0, touchLandscape and 34 or 20, 0, touchLandscape and 104 or 146)
+		toggleButton.Size = UDim2.fromOffset(touchLandscape and 70 or 58, touchLandscape and 34 or 30)
 		panel.AnchorPoint = Vector2.new(0.5, 0.5)
 		panel.Position = UDim2.fromScale(touchLandscape and 0.42 or 0.5, 0.56)
 		panel.Size = UDim2.new(touchLandscape and 0.68 or 0.94, 0, 0.74, 0)
