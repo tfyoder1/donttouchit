@@ -9,6 +9,8 @@ local FeedbackService = require(script.Parent:WaitForChild("FeedbackService"))
 local InteractionService = require(script.Parent:WaitForChild("InteractionService"))
 local LocationPingService = require(script.Parent:WaitForChild("LocationPingService"))
 local MovementAuthorityService = require(script.Parent:WaitForChild("MovementAuthorityService"))
+local ModerationService = require(script.Parent:WaitForChild("ModerationService"))
+local PermissionService = require(script.Parent:WaitForChild("PermissionService"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
@@ -19,6 +21,12 @@ workspace.Gravity = Constants.NormalGravity
 RemoteService.Initialize()
 
 local roomReferences = RoomBuilder.Build()
+local permissionService = PermissionService.new()
+permissionService:Initialize()
+
+local moderationService = ModerationService.new(permissionService)
+moderationService:Initialize()
+
 local discoveryService = DiscoveryService.new()
 discoveryService:Initialize()
 
@@ -53,7 +61,17 @@ local interactionService =
 interactionService:Initialize()
 
 local devToolsService =
-	DevToolsService.new(discoveryService, roomProgressService, eventManager, ResetService, interactionService, movementAuthorityService, bunkerEnergyService)
+	DevToolsService.new(
+		discoveryService,
+		roomProgressService,
+		eventManager,
+		ResetService,
+		interactionService,
+		movementAuthorityService,
+		bunkerEnergyService,
+		permissionService,
+		moderationService
+	)
 devToolsService:Initialize()
 
 print("[DON'T TOUCH IT] Prototype initialized.")

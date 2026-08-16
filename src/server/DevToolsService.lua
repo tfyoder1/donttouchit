@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
-local DevToolsConfig = require(script.Parent:WaitForChild("DevToolsConfig"))
 local EventRegistry = require(script.Parent:WaitForChild("EventRegistry"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 
@@ -15,6 +14,53 @@ local PRESETS = {
 	"Fresh",
 	"Midway",
 	"Completed",
+}
+
+local ACTION_CAPABILITY = {
+	JumpToRoom = { "DEV_ROOM_TESTING", "DEV_FULL", "TEST_ROOM_TELEPORT" },
+	SetRoomPreset = { "DEV_ROOM_TESTING", "DEV_FULL", "TEST_ROOM_STATE" },
+	CompleteCurrentRoom = { "DEV_ROOM_TESTING", "DEV_FULL", "TEST_ROOM_STATE" },
+	ResetCurrentRoom = { "DEV_ROOM_TESTING", "DEV_FULL", "TEST_ROOM_STATE" },
+	FreshStart = { "DEV_FULL" },
+	TriggerSpecificEvent = { "DEV_FULL" },
+	TriggerRandomEvent = { "DEV_FULL" },
+	TeleportSecretArea = { "DEV_FULL", "DEV_SURVEILLANCE" },
+	UnlockAllSession = { "DEV_FULL" },
+	RestoreNormalProgress = { "DEV_FULL" },
+	SetMovement = { "DEV_FULL" },
+	SetNourishment = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	SetBunkerPower = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	TriggerPassOut = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	TeleportInfirmary = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	RestoreHealthyState = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	SimulateInactivity = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	ResetInfirmaryState = { "DEV_BUNKER_ENERGY", "DEV_FULL" },
+	SetDiscovery = { "DEV_ROOM_TESTING", "DEV_FULL" },
+	AdjustStorePrice = { "DEV_ECONOMY_TESTING", "DEV_FULL" },
+	ResetStorePrices = { "DEV_ECONOMY_TESTING", "DEV_FULL" },
+	RefreshUserManagement = { "ROLE_MANAGEMENT", "MOD_VIEW_HISTORY", "MOD_WARN_PLAYER", "MOD_BAN_24H" },
+	SelectManagedUser = { "ROLE_MANAGEMENT", "MOD_VIEW_HISTORY", "MOD_WARN_PLAYER", "MOD_BAN_24H" },
+	LookupManagedUser = { "ROLE_MANAGEMENT", "MOD_VIEW_HISTORY", "MOD_WARN_PLAYER", "MOD_BAN_24H" },
+	SetManagedUserRole = { "ROLE_MANAGEMENT" },
+	SetManagedUserTestAccess = { "TEST_BUILD_ACCESS_MANAGEMENT" },
+	WarnManagedUser = { "MOD_WARN_PLAYER" },
+	BanManagedUser24h = { "MOD_BAN_24H" },
+	RemoveManagedUserBan = { "MOD_REMOVE_BAN" },
+	ViewManagedUserHistory = { "MOD_VIEW_HISTORY" },
+}
+
+local NO_PROGRESS_LOAD_REQUIRED = {
+	Refresh = true,
+	SetMovement = true,
+	RefreshUserManagement = true,
+	SelectManagedUser = true,
+	LookupManagedUser = true,
+	SetManagedUserRole = true,
+	SetManagedUserTestAccess = true,
+	WarnManagedUser = true,
+	BanManagedUser24h = true,
+	RemoveManagedUserBan = true,
+	ViewManagedUserHistory = true,
 }
 
 local SECRET_AREAS = {
@@ -114,7 +160,17 @@ local function listContains(items, value)
 	return false
 end
 
-function DevToolsService.new(discoveryService, roomProgressService, eventManager, resetService, interactionService, movementAuthorityService, bunkerEnergyService)
+function DevToolsService.new(
+	discoveryService,
+	roomProgressService,
+	eventManager,
+	resetService,
+	interactionService,
+	movementAuthorityService,
+	bunkerEnergyService,
+	permissionService,
+	moderationService
+)
 	local self = setmetatable({}, DevToolsService)
 	self.discoveryService = discoveryService
 	self.roomProgressService = roomProgressService
@@ -123,6 +179,8 @@ function DevToolsService.new(discoveryService, roomProgressService, eventManager
 	self.interactionService = interactionService
 	self.movementAuthorityService = movementAuthorityService
 	self.bunkerEnergyService = bunkerEnergyService
+	self.permissionService = permissionService
+	self.moderationService = moderationService
 	self.remote = RemoteService.GetRemote(Constants.Remotes.DevTools)
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.eventIds = {}
@@ -150,9 +208,34 @@ function DevToolsService:Initialize()
 		self:_handleRequest(player, payload)
 	end)
 
+	Players.PlayerAdded:Connect(function(player)
+		task.delay(1, function()
+			if player.Parent and self:IsAuthorized(player) then
+				self:_sendState(player, "Auth")
+			end
+			self:_broadcastUserManagement()
+		end)
+	end)
+
 	Players.PlayerRemoving:Connect(function(player)
 		self.movementStateByUserId[player.UserId] = nil
+		self:_broadcastUserManagement()
 	end)
+
+	if self.permissionService and self.permissionService.Changed then
+		self.permissionService.Changed:Connect(function()
+			self:_broadcastUserManagement()
+			for _, player in ipairs(Players:GetPlayers()) do
+				if self:IsAuthorized(player) then
+					self:_sendState(player, "State")
+				else
+					self.remote:FireClient(player, {
+						Type = "AuthorizationRevoked",
+					})
+				end
+			end
+		end)
+	end
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		if self:IsAuthorized(player) then
@@ -162,7 +245,7 @@ function DevToolsService:Initialize()
 end
 
 function DevToolsService:IsAuthorized(player)
-	return DevToolsConfig.IsAuthorized(player)
+	return self.permissionService ~= nil and self.permissionService:CanUseDevTools(player.UserId)
 end
 
 function DevToolsService:_sendMessage(player, text)
@@ -180,15 +263,58 @@ function DevToolsService:_getCurrentRoomId(player)
 	return Constants.RoomOrder[1]
 end
 
-function DevToolsService:_getRoomOptions()
+function DevToolsService:_hasCapability(player, capability)
+	return self.permissionService ~= nil and self.permissionService:HasPermission(player.UserId, capability)
+end
+
+function DevToolsService:_hasAnyCapability(player, capabilities)
+	for _, capability in ipairs(capabilities or {}) do
+		if self:_hasCapability(player, capability) then
+			return true
+		end
+	end
+	return false
+end
+
+function DevToolsService:_getAdminCapabilities(player)
+	if not self.permissionService then
+		return {}
+	end
+	return self.permissionService:GetCapabilities(player.UserId)
+end
+
+function DevToolsService:_isTesterRoomAllowed(player, roomId, presetName)
+	local room = Constants.GetRoom(roomId)
+	if not room or room.TesterAccessible ~= true then
+		return false
+	end
+	if presetName then
+		return listContains(room.TesterStatePresets or {}, presetName)
+	end
+	return true
+end
+
+function DevToolsService:_canUseRoomTesting(player, roomId, presetName)
+	if self:_hasCapability(player, "DEV_ROOM_TESTING") or self:_hasCapability(player, "DEV_FULL") then
+		return true
+	end
+	if self:_hasAnyCapability(player, { "TEST_ROOM_TELEPORT", "TEST_ROOM_STATE" }) then
+		return self:_isTesterRoomAllowed(player, roomId, presetName)
+	end
+	return false
+end
+
+function DevToolsService:_getRoomOptions(player)
 	local rooms = {}
+	local isDeveloper = player and self:_hasAnyCapability(player, { "DEV_FULL", "DEV_ROOM_TESTING" })
 
 	for _, roomId in ipairs(Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
 		local room = Constants.GetRoom(roomId)
-		if room then
+		if room and (isDeveloper or room.TesterAccessible == true) then
 			table.insert(rooms, {
 				Id = roomId,
 				Name = room.Name,
+				TesterAccessible = room.TesterAccessible == true,
 			})
 		end
 	end
@@ -210,6 +336,14 @@ function DevToolsService:_getEventOptions()
 end
 
 function DevToolsService:_getSecretAreaOptions()
+	return self:_getSecretAreaOptionsForPlayer(nil)
+end
+
+function DevToolsService:_getSecretAreaOptionsForPlayer(player)
+	if player and not self:_hasAnyCapability(player, { "DEV_FULL", "DEV_SURVEILLANCE" }) then
+		return {}
+	end
+
 	local areas = {}
 
 	for _, area in ipairs(SECRET_AREAS) do
@@ -232,6 +366,70 @@ function DevToolsService:_getAreaById(areaId)
 	return nil
 end
 
+function DevToolsService:_getLivePlayerSummaries()
+	local summaries = {}
+	for _, livePlayer in ipairs(Players:GetPlayers()) do
+		local summary = self.permissionService and self.permissionService:GetUserAdminSummary(livePlayer.UserId) or nil
+		if summary then
+			if self.moderationService then
+				summary.Moderation = self.moderationService:GetSummary(livePlayer.UserId)
+			end
+			table.insert(summaries, summary)
+		end
+	end
+	table.sort(summaries, function(left, right)
+		return string.lower(left.Username or "") < string.lower(right.Username or "")
+	end)
+	return summaries
+end
+
+function DevToolsService:_getManagedUserSummary(userId, includeHistory)
+	userId = tonumber(userId)
+	if not userId or not self.permissionService then
+		return nil
+	end
+	local summary = self.permissionService:GetUserAdminSummary(userId)
+	if summary and self.moderationService then
+		summary.Moderation = self.moderationService:GetSummary(userId)
+		if includeHistory then
+			summary.ModerationHistory = self.moderationService:GetHistory(userId)
+		end
+	end
+	return summary
+end
+
+function DevToolsService:_getUserManagementState(player, selectedUserId, includeHistory)
+	if not self.permissionService or not self:_hasAnyCapability(player, {
+		"ROLE_MANAGEMENT",
+		"TEST_BUILD_ACCESS_MANAGEMENT",
+		"MOD_WARN_PLAYER",
+		"MOD_BAN_24H",
+		"MOD_VIEW_HISTORY",
+		"MOD_REMOVE_BAN",
+	}) then
+		return nil
+	end
+
+	return {
+		LivePlayers = self:_getLivePlayerSummaries(),
+		SelectedUser = selectedUserId and self:_getManagedUserSummary(selectedUserId, includeHistory) or nil,
+		Reasons = Constants.ModerationReasons,
+		ReasonOrder = Constants.ModerationReasonOrder,
+		RoleOrder = Constants.AdminRoleOrder,
+	}
+end
+
+function DevToolsService:_broadcastUserManagement()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if self:IsAuthorized(player) then
+			self.remote:FireClient(player, {
+				Type = "UserManagement",
+				UserManagement = self:_getUserManagementState(player),
+			})
+		end
+	end
+end
+
 function DevToolsService:_sendState(player, stateType, roomId)
 	if not self:IsAuthorized(player) then
 		return
@@ -252,11 +450,13 @@ function DevToolsService:_sendState(player, stateType, roomId)
 	self.remote:FireClient(player, {
 		Type = stateType or "State",
 		Authorized = true,
+		Role = self.permissionService and self.permissionService:GetRole(player.UserId) or "Player",
+		Capabilities = self:_getAdminCapabilities(player),
 		DevSessionActive = self.discoveryService:IsDevOverrideActive(player),
 		CurrentRoomId = currentRoomId,
-		Rooms = self:_getRoomOptions(),
+		Rooms = self:_getRoomOptions(player),
 		Events = self:_getEventOptions(),
-		SecretAreas = self:_getSecretAreaOptions(),
+		SecretAreas = self:_getSecretAreaOptionsForPlayer(player),
 		Presets = PRESETS,
 		Movement = {
 			Fly = movementState.Fly == true,
@@ -265,6 +465,7 @@ function DevToolsService:_sendState(player, stateType, roomId)
 		Energy = self.bunkerEnergyService and self.bunkerEnergyService:GetDevState(player) or nil,
 		StorePrices = self.roomProgressService and self.roomProgressService:GetStorePrices() or Constants.NoTouch,
 		RoomSnapshot = self.discoveryService:GetRoomSnapshot(player, currentRoomId),
+		UserManagement = self:_getUserManagementState(player),
 	})
 end
 
@@ -346,11 +547,97 @@ function DevToolsService:_setDiscoveryCompletion(player, payload)
 	return ok
 end
 
+function DevToolsService:_isActionAllowed(player, action)
+	local capabilities = ACTION_CAPABILITY[action]
+	if not capabilities then
+		return true
+	end
+	return self:_hasAnyCapability(player, capabilities)
+end
+
+function DevToolsService:_sendUserManagementState(player, selectedUserId, includeHistory, message)
+	self.remote:FireClient(player, {
+		Type = "UserManagement",
+		UserMessage = message,
+		UserManagement = self:_getUserManagementState(player, selectedUserId, includeHistory),
+	})
+end
+
+function DevToolsService:_resolveUsername(username)
+	username = tostring(username or ""):gsub("[%c\r\n\t]", ""):match("^%s*(.-)%s*$") or ""
+	if username == "" or #username > 32 then
+		return nil, "Enter a valid Roblox username."
+	end
+
+	local ok, userId = pcall(function()
+		return Players:GetUserIdFromNameAsync(username)
+	end)
+	if not ok or typeof(userId) ~= "number" then
+		return nil, "Username lookup failed or no such user exists."
+	end
+	return userId, nil
+end
+
+function DevToolsService:_handleUserManagementRequest(player, payload)
+	local action = payload.Action
+	local targetUserId = tonumber(payload.TargetUserId or payload.UserId)
+	local includeHistory = action == "ViewManagedUserHistory"
+
+	if action == "RefreshUserManagement" then
+		self:_sendUserManagementState(player, nil, false, nil)
+	elseif action == "SelectManagedUser" then
+		if not targetUserId then
+			self:_sendUserManagementState(player, nil, false, "Invalid selected UserId.")
+			return true
+		end
+		self:_sendUserManagementState(player, targetUserId, false, nil)
+	elseif action == "LookupManagedUser" then
+		local userId, err = self:_resolveUsername(payload.Username)
+		if not userId then
+			self:_sendUserManagementState(player, nil, false, err)
+			return true
+		end
+		self:_sendUserManagementState(player, userId, false, "Player lookup complete.")
+	elseif action == "SetManagedUserRole" then
+		local ok, message = self.permissionService:SetRole(player.UserId, targetUserId, payload.Role)
+		self:_sendUserManagementState(player, targetUserId, false, ok and "Role updated." or message)
+	elseif action == "SetManagedUserTestAccess" then
+		local ok, message = self.permissionService:SetTestBuildAccess(player.UserId, targetUserId, payload.Enabled == true)
+		self:_sendUserManagementState(player, targetUserId, false, ok and "Test access updated." or message)
+	elseif action == "WarnManagedUser" then
+		local ok, message = self.moderationService:IssueWarning(player.UserId, targetUserId, payload.ReasonCode, payload.ReasonText)
+		self:_sendUserManagementState(player, targetUserId, true, message or (ok and "Warning issued." or "Warning failed."))
+	elseif action == "BanManagedUser24h" then
+		local ok, message = self.moderationService:Ban24Hours(player.UserId, targetUserId, payload.ReasonCode, payload.ReasonText)
+		self:_sendUserManagementState(player, targetUserId, true, message or (ok and "24-hour ban issued." or "Ban failed."))
+	elseif action == "RemoveManagedUserBan" then
+		local ok, message = self.moderationService:RemoveActiveBan(player.UserId, targetUserId, payload.ReasonText)
+		self:_sendUserManagementState(player, targetUserId, true, message or (ok and "Ban removed." or "Unban failed."))
+	elseif action == "ViewManagedUserHistory" then
+		self:_sendUserManagementState(player, targetUserId, true, nil)
+	else
+		return false
+	end
+
+	self:_broadcastUserManagement()
+	return true
+end
+
 function DevToolsService:_handleAuthorizedRequest(player, payload)
 	local action = payload.Action
 	local roomId = payload.RoomId
 
-	if action ~= "SetMovement" and not self.discoveryService:IsLoaded(player) then
+	if not self:_isActionAllowed(player, action) then
+		self:_sendMessage(player, "You do not have permission for that dev action.")
+		self:_sendState(player, "State", roomId)
+		return
+	end
+
+	if self:_handleUserManagementRequest(player, payload) then
+		return
+	end
+
+	if not NO_PROGRESS_LOAD_REQUIRED[action] and not self.discoveryService:IsLoaded(player) then
 		self:_sendMessage(player, "Dev tools are waiting for saved progress to load.")
 		self:_sendState(player, "State", roomId)
 		return
@@ -361,6 +648,11 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 	elseif action == "JumpToRoom" then
 		local room = Constants.GetRoom(roomId)
 		if not room then
+			return
+		end
+		if not self:_canUseRoomTesting(player, roomId) then
+			self:_sendMessage(player, "That room is not approved for your test access.")
+			self:_sendState(player, "State", self:_getCurrentRoomId(player))
 			return
 		end
 		self.discoveryService:EnableDevOverride(player)
@@ -374,16 +666,32 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 	elseif action == "SetRoomPreset" then
 		local presetName = payload.Preset
 		if typeof(roomId) == "string" and typeof(presetName) == "string" then
+			if not self:_canUseRoomTesting(player, roomId, presetName) then
+				self:_sendMessage(player, "That room preset is not approved for your test access.")
+				self:_sendState(player, "State", self:_getCurrentRoomId(player))
+				return
+			end
 			self:_applyRoomPreset(player, roomId, presetName)
 			self:_sendState(player, "State", roomId)
 		end
 	elseif action == "CompleteCurrentRoom" then
 		local currentRoomId = self:_getCurrentRoomId(player)
+		if not self:_canUseRoomTesting(player, currentRoomId, "Completed") then
+			self:_sendMessage(player, "Completed preset is not approved for this test room.")
+			self:_sendState(player, "State", currentRoomId)
+			return
+		end
 		self:_applyRoomPreset(player, currentRoomId, "Completed")
 		self:_sendState(player, "State", currentRoomId)
 	elseif action == "ResetCurrentRoom" then
+		local currentRoomId = self:_getCurrentRoomId(player)
+		if not self:_canUseRoomTesting(player, currentRoomId, "Fresh") then
+			self:_sendMessage(player, "Reset is not approved for this test room.")
+			self:_sendState(player, "State", currentRoomId)
+			return
+		end
 		self:_resetRoom(player)
-		self:_sendState(player, "State", self:_getCurrentRoomId(player))
+		self:_sendState(player, "State", currentRoomId)
 	elseif action == "FreshStart" then
 		self.discoveryService:StartFreshDevSession(player)
 		self:_resetRoom(player)

@@ -1177,10 +1177,19 @@ startBlur.Size = 0
 
 local startOverlayPhase = "Hidden"
 local setStartPhase = nil
+local startCinematicLayer = nil
+local startCinematicButton = nil
 
 local function setStartOverlayVisible(visible)
 	startOverlay.Visible = visible
 	startOverlay.Active = visible
+	if startCinematicLayer then
+		startCinematicLayer.Visible = visible and startOverlayPhase == "Title"
+	end
+	if startCinematicButton then
+		startCinematicButton.Active = visible and startOverlayPhase == "Title"
+		startCinematicButton.Modal = visible and startOverlayPhase == "Title"
+	end
 	gui.DisplayOrder = visible and START_OVERLAY_DISPLAY_ORDER or DEFAULT_UI_DISPLAY_ORDER
 	startBlur.Enabled = visible
 	startBlur.Size = visible and 24 or 0
@@ -1198,7 +1207,7 @@ local function setStartOverlayVisible(visible)
 	applyHudVisibility()
 end
 
-local startCinematicLayer = Instance.new("Frame")
+startCinematicLayer = Instance.new("Frame")
 startCinematicLayer.Name = "StartCinematicLayer"
 startCinematicLayer.BackgroundTransparency = 1
 startCinematicLayer.Size = UDim2.fromScale(1, 1)
@@ -1206,7 +1215,7 @@ startCinematicLayer.Visible = false
 startCinematicLayer.ZIndex = 21
 startCinematicLayer.Parent = startOverlay
 
-local startCinematicButton = Instance.new("TextButton")
+startCinematicButton = Instance.new("TextButton")
 startCinematicButton.Name = "StartCinematicAdvance"
 startCinematicButton.Active = true
 startCinematicButton.AutoButtonColor = false

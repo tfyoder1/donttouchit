@@ -28,7 +28,14 @@ local toolsList = nil
 local energyList = nil
 local storeList = nil
 local discoveryList = nil
+local userList = nil
+local userManagementList = nil
+local manualLookupBox = nil
 local selectedRoomId = nil
+local selectedManagedUserId = nil
+local selectedModerationReasonCode = "HARASSMENT"
+local moderationReasonText = ""
+local pendingAdminActionKey = nil
 local latestState = nil
 local flyEnabled = false
 local noclipEnabled = false
@@ -85,6 +92,7 @@ local sectionExpanded = {
 	EnergyRecovery = false,
 	StorePrices = false,
 	RoomLogOverrides = false,
+	UserManagement = false,
 }
 
 local function isPhoneProfile()
@@ -237,6 +245,108 @@ local function makeButton(parent, text, color, onClick)
 
 	wireButtonActivation(button, onClick)
 	return button
+end
+
+local function makeInfoText(parent, text, height)
+	local label = Instance.new("TextLabel")
+	label.BackgroundColor3 = Color3.fromRGB(20, 25, 32)
+	label.BackgroundTransparency = 0.08
+	label.BorderSizePixel = 0
+	label.Font = Enum.Font.Code
+	label.Size = UDim2.new(1, 0, 0, height or (isPhoneProfile() and 52 or 60))
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(224, 239, 248)
+	label.TextSize = isPhoneProfile() and 8 or 10
+	label.TextWrapped = true
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Top
+	label.Parent = parent
+	makeCorner(label, 5)
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, 6)
+	padding.PaddingBottom = UDim.new(0, 6)
+	padding.PaddingLeft = UDim.new(0, 7)
+	padding.PaddingRight = UDim.new(0, 7)
+	padding.Parent = label
+	return label
+end
+
+local function makeTextBox(parent, placeholder, text, onChanged)
+	local box = Instance.new("TextBox")
+	box.BackgroundColor3 = Color3.fromRGB(10, 14, 20)
+	box.BorderSizePixel = 0
+	box.ClearTextOnFocus = false
+	box.Font = Enum.Font.GothamBold
+	box.PlaceholderText = placeholder
+	box.Size = UDim2.new(1, 0, 0, isPhoneProfile() and 30 or 34)
+	box.Text = text or ""
+	box.TextColor3 = Color3.fromRGB(238, 247, 255)
+	box.PlaceholderColor3 = Color3.fromRGB(132, 147, 164)
+	box.TextScaled = true
+	box.TextXAlignment = Enum.TextXAlignment.Left
+	box.Parent = parent
+	makeCorner(box, 5)
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 8)
+	padding.PaddingRight = UDim.new(0, 8)
+	padding.Parent = box
+
+	box.FocusLost:Connect(function()
+		if onChanged then
+			onChanged(box.Text)
+		end
+	end)
+	box:GetPropertyChangedSignal("Text"):Connect(function()
+		if onChanged then
+			onChanged(box.Text)
+		end
+	end)
+	return box
+end
+
+local function hasCapability(capability)
+	local capabilities = latestState and latestState.Capabilities
+	return typeof(capabilities) == "table" and capabilities[capability] == true
+end
+
+local function hasAnyCapability(capabilities)
+	for _, capability in ipairs(capabilities or {}) do
+		if hasCapability(capability) then
+			return true
+		end
+	end
+	return false
+end
+
+local function getModerationReasonLabel(reasonCode)
+	return (Constants.ModerationReasons and Constants.ModerationReasons[reasonCode]) or tostring(reasonCode or "Other")
+end
+
+local function getNextModerationReason(reasonCode)
+	local order = Constants.ModerationReasonOrder or { "OTHER" }
+	for index, code in ipairs(order) do
+		if code == reasonCode then
+			return order[(index % #order) + 1]
+		end
+	end
+	return order[1]
+end
+
+local function makeConfirmableButton(parent, actionKey, label, confirmLabel, color, onConfirm)
+	local confirming = pendingAdminActionKey == actionKey
+	makeButton(parent, confirming and confirmLabel or label, confirming and Color3.fromRGB(138, 65, 55) or color, function()
+		if pendingAdminActionKey == actionKey then
+			pendingAdminActionKey = nil
+			onConfirm()
+		else
+			pendingAdminActionKey = actionKey
+			if rebuildPanel then
+				rebuildPanel()
+			end
+		end
+	end)
 end
 
 local function findFirstSelectableButton(root, selectionSnapshot)
@@ -1627,6 +1737,202 @@ local function rebuildStorePrices()
 	end)
 end
 
+local function sendUserAction(payload)
+	pendingAdminActionKey = nil
+	send(payload)
+end
+
+local function getSelectedManagedUser()
+	local userManagement = latestState and latestState.UserManagement
+	return userManagement and userManagement.SelectedUser or nil
+end
+
+local function rebuildUserManagement()
+	clearList(userList)
+	clearList(userManagementList)
+
+	if not latestState or not userList or not userManagementList then
+		return
+	end
+
+	if not hasAnyCapability({
+		"ROLE_MANAGEMENT",
+		"TEST_BUILD_ACCESS_MANAGEMENT",
+		"MOD_WARN_PLAYER",
+		"MOD_BAN_24H",
+		"MOD_VIEW_HISTORY",
+		"MOD_REMOVE_BAN",
+	}) then
+		return
+	end
+
+	local userManagement = latestState.UserManagement or {}
+	local livePlayers = userManagement.LivePlayers or {}
+	if makeCollapseHeader(userList, "UserManagement", "User Management", #livePlayers) then
+		makeSection(userList, "Manual Lookup")
+		manualLookupBox = makeTextBox(userList, "Roblox username", manualLookupBox and manualLookupBox.Text or "", function() end)
+		makeButton(userList, "Look Up Username", Color3.fromRGB(47, 85, 102), function()
+			selectedManagedUserId = nil
+			pendingAdminActionKey = nil
+			send({
+				Action = "LookupManagedUser",
+				Username = manualLookupBox and manualLookupBox.Text or "",
+			})
+		end)
+		makeButton(userList, "Refresh User List", Color3.fromRGB(45, 52, 64), function()
+			send({
+				Action = "RefreshUserManagement",
+			})
+		end)
+
+		makeSection(userList, "Live Players")
+		for _, summary in ipairs(livePlayers) do
+			local moderation = summary.Moderation or {}
+			local selected = selectedManagedUserId == summary.UserId
+			local text = ("%s%s\n@%s | %d | %s | Test %s | %s"):format(
+				selected and "> " or "",
+				summary.DisplayName or summary.Username or "Player",
+				summary.Username or "unknown",
+				summary.UserId or 0,
+				summary.Role or "Player",
+				summary.TestBuildAccess and "ON" or "OFF",
+				moderation.Status or "Normal"
+			)
+			makeButton(userList, text, selected and Color3.fromRGB(54, 90, 124) or Color3.fromRGB(45, 52, 64), function()
+				selectedManagedUserId = summary.UserId
+				pendingAdminActionKey = nil
+				send({
+					Action = "SelectManagedUser",
+					TargetUserId = summary.UserId,
+				})
+			end)
+		end
+	end
+
+	local selected = getSelectedManagedUser()
+	if not selected then
+		return
+	end
+
+	selectedManagedUserId = selected.UserId
+	local moderation = selected.Moderation or {}
+	local activeBan = moderation.ActiveBan
+	local onlineText = selected.Online and "ONLINE" or "PLAYER OFFLINE"
+	makeSection(userManagementList, "Player Management")
+	makeInfoText(
+		userManagementList,
+		("%s\nDisplay: %s\nUsername: @%s\nUserId: %d\nRole: %s | Test Access: %s\nModeration: %s | Warnings: %d"):format(
+			onlineText,
+			selected.DisplayName or selected.Username or "Unknown",
+			selected.Username or "unknown",
+			selected.UserId or 0,
+			selected.Role or "Player",
+			selected.TestBuildAccess and "Enabled" or "Disabled",
+			moderation.Status or "Normal",
+			moderation.WarningCount or 0
+		),
+		isPhoneProfile() and 86 or 102
+	)
+
+	if hasCapability("ROLE_MANAGEMENT") then
+		makeSection(userManagementList, "Role / Access")
+		for _, role in ipairs((latestState.UserManagement and latestState.UserManagement.RoleOrder) or Constants.AdminRoleOrder or {}) do
+			makeConfirmableButton(userManagementList, ("role:%d:%s"):format(selected.UserId, role), ("Set %s"):format(role), ("CONFIRM Set %s"):format(role), Color3.fromRGB(52, 83, 70), function()
+				sendUserAction({
+					Action = "SetManagedUserRole",
+					TargetUserId = selected.UserId,
+					Role = role,
+				})
+			end)
+		end
+	end
+
+	if hasCapability("TEST_BUILD_ACCESS_MANAGEMENT") then
+		makeConfirmableButton(
+			userManagementList,
+			("test:%d:%s"):format(selected.UserId, tostring(not selected.TestBuildAccess)),
+			selected.TestBuildAccess and "Disable Test Access" or "Enable Test Access",
+			selected.TestBuildAccess and "CONFIRM Disable Test Access" or "CONFIRM Enable Test Access",
+			selected.TestBuildAccess and Color3.fromRGB(116, 48, 52) or Color3.fromRGB(38, 113, 96),
+			function()
+				sendUserAction({
+					Action = "SetManagedUserTestAccess",
+					TargetUserId = selected.UserId,
+					Enabled = not selected.TestBuildAccess,
+				})
+			end
+		)
+	end
+
+	if hasAnyCapability({ "MOD_WARN_PLAYER", "MOD_BAN_24H", "MOD_VIEW_HISTORY", "MOD_REMOVE_BAN" }) then
+		makeSection(userManagementList, "Moderation")
+		makeButton(userManagementList, ("Reason: %s"):format(getModerationReasonLabel(selectedModerationReasonCode)), Color3.fromRGB(64, 70, 82), function()
+			selectedModerationReasonCode = getNextModerationReason(selectedModerationReasonCode)
+			pendingAdminActionKey = nil
+			rebuildPanel()
+		end)
+		makeTextBox(userManagementList, "Optional details / required for Other", moderationReasonText, function(text)
+			moderationReasonText = text
+		end)
+	end
+
+	if hasCapability("MOD_WARN_PLAYER") then
+		makeConfirmableButton(userManagementList, ("warn:%d"):format(selected.UserId), "Warn Player", "CONFIRM Issue Warning", Color3.fromRGB(126, 93, 42), function()
+			sendUserAction({
+				Action = "WarnManagedUser",
+				TargetUserId = selected.UserId,
+				ReasonCode = selectedModerationReasonCode,
+				ReasonText = moderationReasonText,
+			})
+		end)
+	end
+
+	if hasCapability("MOD_BAN_24H") then
+		makeConfirmableButton(userManagementList, ("ban:%d"):format(selected.UserId), "24-Hour Ban", "CONFIRM 24-HOUR BAN", Color3.fromRGB(132, 54, 61), function()
+			sendUserAction({
+				Action = "BanManagedUser24h",
+				TargetUserId = selected.UserId,
+				ReasonCode = selectedModerationReasonCode,
+				ReasonText = moderationReasonText,
+			})
+		end)
+	end
+
+	if activeBan and hasCapability("MOD_REMOVE_BAN") then
+		makeConfirmableButton(userManagementList, ("unban:%d"):format(selected.UserId), "Remove Active Ban", "CONFIRM Remove Ban", Color3.fromRGB(116, 48, 52), function()
+			sendUserAction({
+				Action = "RemoveManagedUserBan",
+				TargetUserId = selected.UserId,
+				ReasonText = moderationReasonText,
+			})
+		end)
+	end
+
+	if hasCapability("MOD_VIEW_HISTORY") then
+		makeButton(userManagementList, "View Moderation History", Color3.fromRGB(47, 85, 102), function()
+			send({
+				Action = "ViewManagedUserHistory",
+				TargetUserId = selected.UserId,
+			})
+		end)
+	end
+
+	local history = selected.ModerationHistory
+	if typeof(history) == "table" then
+		local rows = {}
+		for _, warning in ipairs(history.Warnings or {}) do
+			table.insert(rows, ("WARN %s | %s"):format(warning.ReasonCode or "OTHER", warning.ReasonText or ""))
+		end
+		for _, ban in ipairs(history.Bans or {}) do
+			table.insert(rows, ("BAN %s | until %s | %s"):format(ban.ReasonCode or "OTHER", tostring(ban.ExpirationTime or "?"), ban.ReasonText or ""))
+		end
+		for _, unban in ipairs(history.Unbans or {}) do
+			table.insert(rows, ("UNBAN | %s"):format(unban.ReasonText or ""))
+		end
+		makeInfoText(userManagementList, if #rows > 0 then table.concat(rows, "\n") else "No moderation history.", math.min(180, math.max(54, #rows * 30)))
+	end
+end
+
 rebuildPanel = function()
 	if not latestState or not gui then
 		return
@@ -1644,9 +1950,11 @@ rebuildPanel = function()
 	clearList(toolsList)
 	clearList(energyList)
 	clearList(storeList)
+	clearList(userList)
+	clearList(userManagementList)
 
 	local rooms = latestState.Rooms or {}
-	if makeCollapseHeader(roomList, "Locations", "Locations", #rooms) then
+	if hasAnyCapability({ "DEV_ROOM_TESTING", "DEV_FULL", "TEST_ROOM_TELEPORT" }) and makeCollapseHeader(roomList, "Locations", "Locations", #rooms) then
 		for _, room in ipairs(rooms) do
 			local isSelected = room.Id == selectedRoomId
 			makeButton(roomList, (isSelected and "> " or "") .. room.Name, isSelected and Color3.fromRGB(54, 90, 124) or Color3.fromRGB(45, 52, 64), function()
@@ -1659,7 +1967,7 @@ rebuildPanel = function()
 		end
 	end
 
-	if makeCollapseHeader(sessionList, "SessionSimulation", "Session Simulation", 1) then
+	if hasCapability("DEV_FULL") and makeCollapseHeader(sessionList, "SessionSimulation", "Session Simulation", 1) then
 		makeButton(sessionList, "Fresh Start", Color3.fromRGB(42, 103, 92), function()
 			send({
 				Action = "FreshStart",
@@ -1668,7 +1976,7 @@ rebuildPanel = function()
 	end
 
 	local presets = latestState.Presets or {}
-	if makeCollapseHeader(roomStateList, "RoomState", "Room State", #presets + 2) then
+	if hasAnyCapability({ "DEV_ROOM_TESTING", "DEV_FULL", "TEST_ROOM_STATE" }) and makeCollapseHeader(roomStateList, "RoomState", "Room State", #presets + 2) then
 		for _, presetName in ipairs(presets) do
 			makeButton(roomStateList, presetName, Color3.fromRGB(74, 58, 112), function()
 				send({
@@ -1691,7 +1999,7 @@ rebuildPanel = function()
 	end
 
 	local events = latestState.Events or {}
-	if makeCollapseHeader(eventList, "Events", "Events", #events + 1) then
+	if hasCapability("DEV_FULL") and makeCollapseHeader(eventList, "Events", "Events", #events + 1) then
 		makeButton(eventList, "Trigger Random Event", Color3.fromRGB(138, 77, 56), function()
 			send({
 				Action = "TriggerRandomEvent",
@@ -1708,7 +2016,7 @@ rebuildPanel = function()
 	end
 
 	local secretAreas = latestState.SecretAreas or {}
-	if makeCollapseHeader(areaList, "SecretAreas", "Secret Areas", #secretAreas) then
+	if hasAnyCapability({ "DEV_FULL", "DEV_SURVEILLANCE" }) and makeCollapseHeader(areaList, "SecretAreas", "Secret Areas", #secretAreas) then
 		for _, area in ipairs(secretAreas) do
 			makeButton(areaList, area.Name, Color3.fromRGB(55, 93, 113), function()
 				send({
@@ -1719,42 +2027,46 @@ rebuildPanel = function()
 		end
 	end
 
-	if makeCollapseHeader(toolsList, "SessionTools", "Session Tools", 7) then
+	if hasAnyCapability({ "DEV_FULL", "TEST_BUILD_ACCESS" }) and makeCollapseHeader(toolsList, "SessionTools", hasCapability("DEV_FULL") and "Session Tools" or "Facility Test Panel", 7) then
 		local titleSequenceEnabled = isTitleSequenceEnabledForDev()
-		makeButton(
-			toolsList,
-			titleSequenceEnabled and "Title Sequence: ON" or "Title Sequence: OFF",
-			titleSequenceEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(116, 48, 52),
-			function()
-				setTitleSequenceEnabledForDev(not isTitleSequenceEnabledForDev())
-				rebuildPanel()
-			end
-		)
-		makeButton(toolsList, "Show Title Now", Color3.fromRGB(47, 85, 102), showTitleSequenceNowForDev)
-		makeButton(toolsList, "Unlock All This Session", Color3.fromRGB(35, 103, 68), function()
-			send({
-				Action = "UnlockAllSession",
-			})
-		end)
-		makeButton(toolsList, "Restore Normal Progress", Color3.fromRGB(116, 48, 52), function()
-			send({
-				Action = "RestoreNormalProgress",
-			})
-		end)
-		makeButton(toolsList, (flyEnabled and "Fly: ON" or "Fly: OFF"), flyEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(64, 70, 82), function()
-			send({
-				Action = "SetMovement",
-				Fly = not flyEnabled,
-				Noclip = noclipEnabled,
-			})
-		end)
-		makeButton(toolsList, (noclipEnabled and "Noclip: ON" or "Noclip: OFF"), noclipEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(64, 70, 82), function()
-			send({
-				Action = "SetMovement",
-				Fly = flyEnabled,
-				Noclip = not noclipEnabled,
-			})
-		end)
+		if hasCapability("DEV_FULL") then
+			makeButton(
+				toolsList,
+				titleSequenceEnabled and "Title Sequence: ON" or "Title Sequence: OFF",
+				titleSequenceEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(116, 48, 52),
+				function()
+					setTitleSequenceEnabledForDev(not isTitleSequenceEnabledForDev())
+					rebuildPanel()
+				end
+			)
+			makeButton(toolsList, "Show Title Now", Color3.fromRGB(47, 85, 102), showTitleSequenceNowForDev)
+			makeButton(toolsList, "Unlock All This Session", Color3.fromRGB(35, 103, 68), function()
+				send({
+					Action = "UnlockAllSession",
+				})
+			end)
+			makeButton(toolsList, "Restore Normal Progress", Color3.fromRGB(116, 48, 52), function()
+				send({
+					Action = "RestoreNormalProgress",
+				})
+			end)
+			makeButton(toolsList, (flyEnabled and "Fly: ON" or "Fly: OFF"), flyEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(64, 70, 82), function()
+				send({
+					Action = "SetMovement",
+					Fly = not flyEnabled,
+					Noclip = noclipEnabled,
+				})
+			end)
+			makeButton(toolsList, (noclipEnabled and "Noclip: ON" or "Noclip: OFF"), noclipEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(64, 70, 82), function()
+				send({
+					Action = "SetMovement",
+					Fly = flyEnabled,
+					Noclip = not noclipEnabled,
+				})
+			end)
+		else
+			makeInfoText(toolsList, ("TEST SESSION\nBuild: %s\nCurrent room: %s"):format(tostring(Constants.BuildVersion or "?"), selectedRoomId or "?"), 64)
+		end
 		makeButton(toolsList, (inspectEnabled and "Inspect: ON" or "Inspect: OFF"), inspectEnabled and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(64, 70, 82), function()
 			setInspectState(not inspectEnabled)
 			rebuildPanel()
@@ -1775,7 +2087,7 @@ rebuildPanel = function()
 	local bunkerPower = math.floor((tonumber(energy.WorldPower) or 0) * 100 + 0.5)
 	local signalLoad = math.floor((tonumber(energy.BunkerHunger) or 0) * 100 + 0.5)
 	local energyTitle = ("Energy / Recovery  P%d%% B%d%% S%d%%"):format(playerEnergy, bunkerPower, signalLoad)
-	if makeCollapseHeader(energyList, "EnergyRecovery", energyTitle, 9) then
+	if hasAnyCapability({ "DEV_BUNKER_ENERGY", "DEV_FULL" }) and makeCollapseHeader(energyList, "EnergyRecovery", energyTitle, 9) then
 		makeButton(energyList, "Nourishment: 100%", Color3.fromRGB(38, 113, 96), function()
 			send({
 				Action = "SetNourishment",
@@ -1833,8 +2145,13 @@ rebuildPanel = function()
 		end)
 	end
 
-	rebuildStorePrices()
-	rebuildDiscoveries()
+	if hasAnyCapability({ "DEV_ECONOMY_TESTING", "DEV_FULL" }) then
+		rebuildStorePrices()
+	end
+	if hasAnyCapability({ "DEV_ROOM_TESTING", "DEV_FULL" }) then
+		rebuildDiscoveries()
+	end
+	rebuildUserManagement()
 	updateStatus()
 	preserveGamepadSelection(selectionSnapshot)
 end
@@ -2020,6 +2337,8 @@ local function buildGui()
 	energyList = makeList(scroll)
 	storeList = makeList(scroll)
 	discoveryList = makeList(scroll)
+	userList = makeList(scroll)
+	userManagementList = makeList(scroll)
 	applyDevLayout(currentDeviceProfile)
 
 	wireButtonActivation(toggleButton, function()
@@ -2059,6 +2378,31 @@ devRemote.OnClientEvent:Connect(function(payload)
 		return
 	end
 
+	if payload.Type == "UserManagement" then
+		if latestState then
+			latestState.UserManagement = payload.UserManagement
+			if payload.UserMessage and showDevInfo then
+				showDevInfo(payload.UserMessage, 6)
+			end
+			rebuildPanel()
+		end
+		return
+	end
+
+	if payload.Type == "AuthorizationRevoked" then
+		authorized = false
+		latestState = nil
+		clearIdLabels()
+		setInspectState(false)
+		if panel then
+			panel.Visible = false
+		end
+		if toggleButton then
+			toggleButton.Visible = false
+		end
+		return
+	end
+
 	if payload.Authorized ~= true then
 		return
 	end
@@ -2066,6 +2410,9 @@ devRemote.OnClientEvent:Connect(function(payload)
 	authorized = true
 	connectMovementLoops()
 	buildGui()
+	if toggleButton then
+		toggleButton.Visible = true
+	end
 	if not inspectAutoEnabled then
 		inspectAutoEnabled = true
 		setInspectState(true)

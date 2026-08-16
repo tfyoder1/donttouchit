@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.180"
+Constants.BuildVersion = "0.5.181"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -286,8 +286,102 @@ Constants.DataStore = {
 	FeedbackName = "DontTouchItFeedback_v1",
 	VictoryBricksName = "DontTouchItVictoryBricks_v1",
 	VictoryBricksKey = "victory_brick_registry",
+	AdminRolesName = "DontTouchItAdminRoles_v1",
+	ModerationName = "DontTouchItModeration_v1",
+	AdminAuditName = "DontTouchItAdminAudit_v1",
 	AutosaveSeconds = 45,
 	RetryCount = 3,
+}
+
+Constants.AdminRoles = {
+	Owner = "Owner",
+	Developer = "Developer",
+	Tester = "Tester",
+	Founder = "Founder",
+	Player = "Player",
+}
+
+Constants.AdminRoleOrder = {
+	Constants.AdminRoles.Player,
+	Constants.AdminRoles.Tester,
+	Constants.AdminRoles.Developer,
+	Constants.AdminRoles.Founder,
+}
+
+Constants.AdminCapabilities = {
+	DEV_FULL = "DEV_FULL",
+	DEV_ROOM_TESTING = "DEV_ROOM_TESTING",
+	DEV_ECONOMY_TESTING = "DEV_ECONOMY_TESTING",
+	DEV_SURVEILLANCE = "DEV_SURVEILLANCE",
+	DEV_BUNKER_ENERGY = "DEV_BUNKER_ENERGY",
+	TEST_ROOM_TELEPORT = "TEST_ROOM_TELEPORT",
+	TEST_ROOM_STATE = "TEST_ROOM_STATE",
+	TEST_BUILD_ACCESS = "TEST_BUILD_ACCESS",
+	TEST_BUILD_ACCESS_MANAGEMENT = "TEST_BUILD_ACCESS_MANAGEMENT",
+	ROLE_MANAGEMENT = "ROLE_MANAGEMENT",
+	FOUNDER_RECOGNITION = "FOUNDER_RECOGNITION",
+	MOD_WARN_PLAYER = "MOD_WARN_PLAYER",
+	MOD_BAN_24H = "MOD_BAN_24H",
+	MOD_VIEW_HISTORY = "MOD_VIEW_HISTORY",
+	MOD_REMOVE_BAN = "MOD_REMOVE_BAN",
+}
+
+Constants.AdminCapabilityOrder = {
+	"DEV_FULL",
+	"DEV_ROOM_TESTING",
+	"DEV_ECONOMY_TESTING",
+	"DEV_SURVEILLANCE",
+	"DEV_BUNKER_ENERGY",
+	"TEST_ROOM_TELEPORT",
+	"TEST_ROOM_STATE",
+	"TEST_BUILD_ACCESS",
+	"TEST_BUILD_ACCESS_MANAGEMENT",
+	"ROLE_MANAGEMENT",
+	"FOUNDER_RECOGNITION",
+	"MOD_WARN_PLAYER",
+	"MOD_BAN_24H",
+	"MOD_VIEW_HISTORY",
+	"MOD_REMOVE_BAN",
+}
+
+Constants.DeveloperDefaultCapabilities = {
+	"DEV_FULL",
+	"DEV_ROOM_TESTING",
+	"DEV_ECONOMY_TESTING",
+	"DEV_SURVEILLANCE",
+	"DEV_BUNKER_ENERGY",
+	"TEST_ROOM_TELEPORT",
+	"TEST_ROOM_STATE",
+	"TEST_BUILD_ACCESS",
+	"MOD_WARN_PLAYER",
+	"MOD_BAN_24H",
+	"MOD_VIEW_HISTORY",
+}
+
+Constants.TesterDefaultCapabilities = {
+	"TEST_ROOM_TELEPORT",
+	"TEST_ROOM_STATE",
+	"TEST_BUILD_ACCESS",
+}
+
+Constants.ModerationReasons = {
+	HARASSMENT = "Harassment",
+	ABUSIVE_BEHAVIOR = "Abusive behavior",
+	DISRUPTION = "Disrupting other players",
+	EXPLOIT_SUSPICION = "Exploit suspicion",
+	INAPPROPRIATE_CONDUCT = "Inappropriate conduct",
+	SPAM = "Spam",
+	OTHER = "Other",
+}
+
+Constants.ModerationReasonOrder = {
+	"HARASSMENT",
+	"ABUSIVE_BEHAVIOR",
+	"DISRUPTION",
+	"EXPLOIT_SUSPICION",
+	"INAPPROPRIATE_CONDUCT",
+	"SPAM",
+	"OTHER",
 }
 
 Constants.VictoryWalkway = {
@@ -1680,6 +1774,19 @@ Constants.Rooms = {
 		},
 	},
 }
+
+for _, room in pairs(Constants.Rooms) do
+	if room.TesterAccessible == nil then
+		room.TesterAccessible = true
+	end
+	if room.TesterStatePresets == nil then
+		room.TesterStatePresets = {
+			"Fresh",
+			"Midway",
+			"Completed",
+		}
+	end
+end
 
 Constants.RoomUnlockRules = {
 	SecurityRoom = {

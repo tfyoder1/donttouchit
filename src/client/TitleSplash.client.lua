@@ -187,7 +187,6 @@ local titleCameraState = nil
 local titleCameraToken = 0
 
 local SUPPRESSED_PROJECT_GUIS = {
-	DontTouchItUI = true,
 	DontTouchItDevTools = true,
 	DontTouchItTouchControls = true,
 	DontTouchItControlOptions = true,
@@ -633,6 +632,7 @@ local function fadeAndDestroy()
 		return
 	end
 
+	notifyTitleSplashFinished()
 	restoreTopbar()
 	restoreSplashBlur()
 	stopTitleCameraPan()
