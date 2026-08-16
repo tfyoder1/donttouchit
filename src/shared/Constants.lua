@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.192"
+Constants.BuildVersion = "0.5.193"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
@@ -39,6 +39,7 @@ Constants.Remotes = {
 	LocalAudio = "LocalAudio",
 	LocationPing = "LocationPing",
 	InventoryAction = "InventoryAction",
+	UiLayout = "UiLayout",
 }
 
 Constants.Tags = {
@@ -289,6 +290,7 @@ Constants.DataStore = {
 	AdminRolesName = "DontTouchItAdminRoles_v1",
 	ModerationName = "DontTouchItModeration_v1",
 	AdminAuditName = "DontTouchItAdminAudit_v1",
+	UiLayoutName = "DontTouchItUiLayout_v1",
 	AutosaveSeconds = 45,
 	RetryCount = 3,
 }

@@ -1,8 +1,12 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local uiLayoutRemote = remotes:WaitForChild(Constants.Remotes.UiLayout)
 
 local TouchControls = {}
 
@@ -49,6 +53,58 @@ local activeControlInputs = {}
 local activeControlInputConnections = {}
 local controlsToggle = nil
 local controlsTogglePosition = nil
+local loadedLayout = nil
+local layoutSaveQueued = false
+
+local function udim2ToPayload(position)
+	return {
+		XScale = position.X.Scale,
+		XOffset = position.X.Offset,
+		YScale = position.Y.Scale,
+		YOffset = position.Y.Offset,
+	}
+end
+
+local function payloadToUdim2(payload)
+	if typeof(payload) ~= "table" then
+		return nil
+	end
+	return UDim2.new(
+		tonumber(payload.XScale) or 0,
+		tonumber(payload.XOffset) or 0,
+		tonumber(payload.YScale) or 0,
+		tonumber(payload.YOffset) or 0
+	)
+end
+
+local function buildLayoutPayload()
+	local layout = {}
+	for id, position in pairs(sessionPositions) do
+		layout[id] = udim2ToPayload(position)
+	end
+	if controlsTogglePosition then
+		layout.Controls = udim2ToPayload(controlsTogglePosition)
+	end
+	return layout
+end
+
+local function saveLayoutNow()
+	uiLayoutRemote:FireServer({
+		Action = "Save",
+		Layout = buildLayoutPayload(),
+	})
+end
+
+local function queueSaveLayout()
+	if layoutSaveQueued then
+		return
+	end
+	layoutSaveQueued = true
+	task.delay(0.35, function()
+		layoutSaveQueued = false
+		saveLayoutNow()
+	end)
+end
 
 local function isTouchPointer(input)
 	return input.UserInputType == Enum.UserInputType.Touch
@@ -329,6 +385,7 @@ local function applyControlsToggleState()
 		controlsToggle.Position = clampGuiPosition(controlsToggle, controlsTogglePosition)
 		controlsTogglePosition = controlsToggle.Position
 	end
+	controlsToggle.Visible = true
 
 	local coordinateLabel = ensureChromeCoordinateLabel(controlsToggle)
 	local anchorPosition = controlsToggle.AbsolutePosition + controlsToggle.AbsoluteSize * controlsToggle.AnchorPoint
@@ -492,10 +549,14 @@ local function updateLabelToggleButton()
 end
 
 local function finishDrag()
+	local hadDrag = activeDrag ~= nil
 	if activeDrag and activeDrag.State and activeDrag.State.Button then
 		activeDrag.State.Button.ZIndex = BUTTON_Z_INDEX
 	end
 	activeDrag = nil
+	if hadDrag then
+		queueSaveLayout()
+	end
 end
 
 local function beginChromeDrag(guiObject, input)
@@ -511,7 +572,11 @@ local function beginChromeDrag(guiObject, input)
 end
 
 local function finishChromeDrag()
+	local hadDrag = activeChromeDrag ~= nil
 	activeChromeDrag = nil
+	if hadDrag then
+		queueSaveLayout()
+	end
 end
 
 local function finishControlInput(input)
@@ -693,6 +758,9 @@ local function createOptionsPanel()
 	toggle.AnchorPoint = Vector2.new(0, 0)
 	setStroke(toggle, Color3.fromRGB(102, 217, 255), 1.5, 0.22)
 	controlsToggle = toggle
+	if loadedLayout and loadedLayout.Controls then
+		controlsTogglePosition = payloadToUdim2(loadedLayout.Controls)
+	end
 	applyControlsToggleState()
 	toggle.InputBegan:Connect(function(input)
 		beginChromeDrag(toggle, input)
@@ -799,12 +867,14 @@ local function createOptionsPanel()
 		if editMode then
 			return
 		end
+		toggle.Visible = true
 		panel.Visible = not panel.Visible
 	end)
 
 	close.Activated:Connect(function()
 		panel.Visible = false
 		setEditMode(false)
+		applyControlsToggleState()
 	end)
 
 	editButton.Activated:Connect(function()
@@ -825,6 +895,9 @@ local function createOptionsPanel()
 		playerGui:SetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE, (tonumber(playerGui:GetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE)) or 0) + 1)
 		applyAllButtonStates()
 		applyControlsToggleState()
+		uiLayoutRemote:FireServer({
+			Action = "Reset",
+		})
 	end)
 
 	renderOptionsRows()
@@ -853,6 +926,9 @@ local function register(config, hasTouchButton)
 	state.Touch = tostring(config.Touch or state.Text)
 	state.Order = tonumber(config.Order) or 100
 	state.DefaultPosition = config.Position or config.DefaultPosition or UDim2.new(1, -92, 1, -176)
+	if loadedLayout and loadedLayout[id] then
+		sessionPositions[id] = payloadToUdim2(loadedLayout[id])
+	end
 	state.Size = config.Size or TOUCH_BUTTON_SIZE
 	state.Color = config.Color or Color3.fromRGB(18, 23, 29)
 	state.TextColor = config.TextColor or Color3.fromRGB(224, 236, 245)
@@ -1007,5 +1083,26 @@ playerGui:GetAttributeChangedSignal(TOUCH_HIDE_LABELS_ATTRIBUTE):Connect(functio
 	updateLabelToggleButton()
 	applyAllButtonStates()
 end)
+
+uiLayoutRemote.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" or payload.Action ~= "Loaded" then
+		return
+	end
+	loadedLayout = if typeof(payload.Layout) == "table" then payload.Layout else {}
+	table.clear(sessionPositions)
+	for id, positionPayload in pairs(loadedLayout) do
+		if id == "Controls" then
+			controlsTogglePosition = payloadToUdim2(positionPayload)
+		elseif controlsById[id] then
+			sessionPositions[id] = payloadToUdim2(positionPayload)
+		end
+	end
+	applyAllButtonStates()
+	applyControlsToggleState()
+end)
+
+uiLayoutRemote:FireServer({
+	Action = "Request",
+})
 
 return TouchControls

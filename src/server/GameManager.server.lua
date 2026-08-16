@@ -15,6 +15,7 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
 local RoomBuilder = require(script.Parent:WaitForChild("RoomBuilder"))
+local UiLayoutService = require(script.Parent:WaitForChild("UiLayoutService"))
 local VictoryBrickService = require(script.Parent:WaitForChild("VictoryBrickService"))
 
 workspace.Gravity = Constants.NormalGravity
@@ -39,6 +40,9 @@ roomProgressService:SetMovementAuthorityService(movementAuthorityService)
 
 local locationPingService = LocationPingService.new()
 locationPingService:Initialize()
+
+local uiLayoutService = UiLayoutService.new()
+uiLayoutService:Initialize()
 
 local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService)
 bunkerEnergyService:Initialize()
