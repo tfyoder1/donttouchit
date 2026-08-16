@@ -61,6 +61,7 @@ local lastIdLabelsUpdateAt = 0
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
 local DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE = "DontTouchItDevTitleSequenceEnabled"
 local DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE = "DontTouchItDevShowTitleSequenceNonce"
+local DEV_WALL_DRAFT_ENABLED_ATTRIBUTE = "DontTouchItDevWallDraftEnabled"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
 local playerGui = player:WaitForChild("PlayerGui")
@@ -89,6 +90,9 @@ local devPanelManualPosition = nil
 local devLayoutDragging = nil
 local devToggleCoordinateLabel = nil
 local devPanelCoordinateLabel = nil
+local flyTouchGui = nil
+local flyTouchUpPressed = false
+local flyTouchDownPressed = false
 
 local sectionExpanded = {
 	Locations = false,
@@ -1551,6 +1555,7 @@ local function isFlyDescendPressed()
 		or pressedKeys[Enum.KeyCode.ButtonX]
 		or pressedKeys[Enum.KeyCode.ButtonB]
 		or pressedKeys[Enum.KeyCode.DPadDown]
+		or flyTouchDownPressed
 end
 
 local function isFlyAscendPressed()
@@ -1558,6 +1563,7 @@ local function isFlyAscendPressed()
 		or pressedKeys[Enum.KeyCode.E]
 		or pressedKeys[Enum.KeyCode.ButtonA]
 		or pressedKeys[Enum.KeyCode.DPadUp]
+		or flyTouchUpPressed
 end
 
 local function isAirborneForDoubleJump()
@@ -1634,6 +1640,73 @@ local function destroyFlyObjects()
 	end
 end
 
+local function destroyFlyTouchButtons()
+	flyTouchUpPressed = false
+	flyTouchDownPressed = false
+	if flyTouchGui then
+		flyTouchGui:Destroy()
+		flyTouchGui = nil
+	end
+end
+
+local function makeFlyTouchButton(parent, name, text, position, began, ended)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.AnchorPoint = Vector2.new(1, 1)
+	button.BackgroundColor3 = Color3.fromRGB(18, 23, 29)
+	button.BackgroundTransparency = 0.12
+	button.BorderSizePixel = 0
+	button.Font = Enum.Font.GothamBlack
+	button.Position = position
+	button.Size = UDim2.fromOffset(64, 48)
+	button.Text = text
+	button.TextColor3 = Color3.fromRGB(226, 245, 255)
+	button.TextScaled = true
+	button.TextStrokeTransparency = 0.35
+	button.ZIndex = 16
+	button.Parent = parent
+	makeCorner(button, 8)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(119, 255, 203)
+	stroke.Thickness = 1.2
+	stroke.Transparency = 0.25
+	stroke.Parent = button
+	button.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			began()
+		end
+	end)
+	button.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			ended()
+		end
+	end)
+	return button
+end
+
+local function ensureFlyTouchButtons()
+	if not UserInputService.TouchEnabled or flyTouchGui then
+		return
+	end
+	flyTouchGui = Instance.new("ScreenGui")
+	flyTouchGui.Name = "DontTouchItDevFlyTouchControls"
+	flyTouchGui.ResetOnSpawn = false
+	flyTouchGui.IgnoreGuiInset = true
+	flyTouchGui.DisplayOrder = 172
+	flyTouchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	flyTouchGui.Parent = playerGui
+	makeFlyTouchButton(flyTouchGui, "DevFlyUp", "UP", UDim2.new(1, -24, 1, -196), function()
+		flyTouchUpPressed = true
+	end, function()
+		flyTouchUpPressed = false
+	end)
+	makeFlyTouchButton(flyTouchGui, "DevFlyDown", "DN", UDim2.new(1, -24, 1, -132), function()
+		flyTouchDownPressed = true
+	end, function()
+		flyTouchDownPressed = false
+	end)
+end
+
 local function updateFlyObjects()
 	local rootPart = getRootPart()
 	if not rootPart then
@@ -1675,6 +1748,9 @@ local function setMovementState(fly, noclip)
 
 	if not flyEnabled then
 		destroyFlyObjects()
+		destroyFlyTouchButtons()
+	elseif flyEnabled then
+		ensureFlyTouchButtons()
 	end
 
 	if not noclipEnabled then
@@ -2228,6 +2304,15 @@ rebuildPanel = function()
 					Noclip = not noclipEnabled,
 				})
 			end)
+			makeButton(
+				toolsList,
+				(playerGui:GetAttribute(DEV_WALL_DRAFT_ENABLED_ATTRIBUTE) == true and "Wall Draft: ON" or "Wall Draft: OFF"),
+				playerGui:GetAttribute(DEV_WALL_DRAFT_ENABLED_ATTRIBUTE) == true and Color3.fromRGB(38, 113, 96) or Color3.fromRGB(64, 70, 82),
+				function()
+					playerGui:SetAttribute(DEV_WALL_DRAFT_ENABLED_ATTRIBUTE, playerGui:GetAttribute(DEV_WALL_DRAFT_ENABLED_ATTRIBUTE) ~= true)
+					rebuildPanel()
+				end
+			)
 		else
 			makeInfoText(toolsList, ("TEST SESSION\nBuild: %s\nCurrent room: %s"):format(tostring(Constants.BuildVersion or "?"), selectedRoomId or "?"), 64)
 		end

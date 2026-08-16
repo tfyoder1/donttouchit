@@ -27,7 +27,7 @@ return {
 
 		for index = 1, sectionsToHide do
 			local section = floorSections[index]
-			if section and section.Parent then
+			if section and section.Parent and section:GetAttribute("FloorGoneProtected") ~= true then
 				section.Transparency = 1
 				section.CanCollide = false
 			end
@@ -36,4 +36,3 @@ return {
 		task.wait(Constants.EventDuration)
 	end,
 }
-

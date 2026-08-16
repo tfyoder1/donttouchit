@@ -406,6 +406,9 @@ local function makeFloor(roomFolder)
 
 			local prompt = createPrompt(floor, "Press", "The Floor", 0)
 			prompt.MaxActivationDistance = 7
+			if (column >= 3 and row >= 3) or (column == 2 and row == 3) then
+				floor:SetAttribute("FloorGoneProtected", true)
+			end
 			tag(floor, Constants.Tags.FloorSection)
 		end
 	end
@@ -1670,17 +1673,42 @@ local function makeLowerTunnelBranch(parent)
 	createPart(tunnel, "ThirdFlightRightWall", Vector3.new(0.38, 10.8, 12.8), CFrame.new(-15.45, -7.4, 61.8), wallColor, Enum.Material.Concrete)
 	createPart(tunnel, "ThirdFlightLowCeiling", Vector3.new(6.4, 0.38, 12.8), CFrame.new(-18.45, -2.1, 61.8), Color3.fromRGB(24, 30, 37), Enum.Material.Concrete)
 
-	createPart(tunnel, "LowerTunnelFloor", Vector3.new(28, 0.7, 58), CFrame.new(-18.45, -13.72, 25), Color3.fromRGB(37, 43, 50), Enum.Material.Concrete)
-	createPart(tunnel, "LowerTunnelCeiling", Vector3.new(28, 0.7, 58), CFrame.new(-18.45, -5.25, 25), Color3.fromRGB(26, 31, 38), Enum.Material.Concrete)
-	createPart(tunnel, "LowerTunnelLeftWall", Vector3.new(0.8, 8.8, 58), CFrame.new(-32.45, -9.5, 25), wallColor, Enum.Material.Concrete)
-	createPart(tunnel, "LowerTunnelRightWall", Vector3.new(0.8, 8.8, 58), CFrame.new(-4.45, -9.5, 25), wallColor, Enum.Material.Concrete)
-	createPart(tunnel, "LowerTunnelWalkway", Vector3.new(5.6, 0.24, 42), CFrame.new(-18.45, -13.22, 18), Color3.fromRGB(74, 82, 92), Enum.Material.Metal)
-	createPart(tunnel, "LowerTunnelRailLeft", Vector3.new(0.22, 1.3, 42), CFrame.new(-21.45, -12.36, 18), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
-	createPart(tunnel, "LowerTunnelRailRight", Vector3.new(0.22, 1.3, 42), CFrame.new(-15.45, -12.36, 18), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	local lowerTunnelCenterX = -45.45
+	local lowerTunnelShiftX = lowerTunnelCenterX + 18.45
+	local fourthLanding = createPart(tunnel, "FourthTurnLanding", Vector3.new(7.2, 0.42, 7.0), CFrame.new(-18.45, -13.72, 54), floorColor, Enum.Material.Concrete)
+	createPart(tunnel, "FourthTurnLandingLeftWall", Vector3.new(7.6, 8.2, 0.38), CFrame.new(-18.45, -9.8, 50.35), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "FourthTurnLandingRightWall", Vector3.new(7.6, 8.2, 0.38), CFrame.new(-18.45, -9.8, 57.65), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "FourthTurnLandingCeiling", Vector3.new(7.8, 0.38, 7.4), CFrame.new(-18.45, -5.45, 54), Color3.fromRGB(23, 29, 36), Enum.Material.Concrete)
+	for stepIndex = 1, 14 do
+		local alpha = stepIndex / 14
+		createPart(
+			tunnel,
+			"FourthFlightStep" .. stepIndex,
+			Vector3.new(0.86, 0.28, 4.8),
+			CFrame.new(-20.2 - stepIndex * 1.72, -13.72 - alpha * 0.35, 54),
+			Color3.fromRGB(61, 70, 82),
+			Enum.Material.Concrete
+		)
+	end
+	createPart(tunnel, "FourthFlightLeftWall", Vector3.new(27.5, 8.6, 0.38), CFrame.new(-33.4, -9.92, 50.72), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "FourthFlightRightWall", Vector3.new(27.5, 8.6, 0.38), CFrame.new(-33.4, -9.92, 57.28), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "FourthFlightLowCeiling", Vector3.new(27.5, 0.38, 6.9), CFrame.new(-33.4, -5.65, 54), Color3.fromRGB(22, 28, 35), Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelEntryLanding", Vector3.new(8.2, 0.42, 7.0), CFrame.new(lowerTunnelCenterX, -14.07, 54), floorColor, Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelEntryLandingLeftWall", Vector3.new(8.6, 8.4, 0.38), CFrame.new(lowerTunnelCenterX, -10.02, 50.35), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelEntryLandingRightWall", Vector3.new(8.6, 8.4, 0.38), CFrame.new(lowerTunnelCenterX, -10.02, 57.65), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelEntryLandingCeiling", Vector3.new(8.8, 0.38, 7.4), CFrame.new(lowerTunnelCenterX, -5.65, 54), Color3.fromRGB(22, 28, 35), Enum.Material.Concrete)
+
+	createPart(tunnel, "LowerTunnelFloor", Vector3.new(28, 0.7, 58), CFrame.new(lowerTunnelCenterX, -13.72, 25), Color3.fromRGB(37, 43, 50), Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelCeiling", Vector3.new(28, 0.7, 58), CFrame.new(lowerTunnelCenterX, -5.25, 25), Color3.fromRGB(26, 31, 38), Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelLeftWall", Vector3.new(0.8, 8.8, 58), CFrame.new(lowerTunnelCenterX - 14, -9.5, 25), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelRightWall", Vector3.new(0.8, 8.8, 58), CFrame.new(lowerTunnelCenterX + 14, -9.5, 25), wallColor, Enum.Material.Concrete)
+	createPart(tunnel, "LowerTunnelWalkway", Vector3.new(5.6, 0.24, 42), CFrame.new(lowerTunnelCenterX, -13.22, 18), Color3.fromRGB(74, 82, 92), Enum.Material.Metal)
+	createPart(tunnel, "LowerTunnelRailLeft", Vector3.new(0.22, 1.3, 42), CFrame.new(lowerTunnelCenterX - 3, -12.36, 18), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	createPart(tunnel, "LowerTunnelRailRight", Vector3.new(0.22, 1.3, 42), CFrame.new(lowerTunnelCenterX + 3, -12.36, 18), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
 
 	for _, pond in ipairs({
-		{ Name = "LeftRetainingPond", X = -26.7 },
-		{ Name = "RightRetainingPond", X = -10.2 },
+		{ Name = "LeftRetainingPond", X = -26.7 + lowerTunnelShiftX },
+		{ Name = "RightRetainingPond", X = -10.2 + lowerTunnelShiftX },
 	}) do
 		local water = createPart(tunnel, pond.Name, Vector3.new(8.8, 0.16, 34), CFrame.new(pond.X, -13.1, 17), waterColor, Enum.Material.Glass)
 		water.Transparency = 0.2
@@ -1690,36 +1718,36 @@ local function makeLowerTunnelBranch(parent)
 	end
 
 	for duckIndex, data in ipairs({
-		{ X = -26.3, Z = 11.5, Yaw = 18 },
-		{ X = -29.0, Z = 23.0, Yaw = -22 },
-		{ X = -10.0, Z = 13.0, Yaw = 35 },
-		{ X = -7.7, Z = 28.2, Yaw = -35 },
+		{ X = -26.3 + lowerTunnelShiftX, Z = 11.5, Yaw = 18 },
+		{ X = -29.0 + lowerTunnelShiftX, Z = 23.0, Yaw = -22 },
+		{ X = -10.0 + lowerTunnelShiftX, Z = 13.0, Yaw = 35 },
+		{ X = -7.7 + lowerTunnelShiftX, Z = 28.2, Yaw = -35 },
 	}) do
 		makeRubberDuck(tunnel, "LowerTunnelRubberDuck" .. duckIndex, CFrame.new(data.X, -12.76, data.Z) * CFrame.Angles(0, math.rad(data.Yaw), 0), 0.88)
 	end
 
-	local duckStand = createPart(tunnel, "ContributorDuckStand", Vector3.new(4.8, 2.2, 0.36), CFrame.new(-18.45, -11.62, 37.3), Color3.fromRGB(28, 72, 82), Enum.Material.Metal)
+	local duckStand = createPart(tunnel, "ContributorDuckStand", Vector3.new(4.8, 2.2, 0.36), CFrame.new(lowerTunnelCenterX, -11.62, 37.3), Color3.fromRGB(28, 72, 82), Enum.Material.Metal)
 	duckStand.CanCollide = false
 	duckStand:SetAttribute("BaseCanCollide", false)
 	createSurfaceText(duckStand, "ContributorDuckStandText", "DUCK\nFOUNDER\n80,000 R$", Enum.NormalId.Front, Color3.fromRGB(196, 249, 255), Color3.fromRGB(28, 72, 82))
 	createPrompt(duckStand, "Inspect", "Name a Duck", 0.2)
 	tag(duckStand, Constants.Tags.ContributorDuckStand)
 
-	local blastLeft = createPart(tunnel, "LowerBlastDoorLeft", Vector3.new(7.2, 8.1, 0.5), CFrame.new(-22.2, -9.45, -2.2), Color3.fromRGB(84, 90, 99), Enum.Material.Metal)
-	local blastRight = createPart(tunnel, "LowerBlastDoorRight", Vector3.new(7.2, 8.1, 0.5), CFrame.new(-14.7, -9.45, -2.2), Color3.fromRGB(84, 90, 99), Enum.Material.Metal)
-	local blastCenter = createPart(tunnel, "LowerBlastDoorWarningSeal", Vector3.new(3.2, 3.2, 0.58), CFrame.new(-18.45, -9.45, -2.55), Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
+	local blastLeft = createPart(tunnel, "LowerBlastDoorLeft", Vector3.new(7.2, 8.1, 0.5), CFrame.new(lowerTunnelCenterX - 3.75, -9.45, -2.2), Color3.fromRGB(84, 90, 99), Enum.Material.Metal)
+	local blastRight = createPart(tunnel, "LowerBlastDoorRight", Vector3.new(7.2, 8.1, 0.5), CFrame.new(lowerTunnelCenterX + 3.75, -9.45, -2.2), Color3.fromRGB(84, 90, 99), Enum.Material.Metal)
+	local blastCenter = createPart(tunnel, "LowerBlastDoorWarningSeal", Vector3.new(3.2, 3.2, 0.58), CFrame.new(lowerTunnelCenterX, -9.45, -2.55), Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
 	blastCenter.Shape = Enum.PartType.Cylinder
 	blastCenter:SetAttribute("PrologueDescription", "The blast doors are not part of a cave. That is the first truly bad sign.")
 	createSurfaceText(blastCenter, "BlastDoorWarningText", "?", Enum.NormalId.Front, Color3.fromRGB(34, 28, 16), Color3.fromRGB(255, 221, 84))
 	createPrompt(blastCenter, "Inspect", "Blast Doors", 0)
 	tag(blastCenter, Constants.Tags.LowerTunnelBlastDoor)
-	createPart(tunnel, "BlastDoorFrameTop", Vector3.new(16, 0.5, 0.8), CFrame.new(-18.45, -5.25, -2.2), Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
-	createPart(tunnel, "BlastDoorFrameLeft", Vector3.new(0.5, 8.6, 0.8), CFrame.new(-26.45, -9.45, -2.2), Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
-	createPart(tunnel, "BlastDoorFrameRight", Vector3.new(0.5, 8.6, 0.8), CFrame.new(-10.45, -9.45, -2.2), Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
+	createPart(tunnel, "BlastDoorFrameTop", Vector3.new(16, 0.5, 0.8), CFrame.new(lowerTunnelCenterX, -5.25, -2.2), Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
+	createPart(tunnel, "BlastDoorFrameLeft", Vector3.new(0.5, 8.6, 0.8), CFrame.new(lowerTunnelCenterX - 8, -9.45, -2.2), Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
+	createPart(tunnel, "BlastDoorFrameRight", Vector3.new(0.5, 8.6, 0.8), CFrame.new(lowerTunnelCenterX + 8, -9.45, -2.2), Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
 	createSurfaceText(blastLeft, "BlastLeftText", "AUTHORIZED\nTO TOUCH\nNOTHING", Enum.NormalId.Front, Color3.fromRGB(235, 245, 255), Color3.fromRGB(84, 90, 99))
 	createSurfaceText(blastRight, "BlastRightText", "BLAST\nDOORS", Enum.NormalId.Front, Color3.fromRGB(235, 245, 255), Color3.fromRGB(84, 90, 99))
 
-	tunnel.PrimaryPart = lowerLanding
+	tunnel.PrimaryPart = fourthLanding
 	return tunnel
 end
 

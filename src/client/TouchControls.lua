@@ -12,7 +12,7 @@ local TouchControls = {}
 
 local TOUCH_GUI_NAME = "DontTouchItTouchControls"
 local OPTIONS_GUI_NAME = "DontTouchItControlOptions"
-local TOUCH_LAYOUT_VERSION = "touch-cluster-2026-08-15-v5"
+local TOUCH_LAYOUT_VERSION = "touch-cluster-2026-08-16-v6"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
 local TOUCH_HIDE_LABELS_ATTRIBUTE = "DontTouchItTouchHideButtonLabels"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
@@ -79,6 +79,7 @@ end
 
 local function buildLayoutPayload()
 	local layout = {}
+	layout.Version = TOUCH_LAYOUT_VERSION
 	for id, position in pairs(sessionPositions) do
 		layout[id] = udim2ToPayload(position)
 	end
@@ -752,8 +753,8 @@ local function createOptionsPanel()
 		"...",
 		Color3.fromRGB(18, 23, 29),
 		Color3.fromRGB(224, 236, 245),
-		UDim2.new(1, -154, 0, 9),
-		UDim2.fromOffset(46, 34)
+		UDim2.new(0.965, -46, 0, 8),
+		UDim2.fromOffset(42, 28)
 	)
 	toggle.AnchorPoint = Vector2.new(0, 0)
 	setStroke(toggle, Color3.fromRGB(102, 217, 255), 1.5, 0.22)
@@ -1088,7 +1089,7 @@ uiLayoutRemote.OnClientEvent:Connect(function(payload)
 	if typeof(payload) ~= "table" or payload.Action ~= "Loaded" then
 		return
 	end
-	loadedLayout = if typeof(payload.Layout) == "table" then payload.Layout else {}
+	loadedLayout = if typeof(payload.Layout) == "table" and payload.Layout.Version == TOUCH_LAYOUT_VERSION then payload.Layout else {}
 	table.clear(sessionPositions)
 	for id, positionPayload in pairs(loadedLayout) do
 		if id == "Controls" then
