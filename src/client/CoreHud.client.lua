@@ -13,6 +13,7 @@ local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local HUD_NAME = "DontTouchItCoreHud"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
+local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
 local DRAG_MARGIN = 8
 local gui = playerGui:FindFirstChild(HUD_NAME)
 if gui and gui:IsA("ScreenGui") then
@@ -262,6 +263,17 @@ registerHudItem("Energy", energyPanel)
 local energyLabel = makeLabel(energyPanel, "PlayerEnergyLabel", "Energy 100%")
 local _, energyFill = makeTrack(energyPanel, "PlayerEnergyTrack")
 
+local bunkerEnergyPanel = makePanel(
+	"BunkerEnergyMonitor",
+	Vector2.new(1, 0),
+	UDim2.new(0.91, 0, 0, 88),
+	UDim2.fromOffset(180, 28)
+)
+registerHudItem("Bunker", bunkerEnergyPanel)
+local bunkerEnergyLabel = makeLabel(bunkerEnergyPanel, "BunkerEnergyLabel", "Bunker 0%")
+local _, bunkerEnergyFill = makeTrack(bunkerEnergyPanel, "BunkerEnergyTrack")
+bunkerEnergyPanel.Visible = false
+
 local lastDiscoveryPayload = {
 	Count = 0,
 	Total = Constants.TotalDiscoveries or 0,
@@ -296,23 +308,27 @@ local function applyLayout()
 	local sideInset = UserInputService.TouchEnabled and 32 or 18
 
 	if touchLandscape then
-		topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
-		topInfoBar.Size = UDim2.new(0.82, -12, 0, 88)
-		progressPanel.Position = UDim2.new(0.5, 0, 0, 18)
-		progressPanel.Size = UDim2.new(0.58, 0, 0, 30)
-		roomCounter.Position = UDim2.new(0.09, 0, 0, 58)
-		roomCounter.Size = UDim2.fromOffset(210, 32)
-		energyPanel.Position = UDim2.new(0.91, 0, 0, 58)
-		energyPanel.Size = UDim2.fromOffset(180, 32)
+		topInfoBar.Position = UDim2.new(0.5, 0, 0, 10)
+		topInfoBar.Size = UDim2.new(0.76, -8, 0, 98)
+		progressPanel.Position = UDim2.new(0.46, 0, 0, 17)
+		progressPanel.Size = UDim2.new(0.46, 0, 0, 28)
+		roomCounter.Position = UDim2.new(0.14, 0, 0, 47)
+		roomCounter.Size = UDim2.fromOffset(190, 28)
+		energyPanel.Position = UDim2.new(0.86, 0, 0, 47)
+		energyPanel.Size = UDim2.fromOffset(170, 28)
+		bunkerEnergyPanel.Position = UDim2.new(0.86, 0, 0, 76)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(170, 24)
 	else
 		topInfoBar.Position = UDim2.new(0.5, 0, 0, 46)
-		topInfoBar.Size = UDim2.new(0.78, 0, 0, 96)
-		progressPanel.Position = UDim2.new(0.5, 0, 0, 58)
-		progressPanel.Size = UDim2.new(0.58, 0, 0, 34)
-		roomCounter.Position = UDim2.new(0.16, 0, 0, 100)
-		roomCounter.Size = UDim2.fromOffset(240, 36)
-		energyPanel.Position = UDim2.new(0.84, 0, 0, 100)
-		energyPanel.Size = UDim2.fromOffset(220, 36)
+		topInfoBar.Size = UDim2.new(0.72, 0, 0, 112)
+		progressPanel.Position = UDim2.new(0.46, 0, 0, 58)
+		progressPanel.Size = UDim2.new(0.44, 0, 0, 32)
+		roomCounter.Position = UDim2.new(0.17, 0, 0, 96)
+		roomCounter.Size = UDim2.fromOffset(220, 32)
+		energyPanel.Position = UDim2.new(0.84, 0, 0, 96)
+		energyPanel.Size = UDim2.fromOffset(200, 32)
+		bunkerEnergyPanel.Position = UDim2.new(0.84, 0, 0, 130)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(200, 28)
 	end
 
 	for id, position in pairs(sessionPositions) do
@@ -331,6 +347,10 @@ local function applyVisibility()
 	progressPanel.Visible = not hidden
 	roomCounter.Visible = not hidden
 	energyPanel.Visible = not hidden
+	bunkerEnergyPanel.Visible = not hidden and (
+		player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
+		or playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
+	)
 	applyHudEditState()
 end
 
@@ -349,6 +369,32 @@ local function updateEnergy()
 		elseif energy <= 0.48
 		then Color3.fromRGB(255, 198, 82)
 		else Color3.fromRGB(119, 255, 203)
+end
+
+local function getBunkerDrawText(hunger)
+	if hunger >= 0.66 then
+		return "High"
+	elseif hunger >= 0.33 then
+		return "Med"
+	end
+	return "Low"
+end
+
+local function updateBunkerEnergy()
+	local power = math.clamp(getReplicatedAttribute("DontTouchItBunkerPower", 0), 0, 1)
+	local hunger = math.clamp(getReplicatedAttribute("DontTouchItBunkerHunger", 0), 0, 1)
+	local percent = math.floor(power * 100 + 0.5)
+	local color = if hunger >= 0.66
+		then Color3.fromRGB(255, 96, 102)
+		elseif hunger >= 0.33
+		then Color3.fromRGB(255, 198, 82)
+		else Color3.fromRGB(119, 255, 203)
+
+	bunkerEnergyLabel.Text = ("Bunker %d%% %s"):format(percent, getBunkerDrawText(hunger))
+	bunkerEnergyLabel.TextColor3 = color
+	bunkerEnergyFill.Size = UDim2.fromScale(power, 1)
+	bunkerEnergyFill.BackgroundColor3 = color
+	applyVisibility()
 end
 
 local function updateProgress(payload)
@@ -400,6 +446,12 @@ end)
 
 player:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEnergy)
 playerGui:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEnergy)
+player:GetAttributeChangedSignal("DontTouchItBunkerPower"):Connect(updateBunkerEnergy)
+player:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBunkerEnergy)
+player:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(updateBunkerEnergy)
+playerGui:GetAttributeChangedSignal("DontTouchItBunkerPower"):Connect(updateBunkerEnergy)
+playerGui:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBunkerEnergy)
+playerGui:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(updateBunkerEnergy)
 playerGui.ChildAdded:Connect(function(child)
 	if child.Name == "DontTouchItTitleSplash" or child.Name == "DontTouchItUI" then
 		task.defer(applyVisibility)
@@ -467,5 +519,6 @@ end)
 applyLayout()
 applyVisibility()
 updateEnergy()
+updateBunkerEnergy()
 updateProgress(lastDiscoveryPayload)
 updateRoomStatus(nil)

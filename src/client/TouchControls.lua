@@ -684,11 +684,11 @@ local function createOptionsPanel()
 	local toggle = makePanelButton(
 		gui,
 		"ControlsToggle",
-		"Controls",
+		"...",
 		Color3.fromRGB(18, 23, 29),
 		Color3.fromRGB(224, 236, 245),
-		UDim2.new(1, -156, 0, 58),
-		UDim2.fromOffset(94, 34)
+		UDim2.new(1, -86, 0, 48),
+		UDim2.fromOffset(42, 34)
 	)
 	toggle.AnchorPoint = Vector2.new(0, 0)
 	setStroke(toggle, Color3.fromRGB(102, 217, 255), 1.5, 0.22)
