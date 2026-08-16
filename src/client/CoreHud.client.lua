@@ -35,11 +35,11 @@ local function makePanel(name, anchorPoint, position, size)
 	panel.Name = name
 	panel.AnchorPoint = anchorPoint
 	panel.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
-	panel.BackgroundTransparency = 0.16
+	panel.BackgroundTransparency = 1
 	panel.BorderSizePixel = 0
 	panel.Position = position
 	panel.Size = size
-	panel.ZIndex = 2
+	panel.ZIndex = 4
 	panel.Parent = gui
 
 	local corner = Instance.new("UICorner")
@@ -53,7 +53,7 @@ local topInfoBar = Instance.new("Frame")
 topInfoBar.Name = "UnifiedInfoBar"
 topInfoBar.AnchorPoint = Vector2.new(0.5, 0)
 topInfoBar.BackgroundColor3 = Color3.fromRGB(10, 13, 18)
-topInfoBar.BackgroundTransparency = 0.18
+topInfoBar.BackgroundTransparency = 0.1
 topInfoBar.BorderSizePixel = 0
 topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
 topInfoBar.Size = UDim2.new(0.78, 0, 0, 88)
@@ -69,6 +69,21 @@ topInfoStroke.Color = Color3.fromRGB(226, 238, 246)
 topInfoStroke.Thickness = 1.5
 topInfoStroke.Transparency = 0.18
 topInfoStroke.Parent = topInfoBar
+
+local topInfoDividers = {}
+for index = 1, 3 do
+	local divider = Instance.new("Frame")
+	divider.Name = "UnifiedInfoDivider" .. index
+	divider.AnchorPoint = Vector2.new(0.5, 0.5)
+	divider.BackgroundColor3 = Color3.fromRGB(226, 238, 246)
+	divider.BackgroundTransparency = 0.74
+	divider.BorderSizePixel = 0
+	divider.Position = UDim2.fromScale(index / 4, 0.5)
+	divider.Size = UDim2.new(0, 1, 1, -10)
+	divider.ZIndex = 2
+	divider.Parent = topInfoBar
+	topInfoDividers[index] = divider
+end
 
 local hudItems = {}
 local sessionPositions = {}
@@ -203,8 +218,11 @@ local function makeLabel(parent, name, text)
 	label.TextColor3 = Color3.fromRGB(236, 246, 255)
 	label.TextScaled = false
 	label.TextSize = 13
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeTransparency = 0.25
 	label.TextTruncate = Enum.TextTruncate.AtEnd
 	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = parent.ZIndex + 2
 	label.Parent = parent
 	return label
 end
@@ -212,8 +230,10 @@ end
 local function makeTrack(parent, name)
 	local track = Instance.new("Frame")
 	track.Name = name
-	track.BackgroundColor3 = Color3.fromRGB(42, 47, 56)
+	track.BackgroundColor3 = Color3.fromRGB(74, 84, 99)
+	track.BackgroundTransparency = 0.18
 	track.BorderSizePixel = 0
+	track.ZIndex = parent.ZIndex + 1
 	track.Position = UDim2.new(0, 9, 1, -9)
 	track.Size = UDim2.new(1, -18, 0, 5)
 	track.Parent = parent
@@ -227,6 +247,7 @@ local function makeTrack(parent, name)
 	fill.BackgroundColor3 = Color3.fromRGB(119, 255, 203)
 	fill.BorderSizePixel = 0
 	fill.Size = UDim2.fromScale(1, 1)
+	fill.ZIndex = track.ZIndex + 1
 	fill.Parent = track
 
 	local fillCorner = Instance.new("UICorner")
@@ -360,11 +381,6 @@ local function updateEnergy()
 	local energy = math.clamp(getReplicatedAttribute("DontTouchItPlayerEnergy", 1), 0, 1)
 	local percent = math.floor(energy * 100 + 0.5)
 	energyLabel.Text = ("Energy %d%%"):format(percent)
-	energyPanel.BackgroundColor3 = if energy <= 0.22
-		then Color3.fromRGB(48, 16, 22)
-		elseif energy <= 0.48
-		then Color3.fromRGB(45, 35, 22)
-		else Color3.fromRGB(18, 20, 24)
 	energyFill.Size = UDim2.fromScale(energy, 1)
 	energyFill.BackgroundColor3 = if energy <= 0.22
 		then Color3.fromRGB(255, 96, 102)
