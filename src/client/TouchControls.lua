@@ -687,8 +687,8 @@ local function createOptionsPanel()
 		"...",
 		Color3.fromRGB(18, 23, 29),
 		Color3.fromRGB(224, 236, 245),
-		UDim2.new(1, -86, 0, 48),
-		UDim2.fromOffset(42, 34)
+		UDim2.new(1, -154, 0, 9),
+		UDim2.fromOffset(46, 34)
 	)
 	toggle.AnchorPoint = Vector2.new(0, 0)
 	setStroke(toggle, Color3.fromRGB(102, 217, 255), 1.5, 0.22)

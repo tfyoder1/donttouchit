@@ -201,7 +201,9 @@ local function makeLabel(parent, name, text)
 	label.Size = UDim2.new(1, -18, 0, 20)
 	label.Text = text
 	label.TextColor3 = Color3.fromRGB(236, 246, 255)
-	label.TextScaled = true
+	label.TextScaled = false
+	label.TextSize = 13
+	label.TextTruncate = Enum.TextTruncate.AtEnd
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = parent
 	return label
@@ -308,27 +310,27 @@ local function applyLayout()
 	local sideInset = UserInputService.TouchEnabled and 32 or 18
 
 	if touchLandscape then
-		topInfoBar.Position = UDim2.new(0.5, 0, 0, 10)
-		topInfoBar.Size = UDim2.new(0.76, -8, 0, 98)
-		progressPanel.Position = UDim2.new(0.46, 0, 0, 17)
-		progressPanel.Size = UDim2.new(0.46, 0, 0, 28)
-		roomCounter.Position = UDim2.new(0.14, 0, 0, 47)
-		roomCounter.Size = UDim2.fromOffset(190, 28)
-		energyPanel.Position = UDim2.new(0.86, 0, 0, 47)
-		energyPanel.Size = UDim2.fromOffset(170, 28)
-		bunkerEnergyPanel.Position = UDim2.new(0.86, 0, 0, 76)
-		bunkerEnergyPanel.Size = UDim2.fromOffset(170, 24)
+		topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
+		topInfoBar.Size = UDim2.new(0.78, 0, 0, 36)
+		roomCounter.Position = UDim2.new(0.13, 0, 0, 11)
+		roomCounter.Size = UDim2.fromOffset(216, 30)
+		progressPanel.Position = UDim2.new(0.44, 0, 0, 11)
+		progressPanel.Size = UDim2.fromOffset(300, 30)
+		energyPanel.Position = UDim2.new(0.78, 0, 0, 11)
+		energyPanel.Size = UDim2.fromOffset(196, 30)
+		bunkerEnergyPanel.Position = UDim2.new(0.78, 0, 0, 43)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(196, 24)
 	else
 		topInfoBar.Position = UDim2.new(0.5, 0, 0, 46)
-		topInfoBar.Size = UDim2.new(0.72, 0, 0, 112)
-		progressPanel.Position = UDim2.new(0.46, 0, 0, 58)
-		progressPanel.Size = UDim2.new(0.44, 0, 0, 32)
-		roomCounter.Position = UDim2.new(0.17, 0, 0, 96)
-		roomCounter.Size = UDim2.fromOffset(220, 32)
-		energyPanel.Position = UDim2.new(0.84, 0, 0, 96)
-		energyPanel.Size = UDim2.fromOffset(200, 32)
-		bunkerEnergyPanel.Position = UDim2.new(0.84, 0, 0, 130)
-		bunkerEnergyPanel.Size = UDim2.fromOffset(200, 28)
+		topInfoBar.Size = UDim2.new(0.74, 0, 0, 38)
+		roomCounter.Position = UDim2.new(0.15, 0, 0, 50)
+		roomCounter.Size = UDim2.fromOffset(230, 32)
+		progressPanel.Position = UDim2.new(0.44, 0, 0, 50)
+		progressPanel.Size = UDim2.fromOffset(330, 32)
+		energyPanel.Position = UDim2.new(0.79, 0, 0, 50)
+		energyPanel.Size = UDim2.fromOffset(210, 32)
+		bunkerEnergyPanel.Position = UDim2.new(0.79, 0, 0, 84)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(210, 28)
 	end
 
 	for id, position in pairs(sessionPositions) do
