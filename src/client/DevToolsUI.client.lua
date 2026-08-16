@@ -87,6 +87,8 @@ local lastDoubleJumpFlyRequestAt = 0
 local devToggleManualPosition = nil
 local devPanelManualPosition = nil
 local devLayoutDragging = nil
+local devToggleCoordinateLabel = nil
+local devPanelCoordinateLabel = nil
 
 local sectionExpanded = {
 	Locations = false,
@@ -122,6 +124,34 @@ local function makeCorner(parent, radius)
 	corner.CornerRadius = UDim.new(0, radius or 6)
 	corner.Parent = parent
 	return corner
+end
+
+local function makeCoordinateLabel(parent, name)
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.Active = false
+	label.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
+	label.BackgroundTransparency = 0.08
+	label.BorderSizePixel = 0
+	label.Font = Enum.Font.Code
+	label.Position = UDim2.new(0, 0, 0, -22)
+	label.Size = UDim2.new(1, 36, 0, 18)
+	label.TextColor3 = Color3.fromRGB(226, 245, 255)
+	label.TextSize = 10
+	label.TextWrapped = false
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.Visible = false
+	label.ZIndex = (parent.ZIndex or 1) + 6
+	label.Parent = parent
+	makeCorner(label, 5)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(102, 217, 255)
+	stroke.Thickness = 1
+	stroke.Transparency = 0.45
+	stroke.Parent = label
+	return label
 end
 
 local function makeSection(parent, titleText)
@@ -644,6 +674,20 @@ local function applyDevManualPositions()
 	end
 end
 
+local function updateDevCoordinateLabel(label, guiObject, text)
+	if not label or not guiObject then
+		return
+	end
+	local anchorPosition = guiObject.AbsolutePosition + guiObject.AbsoluteSize * guiObject.AnchorPoint
+	label.Text = ("%s  x=%d y=%d"):format(text, math.floor(anchorPosition.X + 0.5), math.floor(anchorPosition.Y + 0.5))
+	label.Visible = isTouchEditLayoutActive()
+end
+
+local function updateDevCoordinateLabels()
+	updateDevCoordinateLabel(devToggleCoordinateLabel, toggleButton, "DEV")
+	updateDevCoordinateLabel(devPanelCoordinateLabel, panel, "DevPanel")
+end
+
 local function beginDevLayoutDrag(guiObject, input, key)
 	if not isTouchEditLayoutActive() then
 		return
@@ -659,6 +703,7 @@ local function beginDevLayoutDrag(guiObject, input, key)
 		StartInput = getInputScreenPosition(input),
 		StartPosition = guiObject.Position,
 	}
+	updateDevCoordinateLabels()
 end
 
 local function updateDevLayoutDrag(input)
@@ -682,6 +727,7 @@ local function updateDevLayoutDrag(input)
 	elseif devLayoutDragging.Key == "Panel" then
 		devPanelManualPosition = nextPosition
 	end
+	updateDevCoordinateLabels()
 end
 
 local function endDevLayoutDrag(input)
@@ -709,6 +755,7 @@ local function resetDevLayoutPositions()
 	devLayoutDragging = nil
 	inspectWindowManuallyPositioned = false
 	applyDevLayout(currentDeviceProfile)
+	updateDevCoordinateLabels()
 end
 
 applyDevLayout = function(profile)
@@ -751,6 +798,7 @@ applyDevLayout = function(profile)
 			panelScroll.ScrollBarThickness = 5
 		end
 		applyDevManualPositions()
+		updateDevCoordinateLabels()
 		return
 	end
 
@@ -770,6 +818,7 @@ applyDevLayout = function(profile)
 		panelScroll.ScrollBarThickness = 6
 	end
 	applyDevManualPositions()
+	updateDevCoordinateLabels()
 end
 
 local function makeList(parent)
@@ -2300,6 +2349,7 @@ local function buildGui()
 	toggleButton.TextScaled = true
 	toggleButton.Parent = gui
 	makeCorner(toggleButton, 6)
+	devToggleCoordinateLabel = makeCoordinateLabel(toggleButton, "DevToggleCoordinateLabel")
 	wireDevLayoutDrag(toggleButton, "Toggle")
 
 	devInfoLabel = Instance.new("TextLabel")
@@ -2382,6 +2432,7 @@ local function buildGui()
 	panel.Visible = false
 	panel.Parent = gui
 	makeCorner(panel, 8)
+	devPanelCoordinateLabel = makeCoordinateLabel(panel, "DevPanelCoordinateLabel")
 
 	panelConstraint = Instance.new("UISizeConstraint")
 	panelConstraint.MaxSize = Vector2.new(360, 560)
@@ -2569,6 +2620,7 @@ playerGui:GetAttributeChangedSignal(TOUCH_EDIT_MODE_ATTRIBUTE):Connect(function(
 	if not isTouchEditLayoutActive() then
 		devLayoutDragging = nil
 	end
+	updateDevCoordinateLabels()
 end)
 
 DeviceProfile.Bind(function(profile)

@@ -11,6 +11,9 @@ local discoveryRemote = remotes:WaitForChild(Constants.Remotes.DiscoveryUpdate)
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 
 local HUD_NAME = "DontTouchItCoreHud"
+local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
+local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
+local DRAG_MARGIN = 8
 local gui = playerGui:FindFirstChild(HUD_NAME)
 if gui and gui:IsA("ScreenGui") then
 	gui:Destroy()
@@ -42,6 +45,128 @@ local function makePanel(name, anchorPoint, position, size)
 	corner.Parent = panel
 
 	return panel
+end
+
+local hudItems = {}
+local sessionPositions = {}
+local activeDrag = nil
+
+local function isTouchPointer(input)
+	return input.UserInputType == Enum.UserInputType.Touch
+		or input.UserInputType == Enum.UserInputType.MouseButton1
+end
+
+local function isDragMovement(input)
+	return input.UserInputType == Enum.UserInputType.Touch
+		or input.UserInputType == Enum.UserInputType.MouseMovement
+end
+
+local function toVector2(position)
+	return Vector2.new(position.X, position.Y)
+end
+
+local function isEditMode()
+	return playerGui:GetAttribute(TOUCH_EDIT_MODE_ATTRIBUTE) == true
+end
+
+local function clampPanelPosition(panel, position)
+	local parent = panel.Parent
+	if not parent then
+		return position
+	end
+
+	local parentSize = parent.AbsoluteSize
+	if parentSize.X <= 0 or parentSize.Y <= 0 then
+		return position
+	end
+
+	local size = panel.AbsoluteSize
+	local anchor = panel.AnchorPoint
+	local absoluteX = parentSize.X * position.X.Scale + position.X.Offset
+	local absoluteY = parentSize.Y * position.Y.Scale + position.Y.Offset
+	local minX = DRAG_MARGIN + size.X * anchor.X
+	local minY = DRAG_MARGIN + size.Y * anchor.Y
+	local maxX = math.max(minX, parentSize.X - DRAG_MARGIN - size.X * (1 - anchor.X))
+	local maxY = math.max(minY, parentSize.Y - DRAG_MARGIN - size.Y * (1 - anchor.Y))
+	local clampedX = math.clamp(absoluteX, minX, maxX)
+	local clampedY = math.clamp(absoluteY, minY, maxY)
+	return UDim2.new(position.X.Scale, position.X.Offset + (clampedX - absoluteX), position.Y.Scale, position.Y.Offset + (clampedY - absoluteY))
+end
+
+local function ensureCoordinateLabel(panel)
+	local label = panel:FindFirstChild("HudCoordinateLabel")
+	if label and label:IsA("TextLabel") then
+		return label
+	end
+
+	label = Instance.new("TextLabel")
+	label.Name = "HudCoordinateLabel"
+	label.Active = false
+	label.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
+	label.BackgroundTransparency = 0.08
+	label.BorderSizePixel = 0
+	label.Font = Enum.Font.Code
+	label.Position = UDim2.new(0, 0, 0, -22)
+	label.Size = UDim2.new(1, 38, 0, 18)
+	label.TextColor3 = Color3.fromRGB(226, 245, 255)
+	label.TextSize = 10
+	label.TextWrapped = false
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.ZIndex = panel.ZIndex + 10
+	label.Parent = panel
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 5)
+	corner.Parent = label
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(102, 217, 255)
+	stroke.Thickness = 1
+	stroke.Transparency = 0.45
+	stroke.Parent = label
+	return label
+end
+
+local function applyHudEditState()
+	for id, panel in pairs(hudItems) do
+		if panel and panel.Parent then
+			local label = ensureCoordinateLabel(panel)
+			local anchorPosition = panel.AbsolutePosition + panel.AbsoluteSize * panel.AnchorPoint
+			label.Text = ("%s  x=%d y=%d"):format(id, math.floor(anchorPosition.X + 0.5), math.floor(anchorPosition.Y + 0.5))
+			label.Visible = isEditMode() and panel.Visible
+			panel.Active = isEditMode()
+			local stroke = panel:FindFirstChild("HudEditStroke")
+			if isEditMode() then
+				if not stroke then
+					stroke = Instance.new("UIStroke")
+					stroke.Name = "HudEditStroke"
+					stroke.Color = Color3.fromRGB(255, 255, 255)
+					stroke.Thickness = 2
+					stroke.Transparency = 0.08
+					stroke.Parent = panel
+				end
+				stroke.Enabled = true
+			elseif stroke then
+				stroke.Enabled = false
+			end
+		end
+	end
+end
+
+local function registerHudItem(id, panel)
+	hudItems[id] = panel
+	panel.InputBegan:Connect(function(input)
+		if not isEditMode() or not isTouchPointer(input) then
+			return
+		end
+		activeDrag = {
+			Id = id,
+			Panel = panel,
+			StartInput = toVector2(input.Position),
+			StartPosition = panel.Position,
+		}
+	end)
 end
 
 local function makeLabel(parent, name, text)
@@ -92,6 +217,7 @@ local progressPanel = makePanel(
 	UDim2.new(0.5, 0, 0, 42),
 	UDim2.new(0.56, 0, 0, 30)
 )
+registerHudItem("Discoveries", progressPanel)
 local progressLabel = makeLabel(progressPanel, "DiscoveryProgressLabel", "Discoveries: 0 / 0")
 local _, progressFill = makeTrack(progressPanel, "DiscoveryProgressTrack")
 
@@ -101,6 +227,7 @@ local roomCounter = makePanel(
 	UDim2.new(0, 32, 0, 100),
 	UDim2.fromOffset(180, 30)
 )
+registerHudItem("Room", roomCounter)
 local roomCounterLabel = makeLabel(roomCounter, "DiscoveryRoomCounterLabel", "Finding room...")
 
 local energyPanel = makePanel(
@@ -109,6 +236,7 @@ local energyPanel = makePanel(
 	UDim2.new(1, -32, 0, 100),
 	UDim2.fromOffset(136, 32)
 )
+registerHudItem("Energy", energyPanel)
 local energyLabel = makeLabel(energyPanel, "PlayerEnergyLabel", "Energy 100%")
 local _, energyFill = makeTrack(energyPanel, "PlayerEnergyTrack")
 
@@ -160,6 +288,15 @@ local function applyLayout()
 		energyPanel.Position = UDim2.new(1, -sideInset, 0, 126)
 		energyPanel.Size = UDim2.fromOffset(210, 36)
 	end
+
+	for id, position in pairs(sessionPositions) do
+		local panel = hudItems[id]
+		if panel and panel.Parent then
+			panel.Position = clampPanelPosition(panel, position)
+			sessionPositions[id] = panel.Position
+		end
+	end
+	applyHudEditState()
 end
 
 local function applyVisibility()
@@ -167,6 +304,7 @@ local function applyVisibility()
 	progressPanel.Visible = not hidden
 	roomCounter.Visible = not hidden
 	energyPanel.Visible = not hidden
+	applyHudEditState()
 end
 
 local function updateEnergy()
@@ -239,6 +377,49 @@ playerGui.ChildAdded:Connect(function(child)
 	if child.Name == "DontTouchItTitleSplash" or child.Name == "DontTouchItUI" then
 		task.defer(applyVisibility)
 	end
+end)
+playerGui:GetAttributeChangedSignal(TOUCH_EDIT_MODE_ATTRIBUTE):Connect(function()
+	if not isEditMode() then
+		activeDrag = nil
+	end
+	applyHudEditState()
+end)
+playerGui:GetAttributeChangedSignal(DEV_LAYOUT_RESET_ATTRIBUTE):Connect(function()
+	table.clear(sessionPositions)
+	activeDrag = nil
+	applyLayout()
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if not activeDrag or not activeDrag.Panel then
+		return
+	end
+	if not isDragMovement(input) then
+		return
+	end
+
+	local delta = toVector2(input.Position) - activeDrag.StartInput
+	local start = activeDrag.StartPosition
+	local nextPosition = UDim2.new(
+		start.X.Scale,
+		start.X.Offset + delta.X,
+		start.Y.Scale,
+		start.Y.Offset + delta.Y
+	)
+	nextPosition = clampPanelPosition(activeDrag.Panel, nextPosition)
+	sessionPositions[activeDrag.Id] = nextPosition
+	activeDrag.Panel.Position = nextPosition
+	applyHudEditState()
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if activeDrag and isTouchPointer(input) then
+		activeDrag = nil
+	end
+end)
+
+UserInputService.TouchEnded:Connect(function()
+	activeDrag = nil
 end)
 
 UserInputService.LastInputTypeChanged:Connect(function()

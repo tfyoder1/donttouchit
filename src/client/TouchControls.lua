@@ -10,6 +10,7 @@ local TOUCH_GUI_NAME = "DontTouchItTouchControls"
 local OPTIONS_GUI_NAME = "DontTouchItControlOptions"
 local TOUCH_LAYOUT_VERSION = "touch-cluster-2026-08-15-v5"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
+local TOUCH_HIDE_LABELS_ATTRIBUTE = "DontTouchItTouchHideButtonLabels"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
 local TOUCH_GUI_ORDER = 145
 local OPTIONS_GUI_ORDER = 155
@@ -40,10 +41,14 @@ local optionsPanel = nil
 local controlsList = nil
 local editButton = nil
 local resetButton = nil
+local labelToggleButton = nil
 local editMode = false
 local activeDrag = nil
+local activeChromeDrag = nil
 local activeControlInputs = {}
 local activeControlInputConnections = {}
+local controlsToggle = nil
+local controlsTogglePosition = nil
 
 local function isTouchPointer(input)
 	return input.UserInputType == Enum.UserInputType.Touch
@@ -260,8 +265,75 @@ local function clampButtonPosition(button, position)
 	return UDim2.fromOffset(clampedX, clampedY)
 end
 
+local function clampGuiPosition(guiObject, position)
+	local parent = guiObject and guiObject.Parent
+	if not parent then
+		return position
+	end
+
+	local parentSize = parent.AbsoluteSize
+	if parentSize.X <= 0 or parentSize.Y <= 0 then
+		return position
+	end
+
+	local size = guiObject.AbsoluteSize
+	local anchor = guiObject.AnchorPoint
+	local absoluteX = parentSize.X * position.X.Scale + position.X.Offset
+	local absoluteY = parentSize.Y * position.Y.Scale + position.Y.Offset
+	local minX = DRAG_MARGIN + size.X * anchor.X
+	local minY = DRAG_MARGIN + size.Y * anchor.Y
+	local maxX = math.max(minX, parentSize.X - DRAG_MARGIN - size.X * (1 - anchor.X))
+	local maxY = math.max(minY, parentSize.Y - DRAG_MARGIN - size.Y * (1 - anchor.Y))
+	local clampedX = math.clamp(absoluteX, minX, maxX)
+	local clampedY = math.clamp(absoluteY, minY, maxY)
+	return UDim2.new(position.X.Scale, position.X.Offset + (clampedX - absoluteX), position.Y.Scale, position.Y.Offset + (clampedY - absoluteY))
+end
+
+local function ensureChromeCoordinateLabel(guiObject)
+	local coordinateLabel = guiObject:FindFirstChild("TouchChromeCoordinateLabel")
+	if coordinateLabel and coordinateLabel:IsA("TextLabel") then
+		return coordinateLabel
+	end
+
+	coordinateLabel = Instance.new("TextLabel")
+	coordinateLabel.Name = "TouchChromeCoordinateLabel"
+	coordinateLabel.Active = false
+	coordinateLabel.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
+	coordinateLabel.BackgroundTransparency = 0.08
+	coordinateLabel.BorderSizePixel = 0
+	coordinateLabel.Font = Enum.Font.Code
+	coordinateLabel.Position = UDim2.new(0, 0, 0, -22)
+	coordinateLabel.Size = UDim2.new(1, 36, 0, 18)
+	coordinateLabel.TextColor3 = Color3.fromRGB(226, 245, 255)
+	coordinateLabel.TextSize = 10
+	coordinateLabel.TextWrapped = false
+	coordinateLabel.TextXAlignment = Enum.TextXAlignment.Center
+	coordinateLabel.TextYAlignment = Enum.TextYAlignment.Center
+	coordinateLabel.ZIndex = guiObject.ZIndex + 4
+	coordinateLabel.Parent = guiObject
+	setRounded(coordinateLabel, 5)
+	setStroke(coordinateLabel, Color3.fromRGB(102, 217, 255), 1, 0.45)
+	return coordinateLabel
+end
+
 local function getButtonPosition(state)
 	return sessionPositions[state.Id] or state.DefaultPosition
+end
+
+local function applyControlsToggleState()
+	if not controlsToggle then
+		return
+	end
+
+	if controlsTogglePosition then
+		controlsToggle.Position = clampGuiPosition(controlsToggle, controlsTogglePosition)
+		controlsTogglePosition = controlsToggle.Position
+	end
+
+	local coordinateLabel = ensureChromeCoordinateLabel(controlsToggle)
+	local anchorPosition = controlsToggle.AbsolutePosition + controlsToggle.AbsoluteSize * controlsToggle.AnchorPoint
+	coordinateLabel.Text = ("Controls  x=%d y=%d"):format(math.floor(anchorPosition.X + 0.5), math.floor(anchorPosition.Y + 0.5))
+	coordinateLabel.Visible = editMode
 end
 
 local function applyButtonState(state)
@@ -296,6 +368,7 @@ local function applyButtonState(state)
 	label.Text = state.Text
 	label.TextColor3 = if enabled then state.TextColor else TOUCH_ICON_DISABLED_COLOR
 	label.TextTransparency = if enabled then 0 else 0.22
+	label.Visible = playerGui:GetAttribute(TOUCH_HIDE_LABELS_ATTRIBUTE) ~= true
 
 	diskStroke.Color = if editMode then Color3.fromRGB(255, 255, 255) else state.StrokeColor
 	diskStroke.Transparency = if editMode then 0.12 else 0.58
@@ -405,6 +478,17 @@ local function setEditMode(active)
 		optionsPanel.Visible = false
 	end
 	applyAllButtonStates()
+	applyControlsToggleState()
+end
+
+local function updateLabelToggleButton()
+	if not labelToggleButton then
+		return
+	end
+	local labelsHidden = playerGui:GetAttribute(TOUCH_HIDE_LABELS_ATTRIBUTE) == true
+	labelToggleButton.Text = labelsHidden and "Labels: Off" or "Labels: On"
+	labelToggleButton.BackgroundColor3 = labelsHidden and Color3.fromRGB(64, 72, 88) or Color3.fromRGB(84, 154, 255)
+	labelToggleButton.TextColor3 = labelsHidden and Color3.fromRGB(224, 236, 245) or Color3.fromRGB(14, 27, 46)
 end
 
 local function finishDrag()
@@ -412,6 +496,22 @@ local function finishDrag()
 		activeDrag.State.Button.ZIndex = BUTTON_Z_INDEX
 	end
 	activeDrag = nil
+end
+
+local function beginChromeDrag(guiObject, input)
+	if not editMode or not isTouchPointer(input) then
+		return
+	end
+
+	activeChromeDrag = {
+		Object = guiObject,
+		StartInput = toVector2(input.Position),
+		StartPosition = guiObject.Position,
+	}
+end
+
+local function finishChromeDrag()
+	activeChromeDrag = nil
 end
 
 local function finishControlInput(input)
@@ -592,6 +692,11 @@ local function createOptionsPanel()
 	)
 	toggle.AnchorPoint = Vector2.new(0, 0)
 	setStroke(toggle, Color3.fromRGB(102, 217, 255), 1.5, 0.22)
+	controlsToggle = toggle
+	applyControlsToggleState()
+	toggle.InputBegan:Connect(function(input)
+		beginChromeDrag(toggle, input)
+	end)
 
 	local panel = Instance.new("Frame")
 	panel.Name = "ControlsPanel"
@@ -640,8 +745,8 @@ local function createOptionsPanel()
 	list.Name = "ControlsList"
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.Position = UDim2.fromOffset(14, 46)
-	list.Size = UDim2.new(1, -28, 1, -112)
+	list.Position = UDim2.fromOffset(14, 86)
+	list.Size = UDim2.new(1, -28, 1, -152)
 	list.CanvasSize = UDim2.fromOffset(0, 0)
 	list.ScrollBarThickness = 5
 	list.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -656,6 +761,17 @@ local function createOptionsPanel()
 	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		list.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y + 12)
 	end)
+
+	labelToggleButton = makePanelButton(
+		panel,
+		"ToggleLabels",
+		"Labels: On",
+		Color3.fromRGB(84, 154, 255),
+		Color3.fromRGB(14, 27, 46),
+		UDim2.new(0, 14, 0, 46),
+		UDim2.new(1, -28, 0, 30)
+	)
+	updateLabelToggleButton()
 
 	editButton = makePanelButton(
 		panel,
@@ -680,6 +796,9 @@ local function createOptionsPanel()
 	resetButton.Visible = UserInputService.TouchEnabled
 
 	toggle.Activated:Connect(function()
+		if editMode then
+			return
+		end
 		panel.Visible = not panel.Visible
 	end)
 
@@ -692,12 +811,20 @@ local function createOptionsPanel()
 		setEditMode(not editMode)
 	end)
 
+	labelToggleButton.Activated:Connect(function()
+		playerGui:SetAttribute(TOUCH_HIDE_LABELS_ATTRIBUTE, playerGui:GetAttribute(TOUCH_HIDE_LABELS_ATTRIBUTE) ~= true)
+		updateLabelToggleButton()
+		applyAllButtonStates()
+	end)
+
 	resetButton.Activated:Connect(function()
 		for id in pairs(controlsById) do
 			sessionPositions[id] = nil
 		end
+		controlsTogglePosition = nil
 		playerGui:SetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE, (tonumber(playerGui:GetAttribute(DEV_LAYOUT_RESET_ATTRIBUTE)) or 0) + 1)
 		applyAllButtonStates()
+		applyControlsToggleState()
 	end)
 
 	renderOptionsRows()
@@ -793,6 +920,26 @@ function TouchControls.ResetLayout()
 end
 
 UserInputService.InputChanged:Connect(function(input)
+	if activeChromeDrag and activeChromeDrag.Object then
+		if not isDragMovement(input) then
+			return
+		end
+
+		local delta = toVector2(input.Position) - activeChromeDrag.StartInput
+		local start = activeChromeDrag.StartPosition
+		local nextPosition = UDim2.new(
+			start.X.Scale,
+			start.X.Offset + delta.X,
+			start.Y.Scale,
+			start.Y.Offset + delta.Y
+		)
+		nextPosition = clampGuiPosition(activeChromeDrag.Object, nextPosition)
+		controlsTogglePosition = nextPosition
+		activeChromeDrag.Object.Position = nextPosition
+		applyControlsToggleState()
+		return
+	end
+
 	if not activeDrag or not activeDrag.State or not activeDrag.State.Button then
 		return
 	end
@@ -815,6 +962,9 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
+	if activeChromeDrag and isTouchPointer(input) then
+		finishChromeDrag()
+	end
 	if activeDrag and isTouchPointer(input) then
 		finishDrag()
 	end
@@ -822,6 +972,9 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 UserInputService.TouchEnded:Connect(function(input)
+	if activeChromeDrag then
+		finishChromeDrag()
+	end
 	if activeDrag then
 		finishDrag()
 	end
@@ -835,6 +988,9 @@ UserInputService.WindowFocusReleased:Connect(function()
 	if activeDrag then
 		finishDrag()
 	end
+	if activeChromeDrag then
+		finishChromeDrag()
+	end
 end)
 
 UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(function()
@@ -845,6 +1001,11 @@ UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(function()
 	if resetButton then
 		resetButton.Visible = UserInputService.TouchEnabled
 	end
+end)
+
+playerGui:GetAttributeChangedSignal(TOUCH_HIDE_LABELS_ATTRIBUTE):Connect(function()
+	updateLabelToggleButton()
+	applyAllButtonStates()
 end)
 
 return TouchControls
