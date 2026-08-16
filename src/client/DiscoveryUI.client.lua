@@ -1180,6 +1180,7 @@ local setStartPhase = nil
 
 local function setStartOverlayVisible(visible)
 	startOverlay.Visible = visible
+	startOverlay.Active = visible
 	gui.DisplayOrder = visible and START_OVERLAY_DISPLAY_ORDER or DEFAULT_UI_DISPLAY_ORDER
 	startBlur.Enabled = visible
 	startBlur.Size = visible and 24 or 0
@@ -2219,6 +2220,10 @@ local function renderStartOptions(payload)
 
 	lastStartOptionsPayload = payload
 
+	if startChoiceSent then
+		return
+	end
+
 	if isTitleSplashVisible() then
 		pendingStartOptions = payload
 		setStartOverlayVisible(false)
@@ -2383,8 +2388,13 @@ local function restoreHudAfterTitleSplash()
 	end
 
 	lastHandledTitleSplashFinishedNonce = nonce
+	startChoiceSent = true
+	pendingStartOptions = nil
 	gui.Enabled = true
-	startOverlay.Visible = false
+	setStartOverlayVisible(false)
+	startOverlay.Active = false
+	startCinematicButton.Active = false
+	startCinematicButton.Modal = false
 	gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
 	startBlur.Enabled = false
 	startBlur.Size = 0
