@@ -2273,6 +2273,7 @@ end
 
 local function buildGui()
 	if gui then
+		gui.Enabled = true
 		return
 	end
 
@@ -2531,6 +2532,9 @@ devRemote.OnClientEvent:Connect(function(payload)
 	authorized = true
 	connectMovementLoops()
 	buildGui()
+	if gui then
+		gui.Enabled = true
+	end
 	if toggleButton then
 		toggleButton.Visible = true
 	end

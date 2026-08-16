@@ -135,12 +135,6 @@ local function isTitleSplashVisible()
 	return splashGui and splashGui:IsA("ScreenGui") and splashGui.Enabled ~= false
 end
 
-local function isLegacyStartOverlayVisible()
-	local legacyGui = playerGui:FindFirstChild("DontTouchItUI")
-	local overlay = legacyGui and legacyGui:FindFirstChild("StartChoiceOverlay", true)
-	return overlay and overlay:IsA("GuiObject") and overlay.Visible == true
-end
-
 local function isTouchLandscape()
 	local camera = Workspace.CurrentCamera
 	local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
@@ -169,7 +163,7 @@ local function applyLayout()
 end
 
 local function applyVisibility()
-	local hidden = isTitleSplashVisible() or isLegacyStartOverlayVisible()
+	local hidden = isTitleSplashVisible()
 	progressPanel.Visible = not hidden
 	roomCounter.Visible = not hidden
 	energyPanel.Visible = not hidden
