@@ -81,6 +81,9 @@ local DOUBLE_JUMP_MAX_SECONDS = 0.45
 local DOUBLE_JUMP_FLY_COOLDOWN_SECONDS = 1
 local BUTTON_ACTIVATION_DEBOUNCE_SECONDS = 0.25
 local TOUCH_TAP_MAX_DRAG_PIXELS = 18
+local DESKTOP_DEV_PANEL_CENTER_Y = 0.62
+local NON_TOUCH_HUD_RESERVED_TOP = 142
+local NON_TOUCH_DEV_EDGE_MARGIN = 12
 local currentDeviceProfile = DeviceProfile.Get()
 local showDevInfo
 local rebuildPanel
@@ -553,7 +556,7 @@ local function applyInspectLayout(touchLandscape)
 	elseif isGamepadProfile() then
 		size = Vector2.new(330, 196)
 		defaultLeft = 12
-		defaultTop = 12
+		defaultTop = NON_TOUCH_HUD_RESERVED_TOP
 		inspectLabel.TextSize = 13
 	else
 		size = Vector2.new(330, 196)
@@ -818,12 +821,13 @@ applyDevLayout = function(profile)
 	end
 
 	if isGamepadProfile() then
-		local stackLeft = 12
-		local stackTop = 12
+		local stackLeft = NON_TOUCH_DEV_EDGE_MARGIN
+		local stackTop = NON_TOUCH_HUD_RESERVED_TOP
 		local stackGap = 10
 		local inspectHeight = 196
 		local panelTop = stackTop + inspectHeight + stackGap
-		local panelHeight = math.min(500, math.max(390, viewport.Y - panelTop - stackTop))
+		local panelBottomMargin = NON_TOUCH_DEV_EDGE_MARGIN
+		local panelHeight = math.min(500, math.max(300, viewport.Y - panelTop - panelBottomMargin))
 
 		toggleButton.AnchorPoint = Vector2.new(0, 0)
 		toggleButton.Position = UDim2.fromOffset(stackLeft + 330 + stackGap, stackTop)
@@ -833,7 +837,7 @@ applyDevLayout = function(profile)
 		panel.Size = UDim2.fromOffset(330, panelHeight)
 		if panelConstraint then
 			panelConstraint.MaxSize = Vector2.new(360, 560)
-			panelConstraint.MinSize = Vector2.new(292, 390)
+			panelConstraint.MinSize = Vector2.new(292, 300)
 		end
 		if panelScroll then
 			panelScroll.Position = UDim2.fromOffset(12, 70)
@@ -849,11 +853,11 @@ applyDevLayout = function(profile)
 	toggleButton.Position = UDim2.new(0, 12, 1, -78)
 	toggleButton.Size = UDim2.fromOffset(70, 34)
 	panel.AnchorPoint = Vector2.new(0, 0.5)
-	panel.Position = UDim2.new(0, 12, 0.5, 0)
-	panel.Size = UDim2.fromOffset(330, 500)
+	panel.Position = UDim2.new(0, NON_TOUCH_DEV_EDGE_MARGIN, DESKTOP_DEV_PANEL_CENTER_Y, 0)
+	panel.Size = UDim2.fromOffset(330, math.min(500, math.max(360, viewport.Y - NON_TOUCH_HUD_RESERVED_TOP - NON_TOUCH_DEV_EDGE_MARGIN)))
 	if panelConstraint then
 		panelConstraint.MaxSize = Vector2.new(360, 560)
-		panelConstraint.MinSize = Vector2.new(292, 390)
+		panelConstraint.MinSize = Vector2.new(292, 360)
 	end
 	if panelScroll then
 		panelScroll.Position = UDim2.fromOffset(12, 70)
