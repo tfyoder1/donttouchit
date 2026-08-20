@@ -2123,11 +2123,14 @@ local function makeCaveEntranceArea(roomFolder)
 	caveSpawn:SetAttribute("PrologueInspectIgnore", true)
 
 	local flashlightPickup = makeModel(cave, "StartingFlashlightPickup")
-	flashlightPickup:SetAttribute("PrologueDescription", "A flashlight waits in the grass. It feels like permission to look, not permission to touch anything else.")
+	flashlightPickup:SetAttribute("PrologueDescription", "A flashlight waits by the cave mouth. It feels like permission to look, not permission to touch anything else.")
 	flashlightPickup:SetAttribute("ProloguePriority", 120)
 	flashlightPickup:SetAttribute("TutorialHint", "Take the flashlight. Equip it from inventory, then press Action to turn it on or off.")
 	flashlightPickup:SetAttribute("PrologueSafeNavigation", true)
-	local flashlightCFrame = CFrame.new(-48.5, 0.62, 39.5) * CFrame.Angles(0, math.rad(-18), math.rad(90))
+	local flashlightStand = createPart(flashlightPickup, "FlashlightRockStand", Vector3.new(2.8, 0.7, 1.9), CFrame.new(-64.2, 0.52, 39.2) * CFrame.Angles(0, math.rad(-8), 0), Color3.fromRGB(70, 70, 66), Enum.Material.Slate)
+	flashlightStand.CanCollide = false
+	flashlightStand:SetAttribute("BaseCanCollide", false)
+	local flashlightCFrame = CFrame.new(-64.2, 1.12, 39.2) * CFrame.Angles(0, math.rad(-20), math.rad(90))
 	local flashlightBody = createPart(flashlightPickup, "FlashlightBody", Vector3.new(1.35, 0.34, 0.34), flashlightCFrame, Color3.fromRGB(41, 44, 48), Enum.Material.Metal)
 	flashlightBody.Shape = Enum.PartType.Cylinder
 	flashlightBody.CanCollide = false

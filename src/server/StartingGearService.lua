@@ -93,21 +93,21 @@ local function createFlashlightTool()
 
 	local beam = Instance.new("SpotLight")
 	beam.Name = "FlashlightBeam"
-	beam.Angle = 44
-	beam.Brightness = 2.8
+	beam.Angle = 62
+	beam.Brightness = 7.5
 	beam.Color = Color3.fromRGB(218, 238, 255)
 	beam.Enabled = false
 	beam.Face = Enum.NormalId.Front
-	beam.Range = 44
+	beam.Range = 70
 	beam.Shadows = true
 	beam.Parent = handle
 
 	local spill = Instance.new("PointLight")
 	spill.Name = "FlashlightSpill"
-	spill.Brightness = 0.32
+	spill.Brightness = 1.1
 	spill.Color = Color3.fromRGB(178, 214, 255)
 	spill.Enabled = false
-	spill.Range = 8
+	spill.Range = 18
 	spill.Shadows = false
 	spill.Parent = handle
 

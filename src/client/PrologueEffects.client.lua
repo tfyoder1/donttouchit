@@ -37,6 +37,7 @@ local FLASHLIGHT_LIGHT_COLOR = Color3.fromRGB(255, 226, 170)
 local FLASHLIGHT_BEAM_COLOR = Color3.fromRGB(255, 211, 128)
 local FLASHLIGHT_SPOT_COLOR = Color3.fromRGB(255, 218, 138)
 local FLASHLIGHT_LENS_COLOR = Color3.fromRGB(255, 225, 142)
+local FLASHLIGHT_OWNED_ATTRIBUTE = "DontTouchItHasFlashlight"
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItPrologue"
@@ -939,6 +940,13 @@ local function createFlashlight(range)
 	end)
 end
 
+local function startInspectionOnly()
+	destroyFlashlight()
+	renderConnection = RunService.RenderStepped:Connect(function(deltaTime)
+		updateInspection(deltaTime)
+	end)
+end
+
 local function startAmbientLoop()
 	ambientToken += 1
 	local token = ambientToken
@@ -974,7 +982,11 @@ local function beginPrologue(payload)
 
 	applyDarkLighting(payload.DarkLighting)
 	dimWorldLights()
-	createFlashlight(payload.FlashlightRange)
+	if player:GetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE) == true then
+		createFlashlight(payload.FlashlightRange)
+	else
+		startInspectionOnly()
+	end
 	startOutsideAmbience()
 	startAmbientLoop()
 	clearFirstTouchAlarm()
