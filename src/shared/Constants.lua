@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.223"
+Constants.BuildVersion = "0.5.224"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -595,6 +595,11 @@ Constants.AudioAssets = {
 		Library = {
 			SoundId = "rbxassetid://92072185175546",
 			Volume = 0.043,
+			FadeSeconds = 1.5,
+		},
+		SleepingQuarters = {
+			SoundId = "rbxassetid://1840776993",
+			Volume = 0.025,
 			FadeSeconds = 1.5,
 		},
 	},
