@@ -866,6 +866,8 @@ local function createOptionsPanel()
 
 	toggle.Activated:Connect(function()
 		if editMode then
+			panel.Visible = true
+			applyControlsToggleState()
 			return
 		end
 		toggle.Visible = true

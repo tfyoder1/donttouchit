@@ -181,6 +181,7 @@ local splashBlur = nil
 local titleMusic = nil
 local titleMusicTween = nil
 local suppressedGuiStates = {}
+local suppressedCoreGuiStates = {}
 local suppressChildAddedConnection = nil
 local splashFinishedNotified = false
 local titleCameraState = nil
@@ -191,6 +192,10 @@ local SUPPRESSED_PROJECT_GUIS = {
 	DontTouchItTouchControls = true,
 	DontTouchItControlOptions = true,
 	TouchGui = true,
+}
+
+local SUPPRESSED_CORE_GUI_TYPES = {
+	Enum.CoreGuiType.Backpack,
 }
 
 local TITLE_CAMERA_RENDER_STEP = "DontTouchItTitleSplashCameraPan"
@@ -238,6 +243,12 @@ end
 local function setTopbarEnabled(enabled)
 	pcall(function()
 		StarterGui:SetCore("TopbarEnabled", enabled == true)
+	end)
+end
+
+local function setCoreGuiEnabled(coreGuiType, enabled)
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(coreGuiType, enabled == true)
 	end)
 end
 
@@ -318,6 +329,15 @@ local function suppressProjectGuisDuringSplash()
 	for _, child in ipairs(playerGui:GetChildren()) do
 		suppressProjectGui(child)
 	end
+	for _, coreGuiType in ipairs(SUPPRESSED_CORE_GUI_TYPES) do
+		if suppressedCoreGuiStates[coreGuiType] == nil then
+			local ok, wasEnabled = pcall(function()
+				return StarterGui:GetCoreGuiEnabled(coreGuiType)
+			end)
+			suppressedCoreGuiStates[coreGuiType] = if ok then wasEnabled else true
+		end
+		setCoreGuiEnabled(coreGuiType, false)
+	end
 
 	suppressChildAddedConnection = playerGui.ChildAdded:Connect(function(child)
 		suppressProjectGui(child)
@@ -335,6 +355,10 @@ local function restoreProjectGuis()
 			gui.Enabled = wasEnabled
 		end
 	end
+	for coreGuiType, wasEnabled in pairs(suppressedCoreGuiStates) do
+		setCoreGuiEnabled(coreGuiType, wasEnabled)
+	end
+	table.clear(suppressedCoreGuiStates)
 	table.clear(suppressedGuiStates)
 end
 

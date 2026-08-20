@@ -51,6 +51,9 @@ local function sanitizeLayout(layout)
 	end
 
 	local sanitized = {}
+	if typeof(layout.Version) == "string" then
+		sanitized.Version = string.sub(layout.Version, 1, 64)
+	end
 	for key, value in pairs(layout) do
 		key = tostring(key)
 		if VALID_KEYS[key] then
