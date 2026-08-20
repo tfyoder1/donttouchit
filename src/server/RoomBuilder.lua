@@ -2783,7 +2783,7 @@ local function makeSleepingQuartersRoom(roomFolder)
 	local wallSegmentDepth = (depth - branchGapDepth) / 2
 	local wallSegmentCenterZ = (branchGapDepth / 2 + depth / 2) / 2
 	createPart(room, "SleepingRightWallFront", Vector3.new(1, height, wallSegmentDepth), cframeAt(origin, width / 2, height / 2, wallSegmentCenterZ), Color3.fromRGB(103, 84, 92), Enum.Material.SmoothPlastic)
-	createPart(room, "SleepingRightWallBack", Vector3.new(1, height, wallSegmentDepth), cframeAt(origin, width / 2, height / 2, -wallSegmentCenterZ), Color3.fromRGB(103, 84, 92), Enum.Material.SmoothPlastic)
+	createPart(room, "SleepingRightWallBack", Vector3.new(1, height, wallSegmentDepth), cframeAt(origin, width / 2, height / 2, -wallSegmentCenterZ + 5.5), Color3.fromRGB(103, 84, 92), Enum.Material.SmoothPlastic)
 
 	createSpawnLocation(room, "SleepingQuartersSpawn", "SleepingQuarters", SLEEPING_QUARTERS_SPAWN_CFRAME, Color3.fromRGB(255, 142, 191), false)
 
