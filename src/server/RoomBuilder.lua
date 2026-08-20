@@ -2122,6 +2122,29 @@ local function makeCaveEntranceArea(roomFolder)
 	caveSpawn:SetAttribute("BaseTransparency", 1)
 	caveSpawn:SetAttribute("PrologueInspectIgnore", true)
 
+	local flashlightPickup = makeModel(cave, "StartingFlashlightPickup")
+	flashlightPickup:SetAttribute("PrologueDescription", "A flashlight waits in the grass. It feels like permission to look, not permission to touch anything else.")
+	flashlightPickup:SetAttribute("ProloguePriority", 120)
+	flashlightPickup:SetAttribute("TutorialHint", "Take the flashlight. Equip it from inventory, then press Action to turn it on or off.")
+	flashlightPickup:SetAttribute("PrologueSafeNavigation", true)
+	local flashlightCFrame = CFrame.new(-48.5, 0.62, 39.5) * CFrame.Angles(0, math.rad(-18), math.rad(90))
+	local flashlightBody = createPart(flashlightPickup, "FlashlightBody", Vector3.new(1.35, 0.34, 0.34), flashlightCFrame, Color3.fromRGB(41, 44, 48), Enum.Material.Metal)
+	flashlightBody.Shape = Enum.PartType.Cylinder
+	flashlightBody.CanCollide = false
+	flashlightBody:SetAttribute("BaseCanCollide", false)
+	local flashlightLens = createPart(flashlightPickup, "FlashlightLens", Vector3.new(0.12, 0.44, 0.44), flashlightCFrame * CFrame.new(-0.68, 0, 0), Color3.fromRGB(197, 232, 255), Enum.Material.Glass)
+	flashlightLens.Shape = Enum.PartType.Cylinder
+	flashlightLens.Transparency = 0.18
+	flashlightLens.CanCollide = false
+	flashlightLens:SetAttribute("BaseCanCollide", false)
+	flashlightLens:SetAttribute("BaseTransparency", 0.18)
+	local flashlightPrompt = createPrompt(flashlightBody, "Take", "Flashlight", 0)
+	flashlightPrompt.MaxActivationDistance = 12
+	flashlightPrompt:SetAttribute("PrologueSafeNavigation", true)
+	flashlightPrompt:SetAttribute("TutorialHint", "Take the flashlight. Equip it from inventory, then press Action to turn it on or off.")
+	flashlightPickup.PrimaryPart = flashlightBody
+	tag(flashlightPickup, Constants.Tags.StartingFlashlight)
+
 	for _, backdrop in ipairs({
 		{ Name = "CaveNightBackdropEast", Size = Vector3.new(0.5, 27, 46), CFrame = CFrame.new(-9.7, 12.5, 45) },
 		{ Name = "CaveNightBackdropWestLeft", Size = Vector3.new(0.5, 10.5, 9.8), CFrame = CFrame.new(-74.25, 5.0, 30.2) },

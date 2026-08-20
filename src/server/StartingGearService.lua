@@ -1,10 +1,16 @@
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 
 local StartingGearService = {}
 StartingGearService.__index = StartingGearService
 
 local FLASHLIGHT_TOOL_NAME = "Flashlight"
 local FLASHLIGHT_ATTRIBUTE = "DontTouchItFlashlight"
+local FLASHLIGHT_OWNED_ATTRIBUTE = "DontTouchItHasFlashlight"
+local PICKUP_CONNECTED_ATTRIBUTE = "DontTouchItFlashlightPickupConnected"
 
 local function getBackpack(player)
 	return player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 2)
@@ -134,15 +140,53 @@ function StartingGearService:_grantFlashlight(player)
 	createFlashlightTool().Parent = backpack
 end
 
+function StartingGearService:GrantFlashlight(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	player:SetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE, true)
+	self:_grantFlashlight(player)
+end
+
+function StartingGearService:_sendSystemMessage(player, text)
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	local remote = remotes and remotes:FindFirstChild(Constants.Remotes.SystemMessage)
+	if remote then
+		remote:FireClient(player, text)
+	end
+end
+
+function StartingGearService:_wireFlashlightPickup(instance)
+	if not instance or instance:GetAttribute(PICKUP_CONNECTED_ATTRIBUTE) == true then
+		return
+	end
+
+	local prompt = if instance:IsA("ProximityPrompt") then instance else instance:FindFirstChildWhichIsA("ProximityPrompt", true)
+	if not prompt then
+		return
+	end
+
+	instance:SetAttribute(PICKUP_CONNECTED_ATTRIBUTE, true)
+	prompt.Triggered:Connect(function(player)
+		local alreadyHadFlashlight = playerHasFlashlight(player) or player:GetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE) == true
+		self:GrantFlashlight(player)
+
+		if alreadyHadFlashlight then
+			self:_sendSystemMessage(player, "You already have the flashlight. Equip it, then press Action to turn it on or off.")
+		else
+			self:_sendSystemMessage(player, "Flashlight added. Equip it from inventory, then press Action to turn it on or off.")
+		end
+	end)
+end
+
 function StartingGearService:Initialize()
 	local function setupPlayer(player)
-		task.defer(function()
-			self:_grantFlashlight(player)
-		end)
-
 		player.CharacterAdded:Connect(function()
 			task.delay(0.25, function()
-				self:_grantFlashlight(player)
+				if player:GetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE) == true then
+					self:_grantFlashlight(player)
+				end
 			end)
 		end)
 	end
@@ -151,6 +195,14 @@ function StartingGearService:Initialize()
 	for _, player in ipairs(Players:GetPlayers()) do
 		setupPlayer(player)
 	end
+
+	for _, instance in ipairs(CollectionService:GetTagged(Constants.Tags.StartingFlashlight)) do
+		self:_wireFlashlightPickup(instance)
+	end
+
+	CollectionService:GetInstanceAddedSignal(Constants.Tags.StartingFlashlight):Connect(function(instance)
+		self:_wireFlashlightPickup(instance)
+	end)
 end
 
 return StartingGearService
