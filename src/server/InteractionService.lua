@@ -6764,8 +6764,20 @@ function InteractionService:_wireHallDoor(door)
 				return
 			end
 
+			local endGameComplete = false
+			if door:GetAttribute("RequiresEndGameCompletion") == true and not isPrologueOpen then
+				endGameComplete = self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
+					and not self.discoveryService:IsDevOverrideActive(player)
+				if not endGameComplete then
+					self.systemMessageRemote:FireClient(player, door:GetAttribute("EndGameLockedMessage") or "That door is waiting for the end.")
+					playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
+					return
+				end
+			end
+
 			if door:GetAttribute("OneWayTrapAfterHallwayEntry")
 				and not isPrologueOpen
+				and not endGameComplete
 				and self.caveHallDoorLockedByUserId[player.UserId]
 			then
 				self.systemMessageRemote:FireClient(player, door:GetAttribute("OneWayLockedMessage") or "The entryway locked behind you.")
