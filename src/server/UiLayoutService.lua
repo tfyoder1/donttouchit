@@ -73,12 +73,14 @@ end
 function UiLayoutService.new()
 	return setmetatable({
 		layoutStore = nil,
+		preferencesService = nil,
 		remote = nil,
 		cacheByUserId = {},
 	}, UiLayoutService)
 end
 
-function UiLayoutService:Initialize()
+function UiLayoutService:Initialize(preferencesService)
+	self.preferencesService = preferencesService
 	self.remote = RemoteService.GetRemote(Constants.Remotes.UiLayout)
 
 	local ok, store = pcall(function()
@@ -102,12 +104,21 @@ function UiLayoutService:_load(player)
 	end
 
 	local layout = {}
+	if self.preferencesService then
+		layout = sanitizeLayout(self.preferencesService:GetBucket(player, "Layout"))
+	end
 	if self.layoutStore then
 		local ok, data = pcall(function()
 			return self.layoutStore:GetAsync(dataKey(player))
 		end)
 		if ok then
-			layout = sanitizeLayout(data)
+			local legacyLayout = sanitizeLayout(data)
+			if next(layout) == nil and next(legacyLayout) ~= nil then
+				layout = legacyLayout
+				if self.preferencesService then
+					self.preferencesService:ReplaceBucket(player, "Layout", layout)
+				end
+			end
 		else
 			warn(("[DON'T TOUCH IT] UI layout load failed for %d: %s"):format(player.UserId, tostring(data)))
 		end
@@ -131,6 +142,10 @@ function UiLayoutService:_save(player, layout)
 
 	self.cacheByUserId[player.UserId] = mergedLayout
 
+	if self.preferencesService then
+		self.preferencesService:ReplaceBucket(player, "Layout", mergedLayout)
+	end
+
 	if self.layoutStore then
 		local ok, err = pcall(function()
 			self.layoutStore:SetAsync(dataKey(player), mergedLayout)
@@ -149,6 +164,10 @@ end
 function UiLayoutService:_reset(player)
 	local layout = {}
 	self.cacheByUserId[player.UserId] = layout
+
+	if self.preferencesService then
+		self.preferencesService:ReplaceBucket(player, "Layout", layout)
+	end
 
 	if self.layoutStore then
 		local ok, err = pcall(function()

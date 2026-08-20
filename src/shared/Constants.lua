@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.221"
+Constants.BuildVersion = "0.5.222"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -362,6 +362,7 @@ Constants.DataStore = {
 	AdminRolesName = "DontTouchItAdminRoles_v1",
 	ModerationName = "DontTouchItModeration_v1",
 	AdminAuditName = "DontTouchItAdminAudit_v1",
+	PlayerPreferencesName = "DontTouchItPlayerPreferences_v1",
 	UiLayoutName = "DontTouchItUiLayout_v1",
 	AutosaveSeconds = 45,
 	RetryCount = 3,

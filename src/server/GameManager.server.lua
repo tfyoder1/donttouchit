@@ -11,6 +11,7 @@ local LocationPingService = require(script.Parent:WaitForChild("LocationPingServ
 local MovementAuthorityService = require(script.Parent:WaitForChild("MovementAuthorityService"))
 local ModerationService = require(script.Parent:WaitForChild("ModerationService"))
 local PermissionService = require(script.Parent:WaitForChild("PermissionService"))
+local PlayerPreferencesService = require(script.Parent:WaitForChild("PlayerPreferencesService"))
 local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
@@ -41,8 +42,11 @@ roomProgressService:SetMovementAuthorityService(movementAuthorityService)
 local locationPingService = LocationPingService.new()
 locationPingService:Initialize()
 
+local playerPreferencesService = PlayerPreferencesService.new(Constants)
+playerPreferencesService:Initialize()
+
 local uiLayoutService = UiLayoutService.new()
-uiLayoutService:Initialize()
+uiLayoutService:Initialize(playerPreferencesService)
 
 local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService)
 bunkerEnergyService:Initialize()
