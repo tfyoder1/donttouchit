@@ -39,6 +39,8 @@ local sourceCFrame = nil
 local sourceSize = nil
 local draftIntent = "Add"
 local cloneSourcePart = nil
+local undoStack = {}
+local redoStack = {}
 local hiddenParts = {}
 local deleteCandidate = nil
 local currentDeviceProfile = DeviceProfile.Get()
@@ -285,7 +287,7 @@ local function updateData()
 		return
 	end
 	if not wallPart then
-		dataLabel.Text = "WALL DRAFT\nNew Wall: place a new wall draft.\nSelect Wall: edit an existing wall.\nMove Wall: reposition an existing wall.\nClone Wall: copy an existing wall into a new generated wall.\nX<</X>>: large X moves; X-/X+: fine X moves.\nScreenshot this box after moving/sizing."
+		dataLabel.Text = "WALL DRAFT\nNew Wall: place a new wall draft.\nSelect Wall: edit an existing wall.\nMove Wall: reposition an existing wall.\nClone Wall: copy an existing wall into a new generated wall.\nX/Y/Z<</>>: large moves; -/+: fine moves.\nScreenshot this box after moving/sizing."
 		return
 	end
 	local mode = "ADD WALL"
@@ -309,6 +311,68 @@ local function updateData()
 		table.insert(lines, "Code Note: if the source uses room variables, prefer applying the delta to that expression.")
 	end
 	dataLabel.Text = table.concat(lines, "\n")
+end
+
+local function clearDraftHistory()
+	table.clear(undoStack)
+	table.clear(redoStack)
+end
+
+local function captureDraftState()
+	if not wallPart then
+		return nil
+	end
+	return {
+		CFrame = wallPart.CFrame,
+		Size = wallPart.Size,
+	}
+end
+
+local function restoreDraftState(state)
+	if not wallPart or not state then
+		return
+	end
+	wallPart.CFrame = state.CFrame
+	wallPart.Size = state.Size
+	refreshVisuals()
+	updateData()
+end
+
+local function pushUndoState()
+	local state = captureDraftState()
+	if not state then
+		return false
+	end
+	table.insert(undoStack, state)
+	if #undoStack > 60 then
+		table.remove(undoStack, 1)
+	end
+	table.clear(redoStack)
+	return true
+end
+
+local function undoDraft()
+	local previousState = table.remove(undoStack)
+	if not previousState then
+		return
+	end
+	local currentState = captureDraftState()
+	if currentState then
+		table.insert(redoStack, currentState)
+	end
+	restoreDraftState(previousState)
+end
+
+local function redoDraft()
+	local nextState = table.remove(redoStack)
+	if not nextState then
+		return
+	end
+	local currentState = captureDraftState()
+	if currentState then
+		table.insert(undoStack, currentState)
+	end
+	restoreDraftState(nextState)
 end
 
 local function makeDraftWall(cf, size, source, intent)
@@ -336,6 +400,7 @@ local function makeDraftWall(cf, size, source, intent)
 	sourceCFrame = source and source.CFrame or nil
 	sourceSize = source and source.Size or nil
 	deleteCandidate = nil
+	clearDraftHistory()
 	refreshVisuals()
 	updateData()
 end
@@ -356,6 +421,7 @@ end
 
 local function nudge(offset)
 	if wallPart then
+		pushUndoState()
 		wallPart.CFrame += offset
 		refreshVisuals()
 		updateData()
@@ -364,6 +430,7 @@ end
 
 local function resize(delta)
 	if wallPart then
+		pushUndoState()
 		wallPart.Size = Vector3.new(
 			math.max(0.25, wallPart.Size.X + delta.X),
 			math.max(0.25, wallPart.Size.Y + delta.Y),
@@ -378,6 +445,7 @@ local function rotate(axis, degrees)
 	if not wallPart then
 		return
 	end
+	pushUndoState()
 	local rotation = if axis == "X"
 		then CFrame.Angles(math.rad(degrees), 0, 0)
 		elseif axis == "Y" then CFrame.Angles(0, math.rad(degrees), 0)
@@ -510,8 +578,8 @@ local function ensureGui()
 
 	local grid = Instance.new("Frame")
 	grid.BackgroundTransparency = 1
-	grid.Position = UDim2.fromOffset(10, 170)
-	grid.Size = UDim2.new(1, -20, 1, -180)
+	grid.Position = UDim2.fromOffset(10, 166)
+	grid.Size = UDim2.new(1, -20, 1, -176)
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
 	layout.CellPadding = UDim2.fromOffset(5, 5)
@@ -570,12 +638,13 @@ local function ensureGui()
 		draftIntent = "Add"
 		cloneSourcePart = nil
 		deleteCandidate = nil
+		clearDraftHistory()
 		updateData()
 	end)
 	makeButton(grid, "Commit", 7, commitDraft)
-	makeButton(grid, "Close", 8, closeDraft)
-	makeGridSpacer(grid, 9)
-	makeGridSpacer(grid, 10)
+	makeButton(grid, "Undo", 8, undoDraft)
+	makeButton(grid, "Redo", 9, redoDraft)
+	makeButton(grid, "Close", 10, closeDraft)
 	makeGridSpacer(grid, 11)
 	makeGridSpacer(grid, 12)
 	makeButton(grid, "X<<", 20, function() nudge(Vector3.new(-STEP_MOVE_LARGE, 0, 0)) end)
@@ -584,20 +653,24 @@ local function ensureGui()
 	makeButton(grid, "X+", 23, function() nudge(Vector3.new(STEP_MOVE, 0, 0)) end)
 	makeButton(grid, "Rot X+", 24, function() rotate("X", STEP_ROTATE_DEGREES) end)
 	makeButton(grid, "Rot X-", 25, function() rotate("X", -STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Y-", 30, function() nudge(Vector3.new(0, -STEP_MOVE, 0)) end)
-	makeButton(grid, "Y+", 31, function() nudge(Vector3.new(0, STEP_MOVE, 0)) end)
-	makeButton(grid, "Z-", 32, function() nudge(Vector3.new(0, 0, -STEP_MOVE)) end)
-	makeButton(grid, "Z+", 33, function() nudge(Vector3.new(0, 0, STEP_MOVE)) end)
-	makeButton(grid, "W-", 40, function() resize(Vector3.new(-STEP_SIZE, 0, 0)) end)
-	makeButton(grid, "W+", 41, function() resize(Vector3.new(STEP_SIZE, 0, 0)) end)
-	makeButton(grid, "H-", 42, function() resize(Vector3.new(0, -STEP_SIZE, 0)) end)
-	makeButton(grid, "H+", 43, function() resize(Vector3.new(0, STEP_SIZE, 0)) end)
-	makeButton(grid, "D-", 44, function() resize(Vector3.new(0, 0, -STEP_SIZE)) end)
-	makeButton(grid, "D+", 45, function() resize(Vector3.new(0, 0, STEP_SIZE)) end)
-	makeButton(grid, "Rot Y-", 50, function() rotate("Y", -STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Y+", 51, function() rotate("Y", STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Z-", 52, function() rotate("Z", -STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Z+", 53, function() rotate("Z", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Y<<", 30, function() nudge(Vector3.new(0, -STEP_MOVE_LARGE, 0)) end)
+	makeButton(grid, "Y>>", 31, function() nudge(Vector3.new(0, STEP_MOVE_LARGE, 0)) end)
+	makeButton(grid, "Y-", 32, function() nudge(Vector3.new(0, -STEP_MOVE, 0)) end)
+	makeButton(grid, "Y+", 33, function() nudge(Vector3.new(0, STEP_MOVE, 0)) end)
+	makeButton(grid, "Rot Y+", 34, function() rotate("Y", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Y-", 35, function() rotate("Y", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Z<<", 40, function() nudge(Vector3.new(0, 0, -STEP_MOVE_LARGE)) end)
+	makeButton(grid, "Z>>", 41, function() nudge(Vector3.new(0, 0, STEP_MOVE_LARGE)) end)
+	makeButton(grid, "Z-", 42, function() nudge(Vector3.new(0, 0, -STEP_MOVE)) end)
+	makeButton(grid, "Z+", 43, function() nudge(Vector3.new(0, 0, STEP_MOVE)) end)
+	makeButton(grid, "Rot Z+", 44, function() rotate("Z", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Z-", 45, function() rotate("Z", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "W-", 50, function() resize(Vector3.new(-STEP_SIZE, 0, 0)) end)
+	makeButton(grid, "W+", 51, function() resize(Vector3.new(STEP_SIZE, 0, 0)) end)
+	makeButton(grid, "H-", 52, function() resize(Vector3.new(0, -STEP_SIZE, 0)) end)
+	makeButton(grid, "H+", 53, function() resize(Vector3.new(0, STEP_SIZE, 0)) end)
+	makeButton(grid, "D-", 54, function() resize(Vector3.new(0, 0, -STEP_SIZE)) end)
+	makeButton(grid, "D+", 55, function() resize(Vector3.new(0, 0, STEP_SIZE)) end)
 	updateData()
 end
 
