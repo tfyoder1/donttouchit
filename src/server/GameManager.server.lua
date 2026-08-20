@@ -16,6 +16,7 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
 local RoomBuilder = require(script.Parent:WaitForChild("RoomBuilder"))
+local StartingGearService = require(script.Parent:WaitForChild("StartingGearService"))
 local UiLayoutService = require(script.Parent:WaitForChild("UiLayoutService"))
 local VictoryBrickService = require(script.Parent:WaitForChild("VictoryBrickService"))
 
@@ -47,6 +48,9 @@ playerPreferencesService:Initialize()
 
 local uiLayoutService = UiLayoutService.new()
 uiLayoutService:Initialize(playerPreferencesService)
+
+local startingGearService = StartingGearService.new()
+startingGearService:Initialize()
 
 local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService)
 bunkerEnergyService:Initialize()
