@@ -3448,6 +3448,20 @@ function InteractionService:_setCaveEntranceSealed()
 	return true
 end
 
+function InteractionService:_openCaveEntranceForNewPlayers()
+	for _, seal in ipairs(CollectionService:GetTagged(Constants.Tags.CaveEntranceSeal)) do
+		for _, instance in ipairs(getInstanceAndDescendants(seal)) do
+			if instance:IsA("BasePart") then
+				instance.Transparency = instance:GetAttribute("BaseTransparency") or 1
+				instance.CanCollide = instance:GetAttribute("BaseCanCollide") == true
+				instance.CanQuery = instance:GetAttribute("BaseCanQuery") == true
+				instance.CanTouch = instance:GetAttribute("BaseCanTouch") == true
+			end
+		end
+		self:_persistResetBaseline(seal)
+	end
+end
+
 function InteractionService:_cycleCaveLight(light)
 	local colorIndex = ((light:GetAttribute("CaveLightColorIndex") or 1) % #CAVE_LIGHT_COLORS) + 1
 	local color = CAVE_LIGHT_COLORS[colorIndex]
@@ -3622,6 +3636,8 @@ function InteractionService:_wireCaveKeyDoor(door)
 		end
 
 		task.delay(0.18, function()
+			self.caveHallDoorLockedByUserId[player.UserId] = true
+			self:_openCaveEntranceForNewPlayers()
 			self:_teleportPlayer(player, destinationCFrame, "CaveKeyDoor")
 			self.systemMessageRemote:FireClient(player, "The cave door opens into the hallway. Only the TV Room looks ready to admit anything.")
 		end)
@@ -6748,6 +6764,15 @@ function InteractionService:_wireHallDoor(door)
 				return
 			end
 
+			if door:GetAttribute("OneWayTrapAfterHallwayEntry")
+				and not isPrologueOpen
+				and self.caveHallDoorLockedByUserId[player.UserId]
+			then
+				self.systemMessageRemote:FireClient(player, door:GetAttribute("OneWayLockedMessage") or "The entryway locked behind you.")
+				playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
+				return
+			end
+
 			if door:GetAttribute("RequiresIdBadgeAfterUse")
 				and not isPrologueOpen
 				and self.caveHallDoorLockedByUserId[player.UserId]
@@ -6769,6 +6794,10 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 		self:_teleportPlayer(player, destinationCFrame, "HallDoor")
+		local travelSoundId = door:GetAttribute("TravelSoundId")
+		if typeof(travelSoundId) == "string" and travelSoundId ~= "" then
+			playSound(door, travelSoundId, 0.65, 0.42)
+		end
 
 		local unlockDiscoveryId = door:GetAttribute("UnlockDiscoveryId")
 			if typeof(unlockDiscoveryId) == "string" and not isPrologueOpen then

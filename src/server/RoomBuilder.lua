@@ -3689,11 +3689,14 @@ local function makeHallway(roomFolder)
 			Vector3.new(0.45, 8.5, 6.5),
 			CFrame.new(-5.95, 4.75, 45),
 			Enum.NormalId.Right,
-			"CAVE\nENTRANCE",
+			"CAVE\nENTRYWAY",
 			CAVE_HALLWAY_CAVE_RETURN_CFRAME
 		)
 		caveDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.CaveEntered.Id)
-		caveDoor:SetAttribute("TravelMessage", "The hallway sends you back into the cave.")
+		caveDoor:SetAttribute("TravelMessage", "The entryway locks behind you.")
+		caveDoor:SetAttribute("OneWayTrapAfterHallwayEntry", true)
+		caveDoor:SetAttribute("OneWayLockedMessage", "The cave entryway already locked behind you. The hallway is your way forward now.")
+		caveDoor:SetAttribute("TravelSoundId", Constants.AudioAssets.Prologue.LockdownDoorEchoId)
 		caveDoor.CanCollide = false
 		caveDoor:SetAttribute("BaseCanCollide", false)
 		tag(caveDoor, Constants.Tags.CaveHallwayDoor)
