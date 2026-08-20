@@ -24,6 +24,7 @@ local gui = nil
 local panel = nil
 local dataLabel = nil
 local wallPart = nil
+local visualFolder = nil
 local sourcePart = nil
 local sourceCFrame = nil
 local sourceSize = nil
@@ -62,6 +63,107 @@ local function vectorPayload(v)
 		Y = v.Y,
 		Z = v.Z,
 	}
+end
+
+local function destroyVisuals()
+	if visualFolder then
+		visualFolder:Destroy()
+		visualFolder = nil
+	end
+end
+
+local function ensureVisualFolder()
+	if visualFolder and visualFolder.Parent then
+		return visualFolder
+	end
+	visualFolder = Instance.new("Folder")
+	visualFolder.Name = "DontTouchItWallDraftVisuals"
+	visualFolder.Parent = Workspace
+	return visualFolder
+end
+
+local function makeVisualPart(name, size, cframe, color, transparency, shape)
+	local folder = ensureVisualFolder()
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Color = color
+	part.Material = Enum.Material.Neon
+	part.Shape = shape or Enum.PartType.Block
+	part.Size = size
+	part.Transparency = transparency or 0.12
+	part.CFrame = cframe
+	part.Parent = folder
+	return part
+end
+
+local function makeVisualLabel(parent, text, color)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = text .. "Label"
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.Size = UDim2.fromOffset(56, 24)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 0.75, 0)
+	billboard.Parent = parent
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
+	label.BackgroundTransparency = 0.18
+	label.BorderSizePixel = 0
+	label.Font = Enum.Font.GothamBlack
+	label.Size = UDim2.fromScale(1, 1)
+	label.Text = text
+	label.TextColor3 = color
+	label.TextScaled = true
+	label.Parent = billboard
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 5)
+	corner.Parent = label
+end
+
+local function refreshVisuals()
+	destroyVisuals()
+	if not wallPart or not wallPart.Parent then
+		return
+	end
+
+	local cf = wallPart.CFrame
+	local size = wallPart.Size
+	local axisLength = math.max(3, math.min(10, math.max(size.X, size.Y, size.Z) * 0.55))
+	local xColor = Color3.fromRGB(255, 94, 94)
+	local yColor = Color3.fromRGB(119, 255, 150)
+	local zColor = Color3.fromRGB(94, 170, 255)
+	local cornerColor = Color3.fromRGB(255, 231, 112)
+	local ringColor = Color3.fromRGB(255, 124, 231)
+
+	local xAxis = makeVisualPart("Axis_X_Red", Vector3.new(axisLength, 0.12, 0.12), cf * CFrame.new(axisLength / 2 + size.X / 2 + 0.3, 0, 0), xColor, 0.08)
+	makeVisualLabel(xAxis, "X+", xColor)
+	local yAxis = makeVisualPart("Axis_Y_Green", Vector3.new(0.12, axisLength, 0.12), cf * CFrame.new(0, axisLength / 2 + size.Y / 2 + 0.3, 0), yColor, 0.08)
+	makeVisualLabel(yAxis, "Y+", yColor)
+	local zAxis = makeVisualPart("Axis_Z_Blue", Vector3.new(0.12, 0.12, axisLength), cf * CFrame.new(0, 0, axisLength / 2 + size.Z / 2 + 0.3), zColor, 0.08)
+	makeVisualLabel(zAxis, "Z+", zColor)
+
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sy in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				makeVisualPart(
+					("DragCorner_%d_%d_%d"):format(sx, sy, sz),
+					Vector3.new(0.45, 0.45, 0.45),
+					cf * CFrame.new(sx * size.X / 2, sy * size.Y / 2, sz * size.Z / 2),
+					cornerColor,
+					0.05
+				)
+			end
+		end
+	end
+
+	makeVisualPart("Rotate_X_Ring", Vector3.new(0.1, axisLength * 1.05, axisLength * 1.05), cf, ringColor, 0.45, Enum.PartType.Cylinder)
+	makeVisualPart("Rotate_Y_Ring", Vector3.new(axisLength * 1.05, 0.1, axisLength * 1.05), cf * CFrame.Angles(0, 0, math.rad(90)), ringColor, 0.45, Enum.PartType.Cylinder)
+	makeVisualPart("Rotate_Z_Ring", Vector3.new(axisLength * 1.05, axisLength * 1.05, 0.1), cf * CFrame.Angles(math.rad(90), 0, 0), ringColor, 0.45, Enum.PartType.Cylinder)
 end
 
 local function getSourcePath(part)
@@ -144,6 +246,7 @@ local function makeDraftWall(cf, size, source)
 	sourceCFrame = source and source.CFrame or nil
 	sourceSize = source and source.Size or nil
 	deleteCandidate = nil
+	refreshVisuals()
 	updateData()
 end
 
@@ -164,6 +267,7 @@ end
 local function nudge(offset)
 	if wallPart then
 		wallPart.CFrame += offset
+		refreshVisuals()
 		updateData()
 	end
 end
@@ -175,6 +279,7 @@ local function resize(delta)
 			math.max(0.25, wallPart.Size.Y + delta.Y),
 			math.max(0.25, wallPart.Size.Z + delta.Z)
 		)
+		refreshVisuals()
 		updateData()
 	end
 end
@@ -188,10 +293,12 @@ local function rotate(axis, degrees)
 		elseif axis == "Y" then CFrame.Angles(0, math.rad(degrees), 0)
 		else CFrame.Angles(0, 0, math.rad(degrees))
 	wallPart.CFrame = wallPart.CFrame * rotation
+	refreshVisuals()
 	updateData()
 end
 
 local function closeDraft()
+	destroyVisuals()
 	playerGui:SetAttribute(ENABLED_ATTRIBUTE, false)
 	if gui then
 		gui.Enabled = false
@@ -253,22 +360,40 @@ local function ensureGui()
 	gui.Parent = playerGui
 
 	panel = Instance.new("Frame")
-	panel.AnchorPoint = Vector2.new(0, 1)
+	panel.AnchorPoint = Vector2.new(0, 0.5)
 	panel.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
 	panel.BackgroundTransparency = 0.05
 	panel.BorderSizePixel = 0
-	panel.Position = UDim2.new(0, 12, 1, -12)
+	panel.Position = UDim2.new(0, 12, 0.5, 0)
 	panel.Size = UDim2.fromOffset(430, 334)
 	panel.Parent = gui
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = panel
 
+	local closeButton = Instance.new("TextButton")
+	closeButton.Name = "CloseButton"
+	closeButton.AnchorPoint = Vector2.new(1, 0)
+	closeButton.BackgroundColor3 = Color3.fromRGB(33, 40, 50)
+	closeButton.BackgroundTransparency = 0.02
+	closeButton.BorderSizePixel = 0
+	closeButton.Font = Enum.Font.GothamBlack
+	closeButton.Position = UDim2.new(1, -8, 0, 8)
+	closeButton.Size = UDim2.fromOffset(28, 28)
+	closeButton.Text = "X"
+	closeButton.TextColor3 = Color3.fromRGB(235, 245, 255)
+	closeButton.TextSize = 14
+	closeButton.Parent = panel
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(0, 7)
+	closeCorner.Parent = closeButton
+	closeButton.Activated:Connect(closeDraft)
+
 	dataLabel = Instance.new("TextLabel")
 	dataLabel.BackgroundTransparency = 1
 	dataLabel.Font = Enum.Font.Code
 	dataLabel.Position = UDim2.fromOffset(10, 8)
-	dataLabel.Size = UDim2.new(1, -20, 0, 122)
+	dataLabel.Size = UDim2.new(1, -50, 0, 122)
 	dataLabel.TextColor3 = Color3.fromRGB(196, 249, 255)
 	dataLabel.TextSize = 10
 	dataLabel.TextWrapped = true
@@ -312,6 +437,7 @@ local function ensureGui()
 			wallPart:Destroy()
 			wallPart = nil
 		end
+		destroyVisuals()
 		for part, old in pairs(hiddenParts) do
 			if part and part.Parent then
 				part.LocalTransparencyModifier = 0
@@ -353,6 +479,7 @@ local function setEnabled(enabled)
 		ensureGui()
 		gui.Enabled = true
 	else
+		destroyVisuals()
 		if gui then
 			gui.Enabled = false
 		end
