@@ -1,13 +1,15 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItTutorialHints"
-gui.DisplayOrder = 170
+UiLayerController.ApplyRole(gui, "Tutorial")
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 pcall(function()
@@ -21,6 +23,8 @@ shade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 shade.BackgroundTransparency = 1
 shade.BorderSizePixel = 0
 shade.Size = UDim2.fromScale(1, 1)
+shade.Active = false
+shade.Selectable = false
 shade.Visible = false
 shade.ZIndex = 1
 shade.Parent = gui
@@ -33,6 +37,8 @@ panel.Size = UDim2.new(0.64, 0, 0, 156)
 panel.BackgroundColor3 = Color3.fromRGB(8, 12, 18)
 panel.BackgroundTransparency = 0.08
 panel.BorderSizePixel = 0
+panel.Active = false
+panel.Selectable = false
 panel.Visible = false
 panel.ZIndex = 2
 panel.Parent = gui
@@ -104,6 +110,50 @@ footer.Parent = panel
 local activePrompt = nil
 local activeTween = nil
 local shadeTween = nil
+local activePromptConnections = {}
+
+local function disconnectActivePromptConnections()
+	for _, connection in ipairs(activePromptConnections) do
+		connection:Disconnect()
+	end
+	table.clear(activePromptConnections)
+end
+
+local function getRootPart()
+	local character = player.Character
+	return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getPromptPosition(prompt)
+	local parent = prompt and prompt.Parent
+	if not parent then
+		return nil
+	end
+
+	if parent:IsA("Attachment") then
+		return parent.WorldPosition
+	elseif parent:IsA("BasePart") then
+		return parent.Position
+	elseif parent:IsA("Model") then
+		return parent:GetPivot().Position
+	end
+
+	return nil
+end
+
+local function isPromptStillRelevant(prompt)
+	if not prompt or not prompt.Parent or prompt.Enabled == false then
+		return false
+	end
+
+	local rootPart = getRootPart()
+	local promptPosition = getPromptPosition(prompt)
+	if not rootPart or not promptPosition then
+		return true
+	end
+
+	return (rootPart.Position - promptPosition).Magnitude <= (prompt.MaxActivationDistance + 6)
+end
 
 local function findHint(prompt)
 	local current = prompt
@@ -174,19 +224,49 @@ local function setPanelVisible(visible)
 	end
 end
 
-local function showHint(prompt, hint)
-	activePrompt = prompt
-	body.Text = hint
-	setPanelVisible(true)
-end
-
 local function hideHint(prompt)
 	if activePrompt ~= prompt then
 		return
 	end
 
 	activePrompt = nil
+	disconnectActivePromptConnections()
 	setPanelVisible(false)
+end
+
+local function watchActivePrompt(prompt)
+	table.insert(activePromptConnections, prompt.AncestryChanged:Connect(function()
+		if activePrompt == prompt and not prompt:IsDescendantOf(workspace) then
+			hideHint(prompt)
+		end
+	end))
+
+	table.insert(activePromptConnections, prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
+		if activePrompt == prompt and prompt.Enabled == false then
+			hideHint(prompt)
+		end
+	end))
+
+	local lastCheck = 0
+	table.insert(activePromptConnections, RunService.Heartbeat:Connect(function()
+		local now = os.clock()
+		if now - lastCheck < 0.2 then
+			return
+		end
+
+		lastCheck = now
+		if activePrompt == prompt and not isPromptStillRelevant(prompt) then
+			hideHint(prompt)
+		end
+	end))
+end
+
+local function showHint(prompt, hint)
+	disconnectActivePromptConnections()
+	activePrompt = prompt
+	body.Text = hint
+	watchActivePrompt(prompt)
+	setPanelVisible(true)
 end
 
 ProximityPromptService.PromptShown:Connect(function(prompt)

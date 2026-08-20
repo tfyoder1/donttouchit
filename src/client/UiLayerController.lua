@@ -13,6 +13,7 @@ UiLayerController.DisplayOrder = {
 	Background = 10,
 	CoreHud = 35,
 	DevTools = 100,
+	Tutorial = 120,
 	TouchControls = 145,
 	ControlOptions = 155,
 	RoomMenu = 170,

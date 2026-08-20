@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local FlightInput = require(script.Parent:WaitForChild("FlightInput"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local snackEffectRemote = remotes:WaitForChild(Constants.Remotes.SnackEffect)
 
@@ -43,6 +44,15 @@ local function isAnyGamepadButtonDown(keyCode)
 	end
 
 	return false
+end
+
+local function getFlightHorizontalDirection(humanoid)
+	local moveDirection = humanoid.MoveDirection
+	if moveDirection.Magnitude >= 0.05 then
+		return moveDirection
+	end
+
+	return FlightInput.GetCameraRelativeMoveDirection(false)
 end
 
 local function setTouchButtonHeld(button, held)
@@ -239,7 +249,8 @@ local function startFlight(duration, ceilingY)
 			vertical = SNACK_FLIGHT_IDLE_VERTICAL
 		end
 
-		linearVelocity.VectorVelocity = humanoid.MoveDirection * SNACK_FLIGHT_HORIZONTAL_SPEED + Vector3.new(0, vertical, 0)
+		linearVelocity.VectorVelocity = getFlightHorizontalDirection(humanoid) * SNACK_FLIGHT_HORIZONTAL_SPEED
+			+ Vector3.new(0, vertical, 0)
 	end)
 
 	task.delay(duration or 60, function()

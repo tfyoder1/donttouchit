@@ -9,6 +9,7 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local DeviceProfile = require(script.Parent:WaitForChild("DeviceProfile"))
+local FlightInput = require(script.Parent:WaitForChild("FlightInput"))
 local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local devRemote = remotes:WaitForChild(Constants.Remotes.DevTools)
@@ -1550,7 +1551,7 @@ local function getFlightControlsText()
 	end
 
 	if profile.IsTouch then
-		return "Dev fly ON. Touch support is limited for dev testing. Use the move stick to drift; attach a keyboard/gamepad for full up/down control."
+		return "Dev fly ON. Touch: left thumbstick flies, drag to look, UP climbs, DN descends."
 	end
 
 	return "Dev fly ON. Keyboard/mouse: WASD moves with the camera, Space or E climbs, Ctrl or Q descends. Mouse aims."
@@ -1868,6 +1869,12 @@ local function connectMovementLoops()
 		end
 		if math.abs(stick.Y) >= GAMEPAD_STICK_DEADZONE then
 			direction += look * stick.Y
+		end
+		if UserInputService.TouchEnabled then
+			local touchMoveDirection = FlightInput.GetCameraRelativeMoveDirection(true)
+			if touchMoveDirection.Magnitude >= GAMEPAD_STICK_DEADZONE then
+				direction += touchMoveDirection
+			end
 		end
 
 		if isFlyAscendPressed() then
