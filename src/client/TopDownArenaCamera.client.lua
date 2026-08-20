@@ -1,5 +1,6 @@
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -29,6 +30,7 @@ local OVERHEAD_AIM_DEFAULT_DISTANCE = 34
 local AIM_STICK_DEADZONE = 0.12
 local TOUCH_AIM_BUTTON_SIZE = UDim2.fromOffset(78, 78)
 local TOUCH_AIM_BUTTON_POSITION = UDim2.fromScale(0.82, 0.66)
+local TOUCH_THROW_BUTTON_POSITION = UDim2.fromScale(0.68, 0.66)
 local TOUCH_AIM_RADIUS = 62
 
 local active = false
@@ -50,6 +52,7 @@ local aimMarker = nil
 local overheadAimDirection = Vector3.new(0, 0, -1)
 local overheadAimDistance = OVERHEAD_AIM_DEFAULT_DISTANCE
 local touchAimInput = nil
+local visiblePrompts = {}
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItTopDownArenaHud"
@@ -124,6 +127,36 @@ touchAimStroke.Color = Color3.fromRGB(119, 255, 203)
 touchAimStroke.Thickness = 2
 touchAimStroke.Transparency = 0.18
 touchAimStroke.Parent = touchAimButton
+
+local touchThrowButton = Instance.new("TextButton")
+touchThrowButton.Name = "TopDownTouchThrowButton"
+touchThrowButton.AnchorPoint = Vector2.new(0.5, 0.5)
+touchThrowButton.AutoButtonColor = true
+touchThrowButton.BackgroundColor3 = Color3.fromRGB(32, 27, 38)
+touchThrowButton.BackgroundTransparency = 0.08
+touchThrowButton.BorderSizePixel = 0
+touchThrowButton.Font = Enum.Font.GothamBlack
+touchThrowButton.Position = TOUCH_THROW_BUTTON_POSITION
+touchThrowButton.Size = TOUCH_AIM_BUTTON_SIZE
+touchThrowButton.Text = "Throw"
+touchThrowButton.TextColor3 = Color3.fromRGB(255, 238, 248)
+touchThrowButton.TextScaled = true
+touchThrowButton.TextStrokeColor3 = Color3.fromRGB(5, 8, 12)
+touchThrowButton.TextStrokeTransparency = 0.35
+touchThrowButton.TextWrapped = true
+touchThrowButton.Visible = false
+touchThrowButton.ZIndex = 20
+touchThrowButton.Parent = gui
+
+local touchThrowCorner = Instance.new("UICorner")
+touchThrowCorner.CornerRadius = UDim.new(1, 0)
+touchThrowCorner.Parent = touchThrowButton
+
+local touchThrowStroke = Instance.new("UIStroke")
+touchThrowStroke.Color = Color3.fromRGB(255, 142, 191)
+touchThrowStroke.Thickness = 2
+touchThrowStroke.Transparency = 0.18
+touchThrowStroke.Parent = touchThrowButton
 
 local function getRootPart()
 	local character = player.Character
@@ -277,12 +310,36 @@ local function unbindJumpAim()
 	ContextActionService:UnbindAction(JUMP_AIM_ACTION)
 end
 
+local function hasVisiblePrompt()
+	for prompt in pairs(visiblePrompts) do
+		if not prompt.Parent or prompt.Enabled == false then
+			visiblePrompts[prompt] = nil
+		end
+	end
+
+	return next(visiblePrompts) ~= nil
+end
+
+local function shouldShowTouchArenaButtons()
+	return active and UserInputService.TouchEnabled and not hasVisiblePrompt()
+end
+
 local function updateTouchAimButton()
-	local visible = active and UserInputService.TouchEnabled
+	local visible = shouldShowTouchArenaButtons()
 	touchAimButton.Visible = visible
 	touchAimButton.Text = if aiming then "Aiming" else "Aim"
 	touchAimButton.BackgroundColor3 = if aiming then Color3.fromRGB(43, 76, 68) else Color3.fromRGB(18, 23, 29)
 	touchAimStroke.Transparency = if aiming then 0.02 else 0.18
+end
+
+local function updateTouchThrowButton()
+	touchThrowButton.Visible = shouldShowTouchArenaButtons()
+	touchThrowStroke.Transparency = if aiming then 0.02 else 0.18
+end
+
+local function updateTouchArenaButtons()
+	updateTouchAimButton()
+	updateTouchThrowButton()
 end
 
 local function updateReticle(camera, aimTarget)
@@ -306,7 +363,7 @@ local function setAiming(nextAiming)
 	reticle.Visible = active and aiming and cameraMode ~= "Overhead"
 	local marker = ensureAimMarker()
 	marker.Transparency = aiming and 0.36 or 1
-	updateTouchAimButton()
+	updateTouchArenaButtons()
 end
 
 local function finishTouchAim(input)
@@ -330,9 +387,22 @@ local function updateOverheadAimFromTouch(position)
 	applyOverheadAimVector(x, y)
 end
 
+local function requestThrow()
+	if not active then
+		return
+	end
+
+	topDownRemote:FireServer({
+		Action = "Throw",
+		Direction = getAimDirection(),
+		TargetPosition = getAimTargetPosition(),
+	})
+end
+
 touchAimButton.InputBegan:Connect(function(input)
 	if not active
 		or not UserInputService.TouchEnabled
+		or not touchAimButton.Visible
 		or (input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseButton1)
 	then
 		return
@@ -347,22 +417,33 @@ touchAimButton.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 		finishTouchAim(input)
 	end
-end
+end)
+
+touchThrowButton.Activated:Connect(function()
+	if touchThrowButton.Visible then
+		requestThrow()
+	end
+end)
 
 local function bindThrow()
 	unbindThrow()
-	ContextActionService:BindAction(THROW_ACTION, function(_, inputState)
+	ContextActionService:BindAction(THROW_ACTION, function(_, inputState, inputObject)
 		if inputState ~= Enum.UserInputState.Begin or not active then
 			return Enum.ContextActionResult.Pass
 		end
 
-		topDownRemote:FireServer({
-			Action = "Throw",
-			Direction = getAimDirection(),
-			TargetPosition = getAimTargetPosition(),
-		})
+		if hasVisiblePrompt()
+			and (
+				UserInputService.TouchEnabled
+				or (inputObject and inputObject.UserInputType == Enum.UserInputType.MouseButton1)
+			)
+		then
+			return Enum.ContextActionResult.Pass
+		end
+
+		requestThrow()
 		return Enum.ContextActionResult.Sink
-	end, true, Enum.UserInputType.MouseButton1, Enum.KeyCode.ButtonR2)
+	end, false, Enum.UserInputType.MouseButton1, Enum.KeyCode.ButtonR2)
 
 	pcall(function()
 		ContextActionService:SetTitle(THROW_ACTION, "Throw")
@@ -399,7 +480,7 @@ local function bindJumpAim()
 	ContextActionService:BindActionAtPriority(
 		JUMP_AIM_ACTION,
 		function(_, inputState)
-			if not active or not UserInputService.TouchEnabled then
+			if not active or not UserInputService.TouchEnabled or hasVisiblePrompt() then
 				return Enum.ContextActionResult.Pass
 			end
 
@@ -537,7 +618,7 @@ local function enableCamera()
 	touchAimInput = nil
 	resetOverheadAim()
 	updateAmmoLabel()
-	updateTouchAimButton()
+	updateTouchArenaButtons()
 	bindThrow()
 	bindAim()
 	bindJumpAim()
@@ -625,5 +706,24 @@ topDownRemote.OnClientEvent:Connect(function(payload)
 	end
 end)
 
+ProximityPromptService.PromptShown:Connect(function(prompt)
+	if not prompt or not prompt:IsA("ProximityPrompt") then
+		return
+	end
+
+	visiblePrompts[prompt] = true
+	if active then
+		setAiming(false)
+		updateTouchArenaButtons()
+	end
+end)
+
+ProximityPromptService.PromptHidden:Connect(function(prompt)
+	if visiblePrompts[prompt] then
+		visiblePrompts[prompt] = nil
+		updateTouchArenaButtons()
+	end
+end)
+
 player.CharacterRemoving:Connect(restoreCamera)
-UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(updateTouchAimButton)
+UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(updateTouchArenaButtons)

@@ -1307,16 +1307,19 @@ end
 function BunkerEnergyService:_buildPocketItemToolVisual(tool, options)
 	local kind = options.Kind or "Item"
 	local color = options.Color or if kind == "IslandRock" then Color3.fromRGB(112, 113, 111) else Color3.fromRGB(129, 82, 45)
+	local defaultMaterial = if kind == "IslandRock" then Enum.Material.Slate else Enum.Material.Wood
+	local defaultSize = if kind == "IslandRock" then Vector3.new(0.85, 0.72, 0.85) else Vector3.new(0.48, 0.42, 1.8)
+	local defaultShape = if kind == "IslandRock" then Enum.PartType.Ball else Enum.PartType.Block
 
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
 	handle.Anchored = false
 	handle.CanCollide = false
 	handle.Massless = true
-	handle.Material = if kind == "IslandRock" then Enum.Material.Slate else Enum.Material.Wood
+	handle.Material = options.Material or defaultMaterial
 	handle.Color = color
-	handle.Size = if kind == "IslandRock" then Vector3.new(0.85, 0.72, 0.85) else Vector3.new(0.48, 0.42, 1.8)
-	handle.Shape = if kind == "IslandRock" then Enum.PartType.Ball else Enum.PartType.Block
+	handle.Size = options.Size or defaultSize
+	handle.Shape = options.Shape or defaultShape
 	handle.Parent = tool
 
 	if kind == "IslandWood" then
@@ -1341,6 +1344,14 @@ function BunkerEnergyService:_buildPocketItemToolVisual(tool, options)
 	end
 
 	tool.Grip = if kind == "IslandWood" then CFrame.new(0, -0.2, 0) * CFrame.Angles(0, math.rad(90), 0) else CFrame.new(0, -0.2, 0)
+end
+
+function BunkerEnergyService:GetPocketItemSlotCount(player)
+	if not player or not player.Parent then
+		return 0
+	end
+
+	return self:_countPocketEnergyItems(player)
 end
 
 function BunkerEnergyService:DropOneEquippedInventoryItem(player)

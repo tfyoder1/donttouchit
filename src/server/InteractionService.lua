@@ -142,6 +142,10 @@ local TOP_DOWN_DEFAULT_LOAD_COUNT = 3
 local TOP_DOWN_REFILL_LOAD_COUNT = 5
 local TOP_DOWN_THROW_DISTANCE = 58
 local TOP_DOWN_THROW_ACTION = "Throw"
+local TOP_DOWN_WATER_BALLOON_KIND = "TopDownWaterBalloon"
+local TOP_DOWN_WATER_BALLOON_NAME = "Water Balloon"
+local TOP_DOWN_WATER_BALLOON_COLOR = Color3.fromRGB(93, 217, 255)
+local TOP_DOWN_WATER_BALLOON_SIZE = Vector3.new(0.82, 0.82, 0.82)
 local TELEPORT_LANDING_LIFT = Vector3.new(0, 2.6, 0)
 local BUNKER_RECLAIM_MESSAGE_COOLDOWN = 24
 local OBJECT_RAIN_SORT_COOLDOWN = 3.5
@@ -1865,6 +1869,9 @@ function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
 			Name = itemData.Name,
 			ToolTip = itemData.ToolTip,
 			Color = itemData.Color or primary.Color,
+			Material = itemData.Material,
+			Size = itemData.Size,
+			Shape = itemData.Shape,
 			StackLimit = itemData.StackLimit,
 			GrantMessage = ("%s picked up."):format(itemData.Name or "Item"),
 		})
@@ -1875,6 +1882,9 @@ function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
 		end
 
 		self:_refreshDroppedInventoryCounts(player, itemData.Kind)
+		if itemData.Kind == TOP_DOWN_WATER_BALLOON_KIND then
+			self:_fireTopDownAmmo(player)
+		end
 		playSound(primary, "rbxasset://sounds/button.wav", 0.32, 0.86)
 		self.systemMessageRemote:FireClient(player, message or ("%s picked up."):format(itemData.Name or "Item"))
 		self:_fadeAndDestroyDroppedInventory(primary)
@@ -2069,6 +2079,9 @@ function InteractionService:_handleInventoryActionRemote(player, payload)
 	end
 
 	self:_refreshDroppedInventoryCounts(player, itemData.Kind)
+	if itemData.Kind == TOP_DOWN_WATER_BALLOON_KIND then
+		self:_fireTopDownAmmo(player)
+	end
 	local dropCFrame = self:_getInventoryDropCFrame(player, itemData)
 	if itemData.Kind == "IslandRock" then
 		local plate = self:_findSecurityWeightPlateForDrop(player, dropCFrame)
@@ -3053,15 +3066,51 @@ function InteractionService:_isPlayerInTopDownArena(player)
 	return rootPart ~= nil and room ~= nil and positionInZone(rootPart.Position, room.Zone)
 end
 
+function InteractionService:_getTopDownWaterBalloonCapacity()
+	return math.max(1, Constants.BunkerEnergy.MaxPocketEnergyItems or TOP_DOWN_MAX_LOADED_BALLOONS)
+end
+
+function InteractionService:_getTopDownWaterBalloonCount(player)
+	local count = self:_getPocketItemCount(player, TOP_DOWN_WATER_BALLOON_KIND, self.topDownLoadedBalloonsByUserId)
+	if player then
+		self.topDownLoadedBalloonsByUserId[player.UserId] = count
+	end
+	return count
+end
+
+function InteractionService:_getTopDownAvailableWaterBalloonSlots(player)
+	local capacity = self:_getTopDownWaterBalloonCapacity()
+	if self.bunkerEnergyService and self.bunkerEnergyService.GetPocketItemSlotCount then
+		return math.max(0, capacity - self.bunkerEnergyService:GetPocketItemSlotCount(player))
+	end
+
+	return math.max(0, capacity - self:_getTopDownWaterBalloonCount(player))
+end
+
+function InteractionService:_grantTopDownWaterBalloon(player)
+	return self:_grantPocketItem(player, {
+		Kind = TOP_DOWN_WATER_BALLOON_KIND,
+		Name = TOP_DOWN_WATER_BALLOON_NAME,
+		ToolTip = "Use the arena aim and throw controls to splash a target.",
+		Color = TOP_DOWN_WATER_BALLOON_COLOR,
+		Material = Enum.Material.SmoothPlastic,
+		Size = TOP_DOWN_WATER_BALLOON_SIZE,
+		Shape = Enum.PartType.Ball,
+		StackLimit = 1,
+		GrantMessage = "Water balloon added to inventory.",
+	})
+end
+
 function InteractionService:_fireTopDownAmmo(player, message)
 	if not player or not player.Parent then
 		return
 	end
 
+	local count = self:_getTopDownWaterBalloonCount(player)
 	self.topDownArenaRemote:FireClient(player, {
 		Action = "Ammo",
-		Count = self.topDownLoadedBalloonsByUserId[player.UserId] or 0,
-		Max = TOP_DOWN_MAX_LOADED_BALLOONS,
+		Count = count,
+		Max = self:_getTopDownWaterBalloonCapacity(),
 		Message = message,
 	})
 end
@@ -3250,22 +3299,47 @@ function InteractionService:_loadTopDownWaterBalloons(player, bucket)
 		return
 	end
 
-	local current = self.topDownLoadedBalloonsByUserId[player.UserId] or 0
-	if current >= TOP_DOWN_MAX_LOADED_BALLOONS then
-		self:_fireTopDownAmmo(player, "Already loaded. The balloons are ready to make a point.")
+	local availableSlots = self:_getTopDownAvailableWaterBalloonSlots(player)
+	if availableSlots <= 0 then
+		local message = "Inventory full. Drop an item before picking up water balloons."
+		self:_fireTopDownAmmo(player, message)
+		self.systemMessageRemote:FireClient(player, message)
 		return
 	end
 
 	local loadCount = if bucket:GetAttribute("IsRefillBucket") then TOP_DOWN_REFILL_LOAD_COUNT else TOP_DOWN_DEFAULT_LOAD_COUNT
-	local newCount = math.min(TOP_DOWN_MAX_LOADED_BALLOONS, current + loadCount)
-	self.topDownLoadedBalloonsByUserId[player.UserId] = newCount
+	local grantCount = math.min(loadCount, availableSlots)
+	local granted = 0
+	local failureMessage = nil
+	for _ = 1, grantCount do
+		local ok, message = self:_grantTopDownWaterBalloon(player)
+		if not ok then
+			failureMessage = message
+			break
+		end
+		granted += 1
+	end
+
+	if granted <= 0 then
+		local message = failureMessage or "Inventory full. Drop an item before picking up water balloons."
+		self:_fireTopDownAmmo(player, message)
+		self.systemMessageRemote:FireClient(player, message)
+		return
+	end
+
+	local newCount = self:_getTopDownWaterBalloonCount(player)
 
 	if bucket:GetAttribute("IsRefillBucket") then
 		self.discoveryService:Unlock(player, Constants.Discoveries.TopDownBucketRefill.Id)
 	end
 
 	playSound(bucket, "rbxasset://sounds/electronicpingshort.wav", 0.32, 1.55)
-	local message = ("Loaded %d / %d water balloons. Hold LT to paint a target, then RT to throw."):format(newCount, TOP_DOWN_MAX_LOADED_BALLOONS)
+	local message = ("Picked up %d water balloon%s. Inventory balloons: %d / %d. Aim, then throw."):format(
+		granted,
+		if granted == 1 then "" else "s",
+		newCount,
+		self:_getTopDownWaterBalloonCapacity()
+	)
 	self.systemMessageRemote:FireClient(player, message)
 	self:_fireTopDownAmmo(player, message)
 end
@@ -3307,7 +3381,7 @@ function InteractionService:_throwLoadedTopDownBalloon(player, direction, target
 		return
 	end
 
-	local loaded = self.topDownLoadedBalloonsByUserId[player.UserId] or 0
+	local loaded = self:_getTopDownWaterBalloonCount(player)
 	if loaded <= 0 then
 		self:_fireTopDownAmmo(player, "Load water balloons at a bucket first.")
 		self.systemMessageRemote:FireClient(player, "No balloons loaded. The throw button produces a very confident shrug.")
@@ -3320,8 +3394,12 @@ function InteractionService:_throwLoadedTopDownBalloon(player, direction, target
 	end
 
 	local aimDirection = self:_flatTopDownDirection(player, direction)
+	if not self:_consumePocketItem(player, TOP_DOWN_WATER_BALLOON_KIND, self.topDownLoadedBalloonsByUserId) then
+		self:_fireTopDownAmmo(player, "Load water balloons at a bucket first.")
+		self.systemMessageRemote:FireClient(player, "The balloon disappeared from inventory before the throw.")
+		return
+	end
 	self.topDownLastThrowByUserId[player.UserId] = now
-	self.topDownLoadedBalloonsByUserId[player.UserId] = loaded - 1
 	self.topDownThrowsByUserId[player.UserId] = (self.topDownThrowsByUserId[player.UserId] or 0) + 1
 	self.discoveryService:Unlock(player, Constants.Discoveries.TopDownWaterBalloon.Id)
 
@@ -3389,7 +3467,7 @@ function InteractionService:_wireTopDownWaterBalloonBucket(bucket)
 			return
 		end
 
-		if (self.topDownLoadedBalloonsByUserId[player.UserId] or 0) >= TOP_DOWN_MAX_LOADED_BALLOONS then
+		if self:_getTopDownAvailableWaterBalloonSlots(player) <= 0 then
 			return
 		end
 
