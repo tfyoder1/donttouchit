@@ -6,12 +6,13 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local discoveryRemote = remotes:WaitForChild(Constants.Remotes.DiscoveryUpdate)
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local uiLayoutRemote = remotes:WaitForChild(Constants.Remotes.UiLayout)
 
-local HUD_NAME = "DontTouchItCoreHud"
+local HUD_NAME = UiLayerController.GuiNames.CoreHud
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
 local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
@@ -26,7 +27,7 @@ gui = Instance.new("ScreenGui")
 gui.Name = HUD_NAME
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = false
-gui.DisplayOrder = 35
+UiLayerController.ApplyRole(gui, "CoreHud")
 gui.Parent = playerGui
 pcall(function()
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
@@ -372,8 +373,7 @@ local function getReplicatedAttribute(name, fallback)
 end
 
 local function isTitleSplashVisible()
-	local splashGui = playerGui:FindFirstChild("DontTouchItTitleSplash")
-	return splashGui and splashGui:IsA("ScreenGui") and splashGui.Enabled ~= false
+	return UiLayerController.IsTitleSplashVisible(playerGui)
 end
 
 local function isTouchLandscape()
@@ -547,7 +547,7 @@ playerGui:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBun
 playerGui:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(updateBunkerEnergy)
 playerGui:GetAttributeChangedSignal(SIGNAL_BAND_ATTRIBUTE):Connect(applyVisibility)
 playerGui.ChildAdded:Connect(function(child)
-	if child.Name == "DontTouchItTitleSplash" or child.Name == "DontTouchItUI" then
+	if child.Name == UiLayerController.GuiNames.TitleSplash or child.Name == UiLayerController.GuiNames.DiscoveryUI then
 		task.defer(applyVisibility)
 	end
 end)

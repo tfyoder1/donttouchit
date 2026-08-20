@@ -11,8 +11,9 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 
-local SPLASH_GUI_NAME = "DontTouchItTitleSplash"
+local SPLASH_GUI_NAME = UiLayerController.GuiNames.TitleSplash
 local TITLE_MUSIC_NAME = "DontTouchItTitleSplashMusic"
 local FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local sessionStartRemote = nil
@@ -20,7 +21,7 @@ local titleStoryRandom = Random.new(os.time() + player.UserId)
 
 local splashGui = Instance.new("ScreenGui")
 splashGui.Name = SPLASH_GUI_NAME
-splashGui.DisplayOrder = 210
+UiLayerController.ApplyRole(splashGui, "TitleSplash")
 splashGui.IgnoreGuiInset = true
 splashGui.ResetOnSpawn = false
 splashGui.Parent = playerGui
@@ -190,9 +191,9 @@ local titleCameraState = nil
 local titleCameraToken = 0
 
 local SUPPRESSED_PROJECT_GUIS = {
-	DontTouchItDevTools = true,
-	DontTouchItTouchControls = true,
-	DontTouchItControlOptions = true,
+	[UiLayerController.GuiNames.DevTools] = true,
+	[UiLayerController.GuiNames.TouchControls] = true,
+	[UiLayerController.GuiNames.ControlOptions] = true,
 	TouchGui = true,
 }
 

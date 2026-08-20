@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local discoveryRemote = remotes:WaitForChild(Constants.Remotes.DiscoveryUpdate)
 local referenceBookRemote = remotes:WaitForChild(Constants.Remotes.ReferenceBook)
@@ -28,17 +29,14 @@ local TITLE_SPLASH_READY_ATTRIBUTE = "DontTouchItTitleSplashMenuReady"
 local TITLE_SPLASH_FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
-local DEFAULT_UI_DISPLAY_ORDER = 10
-local ROOM_CONTROL_DISPLAY_ORDER = 170
-local START_OVERLAY_DISPLAY_ORDER = 180
 local playerGui = player:WaitForChild("PlayerGui")
 local introMusicSound = nil
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "DontTouchItUI"
+gui.Name = UiLayerController.GuiNames.DiscoveryUI
 gui.IgnoreGuiInset = false
-gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
 gui.ResetOnSpawn = false
+UiLayerController.ApplyRole(gui, "Background")
 gui.Parent = playerGui
 pcall(function()
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
@@ -72,8 +70,7 @@ local function isStartOverlayDismissedForDevSession()
 end
 
 local function isTitleSplashVisible()
-	local splashGui = playerGui:FindFirstChild("DontTouchItTitleSplash")
-	return splashGui and splashGui:IsA("ScreenGui") and splashGui.Enabled ~= false
+	return UiLayerController.IsTitleSplashVisible(playerGui)
 end
 
 local function normalizeSoundId(soundId)
@@ -1196,10 +1193,10 @@ local function setStartOverlayVisible(visible)
 		startCinematicButton.Modal = visible and startOverlayPhase == "Title"
 		startCinematicButton.Selectable = visible and startOverlayPhase == "Title"
 	end
-	gui.DisplayOrder = visible and START_OVERLAY_DISPLAY_ORDER or DEFAULT_UI_DISPLAY_ORDER
+	UiLayerController.SetStartOverlayOpen(gui, visible == true)
 	startBlur.Enabled = visible
 	startBlur.Size = visible and 24 or 0
-	gui:SetAttribute("GameplayHudSuppressed", visible == true)
+	UiLayerController.SetTitleSuppressed(gui, visible == true)
 	if visible then
 		startIntroMusic()
 		beginStartCameraPan()
@@ -2066,7 +2063,7 @@ local function closeReferenceBook()
 	closeBookButton.Modal = false
 	setOverlayMouse(false)
 	if not startOverlay.Visible then
-		gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
+		UiLayerController.SetRoomMenuOpen(gui, false)
 	end
 end
 
@@ -2418,10 +2415,10 @@ local function restoreHudAfterTitleSplash()
 	startCinematicButton.Active = false
 	startCinematicButton.Modal = false
 	startCinematicButton.Selectable = false
-	gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
+	UiLayerController.SetStartOverlayOpen(gui, false)
 	startBlur.Enabled = false
 	startBlur.Size = 0
-	gui:SetAttribute("GameplayHudSuppressed", false)
+	UiLayerController.SetTitleSuppressed(gui, false)
 	if setStartPhase then
 		setStartPhase("Hidden")
 	end
@@ -2439,7 +2436,7 @@ local function restoreHudAfterTitleSplash()
 		startCinematicButton.Active = false
 		startCinematicButton.Modal = false
 		startCinematicButton.Selectable = false
-		gui:SetAttribute("GameplayHudSuppressed", false)
+		UiLayerController.SetTitleSuppressed(gui, false)
 		setOverlayMouse(false)
 		applyHudVisibility()
 	end)
@@ -2453,7 +2450,7 @@ local function restoreHudAfterTitleSplash()
 		startCinematicButton.Active = false
 		startCinematicButton.Modal = false
 		startCinematicButton.Selectable = false
-		gui:SetAttribute("GameplayHudSuppressed", false)
+		UiLayerController.SetTitleSuppressed(gui, false)
 		setOverlayMouse(false)
 		applyHudVisibility()
 	end)
@@ -2658,8 +2655,7 @@ local function renderReferenceBook(payload)
 	activeBookRoomId = payload.RoomId
 	local mode = payload.Mode or "Log"
 	local storePrices = payload.StorePrices or {}
-	gui.Enabled = true
-	gui.DisplayOrder = ROOM_CONTROL_DISPLAY_ORDER
+	UiLayerController.SetRoomMenuOpen(gui, true)
 	bookPanel.Visible = true
 	feedbackPanel.Visible = false
 	if not wasVisible then

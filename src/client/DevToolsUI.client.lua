@@ -9,6 +9,7 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local DeviceProfile = require(script.Parent:WaitForChild("DeviceProfile"))
+local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local devRemote = remotes:WaitForChild(Constants.Remotes.DevTools)
 
@@ -851,7 +852,7 @@ local function send(payload)
 end
 
 local function getMainUi()
-	return playerGui:FindFirstChild("DontTouchItUI")
+	return playerGui:FindFirstChild(UiLayerController.GuiNames.DiscoveryUI)
 end
 
 local function waitForMainUi(timeoutSeconds)
@@ -860,7 +861,7 @@ local function waitForMainUi(timeoutSeconds)
 		return mainGui
 	end
 
-	mainGui = playerGui:WaitForChild("DontTouchItUI", timeoutSeconds)
+	mainGui = playerGui:WaitForChild(UiLayerController.GuiNames.DiscoveryUI, timeoutSeconds)
 	if mainGui and mainGui:IsA("ScreenGui") then
 		return mainGui
 	end
@@ -949,7 +950,7 @@ local function showEmergencyTitleOverlay()
 
 	local overlayGui = Instance.new("ScreenGui")
 	overlayGui.Name = "DontTouchItDevTitleOverlay"
-	overlayGui.DisplayOrder = 250
+	overlayGui.DisplayOrder = UiLayerController.DisplayOrder.Emergency
 	overlayGui.IgnoreGuiInset = false
 	overlayGui.ResetOnSpawn = false
 	overlayGui.Parent = playerGui
@@ -1692,7 +1693,7 @@ local function ensureFlyTouchButtons()
 	flyTouchGui.Name = "DontTouchItDevFlyTouchControls"
 	flyTouchGui.ResetOnSpawn = false
 	flyTouchGui.IgnoreGuiInset = true
-	flyTouchGui.DisplayOrder = 172
+	flyTouchGui.DisplayOrder = UiLayerController.DisplayOrder.DevFlyControls
 	flyTouchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	flyTouchGui.Parent = playerGui
 	makeFlyTouchButton(flyTouchGui, "DevFlyUp", "UP", UDim2.new(1, -24, 1, -196), function()
@@ -2412,9 +2413,9 @@ local function buildGui()
 	end
 
 	gui = Instance.new("ScreenGui")
-	gui.Name = "DontTouchItDevTools"
+	gui.Name = UiLayerController.GuiNames.DevTools
 	gui.IgnoreGuiInset = false
-	gui.DisplayOrder = 100
+	UiLayerController.ApplyRole(gui, "DevTools")
 	gui.ResetOnSpawn = false
 	gui.Parent = player:WaitForChild("PlayerGui")
 	pcall(function()

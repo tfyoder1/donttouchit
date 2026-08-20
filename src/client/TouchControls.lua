@@ -5,19 +5,20 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local uiLayoutRemote = remotes:WaitForChild(Constants.Remotes.UiLayout)
 
 local TouchControls = {}
 
-local TOUCH_GUI_NAME = "DontTouchItTouchControls"
-local OPTIONS_GUI_NAME = "DontTouchItControlOptions"
+local TOUCH_GUI_NAME = UiLayerController.GuiNames.TouchControls
+local OPTIONS_GUI_NAME = UiLayerController.GuiNames.ControlOptions
 local TOUCH_LAYOUT_VERSION = "touch-cluster-2026-08-16-v6"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
 local TOUCH_HIDE_LABELS_ATTRIBUTE = "DontTouchItTouchHideButtonLabels"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
-local TOUCH_GUI_ORDER = 145
-local OPTIONS_GUI_ORDER = 155
+local TOUCH_GUI_ORDER = UiLayerController.DisplayOrder.TouchControls
+local OPTIONS_GUI_ORDER = UiLayerController.DisplayOrder.ControlOptions
 local BUTTON_Z_INDEX = 10
 local PANEL_Z_INDEX = 50
 local DRAG_MARGIN = 8
