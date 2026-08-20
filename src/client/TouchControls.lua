@@ -80,6 +80,11 @@ end
 
 local function buildLayoutPayload()
 	local layout = {}
+	if typeof(loadedLayout) == "table" then
+		for key, value in pairs(loadedLayout) do
+			layout[key] = value
+		end
+	end
 	layout.Version = TOUCH_LAYOUT_VERSION
 	for id, position in pairs(sessionPositions) do
 		layout[id] = udim2ToPayload(position)
@@ -1095,7 +1100,7 @@ uiLayoutRemote.OnClientEvent:Connect(function(payload)
 	if editMode or activeDrag or activeChromeDrag then
 		return
 	end
-	loadedLayout = if typeof(payload.Layout) == "table" and payload.Layout.Version == TOUCH_LAYOUT_VERSION then payload.Layout else {}
+	loadedLayout = if typeof(payload.Layout) == "table" then payload.Layout else {}
 	table.clear(sessionPositions)
 	for id, positionPayload in pairs(loadedLayout) do
 		if id == "Controls" then
