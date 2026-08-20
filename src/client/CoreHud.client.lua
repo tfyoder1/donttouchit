@@ -436,11 +436,12 @@ local function applyVisibility()
 	local hidden = isTitleSplashVisible()
 	local signalBandEquipped = player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
 		or playerGui:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
-	topInfoBar.Visible = not hidden
-	progressPanel.Visible = not hidden
-	roomCounter.Visible = not hidden
-	energyPanel.Visible = not hidden and signalBandEquipped
-	bunkerEnergyPanel.Visible = not hidden and (
+	local hudVisible = not hidden and signalBandEquipped
+	topInfoBar.Visible = hudVisible
+	progressPanel.Visible = hudVisible
+	roomCounter.Visible = hudVisible
+	energyPanel.Visible = hudVisible
+	bunkerEnergyPanel.Visible = hudVisible and (
 		player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 		or playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 	)
