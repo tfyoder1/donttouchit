@@ -15,6 +15,7 @@ local SPLASH_GUI_NAME = "DontTouchItTitleSplash"
 local TITLE_MUSIC_NAME = "DontTouchItTitleSplashMusic"
 local FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local sessionStartRemote = nil
+local titleStoryRandom = Random.new(os.time() + player.UserId)
 
 local splashGui = Instance.new("ScreenGui")
 splashGui.Name = SPLASH_GUI_NAME
@@ -218,6 +219,51 @@ local TITLE_CAMERA_WAYPOINTS = {
 		Duration = 7,
 	},
 }
+
+local function chooseRandomLine(lines)
+	if typeof(lines) ~= "table" or #lines <= 0 then
+		return nil
+	end
+	return lines[titleStoryRandom:NextInteger(1, #lines)]
+end
+
+local function chooseTitleStoryText(payload)
+	local storyConfig = Constants.TitleStoryLines or {}
+	local candidates = {}
+	local discoveryCount = 0
+	local resumeRoomId = nil
+	if typeof(payload) == "table" then
+		discoveryCount = math.max(0, math.floor(tonumber(payload.DiscoveryCount) or 0))
+		resumeRoomId = if typeof(payload.ResumeRoomId) == "string" then payload.ResumeRoomId else nil
+	end
+
+	for _, tier in ipairs(storyConfig.Progressive or {}) do
+		if discoveryCount >= (tonumber(tier.MinDiscoveries) or math.huge) and typeof(tier.Lines) == "table" then
+			for _, line in ipairs(tier.Lines) do
+				table.insert(candidates, line)
+			end
+		end
+	end
+
+	local roomLines = storyConfig.ByRoom and resumeRoomId and storyConfig.ByRoom[resumeRoomId]
+	if typeof(roomLines) == "table" then
+		for _, line in ipairs(roomLines) do
+			table.insert(candidates, line)
+		end
+	end
+
+	if #candidates > 0 then
+		return chooseRandomLine(candidates)
+	end
+	return chooseRandomLine(storyConfig.Default) or "The lights were already on.\nSome doors remember being opened.\nThe quiet things are not asleep."
+end
+
+local function applyTitleStoryPayload(payload)
+	if not splashGui.Parent or advanced then
+		return
+	end
+	story.Text = chooseTitleStoryText(payload)
+end
 
 local function normalizeSoundId(soundId)
 	if typeof(soundId) == "number" then
@@ -630,6 +676,7 @@ task.spawn(function()
 	hideTopbarDuringSplash()
 end)
 
+applyTitleStoryPayload(nil)
 suppressProjectGuisDuringSplash()
 startTitleMusic()
 enableSplashBlur()
@@ -658,6 +705,14 @@ task.spawn(function()
 		local remote = remotes:WaitForChild("SessionStart", 20)
 		if remote and remote:IsA("RemoteEvent") then
 			sessionStartRemote = remote
+			remote.OnClientEvent:Connect(function(payload)
+				if typeof(payload) == "table" and payload.Action == "Show" then
+					applyTitleStoryPayload(payload)
+				end
+			end)
+			remote:FireServer({
+				Action = "RequestOptions",
+			})
 		end
 	end
 end)

@@ -1,7 +1,79 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.195"
+Constants.BuildVersion = "0.5.196"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
+Constants.TitleStoryLines = {
+	Default = {
+		"The lights were already on.\nSome doors remember being opened.\nThe quiet things are not asleep.",
+		"The cave was waiting with a room behind it.\nThe room was waiting with a screen.\nThe screen was not surprised to see you.",
+		"Someone left the bunker running.\nSomeone left the rules unfinished.\nSomeone forgot to explain why.",
+	},
+	ByRoom = {
+		CaveEntrance = {
+			"The forest keeps poor records.\nThe cave keeps better ones.\nYour footsteps are already in both.",
+			"The entrance looks newly made.\nThe moss disagrees.\nThe lights inside do not flicker.",
+		},
+		TVRoom = {
+			"The lights were already on.\nSome doors remember being opened.\nThe quiet things are not asleep.",
+			"The television knows the room by name.\nThe room knows yours by absence.\nNothing here likes being first.",
+		},
+		SnackLab = {
+			"The food machines are too cheerful.\nThe labels are too specific.\nThe hunger is not entirely yours.",
+			"Something learned comfort from a vending machine.\nSomething learned jokes from a warning sign.\nSomething is still practicing.",
+		},
+		Security = {
+			"The cameras do not watch every room.\nOnly the rooms that watch back.\nSecurity is a kind of conversation.",
+			"Power moves through the bunker like breath.\nScreens blink before anyone touches them.\nSome alarms sound almost relieved.",
+		},
+		SleepingQuarters = {
+			"The beds were made for people.\nThe lockers were made for secrets.\nThe dreams were made somewhere else.",
+			"The bunks are quiet.\nThe pillows remember weight.\nThe night shift never ended.",
+		},
+		Infirmary = {
+			"The infirmary is clean enough to worry about.\nThe machines know how to wait.\nRecovery is not the same as rescue.",
+			"White walls, steady beeps, careful drawers.\nSomeone prepared for injuries.\nSomeone prepared for returns.",
+		},
+		Library = {
+			"The books are shelved in the wrong order.\nThe wrong order is the clue.\nThe clue does not want to be solved yet.",
+			"The library has more exits than doors.\nSome pages remember being rooms.\nSome rooms remember being ideas.",
+		},
+		BowlingAlley = {
+			"The lanes are polished like a ritual.\nThe pins stand back up too politely.\nThe music knows when to pretend.",
+			"Recreation survived the emergency.\nThat may be worse than the emergency.\nThe ball return hums anyway.",
+		},
+		SpaceStation = {
+			"The stars are close enough to be furniture.\nGravity has a local opinion.\nThe map is less certain than it looks.",
+			"The station is not above the bunker.\nAbove is only a setting.\nSettings can be changed.",
+		},
+		VoidRoom = {
+			"The dark room is not empty.\nEmpty would be simpler.\nThis place prefers complicated silences.",
+			"The walls stop making promises here.\nThe floor negotiates.\nThe air waits for instructions.",
+		},
+	},
+	Progressive = {
+		{
+			MinDiscoveries = 20,
+			Lines = {
+				"You have opened enough doors to be noticed.\nThe bunker has started choosing its words.\nIt still refuses to explain them.",
+				"The rooms are no longer introductions.\nThey are evidence.\nThe evidence is rearranging itself.",
+			},
+		},
+		{
+			MinDiscoveries = 50,
+			Lines = {
+				"The bunker is larger than its walls.\nSome spaces are folded carefully.\nSome are folded in a hurry.",
+				"Energy, matter, gravity, space.\nThe systems have names.\nThe names are not the systems.",
+			},
+		},
+		{
+			MinDiscoveries = 90,
+			Lines = {
+				"The rooms may not be rooms.\nThe map may not be a map.\nThe exit may be listening.",
+				"The deeper chamber is not hidden.\nIt is pretending every other room is real first.",
+			},
+		},
+	},
+}
 Constants.NormalGravity = 196.2
 Constants.SpaceStationGravity = 24
 Constants.EventDuration = 10
