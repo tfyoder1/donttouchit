@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.199"
+Constants.BuildVersion = "0.5.200"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -593,7 +593,7 @@ Constants.AudioAssets = {
 		},
 		Library = {
 			SoundId = "rbxassetid://92072185175546",
-			Volume = 0.06,
+			Volume = 0.051,
 			FadeSeconds = 1.5,
 		},
 	},
@@ -1666,20 +1666,20 @@ Constants.DiscoveryRoomOrder = {
 }
 
 Constants.RoomDetectionOrder = {
-	"CaveEntrance",
 	"SecurityRoom",
 	"SleepingQuarters",
 	"Infirmary",
 	"Gym",
 	"TopDownArena",
+	"Library",
 	"TVRoom",
 	"SnackLab",
 	"Island",
-	"Library",
 	"TreetopZipline",
 	"BowlingAlley",
 	"Void",
 	"SpaceStation",
+	"CaveEntrance",
 }
 
 Constants.RoomResumeDiscoveries = {
@@ -1813,7 +1813,7 @@ Constants.Rooms = {
 		SpawnCFrame = CFrame.new(Vector3.new(-14, 3, -29), Vector3.new(-14, 3, -45)),
 		Zone = {
 			Min = Vector3.new(-34, -3, -64),
-			Max = Vector3.new(6, 30, -26),
+			Max = Vector3.new(6, 30, -10),
 		},
 	},
 	BowlingAlley = {
