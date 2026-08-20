@@ -1782,8 +1782,12 @@ local function makeCompactReferenceBook(parent, name, cframe, roomId, title, opt
 		Color3.fromRGB(118, 130, 144),
 		Enum.Material.Metal
 	)
+	back.CanQuery = false
+	back:SetAttribute("BaseCanQuery", false)
 	clip.CanCollide = false
 	clip:SetAttribute("BaseCanCollide", false)
+	clip.CanQuery = false
+	clip:SetAttribute("BaseCanQuery", false)
 
 	screen:SetAttribute("RoomId", roomId)
 	screen:SetAttribute("FixtureType", "DigitalRoomLog")
@@ -1848,6 +1852,8 @@ local function makeCompactPanelButton(parent, name, cframe, labelText, actionTex
 		Enum.Material.Neon
 	)
 	button.Shape = Enum.PartType.Cylinder
+	button.CanQuery = false
+	button:SetAttribute("BaseCanQuery", false)
 
 	local label = createSurfaceText(plate, name .. "Text", labelText, Enum.NormalId.Front, color or Color3.fromRGB(119, 255, 203), Color3.fromRGB(42, 47, 56))
 	label.Position = UDim2.fromScale(0, 0.04)
@@ -1862,14 +1868,16 @@ local function makeCompactPanelButton(parent, name, cframe, labelText, actionTex
 	)
 	lowerGlow.CanCollide = false
 	lowerGlow:SetAttribute("BaseCanCollide", false)
-	local prompt = createPrompt(button, actionText, objectText, 0.2)
+	lowerGlow.CanQuery = false
+	lowerGlow:SetAttribute("BaseCanQuery", false)
+	local prompt = createPrompt(plate, actionText, objectText, 0.2)
 	prompt.MaxActivationDistance = 7
 	if tagName then
-		tag(button, tagName)
+		tag(plate, tagName)
 	end
 
 	buttonModel.PrimaryPart = plate
-	return buttonModel, button
+	return buttonModel, plate
 end
 
 local function makePanelReadout(parent, name, cframe, size, text, textColor, backgroundColor)
@@ -1942,6 +1950,8 @@ local function makePanelBezel(parent, name, cframe, panelWidth, panelHeight)
 		local part = createPart(parent, name .. piece.Name, piece.Size, piece.CFrame, piece.Color, piece.Material)
 		part.CanCollide = false
 		part:SetAttribute("BaseCanCollide", false)
+		part.CanQuery = false
+		part:SetAttribute("BaseCanQuery", false)
 	end
 
 	for index, offset in ipairs({
@@ -1961,6 +1971,8 @@ local function makePanelBezel(parent, name, cframe, panelWidth, panelHeight)
 		rivet.Shape = Enum.PartType.Cylinder
 		rivet.CanCollide = false
 		rivet:SetAttribute("BaseCanCollide", false)
+		rivet.CanQuery = false
+		rivet:SetAttribute("BaseCanQuery", false)
 	end
 end
 
@@ -3486,10 +3498,18 @@ local function makeTopDownArenaRoom(roomFolder)
 	createPrompt(cameraConsole, "Toggle", "Arena Camera Console", 0)
 	tag(cameraConsole, Constants.Tags.TopDownCameraConsole)
 
-	local scoreboard = createPart(room, "TopDownScoreboard", Vector3.new(0.32, 6.2, 12.5), cframeAt(origin, width / 2 - 0.62, 9.2, depth / 2 - 25), Color3.fromRGB(18, 24, 36), Enum.Material.Metal)
-	createSurfaceText(scoreboard, "TopDownScoreText", "SPLASH SCORE\nNO BALLOONS YET", Enum.NormalId.Left, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 24, 36))
-	createPrompt(scoreboard, "Check", "Splash Scoreboard", 0)
-	tag(scoreboard, Constants.Tags.TopDownScoreboard)
+	local function makeScoreboard(name, xOffset, zOffset, face)
+		local board = createPart(room, name, Vector3.new(0.32, 6.2, 12.5), cframeAt(origin, xOffset, 9.2, zOffset), Color3.fromRGB(18, 24, 36), Enum.Material.Metal)
+		createSurfaceText(board, "TopDownScoreText", "ARENA ROUND\nREADY UP\nNORTH 0  SOUTH 0\nROUND 2:00", face, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 24, 36))
+		createPrompt(board, "Check", "Splash Scoreboard", 0)
+		tag(board, Constants.Tags.TopDownScoreboard)
+		return board
+	end
+
+	local scoreboard = makeScoreboard("TopDownScoreboardSE", width / 2 - 0.62, depth / 2 - 25, Enum.NormalId.Left)
+	makeScoreboard("TopDownScoreboardNE", width / 2 - 0.62, -depth / 2 + 25, Enum.NormalId.Left)
+	makeScoreboard("TopDownScoreboardSW", -width / 2 + 0.62, depth / 2 - 25, Enum.NormalId.Right)
+	makeScoreboard("TopDownScoreboardNW", -width / 2 + 0.62, -depth / 2 + 25, Enum.NormalId.Right)
 
 	for _, lineData in ipairs({
 		{ Name = "CenterVertical", Size = Vector3.new(1.2, 0.08, depth - 22), Offset = Vector3.new(0, 0.62, -5), Color = Color3.fromRGB(119, 255, 203) },
@@ -3538,6 +3558,35 @@ local function makeTopDownArenaRoom(roomFolder)
 	createSurfaceText(oppositeTarget, "TopDownOppositePracticeTargetText", "OTHER\nTARGET", Enum.NormalId.Back, Color3.fromRGB(18, 42, 38), Color3.fromRGB(119, 255, 203))
 	createPrompt(oppositeTarget, "Inspect", "Opposite Splash Target", 0)
 	tag(oppositeTarget, Constants.Tags.TopDownSplashTarget)
+
+	local function makeReadyStation(teamId, teamLabel, zOffset, face, insideZ, color)
+		local glass = createPart(room, "TopDown" .. teamId .. "ReadyGlass", Vector3.new(31, 5.6, 0.35), cframeAt(origin, 0, 3.7, zOffset), color, Enum.Material.Glass)
+		glass.Transparency = 0.42
+		glass:SetAttribute("BaseTransparency", glass.Transparency)
+		createSurfaceText(glass, "TopDownReadyWallText", teamLabel .. "\nREADY WALL", face, Color3.fromRGB(18, 24, 36), color)
+
+		local readyButton = createPart(room, "TopDown" .. teamId .. "ReadyButton", Vector3.new(5.8, 1.15, 0.62), cframeAt(origin, 0, 4.2, zOffset + insideZ * 0.62), color, Enum.Material.Neon)
+		readyButton:SetAttribute("TopDownTeamId", teamId)
+		createSurfaceText(readyButton, "TopDownReadyStatusText", "READY\n" .. teamLabel, face, Color3.fromRGB(18, 24, 36), color)
+		createPrompt(readyButton, "Ready", teamLabel .. " Ready Station", 0)
+		tag(readyButton, Constants.Tags.TopDownReadyButton)
+
+		for _, option in ipairs({
+			{ Seconds = 60, Label = "1 MIN", X = -9 },
+			{ Seconds = 120, Label = "2 MIN", X = 0 },
+			{ Seconds = 300, Label = "5 MIN", X = 9 },
+		}) do
+			local roundButton = createPart(room, "TopDown" .. teamId .. "Round" .. tostring(option.Seconds), Vector3.new(5.1, 0.9, 0.54), cframeAt(origin, option.X, 2.35, zOffset + insideZ * 0.62), Color3.fromRGB(32, 37, 45), Enum.Material.Metal)
+			roundButton:SetAttribute("TopDownTeamId", teamId)
+			roundButton:SetAttribute("RoundSeconds", option.Seconds)
+			createSurfaceText(roundButton, "TopDownRoundOptionText", option.Label, face, color, Color3.fromRGB(32, 37, 45))
+			createPrompt(roundButton, "Set", option.Label .. " Round", 0)
+			tag(roundButton, Constants.Tags.TopDownRoundButton)
+		end
+	end
+
+	makeReadyStation("South", "SOUTH", depth / 2 - 17, Enum.NormalId.Front, -1, Color3.fromRGB(255, 142, 191))
+	makeReadyStation("North", "NORTH", -depth / 2 + 17, Enum.NormalId.Back, 1, Color3.fromRGB(119, 255, 203))
 
 	local function makeBucket(name, xOffset, zOffset, label, isRefill, throwMode)
 		local bucket = createPart(room, name, Vector3.new(3.1, 1.45, 3.1), cframeAt(origin, xOffset, 1.2, zOffset), Color3.fromRGB(93, 217, 255), Enum.Material.Metal)
@@ -5680,16 +5729,20 @@ local function makePalmTree(parent, name, x, z, leanDegrees, coconutCount, dropC
 	local trunk = createPart(tree, "PalmTrunk", Vector3.new(trunkDiameter, trunkHeight, trunkDiameter), baseCFrame * CFrame.new(0, trunkHeight / 2, 0), Color3.fromRGB(119, 76, 42), Enum.Material.Wood)
 	trunk.CanCollide = false
 	trunk:SetAttribute("BaseCanCollide", false)
+	local climbTrussBaseSize = Vector3.new(1.35, trunkHeight + 0.8, 1.35)
+	local climbTrussSize = climbTrussBaseSize * 1.3
+	local climbTrussBottomOffset = trunkHeight / 2 - climbTrussBaseSize.Y / 2
 	local climbTruss = createPart(
 		tree,
 		"PalmClimbTruss",
-		Vector3.new(1.35, trunkHeight + 0.8, 1.35),
-		baseCFrame * CFrame.new(0, trunkHeight / 2, 0),
+		climbTrussSize,
+		baseCFrame * CFrame.new(0, climbTrussBottomOffset + climbTrussSize.Y / 2, 0),
 		Color3.fromRGB(99, 64, 38),
 		Enum.Material.Wood,
 		"TrussPart"
 	)
-	climbTruss.Transparency = 0.22
+	climbTruss.Transparency = 1
+	climbTruss.CastShadow = false
 	climbTruss:SetAttribute("BaseTransparency", climbTruss.Transparency)
 	climbTruss:SetAttribute("BaseCanCollide", true)
 	if dropCoconutId then

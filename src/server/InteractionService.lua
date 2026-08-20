@@ -146,6 +146,18 @@ local TOP_DOWN_WATER_BALLOON_KIND = "TopDownWaterBalloon"
 local TOP_DOWN_WATER_BALLOON_NAME = "Water Balloon"
 local TOP_DOWN_WATER_BALLOON_COLOR = Color3.fromRGB(93, 217, 255)
 local TOP_DOWN_WATER_BALLOON_SIZE = Vector3.new(0.82, 0.82, 0.82)
+local TOP_DOWN_READY_DELAY_SECONDS = 3
+local TOP_DOWN_COUNTDOWN_SECONDS = 3
+local TOP_DOWN_DEFAULT_ROUND_SECONDS = 120
+local TOP_DOWN_ROUND_LENGTH_OPTIONS = {
+	[60] = true,
+	[120] = true,
+	[300] = true,
+}
+local TOP_DOWN_TEAM_LABELS = {
+	North = "NORTH",
+	South = "SOUTH",
+}
 local TELEPORT_LANDING_LIFT = Vector3.new(0, 2.6, 0)
 local BUNKER_RECLAIM_MESSAGE_COOLDOWN = 24
 local OBJECT_RAIN_SORT_COOLDOWN = 3.5
@@ -642,6 +654,21 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.topDownBucketTouchAtByUserId = {}
 	self.topDownPracticeTargetState = {}
 	self.topDownCameraMode = "Overhead"
+	self.topDownTeamByUserId = {}
+	self.topDownTeamScores = {
+		North = 0,
+		South = 0,
+	}
+	self.topDownRoundState = {
+		Status = "Waiting",
+		RoundSeconds = TOP_DOWN_DEFAULT_ROUND_SECONDS,
+		CountdownToken = 0,
+		RoundToken = 0,
+		ArmingEndsAt = nil,
+		CountdownEndsAt = nil,
+		EndsAt = nil,
+		LastResult = nil,
+	}
 	self.inventoryDropAtByUserId = {}
 	self.bunkerReclaimMessageAtByKey = {}
 	self.objectRainSortLastAt = 0
@@ -760,7 +787,12 @@ function InteractionService:Initialize()
 		self.topDownLastThrowByUserId[player.UserId] = nil
 		self.topDownLoadedBalloonsByUserId[player.UserId] = nil
 		self.topDownBucketTouchAtByUserId[player.UserId] = nil
+		self.topDownTeamByUserId[player.UserId] = nil
 		self.inventoryDropAtByUserId[player.UserId] = nil
+		task.defer(function()
+			self:_updateTopDownScoreboards()
+			self:_updateTopDownReadyStations()
+		end)
 	end)
 
 	self.securityCameraRemote.OnServerEvent:Connect(function(player, payload)
@@ -1234,8 +1266,17 @@ function InteractionService:Initialize()
 		self:_wireTopDownScoreboard(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.TopDownReadyButton, function(instance)
+		self:_wireTopDownReadyButton(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.TopDownRoundButton, function(instance)
+		self:_wireTopDownRoundButton(instance)
+	end)
+
 	self:_updateBowlingScoreboards()
 	self:_updateTopDownScoreboards()
+	self:_updateTopDownReadyStations()
 	self:_startBowlingAdRotation()
 	self:_startBowlingMaintenanceMotion()
 	self:_startCaveAmbientSounds()
@@ -1802,7 +1843,7 @@ function InteractionService:_createDroppedInventoryPart(itemData, cframe)
 	local part = Instance.new("Part")
 	part.Name = ("Dropped%s"):format(kind)
 	part.Anchored = true
-	part.CanCollide = inventoryType == "PocketItem"
+	part.CanCollide = inventoryType == "PocketItem" and kind ~= TOP_DOWN_WATER_BALLOON_KIND
 	part.CanTouch = false
 	part.CanQuery = true
 	part.Material = material
@@ -1860,6 +1901,10 @@ function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
 	prompt.Parent = primary
 
 	self:_connectPrompt(prompt, function(player)
+		if itemData.Kind == TOP_DOWN_WATER_BALLOON_KIND and not self:_canTopDownPlayerUseBalloons(player, true) then
+			return
+		end
+
 		if not self:_claimDroppedInventoryRoot(primary) then
 			return
 		end
@@ -2945,35 +2990,140 @@ function InteractionService:_wireGymWaterStation(station)
 	end)
 end
 
-function InteractionService:_formatTopDownScoreboardText()
-	local rows = {}
-	for userId, score in pairs(self.topDownScoresByUserId) do
-		if score and score > 0 then
+local function formatTopDownSeconds(seconds)
+	seconds = math.max(0, math.ceil(tonumber(seconds) or 0))
+	return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
+end
+
+local function formatTopDownRoundOption(seconds)
+	return ("%d MIN"):format(math.max(1, math.floor((tonumber(seconds) or TOP_DOWN_DEFAULT_ROUND_SECONDS) / 60)))
+end
+
+function InteractionService:_getTopDownPlayerTeam(player)
+	if not player then
+		return nil
+	end
+
+	local team = self.topDownTeamByUserId[player.UserId]
+	if TOP_DOWN_TEAM_LABELS[team] then
+		return team
+	end
+
+	return nil
+end
+
+function InteractionService:_getTopDownTeamCounts()
+	local counts = {
+		North = 0,
+		South = 0,
+	}
+
+	for userId, team in pairs(self.topDownTeamByUserId) do
+		if TOP_DOWN_TEAM_LABELS[team] then
 			local player = Players:GetPlayerByUserId(userId)
-			table.insert(rows, {
-				Name = player and player.DisplayName or ("USER " .. tostring(userId)),
-				Score = score,
-			})
+			if player and self:_isPlayerInTopDownArena(player) then
+				counts[team] += 1
+			else
+				self.topDownTeamByUserId[userId] = nil
+				if player then
+					player:SetAttribute("TopDownArenaTeam", nil)
+				end
+			end
+		else
+			self.topDownTeamByUserId[userId] = nil
 		end
 	end
 
-	table.sort(rows, function(left, right)
-		if left.Score == right.Score then
-			return left.Name < right.Name
+	return counts
+end
+
+function InteractionService:_hasTopDownReadyMatch()
+	local counts = self:_getTopDownTeamCounts()
+	return counts.North > 0 and counts.South > 0, counts
+end
+
+function InteractionService:_isTopDownRoundActive()
+	local state = self.topDownRoundState
+	return state
+		and state.Status == "Active"
+		and state.EndsAt ~= nil
+		and os.clock() < state.EndsAt
+end
+
+function InteractionService:_broadcastTopDownArenaMessage(message)
+	for _, player in ipairs(self:_getPlayersInRoom("TopDownArena")) do
+		self.systemMessageRemote:FireClient(player, message)
+	end
+end
+
+function InteractionService:_resetTopDownRoundScores()
+	table.clear(self.topDownScoresByUserId)
+	self.topDownTeamScores.North = 0
+	self.topDownTeamScores.South = 0
+end
+
+function InteractionService:_clearTopDownTeams()
+	for userId in pairs(self.topDownTeamByUserId) do
+		self.topDownTeamByUserId[userId] = nil
+		local player = Players:GetPlayerByUserId(userId)
+		if player then
+			player:SetAttribute("TopDownArenaTeam", nil)
 		end
-		return left.Score > right.Score
-	end)
+	end
+end
 
-	if #rows == 0 then
-		return "SPLASH SCORE\nNO BALLOONS YET"
+function InteractionService:_refreshTopDownRoundDisplays()
+	self:_updateTopDownScoreboards()
+	self:_updateTopDownReadyStations()
+end
+
+function InteractionService:_updateTopDownReadyStations()
+	local counts = self:_getTopDownTeamCounts()
+	for _, button in ipairs(CollectionService:GetTagged(Constants.Tags.TopDownReadyButton)) do
+		local team = button:GetAttribute("TopDownTeamId")
+		local label = TOP_DOWN_TEAM_LABELS[team] or "SIDE"
+		local count = counts[team] or 0
+		setTextLabelText(button, "TopDownReadyStatusText", ("%s\nREADY %d"):format(label, count))
 	end
 
-	local lines = { "SPLASH SCORE" }
-	for index = 1, math.min(4, #rows) do
-		table.insert(lines, ("%d. %s  %d"):format(index, rows[index].Name, rows[index].Score))
+	local selectedSeconds = self.topDownRoundState.RoundSeconds or TOP_DOWN_DEFAULT_ROUND_SECONDS
+	for _, button in ipairs(CollectionService:GetTagged(Constants.Tags.TopDownRoundButton)) do
+		local seconds = math.floor(tonumber(button:GetAttribute("RoundSeconds")) or TOP_DOWN_DEFAULT_ROUND_SECONDS)
+		local label = formatTopDownRoundOption(seconds)
+		if seconds == selectedSeconds then
+			label ..= "\nSELECTED"
+		end
+		setTextLabelText(button, "TopDownRoundOptionText", label)
+	end
+end
+
+function InteractionService:_formatTopDownScoreboardText()
+	local state = self.topDownRoundState
+	local status = state.Status or "Waiting"
+	local now = os.clock()
+	local statusLine = "READY UP"
+
+	if status == "Arming" then
+		statusLine = ("COUNTDOWN IN %ds"):format(math.max(0, math.ceil((state.ArmingEndsAt or now) - now)))
+	elseif status == "Countdown" then
+		statusLine = ("STARTS IN %d"):format(math.max(0, math.ceil((state.CountdownEndsAt or now) - now)))
+	elseif status == "Active" then
+		statusLine = "TIME " .. formatTopDownSeconds((state.EndsAt or now) - now)
+	elseif status == "Ended" then
+		statusLine = state.LastResult or "ROUND OVER"
 	end
 
-	return table.concat(lines, "\n")
+	local counts = self:_getTopDownTeamCounts()
+	local northScore = self.topDownTeamScores.North or 0
+	local southScore = self.topDownTeamScores.South or 0
+
+	return table.concat({
+		"ARENA ROUND",
+		statusLine,
+		("NORTH %d  SOUTH %d"):format(northScore, southScore),
+		("READY N%d  S%d"):format(counts.North, counts.South),
+		"ROUND " .. formatTopDownSeconds(state.RoundSeconds or TOP_DOWN_DEFAULT_ROUND_SECONDS),
+	}, "\n")
 end
 
 function InteractionService:_updateTopDownScoreboards()
@@ -2990,8 +3140,221 @@ function InteractionService:_incrementTopDownScore(player, amount)
 		return
 	end
 
-	self.topDownScoresByUserId[player.UserId] = (self.topDownScoresByUserId[player.UserId] or 0) + (amount or 1)
+	local scoreAmount = amount or 1
+	self.topDownScoresByUserId[player.UserId] = (self.topDownScoresByUserId[player.UserId] or 0) + scoreAmount
+	local team = self:_getTopDownPlayerTeam(player)
+	if self:_isTopDownRoundActive() and team then
+		self.topDownTeamScores[team] = (self.topDownTeamScores[team] or 0) + scoreAmount
+	end
 	self:_updateTopDownScoreboards()
+end
+
+function InteractionService:_setTopDownWaitingState()
+	local state = self.topDownRoundState
+	state.Status = "Waiting"
+	state.ArmingEndsAt = nil
+	state.CountdownEndsAt = nil
+	state.EndsAt = nil
+	state.CountdownToken += 1
+	self:_refreshTopDownRoundDisplays()
+end
+
+function InteractionService:_startTopDownRound(countdownToken)
+	local state = self.topDownRoundState
+	if countdownToken and countdownToken ~= state.CountdownToken then
+		return
+	end
+
+	local hasMatch = self:_hasTopDownReadyMatch()
+	if not hasMatch then
+		self:_setTopDownWaitingState()
+		return
+	end
+
+	self:_resetTopDownRoundScores()
+	state.Status = "Active"
+	state.ArmingEndsAt = nil
+	state.CountdownEndsAt = nil
+	state.EndsAt = os.clock() + math.max(60, state.RoundSeconds or TOP_DOWN_DEFAULT_ROUND_SECONDS)
+	state.LastResult = nil
+	state.RoundToken += 1
+	local roundToken = state.RoundToken
+
+	self:_broadcastTopDownArenaMessage(("Arena round started. Time: %s."):format(formatTopDownSeconds(state.RoundSeconds)))
+	self:_refreshTopDownRoundDisplays()
+
+	task.spawn(function()
+		while state.Status == "Active" and state.RoundToken == roundToken do
+			if os.clock() >= (state.EndsAt or 0) then
+				break
+			end
+			self:_updateTopDownScoreboards()
+			task.wait(1)
+		end
+
+		if state.Status == "Active" and state.RoundToken == roundToken then
+			self:_finishTopDownRound(roundToken)
+		end
+	end)
+end
+
+function InteractionService:_scheduleTopDownCountdown(message)
+	local state = self.topDownRoundState
+	if state.Status == "Active" then
+		return false
+	end
+
+	local hasMatch = self:_hasTopDownReadyMatch()
+	if not hasMatch then
+		state.Status = "Waiting"
+		state.ArmingEndsAt = nil
+		state.CountdownEndsAt = nil
+		state.LastResult = nil
+		state.CountdownToken += 1
+		self:_refreshTopDownRoundDisplays()
+		return false
+	end
+
+	state.Status = "Arming"
+	state.ArmingEndsAt = os.clock() + TOP_DOWN_READY_DELAY_SECONDS
+	state.CountdownEndsAt = nil
+	state.EndsAt = nil
+	state.LastResult = nil
+	state.CountdownToken += 1
+	local token = state.CountdownToken
+
+	self:_broadcastTopDownArenaMessage(message or "Both sides are ready. Countdown starts in 3 seconds.")
+	self:_refreshTopDownRoundDisplays()
+
+	task.spawn(function()
+		while state.Status == "Arming" and state.CountdownToken == token do
+			if os.clock() >= (state.ArmingEndsAt or 0) then
+				break
+			end
+			self:_refreshTopDownRoundDisplays()
+			task.wait(0.5)
+		end
+
+		if state.Status ~= "Arming" or state.CountdownToken ~= token then
+			return
+		end
+
+		local stillReady = self:_hasTopDownReadyMatch()
+		if not stillReady then
+			self:_setTopDownWaitingState()
+			return
+		end
+
+		state.Status = "Countdown"
+		state.CountdownEndsAt = os.clock() + TOP_DOWN_COUNTDOWN_SECONDS
+		self:_broadcastTopDownArenaMessage("Arena countdown: 3.")
+		self:_refreshTopDownRoundDisplays()
+
+		while state.Status == "Countdown" and state.CountdownToken == token do
+			if os.clock() >= (state.CountdownEndsAt or 0) then
+				break
+			end
+			self:_refreshTopDownRoundDisplays()
+			task.wait(0.5)
+		end
+
+		if state.Status ~= "Countdown" or state.CountdownToken ~= token then
+			return
+		end
+
+		self:_startTopDownRound(token)
+	end)
+
+	return true
+end
+
+function InteractionService:_finishTopDownRound(roundToken)
+	local state = self.topDownRoundState
+	if roundToken and roundToken ~= state.RoundToken then
+		return
+	end
+
+	state.Status = "Ended"
+	state.ArmingEndsAt = nil
+	state.CountdownEndsAt = nil
+	state.EndsAt = nil
+	state.CountdownToken += 1
+
+	local northScore = self.topDownTeamScores.North or 0
+	local southScore = self.topDownTeamScores.South or 0
+	if northScore > southScore then
+		state.LastResult = "NORTH WINS"
+	elseif southScore > northScore then
+		state.LastResult = "SOUTH WINS"
+	else
+		state.LastResult = "ROUND TIE"
+	end
+
+	self:_broadcastTopDownArenaMessage(("Round over. %s. North %d, South %d. Ready up for another round."):format(state.LastResult, northScore, southScore))
+	self:_clearTopDownTeams()
+	self:_refreshTopDownRoundDisplays()
+end
+
+function InteractionService:_setTopDownPlayerTeam(player, team)
+	if not self:_isPlayerInTopDownArena(player) then
+		self.systemMessageRemote:FireClient(player, "Step into the arena before choosing a side.")
+		return
+	end
+
+	if self:_isTopDownRoundActive() then
+		self.systemMessageRemote:FireClient(player, "A round is already running. Spectate this one or wait for the next ready-up.")
+		return
+	end
+
+	if not TOP_DOWN_TEAM_LABELS[team] then
+		return
+	end
+
+	self.topDownTeamByUserId[player.UserId] = team
+	player:SetAttribute("TopDownArenaTeam", team)
+	self.topDownRoundState.LastResult = nil
+	self.systemMessageRemote:FireClient(player, ("You joined %s. Spectators cannot pick up or throw balloons."):format(TOP_DOWN_TEAM_LABELS[team]))
+	self:_recordTopDownTraining(player, 0.25, 0.001)
+	self:_scheduleTopDownCountdown(("Both sides ready check updated. Round countdown starts 3 seconds after the last side selection."))
+	self:_refreshTopDownRoundDisplays()
+end
+
+function InteractionService:_setTopDownRoundSeconds(player, seconds)
+	seconds = math.floor(tonumber(seconds) or TOP_DOWN_DEFAULT_ROUND_SECONDS)
+	if not TOP_DOWN_ROUND_LENGTH_OPTIONS[seconds] then
+		return
+	end
+
+	if self:_isTopDownRoundActive() then
+		self.systemMessageRemote:FireClient(player, "Round length is locked while the arena round is running.")
+		return
+	end
+
+	self.topDownRoundState.RoundSeconds = seconds
+	self.topDownRoundState.LastResult = nil
+	self.systemMessageRemote:FireClient(player, ("Arena round length set to %s."):format(formatTopDownSeconds(seconds)))
+	self:_recordTopDownTraining(player, 0.18, 0.001)
+	self:_scheduleTopDownCountdown("Round length updated. Countdown waits for the last side selection.")
+	self:_refreshTopDownRoundDisplays()
+end
+
+function InteractionService:_canTopDownPlayerUseBalloons(player, sendMessage)
+	local team = self:_getTopDownPlayerTeam(player)
+	if not team then
+		if sendMessage then
+			self.systemMessageRemote:FireClient(player, "Choose a side at a ready station before using water balloons. Spectators can watch or leave.")
+		end
+		return false
+	end
+
+	if not self:_isTopDownRoundActive() then
+		if sendMessage then
+			self.systemMessageRemote:FireClient(player, "Water balloons unlock when the arena round starts.")
+		end
+		return false
+	end
+
+	return true
 end
 
 function InteractionService:_startTopDownPracticeTargetMotion()
@@ -3196,7 +3559,7 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 	balloon.Size = Vector3.new(1.05, 1.05, 1.05)
 	balloon.Color = Color3.fromRGB(93, 217, 255)
 	balloon.Material = Enum.Material.SmoothPlastic
-	balloon.CanCollide = true
+	balloon.CanCollide = false
 	balloon.CFrame = CFrame.new(startPosition)
 	balloon.Parent = workspace
 	CollectionService:AddTag(balloon, Constants.Tags.TemporaryObject)
@@ -3241,6 +3604,12 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 
 		local hitPlayer = getPlayerFromHit(hit)
 		if hitPlayer and hitPlayer ~= player then
+			local throwerTeam = self:_getTopDownPlayerTeam(player)
+			local hitTeam = self:_getTopDownPlayerTeam(hitPlayer)
+			if not self:_isTopDownRoundActive() or not throwerTeam or not hitTeam or hitTeam == throwerTeam then
+				return
+			end
+
 			touched = true
 			if connection then
 				connection:Disconnect()
@@ -3256,6 +3625,10 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 		end
 
 		if CollectionService:HasTag(hit, Constants.Tags.TopDownSplashTarget) or (mode == "Splash" and targetPlayer == nil and hit.Name == "TopDownPracticeTarget") then
+			if not self:_isTopDownRoundActive() or not self:_getTopDownPlayerTeam(player) then
+				return
+			end
+
 			touched = true
 			if connection then
 				connection:Disconnect()
@@ -3278,7 +3651,7 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 		local ringPosition = ring and (ring:GetAttribute("TargetPosition") or ring.Position) or target
 		local scoreRadius = ring and (ring:GetAttribute("ScoreRadius") or TOP_DOWN_RING_SCORE_RADIUS) or TOP_DOWN_RING_SCORE_RADIUS
 		local flatDistance = (Vector3.new(balloon.Position.X, 0, balloon.Position.Z) - Vector3.new(ringPosition.X, 0, ringPosition.Z)).Magnitude
-		if mode == "Ring" or flatDistance <= scoreRadius then
+		if self:_isTopDownRoundActive() and self:_getTopDownPlayerTeam(player) and (mode == "Ring" or flatDistance <= scoreRadius) then
 			if flatDistance <= scoreRadius then
 				self.discoveryService:Unlock(player, Constants.Discoveries.TopDownRingScore.Id)
 				self:_incrementTopDownScore(player, 1)
@@ -3296,6 +3669,11 @@ end
 function InteractionService:_loadTopDownWaterBalloons(player, bucket)
 	if not self:_isPlayerInTopDownArena(player) then
 		self.systemMessageRemote:FireClient(player, "The bucket waits for you to actually be in the arena.")
+		return
+	end
+
+	if not self:_canTopDownPlayerUseBalloons(player, true) then
+		self:_fireTopDownAmmo(player)
 		return
 	end
 
@@ -3376,6 +3754,11 @@ function InteractionService:_throwLoadedTopDownBalloon(player, direction, target
 		return
 	end
 
+	if not self:_canTopDownPlayerUseBalloons(player, true) then
+		self:_fireTopDownAmmo(player)
+		return
+	end
+
 	local now = os.clock()
 	if now - (self.topDownLastThrowByUserId[player.UserId] or 0) < TOP_DOWN_THROW_COOLDOWN then
 		return
@@ -3437,6 +3820,26 @@ function InteractionService:_wireTopDownCameraConsole(console)
 	end)
 end
 
+function InteractionService:_wireTopDownReadyButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		self:_setTopDownPlayerTeam(player, button:GetAttribute("TopDownTeamId"))
+	end)
+
+	self:_updateTopDownReadyStations()
+end
+
+function InteractionService:_wireTopDownRoundButton(button)
+	local prompt = getPrompt(button)
+
+	self:_connectPrompt(prompt, function(player)
+		self:_setTopDownRoundSeconds(player, button:GetAttribute("RoundSeconds"))
+	end)
+
+	self:_updateTopDownReadyStations()
+end
+
 function InteractionService:_wireTopDownWaterBalloonBucket(bucket)
 	local prompt = getPrompt(bucket)
 
@@ -3467,7 +3870,9 @@ function InteractionService:_wireTopDownWaterBalloonBucket(bucket)
 			return
 		end
 
-		if self:_getTopDownAvailableWaterBalloonSlots(player) <= 0 then
+		if not self:_canTopDownPlayerUseBalloons(player, false)
+			or self:_getTopDownAvailableWaterBalloonSlots(player) <= 0
+		then
 			return
 		end
 
