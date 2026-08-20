@@ -112,6 +112,10 @@ local function isPhoneProfile()
 	return currentDeviceProfile and currentDeviceProfile.IsPhone == true
 end
 
+local function isGamepadProfile()
+	return currentDeviceProfile and currentDeviceProfile.IsGamepad == true
+end
+
 local function clearList(container)
 	if not container then
 		return
@@ -545,6 +549,11 @@ local function applyInspectLayout(touchLandscape)
 		defaultTop = touchLandscape and 92 or nil
 		defaultBottom = (touchLandscape and 138 or 112) + (touchLandscape and 28 or 25) + 10
 		inspectLabel.TextSize = touchLandscape and 7 or 8
+	elseif isGamepadProfile() then
+		size = Vector2.new(330, 196)
+		defaultLeft = 12
+		defaultTop = 12
+		inspectLabel.TextSize = 13
 	else
 		size = Vector2.new(330, 196)
 		defaultLeft = 12
@@ -801,6 +810,34 @@ applyDevLayout = function(profile)
 			panelScroll.Position = UDim2.fromOffset(10, 64)
 			panelScroll.Size = UDim2.new(1, -20, 1, -74)
 			panelScroll.ScrollBarThickness = 5
+		end
+		applyDevManualPositions()
+		updateDevCoordinateLabels()
+		return
+	end
+
+	if isGamepadProfile() then
+		local stackLeft = 12
+		local stackTop = 12
+		local stackGap = 10
+		local inspectHeight = 196
+		local panelTop = stackTop + inspectHeight + stackGap
+		local panelHeight = math.min(500, math.max(390, viewport.Y - panelTop - stackTop))
+
+		toggleButton.AnchorPoint = Vector2.new(0, 0)
+		toggleButton.Position = UDim2.fromOffset(stackLeft + 330 + stackGap, stackTop)
+		toggleButton.Size = UDim2.fromOffset(70, 34)
+		panel.AnchorPoint = Vector2.new(0, 0)
+		panel.Position = UDim2.fromOffset(stackLeft, panelTop)
+		panel.Size = UDim2.fromOffset(330, panelHeight)
+		if panelConstraint then
+			panelConstraint.MaxSize = Vector2.new(360, 560)
+			panelConstraint.MinSize = Vector2.new(292, 390)
+		end
+		if panelScroll then
+			panelScroll.Position = UDim2.fromOffset(12, 70)
+			panelScroll.Size = UDim2.new(1, -24, 1, -82)
+			panelScroll.ScrollBarThickness = 6
 		end
 		applyDevManualPositions()
 		updateDevCoordinateLabels()

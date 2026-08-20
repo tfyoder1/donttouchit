@@ -7,6 +7,7 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local DeviceProfile = require(script.Parent:WaitForChild("DeviceProfile"))
 local devRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild(Constants.Remotes.DevTools)
 
 local ENABLED_ATTRIBUTE = "DontTouchItDevWallDraftEnabled"
@@ -15,6 +16,9 @@ local GUI_NAME = "DontTouchItDevWallDraft"
 local STEP_MOVE = 0.5
 local STEP_SIZE = 0.5
 local STEP_ROTATE_DEGREES = 5
+local PANEL_SIZE = Vector2.new(430, 370)
+local PANEL_DEFAULT_LEFT = 12
+local PANEL_GAMEPAD_LEFT = 454
 
 if player.UserId ~= OWNER_USER_ID then
 	return
@@ -28,8 +32,11 @@ local visualFolder = nil
 local sourcePart = nil
 local sourceCFrame = nil
 local sourceSize = nil
+local draftIntent = "Add"
+local cloneSourcePart = nil
 local hiddenParts = {}
 local deleteCandidate = nil
+local currentDeviceProfile = DeviceProfile.Get()
 
 local function fmt(n)
 	return string.format("%.2f", n)
@@ -63,6 +70,35 @@ local function vectorPayload(v)
 		Y = v.Y,
 		Z = v.Z,
 	}
+end
+
+local function getViewportSize()
+	local viewport = currentDeviceProfile and currentDeviceProfile.Viewport
+	if viewport then
+		return viewport
+	end
+
+	local camera = Workspace.CurrentCamera
+	return camera and camera.ViewportSize or Vector2.new(1024, 768)
+end
+
+local function isGamepadProfile()
+	return currentDeviceProfile and currentDeviceProfile.IsGamepad == true
+end
+
+local function applyPanelLayout()
+	if not panel then
+		return
+	end
+
+	local viewport = getViewportSize()
+	local margin = 12
+	local left = isGamepadProfile() and PANEL_GAMEPAD_LEFT or PANEL_DEFAULT_LEFT
+	local maxLeft = math.max(margin, viewport.X - PANEL_SIZE.X - margin)
+
+	panel.AnchorPoint = Vector2.new(0, 0.5)
+	panel.Position = UDim2.new(0, math.clamp(left, margin, maxLeft), 0.5, 0)
+	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
 end
 
 local function destroyVisuals()
@@ -204,11 +240,15 @@ local function buildCodeInstructionLines(mode, targetPart, draftPart)
 	end
 	if mode == "DELETE / HIDE WALL" then
 		table.insert(lines, "Ask Codex: remove/comment the createPart for this named wall.")
+	elseif mode == "CLONE WALL" then
+		table.insert(lines, "Ask Codex: duplicate this wall's createPart with a unique new name.")
+		table.insert(lines, "Code Note: keep the original wall; use the new Size/CFrame for the clone.")
 	elseif mode == "UPDATE WALL" then
 		table.insert(lines, "Ask Codex: replace that wall's Size/CFrame with these values.")
 	else
 		table.insert(lines, "Ask Codex: add this as a new generated wall near this room.")
 	end
+	table.insert(lines, "Code Note: use Search + Section + Source Path to locate the generated createPart.")
 	table.insert(lines, "Commit button = live server marker only; screenshot this box for code.")
 	return lines
 end
@@ -222,26 +262,40 @@ local function updateData()
 		return
 	end
 	if not wallPart then
-		dataLabel.Text = "WALL DRAFT\nSelect Wall: edit existing wall.\nHide Sel: mark a wall for code removal.\nNew Wall: place a new wall draft.\nScreenshot this box after moving/sizing."
+		dataLabel.Text = "WALL DRAFT\nNew Wall: place a new wall draft.\nSelect Wall: edit an existing wall.\nClone Wall: copy an existing wall into a new generated wall.\nHide Sel: mark a wall for code removal.\nScreenshot this box after moving/sizing."
 		return
 	end
-	local mode = sourcePart and "UPDATE WALL" or "ADD WALL"
-	local lines = buildCodeInstructionLines(mode, sourcePart, wallPart)
+	local mode = "ADD WALL"
+	local instructionSource = nil
+	if draftIntent == "Clone" and cloneSourcePart then
+		mode = "CLONE WALL"
+		instructionSource = cloneSourcePart
+	elseif sourcePart then
+		mode = "UPDATE WALL"
+		instructionSource = sourcePart
+	end
+	local lines = buildCodeInstructionLines(mode, instructionSource, wallPart)
 	table.insert(lines, ("Draft Name: %s"):format(wallPart.Name))
 	table.insert(lines, ("Rot: %.1f, %.1f, %.1f deg"):format(getRotationDegrees(wallPart.CFrame).X, getRotationDegrees(wallPart.CFrame).Y, getRotationDegrees(wallPart.CFrame).Z))
 	if sourcePart and sourceCFrame and sourceSize then
 		table.insert(lines, ("Delta Pos: %s"):format(vectorText(wallPart.Position - sourceCFrame.Position)))
 		table.insert(lines, ("Delta Size: %s"):format(vectorText(wallPart.Size - sourceSize)))
+		table.insert(lines, "Code Note: if the source uses room variables, prefer applying the delta to that expression.")
 	end
 	dataLabel.Text = table.concat(lines, "\n")
 end
 
-local function makeDraftWall(cf, size, source)
+local function makeDraftWall(cf, size, source, intent)
 	if wallPart then
 		wallPart:Destroy()
 	end
 	wallPart = Instance.new("Part")
-	wallPart.Name = source and ("Draft_" .. source.Name) or "DraftTemporaryWall"
+	draftIntent = intent or (source and "Update" or "Add")
+	cloneSourcePart = if draftIntent == "Clone" then source else nil
+	wallPart.Name = if draftIntent == "Clone" and source
+		then ("CloneDraft_" .. source.Name)
+		elseif source then ("Draft_" .. source.Name)
+		else "DraftTemporaryWall"
 	wallPart.Anchored = true
 	wallPart.CanCollide = false
 	wallPart.CanQuery = false
@@ -333,6 +387,7 @@ local function commitDraft()
 		Action = "CommitWallDraft",
 		Mode = "Wall",
 		SourcePath = sourcePart and sourcePart:GetFullName() or "",
+		DraftIntent = draftIntent,
 		Position = vectorPayload(wallPart.Position),
 		Size = vectorPayload(wallPart.Size),
 		RotationDegrees = vectorPayload(getRotationDegrees(wallPart.CFrame)),
@@ -374,9 +429,10 @@ local function ensureGui()
 	panel.BackgroundColor3 = Color3.fromRGB(8, 11, 16)
 	panel.BackgroundTransparency = 0.05
 	panel.BorderSizePixel = 0
-	panel.Position = UDim2.new(0, 12, 0.5, 0)
-	panel.Size = UDim2.fromOffset(430, 334)
+	panel.Position = UDim2.new(0, PANEL_DEFAULT_LEFT, 0.5, 0)
+	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
 	panel.Parent = gui
+	applyPanelLayout()
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = panel
@@ -403,9 +459,9 @@ local function ensureGui()
 	dataLabel.BackgroundTransparency = 1
 	dataLabel.Font = Enum.Font.Code
 	dataLabel.Position = UDim2.fromOffset(10, 8)
-	dataLabel.Size = UDim2.new(1, -50, 0, 122)
+	dataLabel.Size = UDim2.new(1, -50, 0, 154)
 	dataLabel.TextColor3 = Color3.fromRGB(196, 249, 255)
-	dataLabel.TextSize = 10
+	dataLabel.TextSize = 9
 	dataLabel.TextWrapped = true
 	dataLabel.TextXAlignment = Enum.TextXAlignment.Left
 	dataLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -413,8 +469,8 @@ local function ensureGui()
 
 	local grid = Instance.new("Frame")
 	grid.BackgroundTransparency = 1
-	grid.Position = UDim2.fromOffset(10, 138)
-	grid.Size = UDim2.new(1, -20, 1, -148)
+	grid.Position = UDim2.fromOffset(10, 170)
+	grid.Size = UDim2.new(1, -20, 1, -180)
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
 	layout.CellPadding = UDim2.fromOffset(5, 5)
@@ -429,10 +485,16 @@ local function ensureGui()
 	makeButton(grid, "Select Wall", 2, function()
 		local target = getCenterTarget()
 		if target and target:IsA("BasePart") then
-			makeDraftWall(target.CFrame, target.Size, target)
+			makeDraftWall(target.CFrame, target.Size, target, "Update")
 		end
 	end)
-	makeButton(grid, "Hide Sel", 3, function()
+	makeButton(grid, "Clone Wall", 3, function()
+		local target = getCenterTarget()
+		if target and target:IsA("BasePart") then
+			makeDraftWall(target.CFrame, target.Size, target, "Clone")
+		end
+	end)
+	makeButton(grid, "Hide Sel", 4, function()
 		local target = sourcePart or getCenterTarget()
 		if target and target:IsA("BasePart") then
 			deleteCandidate = target
@@ -442,7 +504,7 @@ local function ensureGui()
 			updateData()
 		end
 	end)
-	makeButton(grid, "Clear", 4, function()
+	makeButton(grid, "Clear", 5, function()
 		if wallPart then
 			wallPart:Destroy()
 			wallPart = nil
@@ -458,11 +520,13 @@ local function ensureGui()
 		sourcePart = nil
 		sourceCFrame = nil
 		sourceSize = nil
+		draftIntent = "Add"
+		cloneSourcePart = nil
 		deleteCandidate = nil
 		updateData()
 	end)
-	makeButton(grid, "Commit", 5, commitDraft)
-	makeButton(grid, "Close", 6, closeDraft)
+	makeButton(grid, "Commit", 6, commitDraft)
+	makeButton(grid, "Close", 7, closeDraft)
 	makeButton(grid, "X-", 10, function() nudge(Vector3.new(-STEP_MOVE, 0, 0)) end)
 	makeButton(grid, "X+", 11, function() nudge(Vector3.new(STEP_MOVE, 0, 0)) end)
 	makeButton(grid, "Y+", 12, function() nudge(Vector3.new(0, STEP_MOVE, 0)) end)
@@ -498,6 +562,11 @@ end
 
 playerGui:GetAttributeChangedSignal(ENABLED_ATTRIBUTE):Connect(function()
 	setEnabled(playerGui:GetAttribute(ENABLED_ATTRIBUTE) == true)
+end)
+
+DeviceProfile.Bind(function(profile)
+	currentDeviceProfile = profile
+	applyPanelLayout()
 end)
 
 RunService.RenderStepped:Connect(function()
