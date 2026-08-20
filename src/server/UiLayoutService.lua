@@ -9,10 +9,14 @@ UiLayoutService.__index = UiLayoutService
 
 local VALID_KEYS = {
 	Action = true,
+	Bunker = true,
 	Controls = true,
 	CrouchSlide = true,
+	Discoveries = true,
 	Drop = true,
+	Energy = true,
 	Ping = true,
+	Room = true,
 	Run = true,
 }
 

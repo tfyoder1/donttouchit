@@ -9,6 +9,7 @@ local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local discoveryRemote = remotes:WaitForChild(Constants.Remotes.DiscoveryUpdate)
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
+local uiLayoutRemote = remotes:WaitForChild(Constants.Remotes.UiLayout)
 
 local HUD_NAME = "DontTouchItCoreHud"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
@@ -89,6 +90,60 @@ end
 local hudItems = {}
 local sessionPositions = {}
 local activeDrag = nil
+local loadedLayout = {}
+local layoutSaveQueued = false
+
+local function udim2ToPayload(position)
+	return {
+		XScale = position.X.Scale,
+		XOffset = position.X.Offset,
+		YScale = position.Y.Scale,
+		YOffset = position.Y.Offset,
+	}
+end
+
+local function payloadToUdim2(payload)
+	if typeof(payload) ~= "table" then
+		return nil
+	end
+
+	return UDim2.new(
+		tonumber(payload.XScale) or 0,
+		tonumber(payload.XOffset) or 0,
+		tonumber(payload.YScale) or 0,
+		tonumber(payload.YOffset) or 0
+	)
+end
+
+local function buildLayoutPayload()
+	local layout = {}
+	for key, value in pairs(loadedLayout) do
+		layout[key] = value
+	end
+	for id, position in pairs(sessionPositions) do
+		layout[id] = udim2ToPayload(position)
+	end
+	return layout
+end
+
+local function saveLayoutNow()
+	uiLayoutRemote:FireServer({
+		Action = "Save",
+		Layout = buildLayoutPayload(),
+	})
+end
+
+local function queueSaveLayout()
+	if layoutSaveQueued then
+		return
+	end
+
+	layoutSaveQueued = true
+	task.delay(0.35, function()
+		layoutSaveQueued = false
+		saveLayoutNow()
+	end)
+end
 
 local function isTouchPointer(input)
 	return input.UserInputType == Enum.UserInputType.Touch
@@ -466,6 +521,10 @@ end
 
 discoveryRemote.OnClientEvent:Connect(function(payload)
 	if typeof(payload) == "table" then
+		if payload.Id == Constants.Discoveries.SecurityBunkerEnergy.Id then
+			playerGui:SetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE, true)
+			playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
+		end
 		updateProgress(payload)
 		if not lastRoomPayload then
 			updateRoomStatus(nil)
@@ -528,18 +587,38 @@ end)
 
 UserInputService.InputEnded:Connect(function(input)
 	if activeDrag and isTouchPointer(input) then
+		queueSaveLayout()
 		activeDrag = nil
 	end
 end)
 
 UserInputService.TouchEnded:Connect(function()
-	activeDrag = nil
+	if activeDrag then
+		queueSaveLayout()
+		activeDrag = nil
+	end
 end)
 
 UserInputService.LastInputTypeChanged:Connect(function()
 	applyLayout()
 end)
 Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	applyLayout()
+end)
+
+uiLayoutRemote.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" or payload.Action ~= "Loaded" then
+		return
+	end
+
+	loadedLayout = if typeof(payload.Layout) == "table" then payload.Layout else {}
+	table.clear(sessionPositions)
+	for id, _ in pairs(hudItems) do
+		local position = payloadToUdim2(loadedLayout[id])
+		if position then
+			sessionPositions[id] = position
+		end
+	end
 	applyLayout()
 end)
 
@@ -557,3 +636,6 @@ updateEnergy()
 updateBunkerEnergy()
 updateProgress(lastDiscoveryPayload)
 updateRoomStatus(nil)
+uiLayoutRemote:FireServer({
+	Action = "Request",
+})
