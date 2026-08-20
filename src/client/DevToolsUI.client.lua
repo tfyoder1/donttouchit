@@ -84,6 +84,7 @@ local TOUCH_TAP_MAX_DRAG_PIXELS = 18
 local DESKTOP_DEV_PANEL_CENTER_Y = 0.62
 local NON_TOUCH_HUD_RESERVED_TOP = 142
 local NON_TOUCH_DEV_EDGE_MARGIN = 12
+local GAMEPAD_DEV_PANEL_HEIGHT = 300
 local currentDeviceProfile = DeviceProfile.Get()
 local showDevInfo
 local rebuildPanel
@@ -827,7 +828,7 @@ applyDevLayout = function(profile)
 		local inspectHeight = 196
 		local panelTop = stackTop + inspectHeight + stackGap
 		local panelBottomMargin = NON_TOUCH_DEV_EDGE_MARGIN
-		local panelHeight = math.min(500, math.max(300, viewport.Y - panelTop - panelBottomMargin))
+		local panelHeight = math.max(260, math.min(GAMEPAD_DEV_PANEL_HEIGHT, viewport.Y - panelTop - panelBottomMargin))
 
 		toggleButton.AnchorPoint = Vector2.new(0, 0)
 		toggleButton.Position = UDim2.fromOffset(stackLeft + 330 + stackGap, stackTop)
@@ -837,7 +838,7 @@ applyDevLayout = function(profile)
 		panel.Size = UDim2.fromOffset(330, panelHeight)
 		if panelConstraint then
 			panelConstraint.MaxSize = Vector2.new(360, 560)
-			panelConstraint.MinSize = Vector2.new(292, 300)
+			panelConstraint.MinSize = Vector2.new(292, 260)
 		end
 		if panelScroll then
 			panelScroll.Position = UDim2.fromOffset(12, 70)

@@ -14,11 +14,16 @@ local ENABLED_ATTRIBUTE = "DontTouchItDevWallDraftEnabled"
 local OWNER_USER_ID = 74299698
 local GUI_NAME = "DontTouchItDevWallDraft"
 local STEP_MOVE = 0.5
+local STEP_MOVE_LARGE = 5
 local STEP_SIZE = 0.5
 local STEP_ROTATE_DEGREES = 5
 local PANEL_SIZE = Vector2.new(430, 370)
 local PANEL_DEFAULT_LEFT = 12
-local PANEL_GAMEPAD_LEFT = 454
+local GAMEPAD_STACK_LEFT = 12
+local GAMEPAD_STACK_TOP = 142
+local GAMEPAD_INSPECT_HEIGHT = 196
+local GAMEPAD_DEV_PANEL_HEIGHT = 300
+local GAMEPAD_STACK_GAP = 10
 
 if player.UserId ~= OWNER_USER_ID then
 	return
@@ -93,12 +98,27 @@ local function applyPanelLayout()
 
 	local viewport = getViewportSize()
 	local margin = 12
-	local left = isGamepadProfile() and PANEL_GAMEPAD_LEFT or PANEL_DEFAULT_LEFT
+	local left = PANEL_DEFAULT_LEFT
+	local top = nil
+	local anchor = Vector2.new(0, 0.5)
+	if isGamepadProfile() then
+		left = GAMEPAD_STACK_LEFT
+		top = GAMEPAD_STACK_TOP + GAMEPAD_INSPECT_HEIGHT + GAMEPAD_STACK_GAP + GAMEPAD_DEV_PANEL_HEIGHT + GAMEPAD_STACK_GAP
+		anchor = Vector2.zero
+	end
 	local maxLeft = math.max(margin, viewport.X - PANEL_SIZE.X - margin)
 
-	panel.AnchorPoint = Vector2.new(0, 0.5)
-	panel.Position = UDim2.new(0, math.clamp(left, margin, maxLeft), 0.5, 0)
+	panel.AnchorPoint = anchor
+	if top then
+		local maxTop = math.max(margin, viewport.Y - PANEL_SIZE.Y - margin)
+		panel.Position = UDim2.fromOffset(math.clamp(left, margin, maxLeft), math.clamp(top, margin, maxTop))
+	else
+		panel.Position = UDim2.new(0, math.clamp(left, margin, maxLeft), 0.5, 0)
+	end
 	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
+	if dataLabel then
+		dataLabel.TextSize = isGamepadProfile() and 10 or 9
+	end
 end
 
 local function destroyVisuals()
@@ -240,6 +260,9 @@ local function buildCodeInstructionLines(mode, targetPart, draftPart)
 	end
 	if mode == "DELETE / HIDE WALL" then
 		table.insert(lines, "Ask Codex: remove/comment the createPart for this named wall.")
+	elseif mode == "MOVE WALL" then
+		table.insert(lines, "Ask Codex: move this wall by replacing its CFrame with the New CFrame.")
+		table.insert(lines, "Code Note: keep the original Size unless Delta Size is intentionally non-zero.")
 	elseif mode == "CLONE WALL" then
 		table.insert(lines, "Ask Codex: duplicate this wall's createPart with a unique new name.")
 		table.insert(lines, "Code Note: keep the original wall; use the new Size/CFrame for the clone.")
@@ -262,12 +285,15 @@ local function updateData()
 		return
 	end
 	if not wallPart then
-		dataLabel.Text = "WALL DRAFT\nNew Wall: place a new wall draft.\nSelect Wall: edit an existing wall.\nClone Wall: copy an existing wall into a new generated wall.\nHide Sel: mark a wall for code removal.\nScreenshot this box after moving/sizing."
+		dataLabel.Text = "WALL DRAFT\nNew Wall: place a new wall draft.\nSelect Wall: edit an existing wall.\nMove Wall: reposition an existing wall.\nClone Wall: copy an existing wall into a new generated wall.\nX<</X>>: large X moves; X-/X+: fine X moves.\nScreenshot this box after moving/sizing."
 		return
 	end
 	local mode = "ADD WALL"
 	local instructionSource = nil
-	if draftIntent == "Clone" and cloneSourcePart then
+	if draftIntent == "Move" and sourcePart then
+		mode = "MOVE WALL"
+		instructionSource = sourcePart
+	elseif draftIntent == "Clone" and cloneSourcePart then
 		mode = "CLONE WALL"
 		instructionSource = cloneSourcePart
 	elseif sourcePart then
@@ -405,12 +431,27 @@ local function makeButton(parent, text, order, callback)
 	button.Text = text
 	button.TextColor3 = Color3.fromRGB(226, 245, 255)
 	button.TextSize = 11
+	button.TextScaled = true
+	button.TextWrapped = true
 	button.Parent = parent
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 5)
 	corner.Parent = button
+	local textSizeConstraint = Instance.new("UITextSizeConstraint")
+	textSizeConstraint.MinTextSize = 7
+	textSizeConstraint.MaxTextSize = 11
+	textSizeConstraint.Parent = button
 	button.Activated:Connect(callback)
 	return button
+end
+
+local function makeGridSpacer(parent, order)
+	local spacer = Instance.new("Frame")
+	spacer.BackgroundTransparency = 1
+	spacer.LayoutOrder = order
+	spacer.Size = UDim2.fromOffset(64, 28)
+	spacer.Parent = parent
+	return spacer
 end
 
 local function ensureGui()
@@ -461,7 +502,7 @@ local function ensureGui()
 	dataLabel.Position = UDim2.fromOffset(10, 8)
 	dataLabel.Size = UDim2.new(1, -50, 0, 154)
 	dataLabel.TextColor3 = Color3.fromRGB(196, 249, 255)
-	dataLabel.TextSize = 9
+	dataLabel.TextSize = isGamepadProfile() and 10 or 9
 	dataLabel.TextWrapped = true
 	dataLabel.TextXAlignment = Enum.TextXAlignment.Left
 	dataLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -474,7 +515,7 @@ local function ensureGui()
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
 	layout.CellPadding = UDim2.fromOffset(5, 5)
-	layout.CellSize = UDim2.fromOffset(78, 28)
+	layout.CellSize = UDim2.fromOffset(64, 28)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = grid
 
@@ -488,13 +529,19 @@ local function ensureGui()
 			makeDraftWall(target.CFrame, target.Size, target, "Update")
 		end
 	end)
-	makeButton(grid, "Clone Wall", 3, function()
+	makeButton(grid, "Move Wall", 3, function()
+		local target = getCenterTarget()
+		if target and target:IsA("BasePart") then
+			makeDraftWall(target.CFrame, target.Size, target, "Move")
+		end
+	end)
+	makeButton(grid, "Clone Wall", 4, function()
 		local target = getCenterTarget()
 		if target and target:IsA("BasePart") then
 			makeDraftWall(target.CFrame, target.Size, target, "Clone")
 		end
 	end)
-	makeButton(grid, "Hide Sel", 4, function()
+	makeButton(grid, "Hide Sel", 5, function()
 		local target = sourcePart or getCenterTarget()
 		if target and target:IsA("BasePart") then
 			deleteCandidate = target
@@ -504,7 +551,7 @@ local function ensureGui()
 			updateData()
 		end
 	end)
-	makeButton(grid, "Clear", 5, function()
+	makeButton(grid, "Clear", 6, function()
 		if wallPart then
 			wallPart:Destroy()
 			wallPart = nil
@@ -525,26 +572,32 @@ local function ensureGui()
 		deleteCandidate = nil
 		updateData()
 	end)
-	makeButton(grid, "Commit", 6, commitDraft)
-	makeButton(grid, "Close", 7, closeDraft)
-	makeButton(grid, "X-", 10, function() nudge(Vector3.new(-STEP_MOVE, 0, 0)) end)
-	makeButton(grid, "X+", 11, function() nudge(Vector3.new(STEP_MOVE, 0, 0)) end)
-	makeButton(grid, "Y+", 12, function() nudge(Vector3.new(0, STEP_MOVE, 0)) end)
-	makeButton(grid, "Y-", 13, function() nudge(Vector3.new(0, -STEP_MOVE, 0)) end)
-	makeButton(grid, "Z-", 14, function() nudge(Vector3.new(0, 0, -STEP_MOVE)) end)
-	makeButton(grid, "Z+", 15, function() nudge(Vector3.new(0, 0, STEP_MOVE)) end)
-	makeButton(grid, "W+", 20, function() resize(Vector3.new(STEP_SIZE, 0, 0)) end)
-	makeButton(grid, "W-", 21, function() resize(Vector3.new(-STEP_SIZE, 0, 0)) end)
-	makeButton(grid, "H+", 22, function() resize(Vector3.new(0, STEP_SIZE, 0)) end)
-	makeButton(grid, "H-", 23, function() resize(Vector3.new(0, -STEP_SIZE, 0)) end)
-	makeButton(grid, "D+", 24, function() resize(Vector3.new(0, 0, STEP_SIZE)) end)
-	makeButton(grid, "D-", 25, function() resize(Vector3.new(0, 0, -STEP_SIZE)) end)
-	makeButton(grid, "Rot X-", 30, function() rotate("X", -STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot X+", 31, function() rotate("X", STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Y-", 32, function() rotate("Y", -STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Y+", 33, function() rotate("Y", STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Z-", 34, function() rotate("Z", -STEP_ROTATE_DEGREES) end)
-	makeButton(grid, "Rot Z+", 35, function() rotate("Z", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Commit", 7, commitDraft)
+	makeButton(grid, "Close", 8, closeDraft)
+	makeGridSpacer(grid, 9)
+	makeGridSpacer(grid, 10)
+	makeGridSpacer(grid, 11)
+	makeGridSpacer(grid, 12)
+	makeButton(grid, "X<<", 20, function() nudge(Vector3.new(-STEP_MOVE_LARGE, 0, 0)) end)
+	makeButton(grid, "X>>", 21, function() nudge(Vector3.new(STEP_MOVE_LARGE, 0, 0)) end)
+	makeButton(grid, "X-", 22, function() nudge(Vector3.new(-STEP_MOVE, 0, 0)) end)
+	makeButton(grid, "X+", 23, function() nudge(Vector3.new(STEP_MOVE, 0, 0)) end)
+	makeButton(grid, "Rot X+", 24, function() rotate("X", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot X-", 25, function() rotate("X", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Y-", 30, function() nudge(Vector3.new(0, -STEP_MOVE, 0)) end)
+	makeButton(grid, "Y+", 31, function() nudge(Vector3.new(0, STEP_MOVE, 0)) end)
+	makeButton(grid, "Z-", 32, function() nudge(Vector3.new(0, 0, -STEP_MOVE)) end)
+	makeButton(grid, "Z+", 33, function() nudge(Vector3.new(0, 0, STEP_MOVE)) end)
+	makeButton(grid, "W-", 40, function() resize(Vector3.new(-STEP_SIZE, 0, 0)) end)
+	makeButton(grid, "W+", 41, function() resize(Vector3.new(STEP_SIZE, 0, 0)) end)
+	makeButton(grid, "H-", 42, function() resize(Vector3.new(0, -STEP_SIZE, 0)) end)
+	makeButton(grid, "H+", 43, function() resize(Vector3.new(0, STEP_SIZE, 0)) end)
+	makeButton(grid, "D-", 44, function() resize(Vector3.new(0, 0, -STEP_SIZE)) end)
+	makeButton(grid, "D+", 45, function() resize(Vector3.new(0, 0, STEP_SIZE)) end)
+	makeButton(grid, "Rot Y-", 50, function() rotate("Y", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Y+", 51, function() rotate("Y", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Z-", 52, function() rotate("Z", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Z+", 53, function() rotate("Z", STEP_ROTATE_DEGREES) end)
 	updateData()
 end
 
