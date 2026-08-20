@@ -334,25 +334,33 @@ local function applyLayout()
 	if touchLandscape then
 		topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
 		topInfoBar.Size = UDim2.new(0.97, 0, 0, 32)
-		roomCounter.Position = UDim2.new(0.015, 0, 0, 8)
-		roomCounter.Size = UDim2.new(0.31, -4, 0, 28)
-		progressPanel.Position = UDim2.new(0.335, 0, 0, 8)
-		progressPanel.Size = UDim2.new(0.31, -4, 0, 28)
-		energyPanel.Position = UDim2.new(0.655, 0, 0, 8)
-		energyPanel.Size = UDim2.new(0.31, -4, 0, 28)
-		bunkerEnergyPanel.Position = UDim2.new(0.655, 0, 0, 38)
-		bunkerEnergyPanel.Size = UDim2.new(0.31, -4, 0, 22)
+		roomCounter.Position = UDim2.new(0.012, 0, 0, 8)
+		roomCounter.Size = UDim2.new(0.248, -4, 0, 28)
+		progressPanel.Position = UDim2.new(0.268, 0, 0, 8)
+		progressPanel.Size = UDim2.new(0.34, -4, 0, 28)
+		energyPanel.Position = UDim2.new(0.616, 0, 0, 8)
+		energyPanel.Size = UDim2.new(0.335, -4, 0, 28)
+		bunkerEnergyPanel.Position = UDim2.new(0.616, 0, 0, 38)
+		bunkerEnergyPanel.Size = UDim2.new(0.335, -4, 0, 22)
+		roomCounterLabel.TextSize = 12
+		progressLabel.TextSize = 12
+		energyLabel.TextSize = 12
+		bunkerEnergyLabel.TextSize = 11
 	else
 		topInfoBar.Position = UDim2.new(0.5, 0, 0, 46)
-		topInfoBar.Size = UDim2.new(0.86, 0, 0, 38)
-		roomCounter.Position = UDim2.new(0.14, 0, 0, 50)
-		roomCounter.Size = UDim2.fromOffset(260, 32)
-		progressPanel.Position = UDim2.new(0.45, 0, 0, 50)
-		progressPanel.Size = UDim2.fromOffset(230, 32)
+		topInfoBar.Size = UDim2.new(0.9, 0, 0, 42)
+		roomCounter.Position = UDim2.new(0.12, 0, 0, 50)
+		roomCounter.Size = UDim2.fromOffset(286, 35)
+		progressPanel.Position = UDim2.new(0.44, 0, 0, 50)
+		progressPanel.Size = UDim2.fromOffset(253, 35)
 		energyPanel.Position = UDim2.new(0.76, 0, 0, 50)
-		energyPanel.Size = UDim2.fromOffset(230, 32)
-		bunkerEnergyPanel.Position = UDim2.new(0.76, 0, 0, 84)
-		bunkerEnergyPanel.Size = UDim2.fromOffset(230, 28)
+		energyPanel.Size = UDim2.fromOffset(253, 35)
+		bunkerEnergyPanel.Position = UDim2.new(0.76, 0, 0, 88)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(253, 31)
+		roomCounterLabel.TextSize = 13
+		progressLabel.TextSize = 13
+		energyLabel.TextSize = 13
+		bunkerEnergyLabel.TextSize = 12
 	end
 
 	for id, position in pairs(sessionPositions) do
@@ -425,7 +433,7 @@ local function updateProgress(payload)
 
 	local count = tonumber(lastDiscoveryPayload.Count) or 0
 	local total = math.max(1, tonumber(lastDiscoveryPayload.Total) or Constants.TotalDiscoveries or 1)
-	progressLabel.Text = ("Disc: %d / %d"):format(count, total)
+	progressLabel.Text = ("Discoveries: %d / %d"):format(count, total)
 	progressFill.Size = UDim2.fromScale(math.clamp(count / total, 0, 1), 1)
 end
 
