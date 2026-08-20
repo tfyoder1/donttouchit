@@ -3110,7 +3110,7 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 
 	createPart(branch, "BranchJunctionFloor", Vector3.new(branchUsableWidth, 0.42, 72), CFrame.new(branchCenterX, 0.4, -189), floorColor, Enum.Material.Metal)
 	createPart(branch, "BranchJunctionCeiling", Vector3.new(branchUsableWidth, 0.36, 42), CFrame.new(branchCenterX, hallHeight, -171), ceilingColor, Enum.Material.Concrete)
-	createPart(branch, "InfirmaryApproachLeftWall", Vector3.new(0.42, hallHeight, infirmaryApproachLeftWallDepth), CFrame.new(branchLeftWallX, hallHeight / 2, infirmaryApproachLeftWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
+	createPart(branch, "InfirmaryApproachLeftWall", Vector3.new(0.75, hallHeight, 26.3), CFrame.new(branchLeftWallX, hallHeight / 2, -163.9), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "InfirmaryApproachRightWall", Vector3.new(0.42, hallHeight, infirmaryApproachRightWallDepth), CFrame.new(branchRightWallX, hallHeight / 2, infirmaryApproachRightWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "InfirmaryEntryThresholdFloor", Vector3.new(10.2, 0.42, 7.2), CFrame.new(139.3, 0.42, -150.4), floorColor, Enum.Material.Metal)
 	createPart(branch, "InfirmaryEntryOuterSafetyWall", Vector3.new(0.42, hallHeight, 7.8), CFrame.new(branchLeftWallX, hallHeight / 2, -150.1), wallColor, Enum.Material.SmoothPlastic)

@@ -180,12 +180,22 @@ local function getSourceSearchName(part)
 	return wallPart and wallPart.Name or "DraftTemporaryWall"
 end
 
+local function getSourceSectionHint(part)
+	local path = getSourcePath(part)
+	local roomModelName = path:match("^Workspace%.Room%.([^%.]+)")
+	if roomModelName then
+		return roomModelName
+	end
+	return "-"
+end
+
 local function buildCodeInstructionLines(mode, targetPart, draftPart)
 	local sourceName = getSourceSearchName(targetPart)
 	local partForValues = draftPart or targetPart
 	local lines = {
 		("CODE REQUEST: %s"):format(mode),
 		("Search RoomBuilder.lua: %q"):format(sourceName),
+		("Section Hint: %s"):format(getSourceSectionHint(targetPart)),
 		("Source Path: %s"):format(getSourcePath(targetPart)),
 	}
 	if partForValues then
