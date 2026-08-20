@@ -19,6 +19,7 @@ local SNACK_DONUT_ASSET_ID = 13742217239
 local SNACK_DONUT_MESH_ID = "rbxassetid://13582448483"
 local SNACK_DONUT_TEXTURE_ID = "rbxassetid://13582452879"
 local SLEEPING_REPLACEMENT_TENT_ASSET_ID = 140322654375696
+local LIBRARY_ROLLING_LADDER_ASSET_ID = 88745654506698
 local MAIN_HALLWAY_WALL_TEXTURE_ID = "rbxassetid://12813020091"
 local ATOMIC_COLORS = {
 	Pink = Color3.fromRGB(255, 102, 176),
@@ -4470,6 +4471,128 @@ local function makeLibraryLoftRoom(room)
 	return loft
 end
 
+local function prepareLibraryRollingLadderAssetModel(assetModel)
+	local visualParts = {}
+	for _, descendant in ipairs(assetModel:GetDescendants()) do
+		if descendant:IsA("LuaSourceContainer")
+			or descendant:IsA("Constraint")
+			or descendant:IsA("BodyMover")
+			or descendant:IsA("Humanoid")
+			or descendant:IsA("Animator")
+			or descendant:IsA("Camera")
+			or descendant:IsA("Tool") then
+			descendant:Destroy()
+		elseif descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			descendant.Massless = true
+			descendant:SetAttribute("LibraryRollingLadderVisual", true)
+			descendant:SetAttribute("BaseCanCollide", false)
+			descendant:SetAttribute("BaseCanQuery", false)
+			descendant:SetAttribute("BaseCanTouch", false)
+			table.insert(visualParts, descendant)
+		end
+	end
+
+	return visualParts
+end
+
+local function makeProceduralLibraryRollingLadder(parent, ladderCFrame)
+	local ladderVisual = makeModel(parent, "LibraryRollingLadderVisual")
+	ladderVisual:SetAttribute("SourceAssetId", LIBRARY_ROLLING_LADDER_ASSET_ID)
+	ladderVisual:SetAttribute("SourceAssetUrl", ("https://create.roblox.com/store/asset/%d"):format(LIBRARY_ROLLING_LADDER_ASSET_ID))
+	ladderVisual:SetAttribute("AssetFallbackUsed", true)
+	ladderVisual:SetAttribute("LibraryRollingLadderVisual", true)
+
+	local wood = Color3.fromRGB(171, 112, 67)
+	local rungColor = Color3.fromRGB(198, 146, 89)
+	local leftRail = createPart(ladderVisual, "FallbackLeftRail", Vector3.new(0.22, 7.9, 0.22), ladderCFrame * CFrame.new(-0.45, 0, 0), wood, Enum.Material.Wood)
+	local rightRail = createPart(ladderVisual, "FallbackRightRail", Vector3.new(0.22, 7.9, 0.22), ladderCFrame * CFrame.new(0.45, 0, 0), wood, Enum.Material.Wood)
+
+	for index = 1, 7 do
+		local y = -3.15 + index * 0.82
+		local rung = createPart(ladderVisual, "FallbackRung" .. index, Vector3.new(1.15, 0.16, 0.18), ladderCFrame * CFrame.new(0, y, 0), rungColor, Enum.Material.Wood)
+		rung.CanCollide = false
+		rung.CanQuery = false
+		rung.CanTouch = false
+		rung:SetAttribute("BaseCanCollide", false)
+		rung:SetAttribute("BaseCanQuery", false)
+		rung:SetAttribute("BaseCanTouch", false)
+	end
+
+	for _, wheelX in ipairs({ -0.46, 0.46 }) do
+		local wheel = createPart(ladderVisual, "FallbackWheel", Vector3.new(0.34, 0.34, 0.16), ladderCFrame * CFrame.new(wheelX, -3.9, 0.02) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(54, 43, 36), Enum.Material.Rubber)
+		wheel.Shape = Enum.PartType.Cylinder
+		wheel.CanCollide = false
+		wheel.CanQuery = false
+		wheel.CanTouch = false
+		wheel:SetAttribute("BaseCanCollide", false)
+		wheel:SetAttribute("BaseCanQuery", false)
+		wheel:SetAttribute("BaseCanTouch", false)
+	end
+
+	for _, part in ipairs({ leftRail, rightRail }) do
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part:SetAttribute("BaseCanCollide", false)
+		part:SetAttribute("BaseCanQuery", false)
+		part:SetAttribute("BaseCanTouch", false)
+	end
+
+	ladderVisual.PrimaryPart = leftRail
+	return ladderVisual
+end
+
+local function makeLibraryRollingLadderVisual(parent, ladderCFrame)
+	local ladderVisual = makeModel(parent, "LibraryRollingLadderVisual")
+	ladderVisual:SetAttribute("SourceAssetId", LIBRARY_ROLLING_LADDER_ASSET_ID)
+	ladderVisual:SetAttribute("SourceAssetUrl", ("https://create.roblox.com/store/asset/%d"):format(LIBRARY_ROLLING_LADDER_ASSET_ID))
+	ladderVisual:SetAttribute("AssetFallbackUsed", false)
+	ladderVisual:SetAttribute("LibraryRollingLadderVisual", true)
+
+	local success, assetModel = pcall(AssetService.LoadAssetAsync, AssetService, LIBRARY_ROLLING_LADDER_ASSET_ID)
+	if not success or not assetModel then
+		warn(("[DON'T TOUCH IT] Could not load Library rolling ladder asset %d: %s"):format(LIBRARY_ROLLING_LADDER_ASSET_ID, tostring(assetModel)))
+		ladderVisual:Destroy()
+		return makeProceduralLibraryRollingLadder(parent, ladderCFrame)
+	end
+
+	assetModel.Name = "EchelleFSAsset"
+	assetModel.Parent = ladderVisual
+
+	local visualParts = prepareLibraryRollingLadderAssetModel(assetModel)
+	if #visualParts == 0 then
+		warn(("[DON'T TOUCH IT] Library rolling ladder asset %d loaded without visible parts."):format(LIBRARY_ROLLING_LADDER_ASSET_ID))
+		ladderVisual:Destroy()
+		return makeProceduralLibraryRollingLadder(parent, ladderCFrame)
+	end
+
+	local _, currentSize = assetModel:GetBoundingBox()
+	if currentSize.Y > 0 then
+		assetModel:ScaleTo(7.8 / currentSize.Y)
+	end
+
+	assetModel:PivotTo(ladderCFrame)
+	local boundsCFrame, boundsSize = assetModel:GetBoundingBox()
+	local bottomY = boundsCFrame.Position.Y - boundsSize.Y / 2
+	local targetBottomY = ladderCFrame.Position.Y - 3.8
+	assetModel:PivotTo(assetModel:GetPivot() + Vector3.new(
+		ladderCFrame.Position.X - boundsCFrame.Position.X,
+		targetBottomY - bottomY,
+		ladderCFrame.Position.Z - boundsCFrame.Position.Z
+	))
+
+	for _, part in ipairs(visualParts) do
+		mark(part)
+	end
+
+	ladderVisual.PrimaryPart = visualParts[1]
+	return ladderVisual
+end
+
 local function makeLibraryFurnishings(room)
 	local origin = TV_SECRET_ROOM_ORIGIN
 
@@ -4593,7 +4716,11 @@ local function makeLibraryFurnishings(room)
 	createPrompt(catalog, "Open", "Card Catalog", 0)
 	tag(catalog, Constants.Tags.LibraryCatalog)
 
-	local ladder = createPart(room, "LibraryRollingLadder", Vector3.new(1.15, 7.6, 1.15), cframeAt(origin, -15.4, 4.0, -9.2) * CFrame.Angles(0, 0, math.rad(-10)), Color3.fromRGB(181, 121, 67), Enum.Material.Wood, "TrussPart")
+	local ladderCFrame = cframeAt(origin, -15.4, 4.0, -9.2) * CFrame.Angles(0, 0, math.rad(-10))
+	local ladder = createPart(room, "LibraryRollingLadder", Vector3.new(1.15, 7.6, 1.15), ladderCFrame, Color3.fromRGB(181, 121, 67), Enum.Material.Wood, "TrussPart")
+	ladder.Transparency = 1
+	ladder:SetAttribute("BaseTransparency", 1)
+	makeLibraryRollingLadderVisual(room, ladderCFrame)
 	createPrompt(ladder, "Roll", "Rolling Ladder", 0)
 	tag(ladder, Constants.Tags.LibraryLadder)
 
