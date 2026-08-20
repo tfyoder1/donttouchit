@@ -347,20 +347,24 @@ local function applyLayout()
 		energyLabel.TextSize = 12
 		bunkerEnergyLabel.TextSize = 11
 	else
-		topInfoBar.Position = UDim2.new(0.5, 0, 0, 46)
-		topInfoBar.Size = UDim2.new(0.9, 0, 0, 42)
-		roomCounter.Position = UDim2.new(0.12, 0, 0, 50)
-		roomCounter.Size = UDim2.fromOffset(286, 35)
-		progressPanel.Position = UDim2.new(0.44, 0, 0, 50)
-		progressPanel.Size = UDim2.fromOffset(253, 35)
-		energyPanel.Position = UDim2.new(0.76, 0, 0, 50)
-		energyPanel.Size = UDim2.fromOffset(253, 35)
-		bunkerEnergyPanel.Position = UDim2.new(0.76, 0, 0, 88)
-		bunkerEnergyPanel.Size = UDim2.fromOffset(253, 31)
-		roomCounterLabel.TextSize = 13
-		progressLabel.TextSize = 13
-		energyLabel.TextSize = 13
-		bunkerEnergyLabel.TextSize = 12
+		topInfoBar.Position = UDim2.new(0.5, 0, 0, 44)
+		topInfoBar.Size = UDim2.new(0.94, 0, 0, 52)
+		roomCounter.Position = UDim2.new(0.105, 0, 0, 48)
+		roomCounter.Size = UDim2.fromOffset(315, 42)
+		progressPanel.Position = UDim2.new(0.43, 0, 0, 48)
+		progressPanel.Size = UDim2.fromOffset(292, 42)
+		energyPanel.Position = UDim2.new(0.76, 0, 0, 48)
+		energyPanel.Size = UDim2.fromOffset(292, 42)
+		bunkerEnergyPanel.Position = UDim2.new(0.76, 0, 0, 94)
+		bunkerEnergyPanel.Size = UDim2.fromOffset(292, 36)
+		roomCounter.BackgroundTransparency = 0.12
+		progressPanel.BackgroundTransparency = 0.12
+		energyPanel.BackgroundTransparency = 0.12
+		bunkerEnergyPanel.BackgroundTransparency = 0.12
+		roomCounterLabel.TextSize = 17
+		progressLabel.TextSize = 17
+		energyLabel.TextSize = 17
+		bunkerEnergyLabel.TextSize = 15
 	end
 
 	for id, position in pairs(sessionPositions) do
