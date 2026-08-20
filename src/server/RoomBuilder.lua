@@ -3135,7 +3135,6 @@ local function makeSleepingMaintenanceBranch(roomFolder)
 	createPart(branch, "GymRampRightWall", Vector3.new(0.42, 14, gymRampRightWallDepth), CFrame.new(branchRightWallX, 6.8, gymRampRightWallCenterZ), wallColor, Enum.Material.SmoothPlastic)
 	createPart(branch, "GymRampCeiling", Vector3.new(branchUsableWidth, 0.36, gymRampCeilingDepth), CFrame.new(branchCenterX, 16.8, gymRampCeilingCenterZ), ceilingColor, Enum.Material.Concrete)
 	createPart(branch, "GymEntryNorthReturnWall", Vector3.new(gymEntryReturnWallLength, 14, 0.42), CFrame.new(gymEntryReturnWallCenterX, 6.8, gymEntranceNorthZ), wallColor, Enum.Material.SmoothPlastic)
-	createPart(branch, "GymEntrySouthReturnWall", Vector3.new(gymEntryReturnWallLength, 14, 0.42), CFrame.new(gymEntryReturnWallCenterX, 6.8, gymEntranceSouthZ), wallColor, Enum.Material.SmoothPlastic)
 
 	for lightIndex, data in ipairs({
 		{ Position = Vector3.new(126, 8.7, -188), Color = Color3.fromRGB(119, 255, 203) },
