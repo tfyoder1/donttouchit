@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.222"
+Constants.BuildVersion = "0.5.223"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -674,6 +674,17 @@ Constants.BunkerEnergy = {
 	WorldPowerPulseSeconds = 2.8,
 	ActivityPowerPerInteraction = 0.35,
 	ActivityPowerPerDiscovery = 1.15,
+	FeedPowerConversion = 0.08,
+	PlayerActionEnergyCost = 0.005,
+	BaseActionFeed = 0.25,
+	DiscoveryFeed = 0.75,
+	RepeatFeedDecay = 0.1,
+	RepeatResetSeconds = 120,
+	BunkerHungryThreshold = 0.49,
+	HungryFeedMultiplier = 1.25,
+	BunkerCriticalThreshold = 0.25,
+	CriticalFeedMultiplier = 1.5,
+	FruitConsumedBunkerFeed = 5,
 	PlayerActivityPerInteraction = 0.095,
 	PlayerActivityPerDiscovery = 0.18,
 	PlayerActivityPerFruit = 0.16,

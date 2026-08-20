@@ -157,6 +157,8 @@ function BunkerEnergyService.new(discoveryService, movementAuthorityService)
 	self.neonParts = {}
 	self.staticLights = {}
 	self.fruitReliefUntilByUserId = {}
+	self.feedRepeatByUserId = {}
+	self.lastFeedSummaryByUserId = {}
 	self.playerActivityByUserId = {}
 	self.playerEnergyByUserId = {}
 	self.recoveryPoseByUserId = {}
@@ -174,7 +176,7 @@ function BunkerEnergyService:Initialize()
 
 	if self.discoveryService and self.discoveryService.DiscoveryUnlocked then
 		self.discoveryService.DiscoveryUnlocked:Connect(function(player)
-			self:_addWorldPower(Constants.BunkerEnergy.ActivityPowerPerDiscovery or 1)
+			self:_addFeedValue(player, Constants.BunkerEnergy.DiscoveryFeed or 0.75, "Discovery", "Discovery")
 			self:_addPlayerActivity(player, Constants.BunkerEnergy.PlayerActivityPerDiscovery or 0.18)
 			self:_changePlayerEnergy(player, -(Constants.BunkerEnergy.DiscoveryEnergyCost or 0.014))
 			self:_queueApplyAll()
@@ -215,6 +217,8 @@ function BunkerEnergyService:Initialize()
 
 	Players.PlayerRemoving:Connect(function(player)
 		self.fruitReliefUntilByUserId[player.UserId] = nil
+		self.feedRepeatByUserId[player.UserId] = nil
+		self.lastFeedSummaryByUserId[player.UserId] = nil
 		self.playerActivityByUserId[player.UserId] = nil
 		self.playerEnergyByUserId[player.UserId] = nil
 		self.recoveryPoseByUserId[player.UserId] = nil
@@ -291,6 +295,83 @@ function BunkerEnergyService:_addWorldPower(amount)
 	self.worldPowerCharge = math.clamp(charge + math.max(0, tonumber(amount) or 0), 0, capacity)
 	self.lastPowerChargeUpdatedAt = os.clock()
 	return self.worldPowerCharge
+end
+
+function BunkerEnergyService:_getFeedEfficiencyMultiplier(worldPower)
+	worldPower = math.clamp(tonumber(worldPower) or self:_calculateWorldPower(), 0, 1)
+
+	if worldPower <= (Constants.BunkerEnergy.BunkerCriticalThreshold or 0.25) then
+		return Constants.BunkerEnergy.CriticalFeedMultiplier or 1.5
+	end
+
+	if worldPower <= (Constants.BunkerEnergy.BunkerHungryThreshold or 0.49) then
+		return Constants.BunkerEnergy.HungryFeedMultiplier or 1.25
+	end
+
+	return 1
+end
+
+function BunkerEnergyService:_getRepeatFeedMultiplier(player, actionKey, now)
+	if not player or not player.Parent or actionKey == nil or actionKey == "" then
+		return 1, 0
+	end
+
+	now = now or os.clock()
+	local userRepeats = self.feedRepeatByUserId[player.UserId]
+	if not userRepeats then
+		userRepeats = {}
+		self.feedRepeatByUserId[player.UserId] = userRepeats
+	end
+
+	local resetSeconds = math.max(1, Constants.BunkerEnergy.RepeatResetSeconds or 120)
+	local decay = math.clamp(Constants.BunkerEnergy.RepeatFeedDecay or 0.1, 0, 0.95)
+	local record = userRepeats[actionKey]
+	local repeatCount = 0
+
+	if record and now - (record.UpdatedAt or 0) <= resetSeconds then
+		repeatCount = math.max(0, math.floor(tonumber(record.Count) or 0)) + 1
+	end
+
+	userRepeats[actionKey] = {
+		Count = repeatCount,
+		UpdatedAt = now,
+	}
+
+	return (1 - decay) ^ repeatCount, repeatCount
+end
+
+function BunkerEnergyService:_addFeedValue(player, feedValue, source, actionKey, options)
+	feedValue = math.max(0, tonumber(feedValue) or 0)
+	if feedValue <= 0 then
+		return 0
+	end
+
+	options = options or {}
+	local now = os.clock()
+	local repeatMultiplier = 1
+	local repeatCount = 0
+	if options.IgnoreRepetition ~= true then
+		repeatMultiplier, repeatCount = self:_getRepeatFeedMultiplier(player, actionKey or source, now)
+	end
+
+	local worldPower = self:_calculateWorldPower(now)
+	local hungerMultiplier = self:_getFeedEfficiencyMultiplier(worldPower)
+	local conversion = math.max(0, Constants.BunkerEnergy.FeedPowerConversion or 0.08)
+	local convertedPower = feedValue * repeatMultiplier * hungerMultiplier * conversion
+
+	self.lastFeedSummaryByUserId[player and player.UserId or 0] = {
+		Source = source or "Unknown",
+		ActionKey = actionKey or source or "Unknown",
+		FeedValue = feedValue,
+		ConvertedPower = convertedPower,
+		RepeatCount = repeatCount,
+		RepeatMultiplier = repeatMultiplier,
+		HungerMultiplier = hungerMultiplier,
+		UpdatedAt = now,
+	}
+
+	self:_addWorldPower(convertedPower)
+	return convertedPower
 end
 
 function BunkerEnergyService:_calculateProgressLoad(player)
@@ -897,6 +978,8 @@ function BunkerEnergyService:GetDevState(player)
 		PlayerEnergy = state and state.Energy or 1,
 		WorldPower = worldPower,
 		BunkerHunger = self:_calculateBunkerHunger(worldPower, player),
+		FeedEfficiencyMultiplier = self:_getFeedEfficiencyMultiplier(worldPower),
+		LastFeed = player and self.lastFeedSummaryByUserId[player.UserId] or nil,
 		Recovering = state and state.Recovering == true or false,
 		RecoveryCount = state and state.RecoveryCount or 0,
 	}
@@ -985,9 +1068,9 @@ function BunkerEnergyService:RecordInteraction(player)
 		return
 	end
 
-	self:_addWorldPower(Constants.BunkerEnergy.ActivityPowerPerInteraction or 0.35)
+	self:_addFeedValue(player, Constants.BunkerEnergy.BaseActionFeed or 0.25, "Action", "Interaction")
 	self:_addPlayerActivity(player, Constants.BunkerEnergy.PlayerActivityPerInteraction or 0.095)
-	self:_changePlayerEnergy(player, -(Constants.BunkerEnergy.InteractionEnergyCost or 0.009))
+	self:_changePlayerEnergy(player, -(Constants.BunkerEnergy.PlayerActionEnergyCost or 0.005))
 	self:_queueApplyAll()
 	self:_applyPlayerEnergy(player, self:_calculateWorldPower())
 end
@@ -997,7 +1080,7 @@ function BunkerEnergyService:RecordTrainingActivity(player, chargeAmount, player
 		return
 	end
 
-	self:_addWorldPower(chargeAmount or Constants.BunkerEnergy.ActivityPowerPerInteraction or 0.35)
+	self:_addFeedValue(player, chargeAmount or Constants.BunkerEnergy.BaseActionFeed or 0.25, "Training", "Training")
 	self:_addPlayerActivity(player, Constants.BunkerEnergy.PlayerActivityPerInteraction or 0.095)
 	self:_changePlayerEnergy(player, -(playerEnergyCost or 0.003), {
 		SuppressLowWarning = true,
@@ -1014,7 +1097,9 @@ function BunkerEnergyService:RecordFruitEaten(player, restoreAmount)
 	local now = os.clock()
 	local duration = Constants.BunkerEnergy.FruitRecoverySeconds or 150
 	self.fruitReliefUntilByUserId[player.UserId] = math.max(self.fruitReliefUntilByUserId[player.UserId] or 0, now) + duration
-	self:_addWorldPower(Constants.BunkerEnergy.FruitPowerBonus or 2)
+	self:_addFeedValue(player, Constants.BunkerEnergy.FruitConsumedBunkerFeed or 5, "FoodEaten", "FoodEaten", {
+		IgnoreRepetition = true,
+	})
 	self:_addPlayerActivity(player, Constants.BunkerEnergy.PlayerActivityPerFruit or 0.16)
 	self:_changePlayerEnergy(player, restoreAmount or Constants.BunkerEnergy.FruitEnergyRestore or 0.32, {
 		SuppressLowWarning = true,
@@ -1041,7 +1126,10 @@ function BunkerEnergyService:RecordEnergyItemUsed(player, kind, restoreAmount)
 		end
 	end
 
-	self:_addWorldPower((Constants.BunkerEnergy.FruitPowerBonus or 2) * math.clamp(amount / 0.32, 0.25, 1.1))
+	local baseline = math.max(0.01, Constants.BunkerEnergy.FruitEnergyRestore or 0.32)
+	self:_addFeedValue(player, (Constants.BunkerEnergy.FruitConsumedBunkerFeed or 5) * math.clamp(amount / baseline, 0.25, 1.1), "EnergyItemUsed", kind or "EnergyItem", {
+		IgnoreRepetition = true,
+	})
 	self:_addPlayerActivity(player, Constants.BunkerEnergy.PlayerActivityPerFruit or 0.16)
 	self:_changePlayerEnergy(player, amount, {
 		SuppressLowWarning = true,
