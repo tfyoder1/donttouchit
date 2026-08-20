@@ -581,13 +581,15 @@ end
 
 local function applyHudVisibility()
 	local suppressed = isGameplayHudSuppressed()
-	local compact = isCompactHud()
 
-	title.Visible = not suppressed and not compact
-	totalProgressPanel.Visible = not suppressed
-	counter.Visible = not suppressed
-	energyPanel.Visible = not suppressed
-	bunkerEnergyPanel.Visible = not suppressed and bunkerEnergyMonitorUnlocked
+	-- CoreHud owns the permanent room/discovery/energy info bar. Keep these
+	-- legacy HUD panels disabled so the two systems do not overlap or fight
+	-- responsive layout on iOS.
+	title.Visible = false
+	totalProgressPanel.Visible = false
+	counter.Visible = false
+	energyPanel.Visible = false
+	bunkerEnergyPanel.Visible = false
 	noTouchPanel.Visible = not suppressed and noTouchPanel:GetAttribute("ShouldShow") == true
 end
 
