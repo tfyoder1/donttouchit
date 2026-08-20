@@ -10,6 +10,8 @@ local BunkerEnergyService = {}
 BunkerEnergyService.__index = BunkerEnergyService
 
 local DIM_COLOR = Color3.fromRGB(4, 7, 10)
+local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
+local SIGNAL_BAND_NAME = "DontTouchItSignalBand"
 
 local EXCLUDED_ANCESTOR_NAMES = {
 	IslandRoom = true,
@@ -79,6 +81,73 @@ local function getPlayerGui(player)
 	return player and player:FindFirstChildOfClass("PlayerGui")
 end
 
+local function setSignalBandAttribute(player)
+	player:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
+
+	local playerGui = getPlayerGui(player)
+	if playerGui then
+		playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
+	end
+end
+
+local function findSignalBandArm(character)
+	return character:FindFirstChild("LeftLowerArm")
+		or character:FindFirstChild("Left Arm")
+		or character:FindFirstChild("RightLowerArm")
+		or character:FindFirstChild("Right Arm")
+end
+
+local function equipSignalBand(player)
+	setSignalBandAttribute(player)
+
+	local character = player.Character
+	if not character or character:FindFirstChild(SIGNAL_BAND_NAME, true) then
+		return
+	end
+
+	local arm = findSignalBandArm(character)
+	if not arm or not arm:IsA("BasePart") then
+		return
+	end
+
+	local band = Instance.new("Part")
+	band.Name = SIGNAL_BAND_NAME
+	band.Shape = Enum.PartType.Cylinder
+	band.Size = Vector3.new(0.62, 0.24, 0.62)
+	band.Color = Color3.fromRGB(18, 23, 29)
+	band.Material = Enum.Material.Metal
+	band.CanCollide = false
+	band.CanQuery = false
+	band.CanTouch = false
+	band.Massless = true
+	band.CFrame = arm.CFrame * CFrame.new(0, -arm.Size.Y * 0.18, 0)
+	band.Parent = character
+
+	local bandWeld = Instance.new("WeldConstraint")
+	bandWeld.Name = "SignalBandWeld"
+	bandWeld.Part0 = arm
+	bandWeld.Part1 = band
+	bandWeld.Parent = band
+
+	local readout = Instance.new("Part")
+	readout.Name = "SignalBandReadout"
+	readout.Size = Vector3.new(0.09, 0.18, 0.34)
+	readout.Color = Color3.fromRGB(119, 255, 203)
+	readout.Material = Enum.Material.Neon
+	readout.CanCollide = false
+	readout.CanQuery = false
+	readout.CanTouch = false
+	readout.Massless = true
+	readout.CFrame = band.CFrame * CFrame.new(0, 0, -0.34)
+	readout.Parent = band
+
+	local readoutWeld = Instance.new("WeldConstraint")
+	readoutWeld.Name = "SignalBandReadoutWeld"
+	readoutWeld.Part0 = band
+	readoutWeld.Part1 = readout
+	readoutWeld.Parent = readout
+end
+
 function BunkerEnergyService.new(discoveryService, movementAuthorityService)
 	local self = setmetatable({}, BunkerEnergyService)
 	self.discoveryService = discoveryService
@@ -126,6 +195,9 @@ function BunkerEnergyService:Initialize()
 				else
 					player:SetAttribute("DontTouchItRecoveryActive", false)
 					self:_setRecoveryAnchored(player, false)
+				end
+				if player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true then
+					equipSignalBand(player)
 				end
 				self:_applyPlayerEnergy(player, self:_calculateWorldPower())
 			end)
@@ -509,7 +581,11 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 		self:_applyPlayerEnergy(player, self:_calculateWorldPower())
 
 		if firstRecovery then
-			self.systemMessageRemote:FireClient(player, "Emergency nourishment authorized.")
+			equipSignalBand(player)
+			self.systemMessageRemote:FireClient(
+				player,
+				"Emergency nourishment authorized. Signal Band fitted: monitor your energy and the information it decides to show you."
+			)
 		else
 			self.systemMessageRemote:FireClient(player, "Condition stabilized.")
 		end

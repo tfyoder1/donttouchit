@@ -14,6 +14,7 @@ local HUD_NAME = "DontTouchItCoreHud"
 local TOUCH_EDIT_MODE_ATTRIBUTE = "DontTouchItTouchEditLayoutActive"
 local DEV_LAYOUT_RESET_ATTRIBUTE = "DontTouchItDevLayoutResetNonce"
 local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
+local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
 local DRAG_MARGIN = 8
 local gui = playerGui:FindFirstChild(HUD_NAME)
 if gui and gui:IsA("ScreenGui") then
@@ -366,10 +367,12 @@ end
 
 local function applyVisibility()
 	local hidden = isTitleSplashVisible()
+	local hasSignalBand = player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
+		or playerGui:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
 	topInfoBar.Visible = not hidden
 	progressPanel.Visible = not hidden
 	roomCounter.Visible = not hidden
-	energyPanel.Visible = not hidden
+	energyPanel.Visible = not hidden and hasSignalBand
 	bunkerEnergyPanel.Visible = not hidden and (
 		player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 		or playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
@@ -467,9 +470,11 @@ playerGui:GetAttributeChangedSignal("DontTouchItPlayerEnergy"):Connect(updateEne
 player:GetAttributeChangedSignal("DontTouchItBunkerPower"):Connect(updateBunkerEnergy)
 player:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBunkerEnergy)
 player:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(updateBunkerEnergy)
+player:GetAttributeChangedSignal(SIGNAL_BAND_ATTRIBUTE):Connect(applyVisibility)
 playerGui:GetAttributeChangedSignal("DontTouchItBunkerPower"):Connect(updateBunkerEnergy)
 playerGui:GetAttributeChangedSignal("DontTouchItBunkerHunger"):Connect(updateBunkerEnergy)
 playerGui:GetAttributeChangedSignal(BUNKER_ENERGY_MONITOR_ATTRIBUTE):Connect(updateBunkerEnergy)
+playerGui:GetAttributeChangedSignal(SIGNAL_BAND_ATTRIBUTE):Connect(applyVisibility)
 playerGui.ChildAdded:Connect(function(child)
 	if child.Name == "DontTouchItTitleSplash" or child.Name == "DontTouchItUI" then
 		task.defer(applyVisibility)

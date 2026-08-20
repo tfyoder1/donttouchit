@@ -2449,6 +2449,18 @@ local function makeSecurityRoom(roomFolder)
 	local sign = createPart(room, "SecurityTitleSign", Vector3.new(15, 2.6, 0.32), cframeAt(origin, 0, 12.3, depth / 2 - 0.82), Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
 	createDoubleSidedSurfaceText(sign, "SecurityTitleText", "SECURITY\nPLEASE LOOK CASUAL", Enum.NormalId.Front, Color3.fromRGB(23, 24, 28), Color3.fromRGB(255, 221, 84))
 
+	local caseStudyPanel = createPart(room, "SecurityCaseStudyAlphaPanel", Vector3.new(12.8, 5.4, 0.32), cframeAt(origin, -13.2, 7.5, depth / 2 - 0.84), Color3.fromRGB(16, 22, 29), Enum.Material.Glass)
+	createSurfaceText(
+		caseStudyPanel,
+		"SecurityCaseStudyText",
+		"SUBJECT CASE STUDY ALPHA\nAWAITING PLAYER FILE\nSECURITY CONTRIBUTION: 0%\nOBSERVATION: ACTIVE",
+		Enum.NormalId.Front,
+		Color3.fromRGB(119, 255, 203),
+		Color3.fromRGB(16, 22, 29)
+	)
+	createPrompt(caseStudyPanel, "Load", "Subject Case Study Alpha", 0)
+	tag(caseStudyPanel, Constants.Tags.SecurityConsole)
+
 	for plateIndex, plateData in ipairs({
 		{ X = -3.2, Z = depth / 2 - 10.4, Label = "BADGE" },
 		{ X = 3.2, Z = depth / 2 - 10.4, Label = "WEIGHT" },

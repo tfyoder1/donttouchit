@@ -13,6 +13,8 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local InteractionService = {}
 InteractionService.__index = InteractionService
 
+local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
+
 local COUCH_GET_UP_LABELS = {
 	"Try to Get Up",
 	"Ask Nicely",
@@ -723,6 +725,15 @@ function InteractionService:Initialize()
 				self:_refreshSecretDoorsForPlayer(player)
 				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id) then
 					self:_grantFreezeRay(player)
+				end
+				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.SecurityBunkerEnergy.Id) then
+					player:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
+					player:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
+					local playerGui = player:FindFirstChildOfClass("PlayerGui")
+					if playerGui then
+						playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
+						playerGui:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
+					end
 				end
 			end
 		end)
@@ -2211,6 +2222,9 @@ function InteractionService:_wireSecurityConsole(console)
 
 	self:_connectPrompt(prompt, function(player)
 		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityMonitorWall.Id)
+		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityBunkerEnergy.Id)
+		setBunkerEnergyMonitorUnlocked(player)
+		self:_updateSecurityCaseStudyPanels(player)
 		playSound(console, "rbxasset://sounds/button.wav", 0.5, 0.8)
 		if console:IsA("BasePart") then
 			tweenPart(console, 0.18, {
@@ -2224,7 +2238,7 @@ function InteractionService:_wireSecurityConsole(console)
 				end
 			end)
 		end
-		self.systemMessageRemote:FireClient(player, "The monitor wall confirms every camera is looking extremely busy.")
+		self.systemMessageRemote:FireClient(player, "Subject Case Study Alpha loaded. The Signal Band now mirrors bunker status; Security records observation without feeding the bunker.")
 	end)
 end
 
@@ -2268,11 +2282,43 @@ function InteractionService:_wireSecurityTapeDeck(tapeDeck)
 end
 
 local function setBunkerEnergyMonitorUnlocked(player)
+	player:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
 	player:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
 
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
 	if playerGui then
+		playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
 		playerGui:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
+	end
+end
+
+function InteractionService:_buildSecurityCaseStudyText(player)
+	local order = Constants.RoomDiscoveryOrder.SecurityRoom or {}
+	local found = if self.discoveryService then self.discoveryService:GetDiscoveryCount(player, order) else 0
+	local total = #order
+	local rows = {
+		"SUBJECT CASE STUDY ALPHA",
+		("%s PROGRESS: %d/%d"):format(string.upper(player.Name), found, total),
+		"SECURITY CONTRIBUTION: 0%",
+		"OBSERVATION: ACTIVE",
+	}
+
+	for _, discoveryId in ipairs(order) do
+		local discovery = Constants.GetDiscovery(discoveryId)
+		local discovered = self.discoveryService and self.discoveryService:HasDiscovery(player, discoveryId)
+		local state = if discovered then "FOUND" else "CLUE"
+		table.insert(rows, ("%s - %s"):format(state, discovery and discovery.Name or discoveryId))
+	end
+
+	return table.concat(rows, "\n")
+end
+
+function InteractionService:_updateSecurityCaseStudyPanels(player)
+	local text = self:_buildSecurityCaseStudyText(player)
+	for _, instance in ipairs(workspace:GetDescendants()) do
+		if instance.Name == "SecurityCaseStudyAlphaPanel" then
+			setTextLabelText(instance, "SecurityCaseStudyText", text)
+		end
 	end
 end
 
@@ -2295,12 +2341,13 @@ function InteractionService:_wireBunkerPowerMeter(meter)
 		end
 
 		setBunkerEnergyMonitorUnlocked(player)
+		self:_updateSecurityCaseStudyPanels(player)
 
 		local power = math.clamp(tonumber(player:GetAttribute("DontTouchItBunkerPower")) or 0, 0, 1)
 		local hunger = math.clamp(tonumber(player:GetAttribute("DontTouchItBunkerHunger")) or 0, 0, 1)
 		self.systemMessageRemote:FireClient(
 			player,
-			("Bunker energy monitor mirrored below your energy readout. Power %d%%, draw %s."):format(
+			("Signal Band bunker status unlocked. Power %d%%, draw %s. Security notes this knowledge does not contribute energy."):format(
 				math.floor(power * 100 + 0.5),
 				formatBunkerDrawText(hunger)
 			)
