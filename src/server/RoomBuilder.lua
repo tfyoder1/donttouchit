@@ -3572,6 +3572,7 @@ local function makeTopDownArenaRoom(roomFolder)
 	makeBucket("TopDownBackLeftBucket", -44, -depth / 2 + 28, "ARC", false, "Ring")
 	makeBucket("TopDownBackRightBucket", 44, -depth / 2 + 28, "THROW", false, "Splash")
 	makeBucket("TopDownRefillBucket", 0, depth / 2 - 32, "REFILL", true, "Auto")
+	makeBucket("TopDownFarRefillBucket", 0, -depth / 2 + 32, "REFILL", true, "Auto")
 
 	local pipe = createPart(room, "TopDownRefillPipe", Vector3.new(0.72, 8.4, 0.72), cframeAt(origin, 0, 7.0, depth / 2 - 32), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
 	pipe.Shape = Enum.PartType.Cylinder
@@ -3586,6 +3587,20 @@ local function makeTopDownArenaRoom(roomFolder)
 	drip.SpreadAngle = Vector2.new(8, 8)
 	drip.Parent = pipe
 	mark(drip)
+
+	local farPipe = createPart(room, "TopDownFarRefillPipe", Vector3.new(0.72, 8.4, 0.72), cframeAt(origin, 0, 7.0, -depth / 2 + 32), Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+	farPipe.Shape = Enum.PartType.Cylinder
+	farPipe.CanCollide = false
+	farPipe:SetAttribute("BaseCanCollide", false)
+	local farDrip = Instance.new("ParticleEmitter")
+	farDrip.Name = "TopDownFarRefillDrip"
+	farDrip.Color = ColorSequence.new(Color3.fromRGB(93, 217, 255))
+	farDrip.Lifetime = NumberRange.new(0.8, 1.2)
+	farDrip.Rate = 10
+	farDrip.Speed = NumberRange.new(2, 4)
+	farDrip.SpreadAngle = Vector2.new(8, 8)
+	farDrip.Parent = farPipe
+	mark(farDrip)
 
 	makeAtomicStarburst(room, "TopDownAtomicStarburst", cframeAt(origin, width / 2 - 0.58, 13.4, -18) * CFrame.Angles(0, math.rad(-90), 0), 0.9, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Cream)
 	makeAtomicBoomerang(room, "TopDownAtomicBoomerang", cframeAt(origin, -width / 2 + 0.58, 12.5, -34) * CFrame.Angles(0, math.rad(90), 0), 0.92, ATOMIC_COLORS.Orange)
