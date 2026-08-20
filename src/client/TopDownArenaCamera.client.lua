@@ -248,6 +248,9 @@ local function getAimDirection()
 	local direction
 	if cameraMode == "FPV" then
 		direction = (CFrame.Angles(0, cameraYaw, 0) * CFrame.Angles(cameraPitch, 0, 0)):VectorToWorldSpace(Vector3.new(0, 0, -1))
+	elseif cameraMode == "Normal" then
+		local camera = workspace.CurrentCamera
+		direction = if camera then flattenDirection(camera.CFrame.LookVector, overheadAimDirection) else overheadAimDirection
 	else
 		direction = overheadAimDirection
 	end
@@ -552,10 +555,14 @@ local function updateCamera(deltaTime)
 		end
 
 		if math.abs(rightStickY) > 0.08 then
-			cameraPitch = math.clamp(cameraPitch - rightStickY * PITCH_SPEED * deltaTime, MIN_FPV_PITCH, MAX_FPV_PITCH)
+			cameraPitch = math.clamp(cameraPitch + rightStickY * PITCH_SPEED * deltaTime, MIN_FPV_PITCH, MAX_FPV_PITCH)
 		end
 	elseif cameraMode == "Overhead" then
-		updateOverheadAimFromStick()
+		if aiming then
+			updateOverheadAimFromStick()
+		elseif math.abs(rightStickX) > 0.08 then
+			cameraYaw -= rightStickX * YAW_SPEED * deltaTime
+		end
 	end
 
 	local aimTarget = getAimTargetPosition()

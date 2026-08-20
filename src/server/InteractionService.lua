@@ -1901,7 +1901,7 @@ function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
 	prompt.Parent = primary
 
 	self:_connectPrompt(prompt, function(player)
-		if itemData.Kind == TOP_DOWN_WATER_BALLOON_KIND and not self:_canTopDownPlayerUseBalloons(player, true) then
+		if itemData.Kind == TOP_DOWN_WATER_BALLOON_KIND and not self:_canTopDownPlayerLoadBalloons(player, true) then
 			return
 		end
 
@@ -3357,6 +3357,18 @@ function InteractionService:_canTopDownPlayerUseBalloons(player, sendMessage)
 	return true
 end
 
+function InteractionService:_canTopDownPlayerLoadBalloons(player, sendMessage)
+	local team = self:_getTopDownPlayerTeam(player)
+	if not team then
+		if sendMessage then
+			self.systemMessageRemote:FireClient(player, "Choose a side at a ready station before loading water balloons. Spectators can watch or leave.")
+		end
+		return false
+	end
+
+	return true
+end
+
 function InteractionService:_startTopDownPracticeTargetMotion()
 	task.spawn(function()
 		while true do
@@ -3672,7 +3684,7 @@ function InteractionService:_loadTopDownWaterBalloons(player, bucket)
 		return
 	end
 
-	if not self:_canTopDownPlayerUseBalloons(player, true) then
+	if not self:_canTopDownPlayerLoadBalloons(player, true) then
 		self:_fireTopDownAmmo(player)
 		return
 	end
@@ -3870,7 +3882,7 @@ function InteractionService:_wireTopDownWaterBalloonBucket(bucket)
 			return
 		end
 
-		if not self:_canTopDownPlayerUseBalloons(player, false)
+		if not self:_canTopDownPlayerLoadBalloons(player, false)
 			or self:_getTopDownAvailableWaterBalloonSlots(player) <= 0
 		then
 			return
