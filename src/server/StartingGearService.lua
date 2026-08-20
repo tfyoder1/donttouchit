@@ -99,7 +99,7 @@ local function createFlashlightTool()
 	beam.Enabled = false
 	beam.Face = Enum.NormalId.Front
 	beam.Range = 70
-	beam.Shadows = true
+	beam.Shadows = false
 	beam.Parent = handle
 
 	local spill = Instance.new("PointLight")
@@ -112,6 +112,39 @@ local function createFlashlightTool()
 	spill.Parent = handle
 
 	tool.Grip = CFrame.new(0, -0.08, -0.45) * CFrame.Angles(0, math.rad(90), 0)
+
+	local localToggle = Instance.new("LocalScript")
+	localToggle.Name = "FlashlightLocalToggle"
+	localToggle.Source = [[
+local tool = script.Parent
+
+local function setLights(enabled)
+	tool:SetAttribute("FlashlightOn", enabled)
+
+	local handle = tool:FindFirstChild("Handle")
+	if not handle then
+		return
+	end
+
+	for _, descendant in ipairs(handle:GetDescendants()) do
+		if descendant:IsA("Light") then
+			descendant.Enabled = enabled
+		elseif descendant:IsA("Beam") then
+			descendant.Enabled = enabled
+		end
+	end
+end
+
+tool.Activated:Connect(function()
+	if tool.Enabled == false then
+		return
+	end
+
+	setLights(tool:GetAttribute("FlashlightOn") ~= true)
+end)
+]]
+	localToggle.Parent = tool
+
 	tool.Activated:Connect(function()
 		if tool.Enabled == false then
 			return
