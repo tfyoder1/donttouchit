@@ -29,6 +29,7 @@ local TITLE_SPLASH_FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local SYSTEM_MESSAGE_MIN_DURATION = 5.5
 local SYSTEM_MESSAGE_MAX_DURATION = 9
 local DEFAULT_UI_DISPLAY_ORDER = 10
+local ROOM_CONTROL_DISPLAY_ORDER = 170
 local START_OVERLAY_DISPLAY_ORDER = 180
 local playerGui = player:WaitForChild("PlayerGui")
 local introMusicSound = nil
@@ -2064,6 +2065,9 @@ local function closeReferenceBook()
 	feedbackPanel.Visible = false
 	closeBookButton.Modal = false
 	setOverlayMouse(false)
+	if not startOverlay.Visible then
+		gui.DisplayOrder = DEFAULT_UI_DISPLAY_ORDER
+	end
 end
 
 local function getStartChoicePreloadRoomId(action, roomId)
@@ -2654,6 +2658,8 @@ local function renderReferenceBook(payload)
 	activeBookRoomId = payload.RoomId
 	local mode = payload.Mode or "Log"
 	local storePrices = payload.StorePrices or {}
+	gui.Enabled = true
+	gui.DisplayOrder = ROOM_CONTROL_DISPLAY_ORDER
 	bookPanel.Visible = true
 	feedbackPanel.Visible = false
 	if not wasVisible then
