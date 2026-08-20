@@ -118,18 +118,45 @@ function UiLayoutService:_load(player)
 end
 
 function UiLayoutService:_save(player, layout)
-	layout = sanitizeLayout(layout)
+	local incomingLayout = sanitizeLayout(layout)
+	local currentLayout = self:_load(player)
+	local mergedLayout = {}
+
+	for key, value in pairs(currentLayout) do
+		mergedLayout[key] = value
+	end
+	for key, value in pairs(incomingLayout) do
+		mergedLayout[key] = value
+	end
+
+	self.cacheByUserId[player.UserId] = mergedLayout
+
+	if self.layoutStore then
+		local ok, err = pcall(function()
+			self.layoutStore:SetAsync(dataKey(player), mergedLayout)
+		end)
+		if not ok then
+			warn(("[DON'T TOUCH IT] UI layout save failed for %d: %s"):format(player.UserId, tostring(err)))
+		end
+	end
+
+	self.remote:FireClient(player, {
+		Action = "Loaded",
+		Layout = mergedLayout,
+	})
+end
+
+function UiLayoutService:_reset(player)
+	local layout = {}
 	self.cacheByUserId[player.UserId] = layout
 
 	if self.layoutStore then
-		task.spawn(function()
-			local ok, err = pcall(function()
-				self.layoutStore:SetAsync(dataKey(player), layout)
-			end)
-			if not ok then
-				warn(("[DON'T TOUCH IT] UI layout save failed for %d: %s"):format(player.UserId, tostring(err)))
-			end
+		local ok, err = pcall(function()
+			self.layoutStore:SetAsync(dataKey(player), layout)
 		end)
+		if not ok then
+			warn(("[DON'T TOUCH IT] UI layout reset failed for %d: %s"):format(player.UserId, tostring(err)))
+		end
 	end
 
 	self.remote:FireClient(player, {
@@ -137,6 +164,7 @@ function UiLayoutService:_save(player, layout)
 		Layout = layout,
 	})
 end
+
 
 function UiLayoutService:_handleRemote(player, payload)
 	if typeof(payload) ~= "table" then
@@ -151,7 +179,7 @@ function UiLayoutService:_handleRemote(player, payload)
 	elseif payload.Action == "Save" then
 		self:_save(player, payload.Layout)
 	elseif payload.Action == "Reset" then
-		self:_save(player, {})
+		self:_reset(player)
 	end
 end
 
