@@ -4716,11 +4716,11 @@ local function makeLibraryFurnishings(room)
 	createPrompt(catalog, "Open", "Card Catalog", 0)
 	tag(catalog, Constants.Tags.LibraryCatalog)
 
-	local ladderCFrame = cframeAt(origin, -15.4, 4.0, -9.2) * CFrame.Angles(0, 0, math.rad(-10))
+	local ladderCFrame = cframeAt(origin, -12.8, 4.0, -9.2) * CFrame.Angles(0, 0, math.rad(-4))
 	local ladder = createPart(room, "LibraryRollingLadder", Vector3.new(1.15, 7.6, 1.15), ladderCFrame, Color3.fromRGB(181, 121, 67), Enum.Material.Wood, "TrussPart")
 	ladder.Transparency = 1
 	ladder:SetAttribute("BaseTransparency", 1)
-	makeLibraryRollingLadderVisual(room, ladderCFrame)
+	makeLibraryRollingLadderVisual(ladder, ladderCFrame)
 	createPrompt(ladder, "Roll", "Rolling Ladder", 0)
 	tag(ladder, Constants.Tags.LibraryLadder)
 

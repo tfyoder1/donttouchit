@@ -4343,12 +4343,26 @@ function InteractionService:_wireLibraryLadder(ladder)
 		playSound(ladder, "rbxasset://sounds/button.wav", 0.42, 0.68)
 
 		local baseCFrame = ladder:GetAttribute("BaseCFrame") or ladder.CFrame
+		local visual = ladder:FindFirstChild("LibraryRollingLadderVisual")
+		local visualBasePivot = nil
+		if visual and visual:IsA("Model") then
+			visualBasePivot = visual:GetAttribute("BasePivot") or visual:GetPivot()
+			if visual:GetAttribute("BasePivot") == nil then
+				visual:SetAttribute("BasePivot", visualBasePivot)
+			end
+		end
 		state.Moved = not state.Moved
 		local targetCFrame = state.Moved and (baseCFrame + Vector3.new(2.6, 0, -1.1)) or baseCFrame
 		tweenPart(ladder, 0.35, {
 			CFrame = targetCFrame,
 			Color = state.Moved and Color3.fromRGB(219, 154, 82) or (ladder:GetAttribute("BaseColor") or ladder.Color),
 		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		if visual and visual:IsA("Model") and visualBasePivot then
+			local visualRelativeCFrame = baseCFrame:ToObjectSpace(visualBasePivot)
+			task.spawn(function()
+				tweenModel(visual, targetCFrame * visualRelativeCFrame, 0.35)
+			end)
+		end
 
 		self.systemMessageRemote:FireClient(player, "The rolling library ladder glides toward the suspicious top shelf.")
 		task.wait(0.25)
