@@ -64,23 +64,60 @@ local function vectorPayload(v)
 	}
 end
 
+local function getSourcePath(part)
+	if part and part.Parent then
+		return part:GetFullName()
+	end
+	return "-"
+end
+
+local function getSourceSearchName(part)
+	if part and part.Name and part.Name ~= "" then
+		return part.Name
+	end
+	return wallPart and wallPart.Name or "DraftTemporaryWall"
+end
+
+local function buildCodeInstructionLines(mode, targetPart, draftPart)
+	local sourceName = getSourceSearchName(targetPart)
+	local partForValues = draftPart or targetPart
+	local lines = {
+		("CODE REQUEST: %s"):format(mode),
+		("Search RoomBuilder.lua: %q"):format(sourceName),
+		("Source Path: %s"):format(getSourcePath(targetPart)),
+	}
+	if partForValues then
+		table.insert(lines, ("New Size: Vector3.new(%s)"):format(vectorText(partForValues.Size)))
+		table.insert(lines, ("New CFrame: %s"):format(cframeCode(partForValues.CFrame)))
+	end
+	if mode == "DELETE / HIDE WALL" then
+		table.insert(lines, "Ask Codex: remove/comment the createPart for this named wall.")
+	elseif mode == "UPDATE WALL" then
+		table.insert(lines, "Ask Codex: replace that wall's Size/CFrame with these values.")
+	else
+		table.insert(lines, "Ask Codex: add this as a new generated wall near this room.")
+	end
+	table.insert(lines, "Commit button = live server marker only; screenshot this box for code.")
+	return lines
+end
+
 local function updateData()
 	if not dataLabel then
 		return
 	end
-	if not wallPart then
-		dataLabel.Text = "WALL DRAFT\nNew Wall creates a local part.\nSelect Wall uses the screen center target.\nHide Selected makes a local deletion note."
+	if deleteCandidate then
+		dataLabel.Text = table.concat(buildCodeInstructionLines("DELETE / HIDE WALL", deleteCandidate, deleteCandidate), "\n")
 		return
 	end
-	local lines = {
-		"WALL DRAFT",
-		("Name: %s"):format(wallPart.Name),
-		("Size: Vector3.new(%s)"):format(vectorText(wallPart.Size)),
-		("CFrame: %s"):format(cframeCode(wallPart.CFrame)),
-		("Rot: %.1f, %.1f, %.1f deg"):format(getRotationDegrees(wallPart.CFrame).X, getRotationDegrees(wallPart.CFrame).Y, getRotationDegrees(wallPart.CFrame).Z),
-	}
+	if not wallPart then
+		dataLabel.Text = "WALL DRAFT\nSelect Wall: edit existing wall.\nHide Sel: mark a wall for code removal.\nNew Wall: place a new wall draft.\nScreenshot this box after moving/sizing."
+		return
+	end
+	local mode = sourcePart and "UPDATE WALL" or "ADD WALL"
+	local lines = buildCodeInstructionLines(mode, sourcePart, wallPart)
+	table.insert(lines, ("Draft Name: %s"):format(wallPart.Name))
+	table.insert(lines, ("Rot: %.1f, %.1f, %.1f deg"):format(getRotationDegrees(wallPart.CFrame).X, getRotationDegrees(wallPart.CFrame).Y, getRotationDegrees(wallPart.CFrame).Z))
 	if sourcePart and sourceCFrame and sourceSize then
-		table.insert(lines, ("Source: %s"):format(sourcePart:GetFullName()))
 		table.insert(lines, ("Delta Pos: %s"):format(vectorText(wallPart.Position - sourceCFrame.Position)))
 		table.insert(lines, ("Delta Size: %s"):format(vectorText(wallPart.Size - sourceSize)))
 	end
@@ -267,7 +304,7 @@ local function ensureGui()
 			hiddenParts[target] = { Transparency = target.Transparency, CanCollide = target.CanCollide }
 			target.LocalTransparencyModifier = 1
 			target.CanCollide = false
-			dataLabel.Text = ("DELETE / HIDE CANDIDATE\n%s\nSize: Vector3.new(%s)\nCFrame: %s"):format(target:GetFullName(), vectorText(target.Size), cframeCode(target.CFrame))
+			updateData()
 		end
 	end)
 	makeButton(grid, "Clear", 4, function()
