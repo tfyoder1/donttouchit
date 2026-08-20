@@ -1,16 +1,20 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local devRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild(Constants.Remotes.DevTools)
 
 local ENABLED_ATTRIBUTE = "DontTouchItDevWallDraftEnabled"
 local OWNER_USER_ID = 74299698
 local GUI_NAME = "DontTouchItDevWallDraft"
 local STEP_MOVE = 0.5
 local STEP_SIZE = 0.5
+local STEP_ROTATE_DEGREES = 5
 
 if player.UserId ~= OWNER_USER_ID then
 	return
@@ -24,6 +28,7 @@ local sourcePart = nil
 local sourceCFrame = nil
 local sourceSize = nil
 local hiddenParts = {}
+local deleteCandidate = nil
 
 local function fmt(n)
 	return string.format("%.2f", n)
@@ -46,6 +51,19 @@ local function cframeCode(cf)
 	)
 end
 
+local function getRotationDegrees(cf)
+	local rx, ry, rz = cf:ToOrientation()
+	return Vector3.new(math.deg(rx), math.deg(ry), math.deg(rz))
+end
+
+local function vectorPayload(v)
+	return {
+		X = v.X,
+		Y = v.Y,
+		Z = v.Z,
+	}
+end
+
 local function updateData()
 	if not dataLabel then
 		return
@@ -59,6 +77,7 @@ local function updateData()
 		("Name: %s"):format(wallPart.Name),
 		("Size: Vector3.new(%s)"):format(vectorText(wallPart.Size)),
 		("CFrame: %s"):format(cframeCode(wallPart.CFrame)),
+		("Rot: %.1f, %.1f, %.1f deg"):format(getRotationDegrees(wallPart.CFrame).X, getRotationDegrees(wallPart.CFrame).Y, getRotationDegrees(wallPart.CFrame).Z),
 	}
 	if sourcePart and sourceCFrame and sourceSize then
 		table.insert(lines, ("Source: %s"):format(sourcePart:GetFullName()))
@@ -87,6 +106,7 @@ local function makeDraftWall(cf, size, source)
 	sourcePart = source
 	sourceCFrame = source and source.CFrame or nil
 	sourceSize = source and source.Size or nil
+	deleteCandidate = nil
 	updateData()
 end
 
@@ -120,6 +140,49 @@ local function resize(delta)
 		)
 		updateData()
 	end
+end
+
+local function rotate(axis, degrees)
+	if not wallPart then
+		return
+	end
+	local rotation = if axis == "X"
+		then CFrame.Angles(math.rad(degrees), 0, 0)
+		elseif axis == "Y" then CFrame.Angles(0, math.rad(degrees), 0)
+		else CFrame.Angles(0, 0, math.rad(degrees))
+	wallPart.CFrame = wallPart.CFrame * rotation
+	updateData()
+end
+
+local function closeDraft()
+	playerGui:SetAttribute(ENABLED_ATTRIBUTE, false)
+	if gui then
+		gui.Enabled = false
+	end
+end
+
+local function commitDraft()
+	if deleteCandidate and deleteCandidate.Parent then
+		devRemote:FireServer({
+			Action = "CommitWallDraft",
+			Mode = "Delete",
+			SourcePath = deleteCandidate:GetFullName(),
+			Position = vectorPayload(deleteCandidate.Position),
+			Size = vectorPayload(deleteCandidate.Size),
+		})
+		return
+	end
+	if not wallPart then
+		return
+	end
+	devRemote:FireServer({
+		Action = "CommitWallDraft",
+		Mode = "Wall",
+		SourcePath = sourcePart and sourcePart:GetFullName() or "",
+		Position = vectorPayload(wallPart.Position),
+		Size = vectorPayload(wallPart.Size),
+		RotationDegrees = vectorPayload(getRotationDegrees(wallPart.CFrame)),
+	})
 end
 
 local function makeButton(parent, text, order, callback)
@@ -158,7 +221,7 @@ local function ensureGui()
 	panel.BackgroundTransparency = 0.05
 	panel.BorderSizePixel = 0
 	panel.Position = UDim2.new(0, 12, 1, -12)
-	panel.Size = UDim2.fromOffset(346, 284)
+	panel.Size = UDim2.fromOffset(430, 334)
 	panel.Parent = gui
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
@@ -168,7 +231,7 @@ local function ensureGui()
 	dataLabel.BackgroundTransparency = 1
 	dataLabel.Font = Enum.Font.Code
 	dataLabel.Position = UDim2.fromOffset(10, 8)
-	dataLabel.Size = UDim2.new(1, -20, 0, 112)
+	dataLabel.Size = UDim2.new(1, -20, 0, 122)
 	dataLabel.TextColor3 = Color3.fromRGB(196, 249, 255)
 	dataLabel.TextSize = 10
 	dataLabel.TextWrapped = true
@@ -178,8 +241,8 @@ local function ensureGui()
 
 	local grid = Instance.new("Frame")
 	grid.BackgroundTransparency = 1
-	grid.Position = UDim2.fromOffset(10, 128)
-	grid.Size = UDim2.new(1, -20, 1, -138)
+	grid.Position = UDim2.fromOffset(10, 138)
+	grid.Size = UDim2.new(1, -20, 1, -148)
 	grid.Parent = panel
 	local layout = Instance.new("UIGridLayout")
 	layout.CellPadding = UDim2.fromOffset(5, 5)
@@ -200,6 +263,7 @@ local function ensureGui()
 	makeButton(grid, "Hide Sel", 3, function()
 		local target = sourcePart or getCenterTarget()
 		if target and target:IsA("BasePart") then
+			deleteCandidate = target
 			hiddenParts[target] = { Transparency = target.Transparency, CanCollide = target.CanCollide }
 			target.LocalTransparencyModifier = 1
 			target.CanCollide = false
@@ -221,8 +285,11 @@ local function ensureGui()
 		sourcePart = nil
 		sourceCFrame = nil
 		sourceSize = nil
+		deleteCandidate = nil
 		updateData()
 	end)
+	makeButton(grid, "Commit", 5, commitDraft)
+	makeButton(grid, "Close", 6, closeDraft)
 	makeButton(grid, "X-", 10, function() nudge(Vector3.new(-STEP_MOVE, 0, 0)) end)
 	makeButton(grid, "X+", 11, function() nudge(Vector3.new(STEP_MOVE, 0, 0)) end)
 	makeButton(grid, "Y+", 12, function() nudge(Vector3.new(0, STEP_MOVE, 0)) end)
@@ -235,6 +302,12 @@ local function ensureGui()
 	makeButton(grid, "H-", 23, function() resize(Vector3.new(0, -STEP_SIZE, 0)) end)
 	makeButton(grid, "D+", 24, function() resize(Vector3.new(0, 0, STEP_SIZE)) end)
 	makeButton(grid, "D-", 25, function() resize(Vector3.new(0, 0, -STEP_SIZE)) end)
+	makeButton(grid, "Rot X-", 30, function() rotate("X", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot X+", 31, function() rotate("X", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Y-", 32, function() rotate("Y", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Y+", 33, function() rotate("Y", STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Z-", 34, function() rotate("Z", -STEP_ROTATE_DEGREES) end)
+	makeButton(grid, "Rot Z+", 35, function() rotate("Z", STEP_ROTATE_DEGREES) end)
 	updateData()
 end
 

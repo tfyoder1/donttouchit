@@ -38,6 +38,7 @@ local ACTION_CAPABILITY = {
 	SetDiscovery = { "DEV_ROOM_TESTING", "DEV_FULL" },
 	AdjustStorePrice = { "DEV_ECONOMY_TESTING", "DEV_FULL" },
 	ResetStorePrices = { "DEV_ECONOMY_TESTING", "DEV_FULL" },
+	CommitWallDraft = { "DEV_FULL" },
 	RefreshUserManagement = { "ROLE_MANAGEMENT", "MOD_VIEW_HISTORY", "MOD_WARN_PLAYER", "MOD_BAN_24H" },
 	SelectManagedUser = { "ROLE_MANAGEMENT", "MOD_VIEW_HISTORY", "MOD_WARN_PLAYER", "MOD_BAN_24H" },
 	LookupManagedUser = { "ROLE_MANAGEMENT", "MOD_VIEW_HISTORY", "MOD_WARN_PLAYER", "MOD_BAN_24H" },
@@ -61,7 +62,27 @@ local NO_PROGRESS_LOAD_REQUIRED = {
 	BanManagedUser24h = true,
 	RemoveManagedUserBan = true,
 	ViewManagedUserHistory = true,
+	CommitWallDraft = true,
 }
+
+local function sanitizeWallNumber(value, fallback, limit)
+	value = tonumber(value)
+	if not value or value ~= value then
+		return fallback
+	end
+	return math.clamp(value, -limit, limit)
+end
+
+local function sanitizeWallVector(payload, fallback, limit)
+	if typeof(payload) ~= "table" then
+		return fallback
+	end
+	return Vector3.new(
+		sanitizeWallNumber(payload.X, fallback.X, limit),
+		sanitizeWallNumber(payload.Y, fallback.Y, limit),
+		sanitizeWallNumber(payload.Z, fallback.Z, limit)
+	)
+end
 
 local SECRET_AREAS = {
 	{
@@ -547,6 +568,61 @@ function DevToolsService:_setDiscoveryCompletion(player, payload)
 	return ok
 end
 
+function DevToolsService:_commitWallDraft(player, payload)
+	local mode = payload.Mode == "Delete" and "Delete" or "Wall"
+	local folder = workspace:FindFirstChild("DevWallDrafts")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "DevWallDrafts"
+		folder.Parent = workspace
+	end
+
+	if mode == "Delete" then
+		local marker = Instance.new("Part")
+		marker.Name = ("DeleteCandidate_%d"):format(os.time())
+		marker.Anchored = true
+		marker.CanCollide = false
+		marker.CanQuery = false
+		marker.CanTouch = false
+		marker.Color = Color3.fromRGB(255, 96, 102)
+		marker.Material = Enum.Material.Neon
+		marker.Transparency = 0.28
+		marker.Size = sanitizeWallVector(payload.Size, Vector3.new(2, 2, 2), 512)
+		local position = sanitizeWallVector(payload.Position, Vector3.new(0, 5, 0), 2048)
+		marker.CFrame = CFrame.new(position)
+		marker:SetAttribute("DevWallDraftMode", "Delete")
+		marker:SetAttribute("CommittedByUserId", player.UserId)
+		marker:SetAttribute("SourcePath", tostring(payload.SourcePath or ""))
+		marker.Parent = folder
+		self:_sendMessage(player, "Wall draft delete marker committed for this server session.")
+		return true
+	end
+
+	local size = sanitizeWallVector(payload.Size, Vector3.new(8, 8, 0.5), 512)
+	size = Vector3.new(math.max(0.25, size.X), math.max(0.25, size.Y), math.max(0.25, size.Z))
+	local position = sanitizeWallVector(payload.Position, Vector3.new(0, 5, 0), 2048)
+	local rotation = sanitizeWallVector(payload.RotationDegrees, Vector3.zero, 3600)
+	local wall = Instance.new("Part")
+	wall.Name = ("CommittedWallDraft_%d"):format(os.time())
+	wall.Anchored = true
+	wall.CanCollide = true
+	wall.CanQuery = true
+	wall.CanTouch = false
+	wall.Color = Color3.fromRGB(78, 133, 156)
+	wall.Material = Enum.Material.Concrete
+	wall.Transparency = 0.08
+	wall.Size = size
+	wall.CFrame = CFrame.new(position) * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+	wall:SetAttribute("DevWallDraftMode", "Wall")
+	wall:SetAttribute("CommittedByUserId", player.UserId)
+	wall:SetAttribute("SourcePath", tostring(payload.SourcePath or ""))
+	wall:SetAttribute("DraftSize", ("%0.2f,%0.2f,%0.2f"):format(size.X, size.Y, size.Z))
+	wall:SetAttribute("DraftRotationDegrees", ("%0.1f,%0.1f,%0.1f"):format(rotation.X, rotation.Y, rotation.Z))
+	wall.Parent = folder
+	self:_sendMessage(player, "Wall draft committed to this server session. Screenshot the data box for source-code incorporation.")
+	return true
+end
+
 function DevToolsService:_isActionAllowed(player, action)
 	local capabilities = ACTION_CAPABILITY[action]
 	if not capabilities then
@@ -795,6 +871,8 @@ function DevToolsService:_handleAuthorizedRequest(player, payload)
 			self:_sendMessage(player, "Dev store prices reset to defaults.")
 			self:_sendState(player, "State", self:_getCurrentRoomId(player))
 		end
+	elseif action == "CommitWallDraft" then
+		self:_commitWallDraft(player, payload)
 	end
 end
 
