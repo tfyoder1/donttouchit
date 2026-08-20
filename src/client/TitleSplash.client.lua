@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -723,6 +724,9 @@ local function fadeAndDestroy()
 	end
 
 	root.Active = false
+	if GuiService.SelectedObject == continueButton or GuiService.SelectedObject == restartButton then
+		GuiService.SelectedObject = nil
+	end
 	notifyTitleSplashFinished()
 	restoreTopbar()
 	restoreSplashBlur()
@@ -764,6 +768,14 @@ local function showStartChoices()
 	restartButton.BackgroundColor3 = restartButtonColor
 	applyLayout()
 	menuFrame.Visible = true
+	continueButton.Selectable = true
+	restartButton.Selectable = true
+	GuiService.SelectedObject = continueButton
+	task.defer(function()
+		if splashGui.Parent and menuFrame.Visible and not restartConfirming then
+			GuiService.SelectedObject = continueButton
+		end
+	end)
 end
 
 local function showRestartConfirmation()
