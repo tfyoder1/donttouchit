@@ -1092,6 +1092,9 @@ uiLayoutRemote.OnClientEvent:Connect(function(payload)
 	if typeof(payload) ~= "table" or payload.Action ~= "Loaded" then
 		return
 	end
+	if editMode or activeDrag or activeChromeDrag then
+		return
+	end
 	loadedLayout = if typeof(payload.Layout) == "table" and payload.Layout.Version == TOUCH_LAYOUT_VERSION then payload.Layout else {}
 	table.clear(sessionPositions)
 	for id, positionPayload in pairs(loadedLayout) do

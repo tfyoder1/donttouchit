@@ -390,13 +390,13 @@ local function applyLayout()
 		topInfoBar.Position = UDim2.new(0.5, 0, 0, 8)
 		topInfoBar.Size = UDim2.new(0.97, 0, 0, 32)
 		roomCounter.Position = UDim2.new(0.012, 0, 0, 8)
-		roomCounter.Size = UDim2.new(0.18, -4, 0, 28)
-		progressPanel.Position = UDim2.new(0.2, 0, 0, 8)
-		progressPanel.Size = UDim2.new(0.392, -4, 0, 28)
-		energyPanel.Position = UDim2.new(0.6, 0, 0, 8)
-		energyPanel.Size = UDim2.new(0.35, -4, 0, 28)
-		bunkerEnergyPanel.Position = UDim2.new(0.6, 0, 0, 38)
-		bunkerEnergyPanel.Size = UDim2.new(0.35, -4, 0, 22)
+		roomCounter.Size = UDim2.new(0.14, -4, 0, 28)
+		progressPanel.Position = UDim2.new(0.16, 0, 0, 8)
+		progressPanel.Size = UDim2.new(0.36, -4, 0, 28)
+		energyPanel.Position = UDim2.new(0.54, 0, 0, 8)
+		energyPanel.Size = UDim2.new(0.36, -4, 0, 28)
+		bunkerEnergyPanel.Position = UDim2.new(0.54, 0, 0, 38)
+		bunkerEnergyPanel.Size = UDim2.new(0.36, -4, 0, 22)
 		roomCounterLabel.TextSize = 12
 		progressLabel.TextSize = 12
 		energyLabel.TextSize = 12
@@ -434,12 +434,10 @@ end
 
 local function applyVisibility()
 	local hidden = isTitleSplashVisible()
-	local hasSignalBand = player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
-		or playerGui:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
 	topInfoBar.Visible = not hidden
 	progressPanel.Visible = not hidden
 	roomCounter.Visible = not hidden
-	energyPanel.Visible = not hidden and hasSignalBand
+	energyPanel.Visible = not hidden
 	bunkerEnergyPanel.Visible = not hidden and (
 		player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 		or playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
@@ -608,6 +606,9 @@ end)
 
 uiLayoutRemote.OnClientEvent:Connect(function(payload)
 	if typeof(payload) ~= "table" or payload.Action ~= "Loaded" then
+		return
+	end
+	if isEditMode() or activeDrag then
 		return
 	end
 
