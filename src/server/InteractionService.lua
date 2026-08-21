@@ -3050,6 +3050,15 @@ function InteractionService:_isTopDownRoundActive()
 		and os.clock() < state.EndsAt
 end
 
+function InteractionService:_isTopDownSoloPracticeAllowed(player)
+	if not self:_isPlayerInTopDownArena(player) then
+		return false
+	end
+
+	local playersInArena = self:_getPlayersInRoom("TopDownArena")
+	return #playersInArena <= 1
+end
+
 function InteractionService:_broadcastTopDownArenaMessage(message)
 	for _, player in ipairs(self:_getPlayersInRoom("TopDownArena")) do
 		self.systemMessageRemote:FireClient(player, message)
@@ -3341,6 +3350,10 @@ end
 function InteractionService:_canTopDownPlayerUseBalloons(player, sendMessage)
 	local team = self:_getTopDownPlayerTeam(player)
 	if not team then
+		if self:_isTopDownSoloPracticeAllowed(player) then
+			return true
+		end
+
 		if sendMessage then
 			self.systemMessageRemote:FireClient(player, "Choose a side at a ready station before using water balloons. Spectators can watch or leave.")
 		end
@@ -3360,6 +3373,10 @@ end
 function InteractionService:_canTopDownPlayerLoadBalloons(player, sendMessage)
 	local team = self:_getTopDownPlayerTeam(player)
 	if not team then
+		if self:_isTopDownSoloPracticeAllowed(player) then
+			return true
+		end
+
 		if sendMessage then
 			self.systemMessageRemote:FireClient(player, "Choose a side at a ready station before loading water balloons. Spectators can watch or leave.")
 		end
@@ -3637,7 +3654,9 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 		end
 
 		if CollectionService:HasTag(hit, Constants.Tags.TopDownSplashTarget) or (mode == "Splash" and targetPlayer == nil and hit.Name == "TopDownPracticeTarget") then
-			if not self:_isTopDownRoundActive() or not self:_getTopDownPlayerTeam(player) then
+			if not self:_isTopDownSoloPracticeAllowed(player)
+				and (not self:_isTopDownRoundActive() or not self:_getTopDownPlayerTeam(player))
+			then
 				return
 			end
 
@@ -3663,7 +3682,9 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 		local ringPosition = ring and (ring:GetAttribute("TargetPosition") or ring.Position) or target
 		local scoreRadius = ring and (ring:GetAttribute("ScoreRadius") or TOP_DOWN_RING_SCORE_RADIUS) or TOP_DOWN_RING_SCORE_RADIUS
 		local flatDistance = (Vector3.new(balloon.Position.X, 0, balloon.Position.Z) - Vector3.new(ringPosition.X, 0, ringPosition.Z)).Magnitude
-		if self:_isTopDownRoundActive() and self:_getTopDownPlayerTeam(player) and (mode == "Ring" or flatDistance <= scoreRadius) then
+		local canScorePractice = self:_isTopDownSoloPracticeAllowed(player)
+			or (self:_isTopDownRoundActive() and self:_getTopDownPlayerTeam(player) ~= nil)
+		if canScorePractice and (mode == "Ring" or flatDistance <= scoreRadius) then
 			if flatDistance <= scoreRadius then
 				self.discoveryService:Unlock(player, Constants.Discoveries.TopDownRingScore.Id)
 				self:_incrementTopDownScore(player, 1)
