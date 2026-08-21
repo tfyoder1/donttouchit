@@ -8,6 +8,7 @@ local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local EventManager = {}
 EventManager.__index = EventManager
 
+local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
 local RED_BUTTON_DISCOVERY_FORCE_INTERVAL = 6
 local RED_BUTTON_DISCOVERY_CYCLE = {
 	{
@@ -161,7 +162,9 @@ function EventManager:_getNextMissingRedButtonDiscoveryEvent(player, state)
 	for offset = 0, #RED_BUTTON_DISCOVERY_CYCLE - 1 do
 		local index = ((state.NextCycleIndex + offset - 1) % #RED_BUTTON_DISCOVERY_CYCLE) + 1
 		local entry = RED_BUTTON_DISCOVERY_CYCLE[index]
-		if entry and not self:_hasDiscovery(player, entry.DiscoveryId) then
+		local eligible = entry
+			and (entry.EventId ~= "object_rain" or player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true)
+		if eligible and not self:_hasDiscovery(player, entry.DiscoveryId) then
 			local eventDefinition = self:_getEventById(entry.EventId)
 			if eventDefinition then
 				state.NextCycleIndex = (index % #RED_BUTTON_DISCOVERY_CYCLE) + 1

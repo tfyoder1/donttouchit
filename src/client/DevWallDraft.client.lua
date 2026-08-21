@@ -19,6 +19,12 @@ local STEP_SIZE = 0.5
 local STEP_ROTATE_DEGREES = 5
 local PANEL_SIZE = Vector2.new(430, 370)
 local PANEL_DEFAULT_LEFT = 12
+local PHONE_PANEL_MAX_SCALE = 0.82
+local PHONE_PANEL_MIN_SCALE = 0.58
+local TABLET_PANEL_MAX_SCALE = 0.92
+local TABLET_PANEL_MIN_SCALE = 0.82
+local TOUCH_PANEL_EDGE_MARGIN = 12
+local TOUCH_PANEL_VERTICAL_RESERVE = 72
 local GAMEPAD_STACK_LEFT = 12
 local GAMEPAD_STACK_TOP = 142
 local GAMEPAD_INSPECT_HEIGHT = 196
@@ -31,6 +37,7 @@ end
 
 local gui = nil
 local panel = nil
+local panelScale = nil
 local dataLabel = nil
 local wallPart = nil
 local visualFolder = nil
@@ -93,6 +100,24 @@ local function isGamepadProfile()
 	return currentDeviceProfile and currentDeviceProfile.IsGamepad == true
 end
 
+local function getPanelScale(viewport)
+	if not currentDeviceProfile or currentDeviceProfile.IsGamepad then
+		return 1
+	end
+
+	local isPhone = currentDeviceProfile.IsPhone == true
+	local isTablet = currentDeviceProfile.IsTablet == true
+	if not isPhone and not isTablet then
+		return 1
+	end
+
+	local widthFitScale = (viewport.X - TOUCH_PANEL_EDGE_MARGIN * 2) / PANEL_SIZE.X
+	local heightFitScale = (viewport.Y - TOUCH_PANEL_VERTICAL_RESERVE) / PANEL_SIZE.Y
+	local maxScale = if isPhone then PHONE_PANEL_MAX_SCALE else TABLET_PANEL_MAX_SCALE
+	local minScale = if isPhone then PHONE_PANEL_MIN_SCALE else TABLET_PANEL_MIN_SCALE
+	return math.clamp(math.min(widthFitScale, heightFitScale, maxScale), minScale, maxScale)
+end
+
 local function applyPanelLayout()
 	if not panel then
 		return
@@ -100,6 +125,8 @@ local function applyPanelLayout()
 
 	local viewport = getViewportSize()
 	local margin = 12
+	local scale = getPanelScale(viewport)
+	local scaledSize = PANEL_SIZE * scale
 	local left = PANEL_DEFAULT_LEFT
 	local top = nil
 	local anchor = Vector2.new(0, 0.5)
@@ -108,11 +135,14 @@ local function applyPanelLayout()
 		top = GAMEPAD_STACK_TOP + GAMEPAD_INSPECT_HEIGHT + GAMEPAD_STACK_GAP + GAMEPAD_DEV_PANEL_HEIGHT + GAMEPAD_STACK_GAP
 		anchor = Vector2.zero
 	end
-	local maxLeft = math.max(margin, viewport.X - PANEL_SIZE.X - margin)
+	local maxLeft = math.max(margin, viewport.X - scaledSize.X - margin)
 
+	if panelScale then
+		panelScale.Scale = scale
+	end
 	panel.AnchorPoint = anchor
 	if top then
-		local maxTop = math.max(margin, viewport.Y - PANEL_SIZE.Y - margin)
+		local maxTop = math.max(margin, viewport.Y - scaledSize.Y - margin)
 		panel.Position = UDim2.fromOffset(math.clamp(left, margin, maxLeft), math.clamp(top, margin, maxTop))
 	else
 		panel.Position = UDim2.new(0, math.clamp(left, margin, maxLeft), 0.5, 0)
@@ -541,6 +571,10 @@ local function ensureGui()
 	panel.Position = UDim2.new(0, PANEL_DEFAULT_LEFT, 0.5, 0)
 	panel.Size = UDim2.fromOffset(PANEL_SIZE.X, PANEL_SIZE.Y)
 	panel.Parent = gui
+	panelScale = Instance.new("UIScale")
+	panelScale.Name = "DeviceScale"
+	panelScale.Scale = 1
+	panelScale.Parent = panel
 	applyPanelLayout()
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
