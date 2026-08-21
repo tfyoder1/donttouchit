@@ -73,6 +73,32 @@ local function positionInZone(position, zone)
 		and position.Z <= zone.Max.Z
 end
 
+local function getContinueDestination(destinationId)
+	if typeof(destinationId) ~= "string" then
+		return nil
+	end
+
+	return Constants.GetRoom(destinationId)
+		or (Constants.GetNamedPlace and Constants.GetNamedPlace(destinationId))
+end
+
+local function getContinueDestinationName(destinationId)
+	local destination = getContinueDestination(destinationId)
+	return destination and destination.Name or "TV Room"
+end
+
+local function getContinueDestinationCFrame(destinationId)
+	if Constants.GetRoom(destinationId) then
+		return Constants.GetRoomSpawnCFrame(destinationId)
+	end
+
+	if Constants.GetNamedPlace and Constants.GetNamedPlace(destinationId) then
+		return Constants.GetNamedPlaceCFrame(destinationId)
+	end
+
+	return Constants.GetRoomSpawnCFrame("TVRoom")
+end
+
 local function getTopDownArenaMusic()
 	local existing = SoundService:FindFirstChild(TOP_DOWN_ARENA_MUSIC_NAME)
 	if existing and existing:IsA("Sound") then
@@ -146,6 +172,39 @@ function RoomProgressService:RememberSafeSpawn(player, destinationCFrame)
 	local state = self:_getState(player)
 	state.LastSafeSpawnCFrame = destinationCFrame
 	return true
+end
+
+function RoomProgressService:_inferContinueDestinationId(destinationCFrame)
+	if typeof(destinationCFrame) ~= "CFrame" then
+		return nil
+	end
+
+	local position = destinationCFrame.Position
+	for _, roomId in ipairs(Constants.RoomDetectionOrder or Constants.DiscoveryRoomOrder or Constants.RoomOrder) do
+		local room = Constants.GetRoom(roomId)
+		if room and positionInZone(position, room.Zone) then
+			return roomId
+		end
+	end
+
+	if Constants.GetNamedPlace and Constants.GetNamedPlace("Hallway") and positionInZone(position, Constants.Hallway.Zone) then
+		return "Hallway"
+	end
+
+	return nil
+end
+
+function RoomProgressService:RememberContinueDestination(player, destinationId, destinationCFrame, shouldSave)
+	if not player or not player.Parent or not self.discoveryService or self:IsUntouchedProloguePending(player) then
+		return false
+	end
+
+	local continueId = if getContinueDestination(destinationId) then destinationId else self:_inferContinueDestinationId(destinationCFrame)
+	if not continueId then
+		return false
+	end
+
+	return self.discoveryService:SetContinueRoomId(player, continueId, shouldSave)
 end
 
 function RoomProgressService:_getRecoveryCFrame(player, state)
@@ -652,7 +711,7 @@ function RoomProgressService:_sendStartOptions(player)
 	state.StartOptionsSent = true
 
 	local resumeRoomId = self.discoveryService:GetContinueRoomId(player)
-	local resumeRoom = Constants.GetRoom(resumeRoomId)
+	local resumeRoomName = getContinueDestinationName(resumeRoomId)
 	local discoveryCount = self.discoveryService:GetDiscoveryCount(player)
 	local hintCount = self.discoveryService:GetHintCount(player)
 	local clueCount = self.discoveryService:GetClueCount(player)
@@ -680,7 +739,7 @@ function RoomProgressService:_sendStartOptions(player)
 		HasProgress = hasProgress,
 		FreshStartRoomName = "Forest Cave",
 		ResumeRoomId = resumeRoomId,
-		ResumeRoomName = resumeRoom and resumeRoom.Name or "TV Room",
+		ResumeRoomName = resumeRoomName,
 		UnlockedRooms = unlockedRooms,
 		DiscoveryCount = discoveryCount,
 		TotalDiscoveries = Constants.TotalDiscoveries,
@@ -719,8 +778,7 @@ function RoomProgressService:_handleSessionStart(player, payload)
 		end
 
 		roomId = self.discoveryService:GetContinueRoomId(player)
-		local room = Constants.GetRoom(roomId)
-		message = ("Returning to %s. Try to look innocent."):format(room and room.Name or "the room")
+		message = ("Returning to %s. Try to look innocent."):format(getContinueDestinationName(roomId))
 	elseif action == "Room" then
 		local requestedRoomId = payload.RoomId
 		if typeof(requestedRoomId) ~= "string" or not Constants.GetRoom(requestedRoomId) then
@@ -755,8 +813,9 @@ function RoomProgressService:_handleSessionStart(player, payload)
 	state.UntouchedPrologueTriggered = false
 	state.TimerStartedAt = os.clock()
 
-	if self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(roomId), "SessionStart") then
-		self.discoveryService:SetContinueRoomId(player, roomId, true)
+	local destinationCFrame = getContinueDestinationCFrame(roomId)
+	if self:_teleportPlayer(player, destinationCFrame, "SessionStart") then
+		self:RememberContinueDestination(player, roomId, destinationCFrame, true)
 	end
 	self.systemMessageRemote:FireClient(player, message)
 end
@@ -1411,8 +1470,11 @@ function RoomProgressService:_requestTeleportRoom(player, sourceRoomId, targetRo
 			return
 		end
 
-		self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(targetRoomId), "TeleportKey")
-		self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(room.Name or "the room"))
+		local destinationCFrame = Constants.GetRoomSpawnCFrame(targetRoomId)
+		if self:_teleportPlayer(player, destinationCFrame, "TeleportKey") then
+			self:RememberContinueDestination(player, targetRoomId, destinationCFrame, true)
+			self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(room.Name or "the room"))
+		end
 		return
 	end
 
@@ -1424,8 +1486,11 @@ function RoomProgressService:_requestTeleportRoom(player, sourceRoomId, targetRo
 			return
 		end
 
-		self:_teleportPlayer(player, Constants.GetNamedPlaceCFrame(targetRoomId), "TeleportKey")
-		self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(place.Name or "the coordinates"))
+		local destinationCFrame = Constants.GetNamedPlaceCFrame(targetRoomId)
+		if self:_teleportPlayer(player, destinationCFrame, "TeleportKey") then
+			self:RememberContinueDestination(player, targetRoomId, destinationCFrame, true)
+			self.systemMessageRemote:FireClient(player, ("Teleport Key moved you to %s."):format(place.Name or "the coordinates"))
+		end
 		return
 	end
 

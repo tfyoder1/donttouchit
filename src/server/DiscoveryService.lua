@@ -73,6 +73,15 @@ local function buildDiscoveryStateList(foundById)
 	return discoveries
 end
 
+local function getContinueDestination(destinationId)
+	if typeof(destinationId) ~= "string" then
+		return nil
+	end
+
+	return Constants.GetRoom(destinationId)
+		or (Constants.GetNamedPlace and Constants.GetNamedPlace(destinationId))
+end
+
 function DiscoveryService.new()
 	local self = setmetatable({}, DiscoveryService)
 	self.discoveryByUserId = {}
@@ -511,7 +520,7 @@ function DiscoveryService:GetSavedProgressSummary(player)
 	local lastUnlockedRoomId = realState.LastUnlockedRoomId or DEFAULT_ROOM_ID
 	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
 	local continueRoomId = realState.ContinueRoomId or lastUnlockedRoomId
-	local continueRoom = Constants.GetRoom(continueRoomId)
+	local continueDestination = getContinueDestination(continueRoomId)
 	return {
 		Count = count,
 		Total = Constants.TotalDiscoveries,
@@ -520,7 +529,7 @@ function DiscoveryService:GetSavedProgressSummary(player)
 		LastUnlockedRoomId = lastUnlockedRoomId,
 		LastUnlockedRoomName = lastUnlockedRoom and lastUnlockedRoom.Name or "TV Room",
 		ContinueRoomId = continueRoomId,
-		ContinueRoomName = continueRoom and continueRoom.Name or "TV Room",
+		ContinueRoomName = continueDestination and continueDestination.Name or "TV Room",
 	}
 end
 
@@ -637,7 +646,7 @@ function DiscoveryService:_loadPlayer(player)
 	end
 
 	local loadedContinueRoomId = nil
-	if typeof(data.ContinueRoomId) == "string" and Constants.GetRoom(data.ContinueRoomId) then
+	if typeof(data.ContinueRoomId) == "string" and getContinueDestination(data.ContinueRoomId) then
 		loadedContinueRoomId = data.ContinueRoomId
 	elseif typeof(data.LastUnlockedRoomId) == "string" and Constants.GetRoom(data.LastUnlockedRoomId) then
 		loadedContinueRoomId = data.LastUnlockedRoomId
@@ -648,7 +657,7 @@ function DiscoveryService:_loadPlayer(player)
 	end
 
 	self:_refreshLastUnlockedRoom(player, false)
-	if loadedContinueRoomId and self:IsRoomUnlocked(player, loadedContinueRoomId) then
+	if loadedContinueRoomId and self:_canUseContinueDestination(player, loadedContinueRoomId) then
 		self.continueRoomByUserId[player.UserId] = loadedContinueRoomId
 	else
 		self.continueRoomByUserId[player.UserId] = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID
@@ -880,7 +889,7 @@ function DiscoveryService:GetContinueRoomId(player)
 	self:_ensurePlayer(player)
 
 	local continueRoomId = self.continueRoomByUserId[player.UserId]
-	if typeof(continueRoomId) == "string" and Constants.GetRoom(continueRoomId) and self:IsRoomUnlocked(player, continueRoomId) then
+	if self:_canUseContinueDestination(player, continueRoomId) then
 		return continueRoomId
 	end
 
@@ -889,13 +898,31 @@ function DiscoveryService:GetContinueRoomId(player)
 	return fallbackRoomId
 end
 
+function DiscoveryService:_canUseContinueDestination(player, destinationId)
+	if not player or not player.Parent or typeof(destinationId) ~= "string" then
+		return false
+	end
+
+	if Constants.GetRoom(destinationId) then
+		return self:IsRoomUnlocked(player, destinationId)
+	end
+
+	local place = Constants.GetNamedPlace and Constants.GetNamedPlace(destinationId)
+	if not place then
+		return false
+	end
+
+	local requirement = place.RequiresDiscoveryId
+	return not requirement or self:HasDiscovery(player, requirement)
+end
+
 function DiscoveryService:SetContinueRoomId(player, roomId, shouldSave)
-	if not player or not player.Parent or typeof(roomId) ~= "string" or not Constants.GetRoom(roomId) then
+	if not player or not player.Parent or typeof(roomId) ~= "string" or not getContinueDestination(roomId) then
 		return false
 	end
 
 	self:_ensurePlayer(player)
-	if not self:IsRoomUnlocked(player, roomId) then
+	if not self:_canUseContinueDestination(player, roomId) then
 		return false
 	end
 

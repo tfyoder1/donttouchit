@@ -679,15 +679,25 @@ end
 function InteractionService:_teleportPlayer(player, destinationCFrame, reason)
 	if self.movementAuthorityService and self.movementAuthorityService.TeleportPlayer then
 		local success = self.movementAuthorityService:TeleportPlayer(player, destinationCFrame, reason)
-		if success and self.roomProgressService and self.roomProgressService.RememberSafeSpawn then
-			self.roomProgressService:RememberSafeSpawn(player, destinationCFrame)
+		if success and self.roomProgressService then
+			if self.roomProgressService.RememberSafeSpawn then
+				self.roomProgressService:RememberSafeSpawn(player, destinationCFrame)
+			end
+			if self.roomProgressService.RememberContinueDestination then
+				self.roomProgressService:RememberContinueDestination(player, nil, destinationCFrame, true)
+			end
 		end
 		return success
 	end
 
 	teleportPlayer(player, destinationCFrame)
-	if self.roomProgressService and self.roomProgressService.RememberSafeSpawn then
-		self.roomProgressService:RememberSafeSpawn(player, destinationCFrame)
+	if self.roomProgressService then
+		if self.roomProgressService.RememberSafeSpawn then
+			self.roomProgressService:RememberSafeSpawn(player, destinationCFrame)
+		end
+		if self.roomProgressService.RememberContinueDestination then
+			self.roomProgressService:RememberContinueDestination(player, nil, destinationCFrame, true)
+		end
 	end
 	return true
 end
