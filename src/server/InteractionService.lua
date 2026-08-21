@@ -137,10 +137,13 @@ local SECURITY_CAMERA_DURATION = 45
 local TOP_DOWN_THROW_COOLDOWN = 0.75
 local TOP_DOWN_BALLOON_LIFETIME = 5.5
 local TOP_DOWN_RING_SCORE_RADIUS = 15
-local TOP_DOWN_MAX_LOADED_BALLOONS = 6
-local TOP_DOWN_DEFAULT_LOAD_COUNT = 3
-local TOP_DOWN_REFILL_LOAD_COUNT = 5
+local TOP_DOWN_MAX_LOADED_BALLOONS = 20
+local TOP_DOWN_DEFAULT_LOAD_COUNT = 20
+local TOP_DOWN_REFILL_LOAD_COUNT = 20
 local TOP_DOWN_THROW_DISTANCE = 58
+local TOP_DOWN_STILL_THROW_SPREAD = 1.6
+local TOP_DOWN_MOVING_THROW_SPREAD = 4.0
+local TOP_DOWN_SPREAD_SPEED = 16
 local TOP_DOWN_THROW_ACTION = "Throw"
 local TOP_DOWN_WATER_BALLOON_KIND = "TopDownWaterBalloon"
 local TOP_DOWN_WATER_BALLOON_NAME = "Water Balloon"
@@ -653,6 +656,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.topDownLoadedBalloonsByUserId = {}
 	self.topDownBucketTouchAtByUserId = {}
 	self.topDownPracticeTargetState = {}
+	self.topDownThrowRandom = Random.new()
 	self.topDownCameraMode = "Overhead"
 	self.topDownTeamByUserId = {}
 	self.topDownTeamScores = {
@@ -3469,7 +3473,7 @@ function InteractionService:_isPlayerInTopDownArena(player)
 end
 
 function InteractionService:_getTopDownWaterBalloonCapacity()
-	return math.max(1, Constants.BunkerEnergy.MaxPocketEnergyItems or TOP_DOWN_MAX_LOADED_BALLOONS)
+	return TOP_DOWN_MAX_LOADED_BALLOONS
 end
 
 function InteractionService:_getTopDownWaterBalloonCount(player)
@@ -3482,11 +3486,23 @@ end
 
 function InteractionService:_getTopDownAvailableWaterBalloonSlots(player)
 	local capacity = self:_getTopDownWaterBalloonCapacity()
-	if self.bunkerEnergyService and self.bunkerEnergyService.GetPocketItemSlotCount then
-		return math.max(0, capacity - self.bunkerEnergyService:GetPocketItemSlotCount(player))
+	local loaded = self:_getTopDownWaterBalloonCount(player)
+	if loaded >= capacity then
+		return 0
 	end
 
-	return math.max(0, capacity - self:_getTopDownWaterBalloonCount(player))
+	if loaded > 0 then
+		return capacity - loaded
+	end
+
+	if self.bunkerEnergyService and self.bunkerEnergyService.GetPocketItemSlotCount then
+		local maxItems = Constants.BunkerEnergy.MaxPocketEnergyItems or 5
+		if self.bunkerEnergyService:GetPocketItemSlotCount(player) >= maxItems then
+			return 0
+		end
+	end
+
+	return capacity
 end
 
 function InteractionService:_grantTopDownWaterBalloon(player)
@@ -3498,7 +3514,7 @@ function InteractionService:_grantTopDownWaterBalloon(player)
 		Material = Enum.Material.SmoothPlastic,
 		Size = TOP_DOWN_WATER_BALLOON_SIZE,
 		Shape = Enum.PartType.Ball,
-		StackLimit = 1,
+		StackLimit = TOP_DOWN_MAX_LOADED_BALLOONS,
 		GrantMessage = "Water balloon added to inventory.",
 	})
 end
@@ -3554,6 +3570,56 @@ function InteractionService:_flatTopDownDirection(player, direction)
 	return flat.Unit
 end
 
+function InteractionService:_getTopDownFullAimDirection(player, direction)
+	local rootPart = getRootPart(player)
+	local fallback = rootPart and rootPart.CFrame.LookVector or Vector3.new(0, 0, -1)
+
+	if typeof(direction) ~= "Vector3" or direction.Magnitude < 0.1 then
+		direction = fallback
+	end
+
+	if direction.Magnitude < 0.1 then
+		return Vector3.new(0, 0, -1)
+	end
+
+	return direction.Unit
+end
+
+function InteractionService:_getTopDownThrowSpreadRadius(player)
+	local humanoid = getHumanoid(player)
+	local rootPart = getRootPart(player)
+	local moveMagnitude = humanoid and humanoid.MoveDirection.Magnitude or 0
+	local horizontalSpeed = 0
+	if rootPart then
+		local velocity = rootPart.AssemblyLinearVelocity
+		horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	end
+
+	local moveAlpha = math.clamp(math.max(moveMagnitude, horizontalSpeed / TOP_DOWN_SPREAD_SPEED), 0, 1)
+	return TOP_DOWN_STILL_THROW_SPREAD + (TOP_DOWN_MOVING_THROW_SPREAD - TOP_DOWN_STILL_THROW_SPREAD) * moveAlpha
+end
+
+function InteractionService:_applyTopDownThrowSpread(player, targetPosition)
+	if typeof(targetPosition) ~= "Vector3" then
+		return targetPosition
+	end
+
+	local radius = self:_getTopDownThrowSpreadRadius(player)
+	if radius <= 0 then
+		return targetPosition
+	end
+
+	local random = self.topDownThrowRandom
+	if not random then
+		random = Random.new()
+		self.topDownThrowRandom = random
+	end
+
+	local angle = random:NextNumber(0, math.pi * 2)
+	local distance = radius * math.sqrt(random:NextNumber())
+	return targetPosition + Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
+end
+
 function InteractionService:_makeTopDownSplash(position, color)
 	local splashModel = Instance.new("Model")
 	splashModel.Name = "TopDownWaterSplash"
@@ -3581,7 +3647,7 @@ function InteractionService:_makeTopDownSplash(position, color)
 	Debris:AddItem(splashModel, 1.1)
 end
 
-function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, targetPosition, mode, targetPlayer, startPosition)
+function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, targetPosition, mode, targetPlayer, startPosition, aimDirection, throwStyle, chargeDuration)
 	local rootPart = getRootPart(player)
 	if not rootPart then
 		return
@@ -3621,8 +3687,26 @@ function InteractionService:_spawnTopDownWaterBalloon(player, sourcePart, target
 	trail.Parent = balloon
 
 	local target = targetPosition or (rootPart.Position + rootPart.CFrame.LookVector * 32)
+	throwStyle = if throwStyle == "Direct" then "Direct" else "Lob"
+	local chargeAlpha = math.clamp((tonumber(chargeDuration) or 0) / 1.25, 0, 1)
+	local pitch = 0
+	if typeof(aimDirection) == "Vector3" and aimDirection.Magnitude > 0.1 then
+		pitch = math.clamp(aimDirection.Unit.Y, -0.65, 0.85)
+	end
+	local horizontalDistance = (Vector3.new(target.X, 0, target.Z) - Vector3.new(startPosition.X, 0, startPosition.Z)).Magnitude
 	local distance = (target - startPosition).Magnitude
-	local flightTime = math.clamp(distance / 58, 1.0, 2.15)
+	local flightTime
+	if throwStyle == "Direct" then
+		flightTime = math.clamp(math.max(horizontalDistance, distance * 0.72) / 88, 0.36, 1.18)
+		flightTime = math.clamp(flightTime + math.max(pitch, 0) * 0.18 + math.min(pitch, 0) * 0.08, 0.34, 1.28)
+	else
+		flightTime = math.clamp(math.max(horizontalDistance, distance * 0.65) / 58, 0.85, 2.15)
+		flightTime = math.clamp(
+			flightTime + math.max(pitch, 0) * 0.7 + math.min(pitch, 0) * 0.24 + chargeAlpha * 0.35,
+			0.65,
+			2.85
+		)
+	end
 	local velocity = (target - startPosition) / flightTime + Vector3.new(0, 0.5 * workspace.Gravity * flightTime, 0)
 	balloon.AssemblyLinearVelocity = velocity
 	balloon.AssemblyAngularVelocity = Vector3.new(8, 14, 2)
@@ -3792,7 +3876,7 @@ function InteractionService:_getValidatedTopDownAimTarget(player, direction, tar
 	return rootPart.Position + aimDirection * TOP_DOWN_THROW_DISTANCE
 end
 
-function InteractionService:_throwLoadedTopDownBalloon(player, direction, targetPosition)
+function InteractionService:_throwLoadedTopDownBalloon(player, direction, targetPosition, throwStyle, chargeDuration)
 	if not self:_isPlayerInTopDownArena(player) then
 		return
 	end
@@ -3819,7 +3903,8 @@ function InteractionService:_throwLoadedTopDownBalloon(player, direction, target
 		return
 	end
 
-	local aimDirection = self:_flatTopDownDirection(player, direction)
+	local fullAimDirection = self:_getTopDownFullAimDirection(player, direction)
+	local aimDirection = self:_flatTopDownDirection(player, fullAimDirection)
 	if not self:_consumePocketItem(player, TOP_DOWN_WATER_BALLOON_KIND, self.topDownLoadedBalloonsByUserId) then
 		self:_fireTopDownAmmo(player, "Load water balloons at a bucket first.")
 		self.systemMessageRemote:FireClient(player, "The balloon disappeared from inventory before the throw.")
@@ -3830,9 +3915,10 @@ function InteractionService:_throwLoadedTopDownBalloon(player, direction, target
 	self.discoveryService:Unlock(player, Constants.Discoveries.TopDownWaterBalloon.Id)
 
 	local startPosition = rootPart.Position + Vector3.new(0, 2.35, 0) + aimDirection * 2.6
-	local validatedTarget = self:_getValidatedTopDownAimTarget(player, direction, targetPosition)
+	local validatedTarget = self:_getValidatedTopDownAimTarget(player, fullAimDirection, targetPosition)
+	validatedTarget = self:_applyTopDownThrowSpread(player, validatedTarget)
 	self:_recordTopDownTraining(player, 0.72, 0.004)
-	self:_spawnTopDownWaterBalloon(player, rootPart, validatedTarget, "Aim", nil, startPosition)
+	self:_spawnTopDownWaterBalloon(player, rootPart, validatedTarget, "Aim", nil, startPosition, fullAimDirection, throwStyle, chargeDuration)
 	self:_fireTopDownAmmo(player)
 end
 
@@ -3842,7 +3928,7 @@ function InteractionService:_handleTopDownArenaRemote(player, payload)
 	end
 
 	if payload.Action == TOP_DOWN_THROW_ACTION then
-		self:_throwLoadedTopDownBalloon(player, payload.Direction, payload.TargetPosition)
+		self:_throwLoadedTopDownBalloon(player, payload.Direction, payload.TargetPosition, payload.ThrowStyle, payload.Charge)
 	end
 end
 

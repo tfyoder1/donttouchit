@@ -1,12 +1,16 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local tutorialPreferencesRemote = remotes:WaitForChild(Constants.Remotes.TutorialPreferences)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItTutorialHints"
@@ -108,13 +112,97 @@ footer.Size = UDim2.new(1, -48, 0, 18)
 footer.ZIndex = 3
 footer.Parent = panel
 
+local controlsRow = Instance.new("Frame")
+controlsRow.Name = "ControlsRow"
+controlsRow.BackgroundTransparency = 1
+controlsRow.BorderSizePixel = 0
+controlsRow.Position = UDim2.new(0, 24, 1, -50)
+controlsRow.Size = UDim2.new(1, -48, 0, 34)
+controlsRow.ZIndex = 3
+controlsRow.Parent = panel
+
+local dontShowButton = Instance.new("TextButton")
+dontShowButton.Name = "DontShowAgain"
+dontShowButton.BackgroundColor3 = Color3.fromRGB(20, 27, 35)
+dontShowButton.BackgroundTransparency = 0.04
+dontShowButton.BorderSizePixel = 0
+dontShowButton.Font = Enum.Font.GothamBold
+dontShowButton.Position = UDim2.fromScale(0, 0)
+dontShowButton.Size = UDim2.new(1, -84, 1, 0)
+dontShowButton.TextColor3 = Color3.fromRGB(218, 234, 244)
+dontShowButton.TextSize = 14
+dontShowButton.TextWrapped = true
+dontShowButton.TextXAlignment = Enum.TextXAlignment.Left
+dontShowButton.ZIndex = 4
+dontShowButton.Parent = controlsRow
+
+local dontShowPadding = Instance.new("UIPadding")
+dontShowPadding.PaddingLeft = UDim.new(0, 10)
+dontShowPadding.PaddingRight = UDim.new(0, 8)
+dontShowPadding.Parent = dontShowButton
+
+local dontShowCorner = Instance.new("UICorner")
+dontShowCorner.CornerRadius = UDim.new(0, 6)
+dontShowCorner.Parent = dontShowButton
+
+local dontShowStroke = Instance.new("UIStroke")
+dontShowStroke.Color = Color3.fromRGB(97, 231, 184)
+dontShowStroke.Thickness = 1
+dontShowStroke.Transparency = 0.34
+dontShowStroke.Parent = dontShowButton
+
+local okButton = Instance.new("TextButton")
+okButton.Name = "OK"
+okButton.AnchorPoint = Vector2.new(1, 0)
+okButton.BackgroundColor3 = Color3.fromRGB(114, 255, 207)
+okButton.BorderSizePixel = 0
+okButton.Font = Enum.Font.GothamBlack
+okButton.Position = UDim2.fromScale(1, 0)
+okButton.Size = UDim2.new(0, 72, 1, 0)
+okButton.Text = "OK"
+okButton.TextColor3 = Color3.fromRGB(7, 28, 25)
+okButton.TextSize = 16
+okButton.ZIndex = 4
+okButton.Parent = controlsRow
+
+local okCorner = Instance.new("UICorner")
+okCorner.CornerRadius = UDim.new(0, 6)
+okCorner.Parent = okButton
+
 local activePrompt = nil
 local activeTween = nil
 local shadeTween = nil
 local activePromptConnections = {}
 local viewportConnection = nil
+local activeTutorialId = nil
+local tutorialsEnabled = true
+local completedTutorials = {}
+local dontShowAgainSelected = true
 
 local DEFAULT_FOOTER_TEXT = "Use the nearby prompt to continue."
+local TUTORIALS_ENABLED_ATTRIBUTE = "DontTouchItTutorialsEnabled"
+
+local function sanitizeLocalTutorialId(value)
+	if typeof(value) ~= "string" then
+		return nil
+	end
+
+	local tutorialId = string.sub(value, 1, 96)
+	tutorialId = string.gsub(tutorialId, "[^%w%._%-:/]", "_")
+	if tutorialId == "" then
+		return nil
+	end
+
+	return tutorialId
+end
+
+local function updateDontShowButton()
+	local prefix = dontShowAgainSelected and "[x]" or "[ ]"
+	dontShowButton.Text = prefix .. " Don't show this again"
+	dontShowButton.BackgroundColor3 = dontShowAgainSelected and Color3.fromRGB(20, 37, 33) or Color3.fromRGB(28, 32, 40)
+	dontShowStroke.Color = dontShowAgainSelected and Color3.fromRGB(97, 231, 184) or Color3.fromRGB(114, 132, 148)
+	dontShowStroke.Transparency = dontShowAgainSelected and 0.24 or 0.44
+end
 
 local function getViewportSize()
 	local camera = workspace.CurrentCamera
@@ -149,10 +237,10 @@ local function applyPanelLayout()
 
 	if compactTouch then
 		panel.AnchorPoint = Vector2.new(0.5, 0)
-		panel.Position = UDim2.new(0.5, 0, 0, phoneLike and 72 or 82)
-		panel.Size = UDim2.new(phoneLike and 0.48 or 0.52, 0, 0, phoneLike and 122 or 132)
-		sizeConstraint.MinSize = Vector2.new(phoneLike and 292 or 340, phoneLike and 108 or 118)
-		sizeConstraint.MaxSize = Vector2.new(phoneLike and 440 or 520, phoneLike and 128 or 140)
+		panel.Position = UDim2.new(0.5, 0, 0, phoneLike and 58 or 74)
+		panel.Size = UDim2.new(phoneLike and 0.54 or 0.52, 0, 0, phoneLike and 164 or 174)
+		sizeConstraint.MinSize = Vector2.new(phoneLike and 320 or 340, phoneLike and 148 or 156)
+		sizeConstraint.MaxSize = Vector2.new(phoneLike and 460 or 540, phoneLike and 168 or 180)
 
 		accent.Position = UDim2.new(0, 16, 0, 35)
 		accent.Size = UDim2.new(1, -32, 0, 2)
@@ -161,19 +249,26 @@ local function applyPanelLayout()
 		title.Position = UDim2.new(0, 16, 0, 8)
 		title.Size = UDim2.new(1, -32, 0, 24)
 
-		body.TextSize = phoneLike and 16 or 18
-		body.Position = UDim2.new(0, 16, 0, 45)
-		body.Size = UDim2.new(1, -32, 1, -68)
+		body.TextSize = phoneLike and 15 or 17
+		body.Position = UDim2.new(0, 16, 0, 44)
+		body.Size = UDim2.new(1, -32, 1, -96)
 
 		footer.TextSize = phoneLike and 11 or 12
-		footer.Position = UDim2.new(0, 16, 1, -20)
+		footer.Position = UDim2.new(0, 16, 1, -50)
 		footer.Size = UDim2.new(1, -32, 0, 16)
+
+		controlsRow.Position = UDim2.new(0, 16, 1, -32)
+		controlsRow.Size = UDim2.new(1, -32, 0, 26)
+		dontShowButton.Size = UDim2.new(1, -64, 1, 0)
+		dontShowButton.TextSize = phoneLike and 11 or 12
+		okButton.Size = UDim2.new(0, 56, 1, 0)
+		okButton.TextSize = 13
 	else
 		panel.AnchorPoint = Vector2.new(0.5, 0.5)
 		panel.Position = UDim2.new(0.5, 0, 0.38, 0)
-		panel.Size = UDim2.new(0.64, 0, 0, 156)
-		sizeConstraint.MinSize = Vector2.new(360, 132)
-		sizeConstraint.MaxSize = Vector2.new(680, 172)
+		panel.Size = UDim2.new(0.64, 0, 0, 206)
+		sizeConstraint.MinSize = Vector2.new(360, 184)
+		sizeConstraint.MaxSize = Vector2.new(680, 224)
 
 		accent.Position = UDim2.new(0, 22, 0, 46)
 		accent.Size = UDim2.new(1, -44, 0, 2)
@@ -182,13 +277,20 @@ local function applyPanelLayout()
 		title.Position = UDim2.new(0, 24, 0, 15)
 		title.Size = UDim2.new(1, -48, 0, 28)
 
-		body.TextSize = 23
+		body.TextSize = 21
 		body.Position = UDim2.new(0, 24, 0, 64)
-		body.Size = UDim2.new(1, -48, 1, -78)
+		body.Size = UDim2.new(1, -48, 1, -128)
 
 		footer.TextSize = 14
-		footer.Position = UDim2.new(0, 24, 1, -28)
+		footer.Position = UDim2.new(0, 24, 1, -76)
 		footer.Size = UDim2.new(1, -48, 0, 18)
+
+		controlsRow.Position = UDim2.new(0, 24, 1, -50)
+		controlsRow.Size = UDim2.new(1, -48, 0, 34)
+		dontShowButton.Size = UDim2.new(1, -84, 1, 0)
+		dontShowButton.TextSize = 14
+		okButton.Size = UDim2.new(0, 72, 1, 0)
+		okButton.TextSize = 16
 	end
 end
 
@@ -274,6 +376,51 @@ local function findHint(prompt)
 	return nil
 end
 
+local function findTutorialId(prompt, hint)
+	local current = prompt
+	while current and current ~= workspace do
+		local tutorialId = sanitizeLocalTutorialId(current:GetAttribute("TutorialId"))
+		if tutorialId then
+			return tutorialId
+		end
+		current = current.Parent
+	end
+
+	local promptPath = prompt and prompt:GetFullName() or "UnknownPrompt"
+	local actionText = prompt and prompt.ActionText or "Prompt"
+	local fallback = ("%s:%s:%s"):format(actionText, promptPath, hint or "")
+	return sanitizeLocalTutorialId(fallback)
+end
+
+local function shouldShowTutorial(tutorialId)
+	if not tutorialsEnabled then
+		return false
+	end
+	if tutorialId and completedTutorials[tutorialId] == true then
+		return false
+	end
+	return true
+end
+
+local function completeTutorial(tutorialId)
+	tutorialId = sanitizeLocalTutorialId(tutorialId)
+	if not tutorialId or completedTutorials[tutorialId] == true then
+		return
+	end
+
+	completedTutorials[tutorialId] = true
+	tutorialPreferencesRemote:FireServer({
+		Action = "Complete",
+		TutorialId = tutorialId,
+	})
+end
+
+local function completeActiveTutorialIfSelected()
+	if dontShowAgainSelected and activeTutorialId then
+		completeTutorial(activeTutorialId)
+	end
+end
+
 local function setPanelVisible(visible)
 	if activeTween then
 		activeTween:Cancel()
@@ -342,6 +489,7 @@ local function hideHint(prompt)
 	end
 
 	activePrompt = nil
+	activeTutorialId = nil
 	disconnectActivePromptConnections()
 	setPanelVisible(false)
 end
@@ -373,13 +521,22 @@ local function watchActivePrompt(prompt)
 	end))
 end
 
-local function showHint(prompt, hint)
+local function showHint(prompt, hint, tutorialId)
 	disconnectActivePromptConnections()
 	activePrompt = prompt
+	activeTutorialId = tutorialId
+	dontShowAgainSelected = true
 	body.Text = hint
 	footer.Text = getPromptFooterText(prompt)
+	updateDontShowButton()
 	watchActivePrompt(prompt)
 	setPanelVisible(true)
+end
+
+local function hideActiveHint()
+	if activePrompt then
+		hideHint(activePrompt)
+	end
 end
 
 bindViewportListener()
@@ -387,11 +544,77 @@ bindViewportListener()
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewportListener)
 UserInputService.LastInputTypeChanged:Connect(handleViewportChanged)
 
+dontShowButton.Activated:Connect(function()
+	dontShowAgainSelected = not dontShowAgainSelected
+	updateDontShowButton()
+end)
+
+okButton.Activated:Connect(function()
+	completeActiveTutorialIfSelected()
+	hideActiveHint()
+end)
+
+tutorialPreferencesRemote.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	if payload.Action == "Loaded" or payload.Action == "Completed" then
+		tutorialsEnabled = payload.TutorialsEnabled ~= false
+		playerGui:SetAttribute(TUTORIALS_ENABLED_ATTRIBUTE, tutorialsEnabled)
+
+		if typeof(payload.Completed) == "table" then
+			completedTutorials = {}
+			for key, value in pairs(payload.Completed) do
+				local tutorialId = sanitizeLocalTutorialId(key)
+				if tutorialId and value == true then
+					completedTutorials[tutorialId] = true
+				end
+			end
+		elseif typeof(payload.TutorialId) == "string" then
+			local tutorialId = sanitizeLocalTutorialId(payload.TutorialId)
+			if tutorialId then
+				completedTutorials[tutorialId] = true
+			end
+		end
+
+		if activeTutorialId and (not tutorialsEnabled or completedTutorials[activeTutorialId] == true) then
+			hideActiveHint()
+		end
+	end
+end)
+
+playerGui:GetAttributeChangedSignal(TUTORIALS_ENABLED_ATTRIBUTE):Connect(function()
+	local enabledAttribute = playerGui:GetAttribute(TUTORIALS_ENABLED_ATTRIBUTE)
+	if typeof(enabledAttribute) ~= "boolean" then
+		return
+	end
+
+	tutorialsEnabled = enabledAttribute
+	if not tutorialsEnabled then
+		hideActiveHint()
+	end
+end)
+
 ProximityPromptService.PromptShown:Connect(function(prompt)
 	local hint = findHint(prompt)
 	if hint then
-		showHint(prompt, hint)
+		local tutorialId = findTutorialId(prompt, hint)
+		if shouldShowTutorial(tutorialId) then
+			showHint(prompt, hint, tutorialId)
+		end
+	end
+end)
+
+ProximityPromptService.PromptTriggered:Connect(function(prompt)
+	if activePrompt == prompt then
+		completeActiveTutorialIfSelected()
+		hideHint(prompt)
 	end
 end)
 
 ProximityPromptService.PromptHidden:Connect(hideHint)
+
+tutorialPreferencesRemote:FireServer({
+	Action = "Request",
+})

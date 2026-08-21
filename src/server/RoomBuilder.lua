@@ -86,7 +86,7 @@ local function createPrompt(parent, actionText, objectText, holdDuration)
 	prompt.ActionText = actionText
 	prompt.ObjectText = objectText
 	prompt.HoldDuration = holdDuration or 0
-	prompt.RequiresLineOfSight = false
+	prompt.RequiresLineOfSight = true
 	prompt.ClickablePrompt = true
 	prompt.MaxActivationDistance = 10
 	prompt.Parent = parent
@@ -2137,6 +2137,7 @@ local function makeCaveEntranceArea(roomFolder)
 	local flashlightPickup = makeModel(cave, "StartingFlashlightPickup")
 	flashlightPickup:SetAttribute("PrologueDescription", "A flashlight waits by the cave mouth. It feels like permission to look, not permission to touch anything else.")
 	flashlightPickup:SetAttribute("ProloguePriority", 120)
+	flashlightPickup:SetAttribute("TutorialId", "StartingFlashlightPickup")
 	flashlightPickup:SetAttribute("TutorialHint", "Take the flashlight. Equip it from inventory, then press Action to turn it on or off.")
 	flashlightPickup:SetAttribute("PrologueSafeNavigation", true)
 	local flashlightStand = createPart(flashlightPickup, "FlashlightRockStand", Vector3.new(2.8, 0.7, 1.9), CFrame.new(-64.2, 0.52, 39.2) * CFrame.Angles(0, math.rad(-8), 0), Color3.fromRGB(70, 70, 66), Enum.Material.Slate)
@@ -2156,6 +2157,7 @@ local function makeCaveEntranceArea(roomFolder)
 	local flashlightPrompt = createPrompt(flashlightBody, "Take", "Flashlight", 0)
 	flashlightPrompt.MaxActivationDistance = 12
 	flashlightPrompt:SetAttribute("PrologueSafeNavigation", true)
+	flashlightPrompt:SetAttribute("TutorialId", "StartingFlashlightPickup")
 	flashlightPrompt:SetAttribute("TutorialHint", "Take the flashlight. Equip it from inventory, then press Action to turn it on or off.")
 	flashlightPickup.PrimaryPart = flashlightBody
 	tag(flashlightPickup, Constants.Tags.StartingFlashlight)

@@ -28,8 +28,13 @@ local TOUCH_PANEL_VERTICAL_RESERVE = 72
 local GAMEPAD_STACK_LEFT = 12
 local GAMEPAD_STACK_TOP = 142
 local GAMEPAD_INSPECT_HEIGHT = 196
+local GAMEPAD_DEV_PANEL_WIDTH = 330
 local GAMEPAD_DEV_PANEL_HEIGHT = 300
+local GAMEPAD_DEV_TOGGLE_WIDTH = 70
 local GAMEPAD_STACK_GAP = 10
+local GAMEPAD_UNDER_PANEL_MIN_SCALE = 0.72
+local GAMEPAD_SIDE_PANEL_MAX_SCALE = 0.9
+local GAMEPAD_SIDE_PANEL_MIN_SCALE = 0.62
 
 if player.UserId ~= OWNER_USER_ID then
 	return
@@ -118,6 +123,22 @@ local function getPanelScale(viewport)
 	return math.clamp(math.min(widthFitScale, heightFitScale, maxScale), minScale, maxScale)
 end
 
+local function getGamepadPanelLayout(viewport, margin)
+	local devPanelTop = GAMEPAD_STACK_TOP + GAMEPAD_INSPECT_HEIGHT + GAMEPAD_STACK_GAP
+	local underTop = devPanelTop + GAMEPAD_DEV_PANEL_HEIGHT + GAMEPAD_STACK_GAP
+	local underFitScale = (viewport.Y - underTop - margin) / PANEL_SIZE.Y
+	if underFitScale >= GAMEPAD_UNDER_PANEL_MIN_SCALE then
+		return GAMEPAD_STACK_LEFT, underTop, math.min(1, underFitScale)
+	end
+
+	local sideLeft = GAMEPAD_STACK_LEFT + GAMEPAD_DEV_PANEL_WIDTH + GAMEPAD_STACK_GAP + GAMEPAD_DEV_TOGGLE_WIDTH + GAMEPAD_STACK_GAP
+	local sideTop = devPanelTop
+	local widthFitScale = (viewport.X - sideLeft - margin) / PANEL_SIZE.X
+	local heightFitScale = (viewport.Y - sideTop - margin) / PANEL_SIZE.Y
+	local sideScale = math.min(GAMEPAD_SIDE_PANEL_MAX_SCALE, widthFitScale, heightFitScale)
+	return sideLeft, sideTop, math.clamp(sideScale, GAMEPAD_SIDE_PANEL_MIN_SCALE, GAMEPAD_SIDE_PANEL_MAX_SCALE)
+end
+
 local function applyPanelLayout()
 	if not panel then
 		return
@@ -126,15 +147,14 @@ local function applyPanelLayout()
 	local viewport = getViewportSize()
 	local margin = 12
 	local scale = getPanelScale(viewport)
-	local scaledSize = PANEL_SIZE * scale
 	local left = PANEL_DEFAULT_LEFT
 	local top = nil
 	local anchor = Vector2.new(0, 0.5)
 	if isGamepadProfile() then
-		left = GAMEPAD_STACK_LEFT
-		top = GAMEPAD_STACK_TOP + GAMEPAD_INSPECT_HEIGHT + GAMEPAD_STACK_GAP + GAMEPAD_DEV_PANEL_HEIGHT + GAMEPAD_STACK_GAP
+		left, top, scale = getGamepadPanelLayout(viewport, margin)
 		anchor = Vector2.zero
 	end
+	local scaledSize = PANEL_SIZE * scale
 	local maxLeft = math.max(margin, viewport.X - scaledSize.X - margin)
 
 	if panelScale then

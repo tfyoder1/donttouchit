@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.246"
+Constants.BuildVersion = "0.5.247"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -112,6 +112,7 @@ Constants.Remotes = {
 	LocationPing = "LocationPing",
 	InventoryAction = "InventoryAction",
 	UiLayout = "UiLayout",
+	TutorialPreferences = "TutorialPreferences",
 }
 
 Constants.Tags = {

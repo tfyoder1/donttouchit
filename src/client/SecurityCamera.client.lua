@@ -9,35 +9,99 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local securityCameraRemote = remotes:WaitForChild(Constants.Remotes.SecurityCamera)
 local playerGui = player:WaitForChild("PlayerGui")
 
+local SECURITY_RENDER_STEP = "DontTouchItSecurityCameraFeed"
 local SCREEN_BUTTON_ACTION = "DontTouchItSecurityScreenButton"
 local STOP_ACTION = "DontTouchItSecurityCameraStop"
 local activeSession = nil
+
+local function getHumanoid()
+	local character = player.Character
+	if not character then
+		return nil
+	end
+
+	return character:FindFirstChildOfClass("Humanoid")
+end
+
+local function rememberLocalCharacterVisibility(session)
+	if not session or session.VisibilityState then
+		return
+	end
+
+	local character = player.Character
+	if not character then
+		return
+	end
+
+	session.VisibilityState = {}
+	for _, descendant in character:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			table.insert(session.VisibilityState, {
+				Part = descendant,
+				LocalTransparencyModifier = descendant.LocalTransparencyModifier,
+			})
+		end
+	end
+end
+
+local function forceLocalCharacterVisible(session)
+	rememberLocalCharacterVisibility(session)
+
+	if not session or not session.VisibilityState then
+		return
+	end
+
+	for _, entry in session.VisibilityState do
+		local part = entry.Part
+		if part and part.Parent then
+			part.LocalTransparencyModifier = 0
+		end
+	end
+end
+
+local function restoreLocalCharacterVisibility(session)
+	if not session or not session.VisibilityState then
+		return
+	end
+
+	for _, entry in session.VisibilityState do
+		local part = entry.Part
+		if part and part.Parent then
+			part.LocalTransparencyModifier = entry.LocalTransparencyModifier or 0
+		end
+	end
+
+	session.VisibilityState = nil
+end
 
 local function restoreCamera()
 	if not activeSession then
 		return
 	end
 
+	local session = activeSession
 	local camera = workspace.CurrentCamera
+	if session.PlayerCameraMode then
+		player.CameraMode = session.PlayerCameraMode
+	end
 	if camera then
-		camera.CameraType = activeSession.CameraType or Enum.CameraType.Custom
-		camera.CameraSubject = activeSession.CameraSubject
-		camera.FieldOfView = activeSession.FieldOfView or 70
-		if activeSession.CameraCFrame then
-			camera.CFrame = activeSession.CameraCFrame
+		camera.CameraType = session.CameraType or Enum.CameraType.Custom
+		camera.CameraSubject = session.CameraSubject
+		camera.FieldOfView = session.FieldOfView or 70
+		if session.CameraCFrame then
+			camera.CFrame = session.CameraCFrame
 		end
 	end
 
-	if activeSession.Gui then
-		activeSession.Gui:Destroy()
+	if session.Gui then
+		session.Gui:Destroy()
 	end
 
-	if activeSession.CameraUpdateConnection then
-		activeSession.CameraUpdateConnection:Disconnect()
-	end
+	RunService:UnbindFromRenderStep(SECURITY_RENDER_STEP)
 
 	ContextActionService:UnbindAction(SCREEN_BUTTON_ACTION)
 	ContextActionService:UnbindAction(STOP_ACTION)
+	restoreLocalCharacterVisibility(session)
 	activeSession = nil
 end
 
@@ -157,21 +221,31 @@ local function startCamera(payload)
 		CameraSubject = camera.CameraSubject,
 		CameraCFrame = camera.CFrame,
 		FieldOfView = camera.FieldOfView,
+		PlayerCameraMode = player.CameraMode,
 		TargetCFrame = cameraCFrame,
 		Gui = makeOverlay(payload.Duration or 45, payload.CameraLabel),
 	}
+
+	player.CameraMode = Enum.CameraMode.Classic
+	local humanoid = getHumanoid()
+	if humanoid then
+		camera.CameraType = Enum.CameraType.Custom
+		camera.CameraSubject = humanoid
+	end
+	forceLocalCharacterVisible(activeSession)
 
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CameraSubject = nil
 	camera.CFrame = cameraCFrame
 	camera.FieldOfView = 64
 
-	activeSession.CameraUpdateConnection = RunService.RenderStepped:Connect(function()
+	RunService:BindToRenderStep(SECURITY_RENDER_STEP, Enum.RenderPriority.Camera.Value + 1, function()
 		local currentCamera = workspace.CurrentCamera
 		if currentCamera and activeSession then
 			currentCamera.CameraType = Enum.CameraType.Scriptable
 			currentCamera.CameraSubject = nil
 			currentCamera.CFrame = activeSession.TargetCFrame
+			forceLocalCharacterVisible(activeSession)
 		end
 	end)
 

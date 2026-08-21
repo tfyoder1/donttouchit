@@ -8,6 +8,7 @@ local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 local UiLayerController = require(script.Parent:WaitForChild("UiLayerController"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local uiLayoutRemote = remotes:WaitForChild(Constants.Remotes.UiLayout)
+local tutorialPreferencesRemote = remotes:WaitForChild(Constants.Remotes.TutorialPreferences)
 
 local TouchControls = {}
 
@@ -47,6 +48,7 @@ local controlsList = nil
 local editButton = nil
 local resetButton = nil
 local labelToggleButton = nil
+local tutorialToggleButton = nil
 local editMode = false
 local activeDrag = nil
 local activeChromeDrag = nil
@@ -56,6 +58,8 @@ local controlsToggle = nil
 local controlsTogglePosition = nil
 local loadedLayout = nil
 local layoutSaveQueued = false
+local tutorialsEnabled = true
+local TUTORIALS_ENABLED_ATTRIBUTE = "DontTouchItTutorialsEnabled"
 
 local function udim2ToPayload(position)
 	return {
@@ -555,6 +559,16 @@ local function updateLabelToggleButton()
 	labelToggleButton.TextColor3 = labelsHidden and Color3.fromRGB(224, 236, 245) or Color3.fromRGB(14, 27, 46)
 end
 
+local function updateTutorialToggleButton()
+	if not tutorialToggleButton then
+		return
+	end
+
+	tutorialToggleButton.Text = tutorialsEnabled and "Tutorials: On" or "Tutorials: Off"
+	tutorialToggleButton.BackgroundColor3 = tutorialsEnabled and Color3.fromRGB(114, 255, 207) or Color3.fromRGB(64, 72, 88)
+	tutorialToggleButton.TextColor3 = tutorialsEnabled and Color3.fromRGB(7, 28, 25) or Color3.fromRGB(224, 236, 245)
+end
+
 local function finishDrag()
 	local hadDrag = activeDrag ~= nil
 	if activeDrag and activeDrag.State and activeDrag.State.Button then
@@ -820,8 +834,8 @@ local function createOptionsPanel()
 	list.Name = "ControlsList"
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.Position = UDim2.fromOffset(14, 86)
-	list.Size = UDim2.new(1, -28, 1, -152)
+	list.Position = UDim2.fromOffset(14, 122)
+	list.Size = UDim2.new(1, -28, 1, -188)
 	list.CanvasSize = UDim2.fromOffset(0, 0)
 	list.ScrollBarThickness = 5
 	list.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -847,6 +861,17 @@ local function createOptionsPanel()
 		UDim2.new(1, -28, 0, 30)
 	)
 	updateLabelToggleButton()
+
+	tutorialToggleButton = makePanelButton(
+		panel,
+		"ToggleTutorials",
+		"Tutorials: On",
+		Color3.fromRGB(114, 255, 207),
+		Color3.fromRGB(7, 28, 25),
+		UDim2.new(0, 14, 0, 82),
+		UDim2.new(1, -28, 0, 30)
+	)
+	updateTutorialToggleButton()
 
 	editButton = makePanelButton(
 		panel,
@@ -894,6 +919,16 @@ local function createOptionsPanel()
 		playerGui:SetAttribute(TOUCH_HIDE_LABELS_ATTRIBUTE, playerGui:GetAttribute(TOUCH_HIDE_LABELS_ATTRIBUTE) ~= true)
 		updateLabelToggleButton()
 		applyAllButtonStates()
+	end)
+
+	tutorialToggleButton.Activated:Connect(function()
+		tutorialsEnabled = not tutorialsEnabled
+		playerGui:SetAttribute(TUTORIALS_ENABLED_ATTRIBUTE, tutorialsEnabled)
+		updateTutorialToggleButton()
+		tutorialPreferencesRemote:FireServer({
+			Action = "SetEnabled",
+			Enabled = tutorialsEnabled,
+		})
 	end)
 
 	resetButton.Activated:Connect(function()
@@ -1093,6 +1128,29 @@ playerGui:GetAttributeChangedSignal(TOUCH_HIDE_LABELS_ATTRIBUTE):Connect(functio
 	applyAllButtonStates()
 end)
 
+playerGui:GetAttributeChangedSignal(TUTORIALS_ENABLED_ATTRIBUTE):Connect(function()
+	local enabledAttribute = playerGui:GetAttribute(TUTORIALS_ENABLED_ATTRIBUTE)
+	if typeof(enabledAttribute) ~= "boolean" then
+		return
+	end
+
+	tutorialsEnabled = enabledAttribute
+	updateTutorialToggleButton()
+end)
+
+tutorialPreferencesRemote.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	if payload.Action ~= "Loaded" and payload.Action ~= "Completed" then
+		return
+	end
+
+	tutorialsEnabled = payload.TutorialsEnabled ~= false
+	playerGui:SetAttribute(TUTORIALS_ENABLED_ATTRIBUTE, tutorialsEnabled)
+	updateTutorialToggleButton()
+end)
+
 uiLayoutRemote.OnClientEvent:Connect(function(payload)
 	if typeof(payload) ~= "table" or payload.Action ~= "Loaded" then
 		return
@@ -1114,6 +1172,10 @@ uiLayoutRemote.OnClientEvent:Connect(function(payload)
 end)
 
 uiLayoutRemote:FireServer({
+	Action = "Request",
+})
+
+tutorialPreferencesRemote:FireServer({
 	Action = "Request",
 })
 

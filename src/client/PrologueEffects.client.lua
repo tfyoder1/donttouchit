@@ -596,10 +596,13 @@ local function getPrologueDescriptionData(instance)
 
 	local prompt = getPromptNear(instance)
 	if prompt and prompt.ObjectText ~= "" then
+		local ownsFlashlight = player:GetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE) == true
 		return {
 			Key = prompt:GetFullName(),
 			Priority = tonumber(prompt:GetAttribute("ProloguePriority")) or 60,
-			Text = ("The flashlight catches %s. It looks much less harmless in the dark."):format(prompt.ObjectText),
+			Text = if ownsFlashlight
+				then ("The flashlight catches %s. It looks much less harmless in the dark."):format(prompt.ObjectText)
+				else ("%s is close enough to notice, even without a light."):format(prompt.ObjectText),
 		}
 	end
 

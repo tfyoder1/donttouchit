@@ -1,4 +1,5 @@
 local ContextActionService = game:GetService("ContextActionService")
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,6 +16,7 @@ local RENDER_STEP_NAME = "DontTouchItTopDownArenaCamera"
 local THROW_ACTION = "DontTouchItTopDownThrow"
 local AIM_ACTION = "DontTouchItTopDownAim"
 local JUMP_AIM_ACTION = "DontTouchItTopDownJumpAim"
+local LOOK_ACTION = "DontTouchItTopDownLook"
 local AIM_MARKER_NAME = "DontTouchItTopDownAimMarker"
 local MIN_HEIGHT = 54
 local MAX_HEIGHT = 92
@@ -22,6 +24,7 @@ local DEFAULT_HEIGHT = 72
 local DEFAULT_BACK_OFFSET = 34
 local YAW_SPEED = 2.45
 local PITCH_SPEED = 2.15
+local MOUSE_LOOK_SENSITIVITY = 0.0032
 local MIN_FPV_PITCH = math.rad(-58)
 local MAX_FPV_PITCH = math.rad(42)
 local AIM_DISTANCE = 58
@@ -32,6 +35,19 @@ local TOUCH_AIM_BUTTON_SIZE = UDim2.fromOffset(78, 78)
 local TOUCH_AIM_BUTTON_POSITION = UDim2.fromScale(0.82, 0.66)
 local TOUCH_THROW_BUTTON_POSITION = UDim2.fromScale(0.68, 0.66)
 local TOUCH_AIM_RADIUS = 62
+local LOB_CHARGE_SECONDS = 0.26
+local MAX_LOB_CHARGE_SECONDS = 1.25
+local STILL_IMPACT_DIAMETER = 3.2
+local MOVING_IMPACT_DIAMETER = 8.0
+local MOVE_SPEED_FOR_MAX_SPREAD = 16
+
+local PROMPT_SUPPRESS_TAGS = {
+	[Constants.Tags.TopDownWaterBalloonBucket] = true,
+	[Constants.Tags.TopDownCameraConsole] = true,
+	[Constants.Tags.TopDownReadyButton] = true,
+	[Constants.Tags.TopDownRoundButton] = true,
+	[Constants.Tags.SecretRoomExit] = true,
+}
 
 local active = false
 local roomActive = false
@@ -49,20 +65,26 @@ local inputEndedConnection = nil
 local ammoCount = 0
 local ammoMax = 6
 local aimMarker = nil
+local savedVisibilityState = nil
 local overheadAimDirection = Vector3.new(0, 0, -1)
 local overheadAimDistance = OVERHEAD_AIM_DEFAULT_DISTANCE
 local touchAimInput = nil
+local aimTriggerHeld = false
+local aimTriggerStartedAt = 0
+local aimTriggerToken = 0
+local aimTriggerCharged = false
+local aimTriggerConsumed = false
 local visiblePrompts = {}
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "DontTouchItTopDownArenaHud"
-gui.IgnoreGuiInset = false
+gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 148
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
 pcall(function()
-	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+	gui.ScreenInsets = Enum.ScreenInsets.None
 end)
 
 local ammoLabel = Instance.new("TextLabel")
@@ -89,8 +111,8 @@ reticle.AnchorPoint = Vector2.new(0.5, 0.5)
 reticle.BackgroundTransparency = 1
 reticle.Font = Enum.Font.GothamBlack
 reticle.Position = UDim2.fromScale(0.5, 0.5)
-reticle.Size = UDim2.fromOffset(96, 96)
-reticle.Text = "+"
+reticle.Size = UDim2.fromOffset(54, 54)
+reticle.Text = "X"
 reticle.TextColor3 = Color3.fromRGB(119, 255, 203)
 reticle.TextScaled = true
 reticle.TextStrokeColor3 = Color3.fromRGB(10, 14, 22)
@@ -167,11 +189,85 @@ local function getRootPart()
 	return character:FindFirstChild("HumanoidRootPart")
 end
 
+local function getHumanoid()
+	local character = player.Character
+	if not character then
+		return nil
+	end
+
+	return character:FindFirstChildOfClass("Humanoid")
+end
+
+local function rememberLocalCharacterVisibility()
+	if savedVisibilityState then
+		return
+	end
+
+	local character = player.Character
+	if not character then
+		return
+	end
+
+	savedVisibilityState = {}
+	for _, descendant in character:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			table.insert(savedVisibilityState, {
+				Part = descendant,
+				LocalTransparencyModifier = descendant.LocalTransparencyModifier,
+			})
+		end
+	end
+end
+
+local function forceLocalCharacterVisible()
+	rememberLocalCharacterVisibility()
+
+	if not savedVisibilityState then
+		return
+	end
+
+	for _, entry in savedVisibilityState do
+		local part = entry.Part
+		if part and part.Parent then
+			part.LocalTransparencyModifier = 0
+		end
+	end
+end
+
+local function restoreLocalCharacterVisibility()
+	if not savedVisibilityState then
+		return
+	end
+
+	for _, entry in savedVisibilityState do
+		local part = entry.Part
+		if part and part.Parent then
+			part.LocalTransparencyModifier = entry.LocalTransparencyModifier or 0
+		end
+	end
+
+	savedVisibilityState = nil
+end
+
+local function getImpactDiameter()
+	local humanoid = getHumanoid()
+	local rootPart = getRootPart()
+	local moveMagnitude = humanoid and humanoid.MoveDirection.Magnitude or 0
+	local horizontalSpeed = 0
+	if rootPart then
+		local velocity = rootPart.AssemblyLinearVelocity
+		horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	end
+
+	local moveAlpha = math.clamp(math.max(moveMagnitude, horizontalSpeed / MOVE_SPEED_FOR_MAX_SPREAD), 0, 1)
+	return STILL_IMPACT_DIAMETER + (MOVING_IMPACT_DIAMETER - STILL_IMPACT_DIAMETER) * moveAlpha
+end
+
 local function getControlHint()
 	if UserInputService.TouchEnabled then
 		return "Hold Aim  tap Throw"
 	elseif UserInputService.GamepadEnabled then
-		return "LT Aim  RT Throw"
+		return "Tap LT Throw  hold LT Lob"
 	end
 
 	return "Right-click Aim  click Throw"
@@ -236,12 +332,18 @@ local function applyOverheadAimVector(x, y)
 		+ (AIM_DISTANCE - OVERHEAD_AIM_MIN_DISTANCE) * scaledMagnitude
 end
 
-local function updateOverheadAimFromStick()
-	if not aiming then
-		return
-	end
+local function setRightStickInput(x, y)
+	local filteredX = math.abs(x) > 0.08 and x or 0
+	local filteredY = math.abs(y) > 0.08 and y or 0
 
-	applyOverheadAimVector(rightStickX, rightStickY)
+	if cameraMode == "Overhead" and aiming then
+		applyOverheadAimVector(filteredX, filteredY)
+		rightStickX = 0
+		rightStickY = 0
+	else
+		rightStickX = filteredX
+		rightStickY = filteredY
+	end
 end
 
 local function getAimDirection()
@@ -270,14 +372,58 @@ local function ensureAimMarker()
 	aimMarker.Anchored = true
 	aimMarker.CanCollide = false
 	aimMarker.CanTouch = false
+	aimMarker.CanQuery = false
 	aimMarker.CastShadow = false
 	aimMarker.Shape = Enum.PartType.Cylinder
-	aimMarker.Size = Vector3.new(0.14, 3.4, 3.4)
+	aimMarker.Size = Vector3.new(STILL_IMPACT_DIAMETER, 0.14, STILL_IMPACT_DIAMETER)
 	aimMarker.Color = Color3.fromRGB(119, 255, 203)
 	aimMarker.Material = Enum.Material.Neon
 	aimMarker.Transparency = 0.36
 	aimMarker.Parent = workspace
 	return aimMarker
+end
+
+local function getRaycastParams()
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude = {}
+	for _, candidate in ipairs(Players:GetPlayers()) do
+		if candidate.Character then
+			table.insert(exclude, candidate.Character)
+		end
+	end
+	if aimMarker and aimMarker.Parent then
+		table.insert(exclude, aimMarker)
+	end
+	params.FilterDescendantsInstances = exclude
+	return params
+end
+
+local function getGroundAimPosition(position, params)
+	local groundResult = workspace:Raycast(position + Vector3.new(0, 35, 0), Vector3.new(0, -120, 0), params)
+	if groundResult then
+		return groundResult.Position + Vector3.new(0, 0.12, 0)
+	end
+
+	return position
+end
+
+local function getCameraAimTargetPosition()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+
+	local viewport = camera.ViewportSize
+	local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
+	local params = getRaycastParams()
+	local result = workspace:Raycast(ray.Origin, ray.Direction * (AIM_DISTANCE + 42), params)
+	if result then
+		return getGroundAimPosition(result.Position, params)
+	end
+
+	local guess = ray.Origin + ray.Direction * AIM_DISTANCE
+	return getGroundAimPosition(guess, params)
 end
 
 local function getAimTargetPosition()
@@ -286,12 +432,14 @@ local function getAimTargetPosition()
 		return nil
 	end
 
+	if cameraMode ~= "Overhead" then
+		return getCameraAimTargetPosition()
+	end
+
 	local direction = getAimDirection()
 	local aimDistance = if cameraMode == "Overhead" then overheadAimDistance else AIM_DISTANCE
 	local guess = rootPart.Position + direction * aimDistance
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { player.Character }
+	local params = getRaycastParams()
 
 	local result = workspace:Raycast(guess + Vector3.new(0, 35, 0), Vector3.new(0, -80, 0), params)
 	if result then
@@ -313,9 +461,27 @@ local function unbindJumpAim()
 	ContextActionService:UnbindAction(JUMP_AIM_ACTION)
 end
 
+local function unbindLook()
+	ContextActionService:UnbindAction(LOOK_ACTION)
+end
+
+local function promptSuppressesArenaButtons(prompt)
+	local current = prompt and prompt.Parent
+	while current and current ~= workspace do
+		for tagName in pairs(PROMPT_SUPPRESS_TAGS) do
+			if CollectionService:HasTag(current, tagName) then
+				return true
+			end
+		end
+		current = current.Parent
+	end
+
+	return false
+end
+
 local function hasVisiblePrompt()
 	for prompt in pairs(visiblePrompts) do
-		if not prompt.Parent or prompt.Enabled == false then
+		if not prompt.Parent or prompt.Enabled == false or not promptSuppressesArenaButtons(prompt) then
 			visiblePrompts[prompt] = nil
 		end
 	end
@@ -351,19 +517,18 @@ local function updateReticle(camera, aimTarget)
 		return
 	end
 
-	if cameraMode == "Overhead" and aimTarget then
-		local screenPoint, onScreen = camera:WorldToViewportPoint(aimTarget + Vector3.new(0, 1.2, 0))
-		reticle.Position = UDim2.fromOffset(screenPoint.X, screenPoint.Y)
-		reticle.Visible = onScreen == true
+	if camera then
+		local viewport = camera.ViewportSize
+		reticle.Position = UDim2.fromOffset(viewport.X * 0.5, viewport.Y * 0.5)
 	else
 		reticle.Position = UDim2.fromScale(0.5, 0.5)
-		reticle.Visible = true
 	end
+	reticle.Visible = true
 end
 
 local function setAiming(nextAiming)
 	aiming = nextAiming == true
-	reticle.Visible = active and aiming and cameraMode ~= "Overhead"
+	reticle.Visible = active and aiming
 	local marker = ensureAimMarker()
 	marker.Transparency = aiming and 0.36 or 1
 	updateTouchArenaButtons()
@@ -390,16 +555,86 @@ local function updateOverheadAimFromTouch(position)
 	applyOverheadAimVector(x, y)
 end
 
-local function requestThrow()
+local function getCurrentAimCharge()
+	if not aimTriggerHeld then
+		return 0
+	end
+
+	return math.clamp(os.clock() - aimTriggerStartedAt, 0, MAX_LOB_CHARGE_SECONDS)
+end
+
+local function requestThrow(throwStyle, chargeDuration)
 	if not active then
 		return
+	end
+
+	if aimTriggerHeld then
+		aimTriggerConsumed = true
+	end
+
+	local style = throwStyle
+	if not style then
+		style = if aiming then "Lob" else "Direct"
+	end
+	local charge = chargeDuration
+	if charge == nil then
+		charge = if style == "Lob" then getCurrentAimCharge() else 0
 	end
 
 	topDownRemote:FireServer({
 		Action = "Throw",
 		Direction = getAimDirection(),
 		TargetPosition = getAimTargetPosition(),
+		ThrowStyle = style,
+		Charge = charge,
 	})
+end
+
+local function beginAimTriggerCharge()
+	if aimTriggerHeld then
+		return
+	end
+
+	aimTriggerHeld = true
+	aimTriggerStartedAt = os.clock()
+	aimTriggerToken += 1
+	aimTriggerCharged = false
+	aimTriggerConsumed = false
+	local token = aimTriggerToken
+
+	task.delay(LOB_CHARGE_SECONDS, function()
+		if not active or not aimTriggerHeld or aimTriggerToken ~= token or aimTriggerConsumed then
+			return
+		end
+
+		aimTriggerCharged = true
+		setAiming(true)
+	end)
+end
+
+local function endAimTriggerCharge()
+	if not aimTriggerHeld then
+		return
+	end
+
+	local heldDuration = math.clamp(os.clock() - aimTriggerStartedAt, 0, MAX_LOB_CHARGE_SECONDS)
+	local shouldThrow = not aimTriggerConsumed
+	local shouldLob = aimTriggerCharged or heldDuration >= LOB_CHARGE_SECONDS
+	aimTriggerHeld = false
+	aimTriggerCharged = false
+	aimTriggerToken += 1
+
+	if shouldThrow then
+		if shouldLob then
+			setAiming(true)
+			requestThrow("Lob", heldDuration)
+		else
+			requestThrow("Direct", heldDuration)
+		end
+	end
+
+	aimTriggerConsumed = false
+	setAiming(false)
 end
 
 touchAimButton.InputBegan:Connect(function(input)
@@ -456,16 +691,25 @@ end
 
 local function bindAim()
 	unbindAim()
-	ContextActionService:BindAction(AIM_ACTION, function(_, inputState)
+	ContextActionService:BindAction(AIM_ACTION, function(_, inputState, inputObject)
 		if not active then
 			return Enum.ContextActionResult.Pass
 		end
 
+		local isGamepadTrigger = inputObject and inputObject.KeyCode == Enum.KeyCode.ButtonL2
 		if inputState == Enum.UserInputState.Begin then
-			setAiming(true)
+			if isGamepadTrigger then
+				beginAimTriggerCharge()
+			else
+				setAiming(true)
+			end
 			return Enum.ContextActionResult.Sink
 		elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
-			setAiming(false)
+			if isGamepadTrigger then
+				endAimTriggerCharge()
+			else
+				setAiming(false)
+			end
 			return Enum.ContextActionResult.Sink
 		end
 
@@ -503,6 +747,30 @@ local function bindJumpAim()
 	)
 end
 
+local function bindLook()
+	unbindLook()
+	ContextActionService:BindActionAtPriority(
+		LOOK_ACTION,
+		function(_, inputState, inputObject)
+			if not active or not inputObject or inputObject.KeyCode ~= Enum.KeyCode.Thumbstick2 then
+				return Enum.ContextActionResult.Pass
+			end
+
+			if inputState == Enum.UserInputState.Begin or inputState == Enum.UserInputState.Change then
+				setRightStickInput(inputObject.Position.X, inputObject.Position.Y)
+			elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
+				rightStickX = 0
+				rightStickY = 0
+			end
+
+			return if cameraMode == "Normal" then Enum.ContextActionResult.Pass else Enum.ContextActionResult.Sink
+		end,
+		false,
+		Enum.ContextActionPriority.High.Value + 9,
+		Enum.KeyCode.Thumbstick2
+	)
+end
+
 local function restoreCamera()
 	if not active then
 		return
@@ -513,11 +781,16 @@ local function restoreCamera()
 	rightStickX = 0
 	rightStickY = 0
 	touchAimInput = nil
+	aimTriggerHeld = false
+	aimTriggerCharged = false
+	aimTriggerConsumed = false
+	aimTriggerToken += 1
 	setAiming(false)
 	RunService:UnbindFromRenderStep(RENDER_STEP_NAME)
 	unbindThrow()
 	unbindAim()
 	unbindJumpAim()
+	unbindLook()
 
 	if inputConnection then
 		inputConnection:Disconnect()
@@ -530,6 +803,9 @@ local function restoreCamera()
 	end
 
 	local camera = workspace.CurrentCamera
+	if savedCameraState and savedCameraState.PlayerCameraMode then
+		player.CameraMode = savedCameraState.PlayerCameraMode
+	end
 	if camera and savedCameraState then
 		camera.CameraType = savedCameraState.CameraType or Enum.CameraType.Custom
 		camera.CameraSubject = savedCameraState.CameraSubject
@@ -540,6 +816,7 @@ local function restoreCamera()
 	end
 
 	savedCameraState = nil
+	restoreLocalCharacterVisibility()
 end
 
 local function updateCamera(deltaTime)
@@ -548,6 +825,7 @@ local function updateCamera(deltaTime)
 	if not camera or not rootPart then
 		return
 	end
+	forceLocalCharacterVisible()
 
 	if cameraMode == "FPV" then
 		if math.abs(rightStickX) > 0.08 then
@@ -555,12 +833,10 @@ local function updateCamera(deltaTime)
 		end
 
 		if math.abs(rightStickY) > 0.08 then
-			cameraPitch = math.clamp(cameraPitch + rightStickY * PITCH_SPEED * deltaTime, MIN_FPV_PITCH, MAX_FPV_PITCH)
+			cameraPitch = math.clamp(cameraPitch - rightStickY * PITCH_SPEED * deltaTime, MIN_FPV_PITCH, MAX_FPV_PITCH)
 		end
 	elseif cameraMode == "Overhead" then
-		if aiming then
-			updateOverheadAimFromStick()
-		elseif math.abs(rightStickX) > 0.08 then
+		if not aiming and math.abs(rightStickX) > 0.08 then
 			cameraYaw -= rightStickX * YAW_SPEED * deltaTime
 		end
 	end
@@ -569,7 +845,9 @@ local function updateCamera(deltaTime)
 	local marker = ensureAimMarker()
 	if marker then
 		if aiming and aimTarget then
-			marker.CFrame = CFrame.new(aimTarget) * CFrame.Angles(0, 0, math.rad(90))
+			local impactDiameter = getImpactDiameter()
+			marker.Size = Vector3.new(impactDiameter, 0.14, impactDiameter)
+			marker.CFrame = CFrame.new(aimTarget + Vector3.new(0, 0.04, 0))
 			marker.Transparency = 0.36
 		else
 			marker.Transparency = 1
@@ -615,7 +893,15 @@ local function enableCamera()
 		CameraSubject = camera.CameraSubject,
 		FieldOfView = camera.FieldOfView,
 		CFrame = camera.CFrame,
+		PlayerCameraMode = player.CameraMode,
 	}
+	player.CameraMode = Enum.CameraMode.Classic
+	local humanoid = getHumanoid()
+	if humanoid then
+		camera.CameraType = Enum.CameraType.Custom
+		camera.CameraSubject = humanoid
+	end
+	forceLocalCharacterVisible()
 	cameraHeight = DEFAULT_HEIGHT
 	backOffset = DEFAULT_BACK_OFFSET
 	cameraYaw = 0
@@ -623,12 +909,18 @@ local function enableCamera()
 	rightStickX = 0
 	rightStickY = 0
 	touchAimInput = nil
+	aimTriggerHeld = false
+	aimTriggerCharged = false
+	aimTriggerConsumed = false
+	aimTriggerStartedAt = 0
+	aimTriggerToken += 1
 	resetOverheadAim()
 	updateAmmoLabel()
 	updateTouchArenaButtons()
 	bindThrow()
 	bindAim()
 	bindJumpAim()
+	bindLook()
 
 	inputConnection = UserInputService.InputChanged:Connect(function(input, gameProcessed)
 		if not active then
@@ -640,9 +932,16 @@ local function enableCamera()
 			return
 		end
 
+		if input.UserInputType == Enum.UserInputType.MouseMovement and cameraMode == "FPV" then
+			if not gameProcessed then
+				cameraYaw -= input.Delta.X * MOUSE_LOOK_SENSITIVITY
+				cameraPitch = math.clamp(cameraPitch - input.Delta.Y * MOUSE_LOOK_SENSITIVITY, MIN_FPV_PITCH, MAX_FPV_PITCH)
+			end
+			return
+		end
+
 		if input.KeyCode == Enum.KeyCode.Thumbstick2 then
-			rightStickX = math.abs(input.Position.X) > 0.08 and input.Position.X or 0
-			rightStickY = math.abs(input.Position.Y) > 0.08 and input.Position.Y or 0
+			setRightStickInput(input.Position.X, input.Position.Y)
 			return
 		end
 
@@ -715,6 +1014,10 @@ end)
 
 ProximityPromptService.PromptShown:Connect(function(prompt)
 	if not prompt or not prompt:IsA("ProximityPrompt") then
+		return
+	end
+
+	if not promptSuppressesArenaButtons(prompt) then
 		return
 	end
 

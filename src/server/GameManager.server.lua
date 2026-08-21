@@ -17,6 +17,7 @@ local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
 local RoomBuilder = require(script.Parent:WaitForChild("RoomBuilder"))
 local StartingGearService = require(script.Parent:WaitForChild("StartingGearService"))
+local TutorialPreferencesService = require(script.Parent:WaitForChild("TutorialPreferencesService"))
 local UiLayoutService = require(script.Parent:WaitForChild("UiLayoutService"))
 local VictoryBrickService = require(script.Parent:WaitForChild("VictoryBrickService"))
 
@@ -45,6 +46,9 @@ locationPingService:Initialize()
 
 local playerPreferencesService = PlayerPreferencesService.new(Constants)
 playerPreferencesService:Initialize()
+
+local tutorialPreferencesService = TutorialPreferencesService.new()
+tutorialPreferencesService:Initialize(playerPreferencesService)
 
 local uiLayoutService = UiLayoutService.new()
 uiLayoutService:Initialize(playerPreferencesService)
