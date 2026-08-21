@@ -169,6 +169,10 @@ local INVENTORY_DROP_COOLDOWN = 0.45
 local INVENTORY_DROP_DISTANCE = 5.2
 local INVENTORY_DROP_RAY_HEIGHT = 7.5
 local INVENTORY_DROP_RAY_DEPTH = 22
+local INVENTORY_DROP_DECAY_DELAY = 7
+local INVENTORY_DROP_DECAY_DURATION = 18
+local INVENTORY_DROP_ABSORB_DELAY = 34
+local INVENTORY_DROP_ABSORB_DURATION = 3.2
 local SECURITY_WEIGHT_DROP_MARGIN = 2.2
 
 local BOWLING_COSMIC_COLORS = {
@@ -1838,6 +1842,34 @@ function InteractionService:_fadeAndDestroyDroppedInventory(root)
 	Debris:AddItem(root, 0.24)
 end
 
+function InteractionService:_scheduleDroppedInventoryAbsorb(root, itemData)
+	if not root or not root.Parent or root:GetAttribute("DroppedInventoryAbsorbScheduled") == true then
+		return
+	end
+
+	root:SetAttribute("DroppedInventoryAbsorbScheduled", true)
+	task.delay(math.max(0, INVENTORY_DROP_ABSORB_DELAY - 0.05), function()
+		if root and root.Parent then
+			root:SetAttribute("DroppedInventoryClaimed", true)
+		end
+	end)
+
+	self:_scheduleBunkerReclaim(root, {
+		Delay = INVENTORY_DROP_ABSORB_DELAY,
+		Duration = INVENTORY_DROP_ABSORB_DURATION,
+		SinkDistance = 2.4,
+		DriftDistance = 0.24,
+		DecayDelay = INVENTORY_DROP_DECAY_DELAY,
+		DecayDuration = INVENTORY_DROP_DECAY_DURATION,
+		Key = "dropped_inventory",
+		DecayMessage = "Dropped supplies go dull at the edges. The bunker has noticed loose inventory.",
+		Message = ("%s sinks into the bunker before it can become a storage policy."):format(
+			(itemData and itemData.Name) or "A dropped item"
+		),
+		PowerPartCount = 1,
+	})
+end
+
 function InteractionService:_createDroppedInventoryPart(itemData, cframe)
 	local kind = itemData and itemData.Kind or "Item"
 	local inventoryType = itemData and itemData.InventoryType or "PocketItem"
@@ -1915,10 +1947,6 @@ function InteractionService:_attachDroppedPocketItemPrompt(primary, itemData)
 	prompt.Parent = primary
 
 	self:_connectPrompt(prompt, function(player)
-		if itemData.Kind == TOP_DOWN_WATER_BALLOON_KIND and not self:_canTopDownPlayerLoadBalloons(player, true) then
-			return
-		end
-
 		if not self:_claimDroppedInventoryRoot(primary) then
 			return
 		end
@@ -2050,6 +2078,7 @@ function InteractionService:_spawnDroppedInventoryItem(player, itemData, cframe)
 	else
 		playSound(part, "rbxasset://sounds/button.wav", 0.25, 0.72)
 	end
+	self:_scheduleDroppedInventoryAbsorb(part, itemData)
 	self.systemMessageRemote:FireClient(player, ("%s dropped."):format(itemData.Name or "Item"))
 	return true
 end

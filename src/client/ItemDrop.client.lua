@@ -11,13 +11,16 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local inventoryRemote = remotes:WaitForChild(Constants.Remotes.InventoryAction)
 
 local DROP_ACTION = "DontTouchItDropEquippedItem"
-local DROP_GAMEPAD_KEY = Enum.KeyCode.ButtonB
+local DROP_GAMEPAD_KEY = Enum.KeyCode.DPadDown
+local DROP_GAMEPAD_ALT_KEY = Enum.KeyCode.ButtonB
 local DROP_KEYBOARD_KEY = Enum.KeyCode.Backspace
+local DROP_KEYBOARD_ALT_KEY = Enum.KeyCode.Q
 local GAMEPAD_HOLD_SECONDS = 0.65
 local CLIENT_DROP_COOLDOWN = 0.25
 
 local lastDropAt = 0
 local holdToken = 0
+local activeGamepadDropKey = nil
 local characterConnections = {}
 local dropControl = nil
 
@@ -90,11 +93,19 @@ local function requestDrop()
 	})
 end
 
-local function cancelGamepadHold()
+local function cancelGamepadHold(keyCode)
+	if keyCode and activeGamepadDropKey ~= keyCode then
+		return false
+	end
+
+	local hadActiveHold = activeGamepadDropKey ~= nil
 	holdToken += 1
+	activeGamepadDropKey = nil
+	return hadActiveHold
 end
 
-local function beginGamepadHold()
+local function beginGamepadHold(keyCode)
+	activeGamepadDropKey = keyCode
 	holdToken += 1
 	local token = holdToken
 	task.delay(GAMEPAD_HOLD_SECONDS, function()
@@ -106,11 +117,23 @@ local function beginGamepadHold()
 end
 
 local function handleDropAction(_, inputState, inputObject)
-	local isGamepadDrop = inputObject and inputObject.KeyCode == DROP_GAMEPAD_KEY
+	local isGamepadDrop = inputObject
+		and (inputObject.KeyCode == DROP_GAMEPAD_KEY or inputObject.KeyCode == DROP_GAMEPAD_ALT_KEY)
+	local shouldPassGamepad = inputObject and inputObject.KeyCode == DROP_GAMEPAD_ALT_KEY
 
 	if inputState == Enum.UserInputState.Begin then
 		if isGamepadDrop then
-			beginGamepadHold()
+			if isBlockingUiOpen() or not getEquippedDroppableTool() then
+				updateDropButtonVisibility()
+				return Enum.ContextActionResult.Pass
+			end
+
+			beginGamepadHold(inputObject.KeyCode)
+			return if shouldPassGamepad then Enum.ContextActionResult.Pass else Enum.ContextActionResult.Sink
+		end
+
+		if isBlockingUiOpen() or not getEquippedDroppableTool() then
+			updateDropButtonVisibility()
 			return Enum.ContextActionResult.Pass
 		end
 
@@ -118,12 +141,12 @@ local function handleDropAction(_, inputState, inputObject)
 		return Enum.ContextActionResult.Sink
 	elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 		if isGamepadDrop then
-			cancelGamepadHold()
-			return Enum.ContextActionResult.Pass
+			local hadActiveHold = cancelGamepadHold(inputObject.KeyCode)
+			return if hadActiveHold and not shouldPassGamepad then Enum.ContextActionResult.Sink else Enum.ContextActionResult.Pass
 		end
 	end
 
-	return if isGamepadDrop then Enum.ContextActionResult.Pass else Enum.ContextActionResult.Sink
+	return if shouldPassGamepad then Enum.ContextActionResult.Pass else Enum.ContextActionResult.Sink
 end
 
 local function disconnectCharacterConnections()
@@ -155,8 +178,8 @@ local function setupTouchDropButton()
 		Label = "Drop",
 		Text = "Drop",
 		Order = 40,
-		Desktop = "Backspace",
-		Xbox = "Hold B",
+		Desktop = "Q / Backspace",
+		Xbox = "Hold D-pad down",
 		Touch = "Drop button",
 		Position = UDim2.new(0, 626, 0, 320),
 		TextColor = Color3.fromRGB(255, 235, 194),
@@ -168,7 +191,15 @@ local function setupTouchDropButton()
 end
 
 ContextActionService:UnbindAction(DROP_ACTION)
-ContextActionService:BindAction(DROP_ACTION, handleDropAction, false, DROP_KEYBOARD_KEY, DROP_GAMEPAD_KEY)
+ContextActionService:BindAction(
+	DROP_ACTION,
+	handleDropAction,
+	false,
+	DROP_KEYBOARD_KEY,
+	DROP_KEYBOARD_ALT_KEY,
+	DROP_GAMEPAD_KEY,
+	DROP_GAMEPAD_ALT_KEY
+)
 
 pcall(function()
 	ContextActionService:SetTitle(DROP_ACTION, "Drop")

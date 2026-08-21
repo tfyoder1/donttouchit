@@ -2156,6 +2156,7 @@ local function makeCaveEntranceArea(roomFolder)
 	flashlightLens:SetAttribute("BaseTransparency", 0.18)
 	local flashlightPrompt = createPrompt(flashlightBody, "Take", "Flashlight", 0)
 	flashlightPrompt.MaxActivationDistance = 12
+	flashlightPrompt.RequiresLineOfSight = false
 	flashlightPrompt:SetAttribute("PrologueSafeNavigation", true)
 	flashlightPrompt:SetAttribute("TutorialId", "StartingFlashlightPickup")
 	flashlightPrompt:SetAttribute("TutorialHint", "Take the flashlight. Equip it from inventory, then press Action to turn it on or off.")
