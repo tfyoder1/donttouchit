@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -111,6 +112,111 @@ local activePrompt = nil
 local activeTween = nil
 local shadeTween = nil
 local activePromptConnections = {}
+local viewportConnection = nil
+
+local DEFAULT_FOOTER_TEXT = "Use the nearby prompt to continue."
+
+local function getViewportSize()
+	local camera = workspace.CurrentCamera
+	if camera then
+		return camera.ViewportSize
+	end
+
+	return gui.AbsoluteSize
+end
+
+local function usesTouchToastLayout()
+	return UserInputService.TouchEnabled
+end
+
+local function getPromptFooterText(prompt)
+	if usesTouchToastLayout() and prompt then
+		local actionText = prompt.ActionText
+		if typeof(actionText) == "string" and actionText ~= "" then
+			return string.format("Tap %s to continue.", actionText)
+		end
+
+		return "Tap the prompt to continue."
+	end
+
+	return DEFAULT_FOOTER_TEXT
+end
+
+local function applyPanelLayout()
+	local viewport = getViewportSize()
+	local compactTouch = usesTouchToastLayout()
+	local phoneLike = compactTouch and math.min(viewport.X, viewport.Y) <= 700
+
+	if compactTouch then
+		panel.AnchorPoint = Vector2.new(0.5, 0)
+		panel.Position = UDim2.new(0.5, 0, 0, phoneLike and 72 or 82)
+		panel.Size = UDim2.new(phoneLike and 0.48 or 0.52, 0, 0, phoneLike and 122 or 132)
+		sizeConstraint.MinSize = Vector2.new(phoneLike and 292 or 340, phoneLike and 108 or 118)
+		sizeConstraint.MaxSize = Vector2.new(phoneLike and 440 or 520, phoneLike and 128 or 140)
+
+		accent.Position = UDim2.new(0, 16, 0, 35)
+		accent.Size = UDim2.new(1, -32, 0, 2)
+
+		title.TextSize = phoneLike and 16 or 18
+		title.Position = UDim2.new(0, 16, 0, 8)
+		title.Size = UDim2.new(1, -32, 0, 24)
+
+		body.TextSize = phoneLike and 16 or 18
+		body.Position = UDim2.new(0, 16, 0, 45)
+		body.Size = UDim2.new(1, -32, 1, -68)
+
+		footer.TextSize = phoneLike and 11 or 12
+		footer.Position = UDim2.new(0, 16, 1, -20)
+		footer.Size = UDim2.new(1, -32, 0, 16)
+	else
+		panel.AnchorPoint = Vector2.new(0.5, 0.5)
+		panel.Position = UDim2.new(0.5, 0, 0.38, 0)
+		panel.Size = UDim2.new(0.64, 0, 0, 156)
+		sizeConstraint.MinSize = Vector2.new(360, 132)
+		sizeConstraint.MaxSize = Vector2.new(680, 172)
+
+		accent.Position = UDim2.new(0, 22, 0, 46)
+		accent.Size = UDim2.new(1, -44, 0, 2)
+
+		title.TextSize = 22
+		title.Position = UDim2.new(0, 24, 0, 15)
+		title.Size = UDim2.new(1, -48, 0, 28)
+
+		body.TextSize = 23
+		body.Position = UDim2.new(0, 24, 0, 64)
+		body.Size = UDim2.new(1, -48, 1, -78)
+
+		footer.TextSize = 14
+		footer.Position = UDim2.new(0, 24, 1, -28)
+		footer.Size = UDim2.new(1, -48, 0, 18)
+	end
+end
+
+local function getShadeTargetTransparency()
+	if usesTouchToastLayout() then
+		return 1
+	end
+
+	return 0.52
+end
+
+local function handleViewportChanged()
+	if activePrompt or panel.Visible then
+		applyPanelLayout()
+	end
+end
+
+local function bindViewportListener()
+	if viewportConnection then
+		viewportConnection:Disconnect()
+		viewportConnection = nil
+	end
+
+	local camera = workspace.CurrentCamera
+	if camera then
+		viewportConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(handleViewportChanged)
+	end
+end
 
 local function disconnectActivePromptConnections()
 	for _, connection in ipairs(activePromptConnections) do
@@ -179,7 +285,11 @@ local function setPanelVisible(visible)
 	end
 
 	if visible then
-		shade.Visible = true
+		applyPanelLayout()
+
+		local shadeTargetTransparency = getShadeTargetTransparency()
+		local showShade = shadeTargetTransparency < 1
+		shade.Visible = showShade
 		panel.Visible = true
 		shade.BackgroundTransparency = 1
 		panel.BackgroundTransparency = 1
@@ -192,9 +302,11 @@ local function setPanelVisible(visible)
 			BackgroundTransparency = 0.08,
 		})
 		shadeTween = TweenService:Create(shade, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			BackgroundTransparency = 0.52,
+			BackgroundTransparency = shadeTargetTransparency,
 		})
-		shadeTween:Play()
+		if showShade then
+			shadeTween:Play()
+		end
 		activeTween:Play()
 		TweenService:Create(title, TweenInfo.new(0.16), { TextTransparency = 0 }):Play()
 		TweenService:Create(body, TweenInfo.new(0.16), { TextTransparency = 0 }):Play()
@@ -265,9 +377,15 @@ local function showHint(prompt, hint)
 	disconnectActivePromptConnections()
 	activePrompt = prompt
 	body.Text = hint
+	footer.Text = getPromptFooterText(prompt)
 	watchActivePrompt(prompt)
 	setPanelVisible(true)
 end
+
+bindViewportListener()
+
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewportListener)
+UserInputService.LastInputTypeChanged:Connect(handleViewportChanged)
 
 ProximityPromptService.PromptShown:Connect(function(prompt)
 	local hint = findHint(prompt)
