@@ -280,6 +280,26 @@ function VictoryBrickService:_takeSlotByIndex(availableSlots, requestedSlotIndex
 	return nil
 end
 
+function VictoryBrickService:_applyFixedBricks(availableSlots)
+	local fixedBricks = Constants.VictoryWalkway.FixedBricks
+	if typeof(fixedBricks) ~= "table" then
+		return
+	end
+
+	for _, fixedBrick in ipairs(fixedBricks) do
+		if typeof(fixedBrick) == "table" then
+			local slot = self:_takeSlotByIndex(availableSlots, fixedBrick.SlotIndex)
+			if slot then
+				self:_applyRecordToSlot(slot, {
+					Username = fixedBrick.Username,
+					DisplayName = fixedBrick.DisplayName or fixedBrick.Username,
+					Tier = fixedBrick.Tier == DELUXE_TIER and DELUXE_TIER or STANDARD_TIER,
+				})
+			end
+		end
+	end
+end
+
 function VictoryBrickService:_applyLayout()
 	if #self.slots == 0 then
 		self:_captureSlots()
@@ -290,6 +310,7 @@ function VictoryBrickService:_applyLayout()
 	end
 
 	local availableSlots = table.clone(self.slots)
+	self:_applyFixedBricks(availableSlots)
 	local records = self:_buildRecordList()
 	local standardRecords = {}
 

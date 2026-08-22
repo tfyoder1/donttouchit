@@ -1,10 +1,15 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
+local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local TouchControls = require(script.Parent:WaitForChild("TouchControls"))
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local inventoryRemote = remotes:WaitForChild(Constants.Remotes.InventoryAction)
 
 local CONSUMABLE_HOLD_SECONDS = 0.45
+local FLASHLIGHT_ATTRIBUTE = "DontTouchItFlashlight"
 local CONSUMABLE_PROMPT_NAMES = {
 	DroppedEnergyPocketPrompt = true,
 	DroppedEnergyUsePrompt = true,
@@ -139,6 +144,13 @@ local function activateEquippedTool()
 	local tool = getEquippedUsableTool()
 	if not tool then
 		updateActionButton()
+		return
+	end
+
+	if tool:GetAttribute(FLASHLIGHT_ATTRIBUTE) == true then
+		inventoryRemote:FireServer({
+			Action = "ToggleFlashlight",
+		})
 		return
 	end
 

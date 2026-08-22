@@ -34,6 +34,21 @@ local function playerHasFlashlight(player)
 	return checkContainer(player.Character) or checkContainer(player:FindFirstChildOfClass("Backpack"))
 end
 
+local function getEquippedFlashlight(player)
+	local character = player and player.Character
+	if not character then
+		return nil
+	end
+
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Tool") and child:GetAttribute(FLASHLIGHT_ATTRIBUTE) == true then
+			return child
+		end
+	end
+
+	return nil
+end
+
 local function setFlashlightEnabled(tool, enabled)
 	tool:SetAttribute("FlashlightOn", enabled)
 
@@ -113,38 +128,6 @@ local function createFlashlightTool()
 
 	tool.Grip = CFrame.new(0, -0.08, -0.45) * CFrame.Angles(0, math.rad(90), 0)
 
-	local localToggle = Instance.new("LocalScript")
-	localToggle.Name = "FlashlightLocalToggle"
-	localToggle.Source = [[
-local tool = script.Parent
-
-local function setLights(enabled)
-	tool:SetAttribute("FlashlightOn", enabled)
-
-	local handle = tool:FindFirstChild("Handle")
-	if not handle then
-		return
-	end
-
-	for _, descendant in ipairs(handle:GetDescendants()) do
-		if descendant:IsA("Light") then
-			descendant.Enabled = enabled
-		elseif descendant:IsA("Beam") then
-			descendant.Enabled = enabled
-		end
-	end
-end
-
-tool.Activated:Connect(function()
-	if tool.Enabled == false then
-		return
-	end
-
-	setLights(tool:GetAttribute("FlashlightOn") ~= true)
-end)
-]]
-	localToggle.Parent = tool
-
 	tool.Activated:Connect(function()
 		if tool.Enabled == false then
 			return
@@ -180,6 +163,15 @@ function StartingGearService:GrantFlashlight(player)
 
 	player:SetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE, true)
 	self:_grantFlashlight(player)
+end
+
+function StartingGearService:_toggleEquippedFlashlight(player)
+	local tool = getEquippedFlashlight(player)
+	if not tool or tool.Enabled == false then
+		return
+	end
+
+	setFlashlightEnabled(tool, tool:GetAttribute("FlashlightOn") ~= true)
 end
 
 function StartingGearService:_sendSystemMessage(player, text)
@@ -235,6 +227,16 @@ function StartingGearService:Initialize()
 
 	CollectionService:GetInstanceAddedSignal(Constants.Tags.StartingFlashlight):Connect(function(instance)
 		self:_wireFlashlightPickup(instance)
+	end)
+
+	local remotes = ReplicatedStorage:WaitForChild("Remotes")
+	local inventoryActionRemote = remotes:WaitForChild(Constants.Remotes.InventoryAction)
+	inventoryActionRemote.OnServerEvent:Connect(function(player, payload)
+		if typeof(payload) ~= "table" or payload.Action ~= "ToggleFlashlight" then
+			return
+		end
+
+		self:_toggleEquippedFlashlight(player)
 	end)
 end
 

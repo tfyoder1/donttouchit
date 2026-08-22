@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.248"
+Constants.BuildVersion = "0.5.249"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -467,6 +467,14 @@ Constants.VictoryWalkway = {
 	CavePriorityPosition = Vector3.new(-46, 0, 55),
 	EmptyBrickText = "FUTURE\nWINNER",
 	DeluxeTextPrefix = "DELUXE",
+	FixedBricks = {
+		{
+			SlotIndex = 1,
+			Username = "BigAlGamer01",
+			DisplayName = "BigAlGamer01",
+			Tier = "Standard",
+		},
+	},
 	StandardBrickColorA = Color3.fromRGB(180, 96, 62),
 	StandardBrickColorB = Color3.fromRGB(124, 72, 48),
 	SignedBrickColor = Color3.fromRGB(154, 82, 56),
