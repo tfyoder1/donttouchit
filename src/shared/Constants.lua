@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.261"
+Constants.BuildVersion = "0.5.262"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -1894,6 +1894,10 @@ for _, room in pairs(Constants.Rooms) do
 end
 
 Constants.RoomUnlockRules = {
+	SleepingQuarters = {
+		RequiredRoomId = "Infirmary",
+		Count = 1,
+	},
 	SecurityRoom = {
 		RequiredRoomId = "SleepingQuarters",
 		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
@@ -1904,7 +1908,7 @@ Constants.RoomUnlockRules = {
 	},
 	SnackLab = {
 		RequiredRoomId = "TVRoom",
-		Fraction = Constants.Hallway.UnlockDiscoveryFraction,
+		Count = 7,
 	},
 	Island = {
 		RequiredRoomId = "SnackLab",
@@ -2098,6 +2102,10 @@ function Constants.GetRoomUnlockRequirement(roomId)
 	local requiredRoom = Constants.GetRoom(rule.RequiredRoomId)
 	if not requiredRoom then
 		return nil
+	end
+
+	if typeof(rule.Count) == "number" then
+		return rule.RequiredRoomId, math.max(0, math.floor(rule.Count))
 	end
 
 	return rule.RequiredRoomId, math.ceil(#requiredRoom.DiscoveryOrder * rule.Fraction)

@@ -15,6 +15,17 @@ InteractionService.__index = InteractionService
 
 local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
 
+local ROOM_UNLOCK_NOTICES = {
+	SnackLab = {
+		SoundId = Constants.AudioAssets.Prologue.LockdownDoorEchoId,
+		Message = "Somewhere in the hallway, a door opens with a tired metal sigh.",
+	},
+	TopDownArena = {
+		SoundId = Constants.AudioAssets.Prologue.LockdownDoorEchoId,
+		Message = "Somewhere beyond the bunks, the training door unlocks.",
+	},
+}
+
 local COUCH_GET_UP_LABELS = {
 	"Try to Get Up",
 	"Ask Nicely",
@@ -680,6 +691,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	}
 	self.inventoryDropAtByUserId = {}
 	self.bunkerReclaimMessageAtByKey = {}
+	self.roomUnlockNoticeByUserId = {}
 	self.objectRainSortLastAt = 0
 	self.objectRainSortRandom = Random.new()
 	return self
@@ -760,6 +772,7 @@ function InteractionService:Initialize()
 		self.discoveryService.DiscoveryUnlocked:Connect(function(player)
 			self:_checkExitUnlock(player)
 			self:_refreshSecretDoorsForPlayer(player)
+			self:_checkRoomUnlockNotices(player)
 		end)
 	end
 
@@ -772,6 +785,7 @@ function InteractionService:Initialize()
 	Players.PlayerAdded:Connect(function(player)
 		task.delay(1.5, function()
 			if player.Parent then
+				self:_snapshotRoomUnlockNotices(player)
 				self:_refreshSecretDoorsForPlayer(player)
 				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id) then
 					self:_grantFreezeRay(player)
@@ -808,6 +822,7 @@ function InteractionService:Initialize()
 		self.topDownBucketTouchAtByUserId[player.UserId] = nil
 		self.topDownTeamByUserId[player.UserId] = nil
 		self.inventoryDropAtByUserId[player.UserId] = nil
+		self.roomUnlockNoticeByUserId[player.UserId] = nil
 		task.defer(function()
 			self:_updateTopDownScoreboards()
 			self:_updateTopDownReadyStations()
@@ -7583,6 +7598,54 @@ function InteractionService:_wireHallDoor(door)
 	end, {
 		PrologueSafeNavigation = true,
 	})
+end
+
+function InteractionService:_snapshotRoomUnlockNotices(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	local state = {}
+	for roomId in pairs(ROOM_UNLOCK_NOTICES) do
+		state[roomId] = self.discoveryService:IsRoomUnlocked(player, roomId) == true
+	end
+	self.roomUnlockNoticeByUserId[player.UserId] = state
+end
+
+function InteractionService:_findRoomDoor(roomId)
+	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.HallDoor)) do
+		if door:GetAttribute("RoomId") == roomId then
+			return door
+		end
+	end
+
+	return nil
+end
+
+function InteractionService:_checkRoomUnlockNotices(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	local state = self.roomUnlockNoticeByUserId[player.UserId]
+	if not state then
+		state = {}
+		self.roomUnlockNoticeByUserId[player.UserId] = state
+	end
+
+	for roomId, notice in pairs(ROOM_UNLOCK_NOTICES) do
+		if not state[roomId] and self.discoveryService:IsRoomUnlocked(player, roomId) then
+			state[roomId] = true
+			if typeof(notice.Message) == "string" then
+				self.systemMessageRemote:FireClient(player, notice.Message)
+			end
+
+			local door = self:_findRoomDoor(roomId)
+			if typeof(notice.SoundId) == "string" then
+				playSound(door or workspace, notice.SoundId, 0.65, 0.42)
+			end
+		end
+	end
 end
 
 function InteractionService:_getRoomDoorRequirementText(player, roomId)

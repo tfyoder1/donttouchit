@@ -3918,6 +3918,7 @@ local function makeHallway(roomFolder)
 		"SLEEPING\nQUARTERS",
 		SLEEPING_QUARTERS_SPAWN_CFRAME
 	)
+	sleepingDoor:SetAttribute("RoomId", "SleepingQuarters")
 	sleepingDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.SleepingEntered.Id)
 	sleepingDoor:SetAttribute("TravelMessage", "Sleeping Quarters unlocked. There are definitely enough beds.")
 
