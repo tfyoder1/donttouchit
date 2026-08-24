@@ -86,7 +86,7 @@ local function createPrompt(parent, actionText, objectText, holdDuration)
 	prompt.ActionText = actionText
 	prompt.ObjectText = objectText
 	prompt.HoldDuration = holdDuration or 0
-	prompt.RequiresLineOfSight = false
+	prompt.RequiresLineOfSight = true
 	prompt.ClickablePrompt = true
 	prompt.MaxActivationDistance = 10
 	prompt.UIOffset = Vector2.new(0, 34)

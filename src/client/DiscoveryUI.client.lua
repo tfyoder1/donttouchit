@@ -888,6 +888,7 @@ victoryBrickOkCorner.Parent = victoryBrickOk
 local function hideVictoryBrickModal()
 	victoryBrickShade.Visible = false
 	victoryBrickModal.Visible = false
+	UiLayerController.SetRoomMenuOpen(gui, false)
 end
 
 local function showVictoryBrickModal(payload)
@@ -906,6 +907,7 @@ local function showVictoryBrickModal(payload)
 		if slotIndex then ("Walkway slot: %d\n"):format(slotIndex) else "",
 		"Recorded accomplishment: completed the bunker."
 	)
+	UiLayerController.SetRoomMenuOpen(gui, true)
 	victoryBrickShade.Visible = true
 	victoryBrickModal.Visible = true
 end
