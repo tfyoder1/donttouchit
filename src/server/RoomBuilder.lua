@@ -89,6 +89,7 @@ local function createPrompt(parent, actionText, objectText, holdDuration)
 	prompt.RequiresLineOfSight = false
 	prompt.ClickablePrompt = true
 	prompt.MaxActivationDistance = 10
+	prompt.UIOffset = Vector2.new(0, 34)
 	prompt.Parent = parent
 	mark(prompt)
 	return prompt
