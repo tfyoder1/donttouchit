@@ -227,6 +227,12 @@ function VictoryBrickService:_resetBrick(slot)
 		slot.Label.BackgroundColor3 = part.Color
 	end
 
+	local prompt = part:FindFirstChild("InteractPrompt")
+	if prompt and prompt:IsA("ProximityPrompt") then
+		prompt.ActionText = "Choose"
+		prompt.ObjectText = "Deluxe Brick Spot"
+	end
+
 	for _, border in ipairs(slot.Borders) do
 		if border.Parent then
 			border.Transparency = 1
@@ -253,6 +259,12 @@ function VictoryBrickService:_applyRecordToSlot(slot, record)
 		slot.Label.Text = formatBrickText(record)
 		slot.Label.TextColor3 = if isDeluxe then Color3.fromRGB(255, 239, 165) else Color3.fromRGB(255, 226, 174)
 		slot.Label.BackgroundColor3 = part.Color
+	end
+
+	local prompt = part:FindFirstChild("InteractPrompt")
+	if prompt and prompt:IsA("ProximityPrompt") then
+		prompt.ActionText = "Read"
+		prompt.ObjectText = if isDeluxe then "Deluxe Victory Brick" else "Victory Brick"
 	end
 
 	for _, border in ipairs(slot.Borders) do

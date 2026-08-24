@@ -32,6 +32,7 @@ local lastInspectLookVector = nil
 local lastInspectSampleAt = 0
 local lastInspectSignature = nil
 local lastInspectCandidateIndex = 1
+local shownInspectDescriptions = {}
 local shudderToken = 0
 
 local FLASHLIGHT_LIGHT_COLOR = Color3.fromRGB(255, 226, 170)
@@ -635,12 +636,14 @@ local function getPrologueDescriptionData(instance)
 	local prompt = getPromptNear(instance)
 	if prompt and prompt.ObjectText ~= "" then
 		local ownsFlashlight = player:GetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE) == true
+		if not ownsFlashlight then
+			return nil
+		end
+
 		return {
 			Key = prompt:GetFullName(),
 			Priority = tonumber(prompt:GetAttribute("ProloguePriority")) or 60,
-			Text = if ownsFlashlight
-				then ("The flashlight catches %s. It looks much less harmless in the dark."):format(prompt.ObjectText)
-				else ("%s is close enough to notice, even without a light."):format(prompt.ObjectText),
+			Text = ("The flashlight catches %s. It looks much less harmless in the dark."):format(prompt.ObjectText),
 		}
 	end
 
@@ -790,6 +793,21 @@ local function getInspectionSignature(candidates)
 	return table.concat(keys, "|")
 end
 
+local function getUnseenInspectionCandidates(candidates)
+	local now = os.clock()
+	local cooldown = Constants.Prologue.InspectDescriptionCooldownSeconds or 26
+	local unseen = {}
+
+	for _, candidate in ipairs(candidates) do
+		local lastShownAt = shownInspectDescriptions[candidate.Key]
+		if not lastShownAt or now - lastShownAt >= cooldown then
+			table.insert(unseen, candidate)
+		end
+	end
+
+	return unseen
+end
+
 local function shouldSampleInspection(camera)
 	local now = os.clock()
 	local root = getRootPart()
@@ -854,6 +872,16 @@ local function updateInspection(deltaTime)
 		return
 	end
 
+	local unseenCandidates = getUnseenInspectionCandidates(candidates)
+	if #unseenCandidates > 0 then
+		candidates = unseenCandidates
+	elseif description.Visible then
+		return
+	else
+		description.Visible = false
+		return
+	end
+
 	local signature = getInspectionSignature(candidates)
 	if moved and signature == lastInspectSignature and #candidates > 1 then
 		lastInspectCandidateIndex = (lastInspectCandidateIndex % #candidates) + 1
@@ -865,6 +893,7 @@ local function updateInspection(deltaTime)
 	local selected = candidates[lastInspectCandidateIndex] or candidates[1]
 	description.Text = selected.Text
 	description.Visible = true
+	shownInspectDescriptions[selected.Key] = os.clock()
 end
 
 local function getFlashlightRaycast(camera, range)

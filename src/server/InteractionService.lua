@@ -564,6 +564,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.topDownArenaRemote = RemoteService.GetRemote(Constants.Remotes.TopDownArena)
 	self.transformCameraRemote = RemoteService.GetRemote(Constants.Remotes.TransformCamera)
 	self.inventoryActionRemote = RemoteService.GetRemote(Constants.Remotes.InventoryAction)
+	self.victoryBrickReadRemote = RemoteService.GetRemote(Constants.Remotes.VictoryBrickRead)
 	self.connectedPrompts = {}
 	self.snackButtonRandom = Random.new()
 	self.couchState = {}
@@ -8800,6 +8801,15 @@ function InteractionService:_wireVictoryBrick(brick)
 		playSound(brick, "rbxasset://sounds/electronicpingshort.wav", 0.32, 1.18)
 
 		if typeof(displayName) == "string" and displayName ~= "" then
+			local isDeluxe = string.lower(tostring(tier or "")) == "deluxe"
+			self.victoryBrickReadRemote:FireClient(player, {
+				DisplayName = displayName,
+				Tier = if isDeluxe then "Deluxe" else "Standard",
+				SlotIndex = slotIndex,
+				Message = if isDeluxe
+					then "This deluxe victory brick was claimed after the bunker was completed."
+					else "This victory brick was signed after the bunker was completed.",
+			})
 			if string.lower(tostring(tier or "")) == "deluxe" then
 				self.systemMessageRemote:FireClient(player, ("%s claimed this deluxe victory brick."):format(displayName))
 			else

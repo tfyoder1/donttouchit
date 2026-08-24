@@ -19,6 +19,7 @@ local systemMessageRemote = remotes:WaitForChild(Constants.Remotes.SystemMessage
 local roomStatusRemote = remotes:WaitForChild(Constants.Remotes.RoomStatus)
 local sparkleRemote = remotes:WaitForChild(Constants.Remotes.SparkleHint)
 local feedbackRemote = remotes:WaitForChild(Constants.Remotes.FeedbackRequest)
+local victoryBrickReadRemote = remotes:WaitForChild(Constants.Remotes.VictoryBrickRead)
 local DEV_DISMISS_START_ATTRIBUTE = "DontTouchItDevDismissedStartIntro"
 local DEV_TITLE_SEQUENCE_ENABLED_ATTRIBUTE = "DontTouchItDevTitleSequenceEnabled"
 local DEV_SHOW_TITLE_SEQUENCE_NONCE_ATTRIBUTE = "DontTouchItDevShowTitleSequenceNonce"
@@ -765,6 +766,152 @@ workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateMessagePositio
 if workspace.CurrentCamera then
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateMessagePosition)
 end
+
+local victoryBrickShade = Instance.new("Frame")
+victoryBrickShade.Name = "VictoryBrickModalShade"
+victoryBrickShade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+victoryBrickShade.BackgroundTransparency = 0.45
+victoryBrickShade.BorderSizePixel = 0
+victoryBrickShade.Size = UDim2.fromScale(1, 1)
+victoryBrickShade.Visible = false
+victoryBrickShade.Active = true
+victoryBrickShade.ZIndex = 220
+victoryBrickShade.Parent = gui
+
+local victoryBrickModal = Instance.new("Frame")
+victoryBrickModal.Name = "VictoryBrickModal"
+victoryBrickModal.AnchorPoint = Vector2.new(0.5, 0.5)
+victoryBrickModal.BackgroundColor3 = Color3.fromRGB(24, 21, 26)
+victoryBrickModal.BackgroundTransparency = 0.03
+victoryBrickModal.BorderSizePixel = 0
+victoryBrickModal.Position = UDim2.fromScale(0.5, 0.5)
+victoryBrickModal.Size = UDim2.new(0.82, 0, 0, 260)
+victoryBrickModal.Visible = false
+victoryBrickModal.Active = true
+victoryBrickModal.ZIndex = 221
+victoryBrickModal.Parent = gui
+
+local victoryBrickModalConstraint = Instance.new("UISizeConstraint")
+victoryBrickModalConstraint.MaxSize = Vector2.new(520, 280)
+victoryBrickModalConstraint.MinSize = Vector2.new(300, 210)
+victoryBrickModalConstraint.Parent = victoryBrickModal
+
+local victoryBrickCorner = Instance.new("UICorner")
+victoryBrickCorner.CornerRadius = UDim.new(0, 8)
+victoryBrickCorner.Parent = victoryBrickModal
+
+local victoryBrickStroke = Instance.new("UIStroke")
+victoryBrickStroke.Color = Color3.fromRGB(255, 226, 174)
+victoryBrickStroke.Thickness = 2
+victoryBrickStroke.Transparency = 0.12
+victoryBrickStroke.Parent = victoryBrickModal
+
+local victoryBrickTitle = Instance.new("TextLabel")
+victoryBrickTitle.Name = "VictoryBrickTitle"
+victoryBrickTitle.BackgroundTransparency = 1
+victoryBrickTitle.Font = Enum.Font.GothamBlack
+victoryBrickTitle.Position = UDim2.fromOffset(18, 16)
+victoryBrickTitle.Size = UDim2.new(1, -82, 0, 34)
+victoryBrickTitle.Text = "Victory Brick"
+victoryBrickTitle.TextColor3 = Color3.fromRGB(255, 226, 174)
+victoryBrickTitle.TextScaled = true
+victoryBrickTitle.TextXAlignment = Enum.TextXAlignment.Left
+victoryBrickTitle.ZIndex = 222
+victoryBrickTitle.Parent = victoryBrickModal
+
+local victoryBrickClose = Instance.new("TextButton")
+victoryBrickClose.Name = "CloseVictoryBrick"
+victoryBrickClose.AnchorPoint = Vector2.new(1, 0)
+victoryBrickClose.BackgroundColor3 = Color3.fromRGB(62, 66, 78)
+victoryBrickClose.BorderSizePixel = 0
+victoryBrickClose.Font = Enum.Font.GothamBlack
+victoryBrickClose.Position = UDim2.new(1, -12, 0, 12)
+victoryBrickClose.Size = UDim2.fromOffset(48, 42)
+victoryBrickClose.Text = "X"
+victoryBrickClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+victoryBrickClose.TextScaled = true
+victoryBrickClose.Modal = false
+victoryBrickClose.ZIndex = 223
+victoryBrickClose.Parent = victoryBrickModal
+
+local victoryBrickCloseCorner = Instance.new("UICorner")
+victoryBrickCloseCorner.CornerRadius = UDim.new(0, 6)
+victoryBrickCloseCorner.Parent = victoryBrickClose
+
+local victoryBrickName = Instance.new("TextLabel")
+victoryBrickName.Name = "VictoryBrickName"
+victoryBrickName.BackgroundTransparency = 1
+victoryBrickName.Font = Enum.Font.GothamBlack
+victoryBrickName.Position = UDim2.fromOffset(18, 68)
+victoryBrickName.Size = UDim2.new(1, -36, 0, 48)
+victoryBrickName.Text = ""
+victoryBrickName.TextColor3 = Color3.fromRGB(255, 244, 201)
+victoryBrickName.TextScaled = true
+victoryBrickName.TextWrapped = true
+victoryBrickName.ZIndex = 222
+victoryBrickName.Parent = victoryBrickModal
+
+local victoryBrickBody = Instance.new("TextLabel")
+victoryBrickBody.Name = "VictoryBrickBody"
+victoryBrickBody.BackgroundTransparency = 1
+victoryBrickBody.Font = Enum.Font.GothamSemibold
+victoryBrickBody.Position = UDim2.fromOffset(22, 124)
+victoryBrickBody.Size = UDim2.new(1, -44, 1, -180)
+victoryBrickBody.Text = ""
+victoryBrickBody.TextColor3 = Color3.fromRGB(232, 236, 242)
+victoryBrickBody.TextScaled = true
+victoryBrickBody.TextWrapped = true
+victoryBrickBody.TextXAlignment = Enum.TextXAlignment.Left
+victoryBrickBody.TextYAlignment = Enum.TextYAlignment.Top
+victoryBrickBody.ZIndex = 222
+victoryBrickBody.Parent = victoryBrickModal
+
+local victoryBrickOk = Instance.new("TextButton")
+victoryBrickOk.Name = "VictoryBrickOk"
+victoryBrickOk.AnchorPoint = Vector2.new(1, 1)
+victoryBrickOk.BackgroundColor3 = Color3.fromRGB(255, 226, 174)
+victoryBrickOk.BorderSizePixel = 0
+victoryBrickOk.Font = Enum.Font.GothamBlack
+victoryBrickOk.Position = UDim2.new(1, -18, 1, -16)
+victoryBrickOk.Size = UDim2.fromOffset(112, 42)
+victoryBrickOk.Text = "OK"
+victoryBrickOk.TextColor3 = Color3.fromRGB(42, 32, 24)
+victoryBrickOk.TextScaled = true
+victoryBrickOk.Modal = false
+victoryBrickOk.ZIndex = 223
+victoryBrickOk.Parent = victoryBrickModal
+
+local victoryBrickOkCorner = Instance.new("UICorner")
+victoryBrickOkCorner.CornerRadius = UDim.new(0, 6)
+victoryBrickOkCorner.Parent = victoryBrickOk
+
+local function hideVictoryBrickModal()
+	victoryBrickShade.Visible = false
+	victoryBrickModal.Visible = false
+end
+
+local function showVictoryBrickModal(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	local displayName = tostring(payload.DisplayName or "Unknown Player")
+	local tier = tostring(payload.Tier or "Victory")
+	local slotIndex = tonumber(payload.SlotIndex)
+	local messageText = tostring(payload.Message or "This brick remembers a completed run.")
+	victoryBrickTitle.Text = if tier == "Deluxe" then "Deluxe Victory Brick" else "Victory Brick"
+	victoryBrickName.Text = displayName
+	victoryBrickBody.Text = ("%s\n\n%s%s"):format(
+		messageText,
+		if slotIndex then ("Walkway slot: %d\n"):format(slotIndex) else "",
+		"Recorded accomplishment: completed the bunker."
+	)
+	victoryBrickShade.Visible = true
+	victoryBrickModal.Visible = true
+end
+
+victoryBrickClose.Activated:Connect(hideVictoryBrickModal)
+victoryBrickOk.Activated:Connect(hideVictoryBrickModal)
 
 local bookPanel = Instance.new("Frame")
 bookPanel.Name = "ReferenceBook"
@@ -3052,6 +3199,8 @@ feedbackRemote.OnClientEvent:Connect(function(payload)
 	hintText.Text = text
 	showSystemMessage(text)
 end)
+
+victoryBrickReadRemote.OnClientEvent:Connect(showVictoryBrickModal)
 
 systemMessageRemote.OnClientEvent:Connect(function(text)
 	if typeof(text) == "string" and text ~= "" then
