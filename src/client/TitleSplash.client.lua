@@ -144,6 +144,22 @@ loadingDetail.TextSize = 15
 loadingDetail.TextWrapped = true
 loadingDetail.Parent = loadingGroup
 
+local versionLabel = Instance.new("TextLabel")
+versionLabel.Name = "VersionLabel"
+versionLabel.AnchorPoint = Vector2.new(1, 1)
+versionLabel.BackgroundTransparency = 1
+versionLabel.Font = Enum.Font.GothamMedium
+versionLabel.Position = UDim2.new(1, -14, 1, -10)
+versionLabel.Size = UDim2.new(0, 120, 0, 18)
+versionLabel.Text = "v" .. tostring(Constants.BuildVersion or "dev")
+versionLabel.TextColor3 = Color3.fromRGB(132, 144, 158)
+versionLabel.TextTransparency = 0.45
+versionLabel.TextScaled = false
+versionLabel.TextSize = 11
+versionLabel.TextXAlignment = Enum.TextXAlignment.Right
+versionLabel.TextYAlignment = Enum.TextYAlignment.Center
+versionLabel.Parent = root
+
 local contentGroup = Instance.new("Frame")
 contentGroup.Name = "Content"
 contentGroup.AnchorPoint = Vector2.new(0.5, 0.5)
