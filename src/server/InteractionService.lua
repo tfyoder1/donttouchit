@@ -7421,6 +7421,25 @@ function InteractionService:_unlockExitDoor(door)
 		return
 	end
 
+	if door:GetAttribute("InvisiblePassage") == true then
+		door.CanCollide = false
+		door.CanQuery = false
+		door.CanTouch = false
+		door.Transparency = 1
+		local prompt = getPrompt(door)
+		if prompt then
+			prompt.Enabled = false
+		end
+
+		local textLabel = door:FindFirstChild("DoorText", true)
+		if textLabel and textLabel:IsA("TextLabel") then
+			textLabel.Text = ""
+		end
+
+		self:_persistResetBaseline(door)
+		return
+	end
+
 	door.CanCollide = false
 	door.Transparency = 0.48
 	door.Color = Color3.fromRGB(61, 217, 132)

@@ -288,6 +288,7 @@ function RoomProgressService:_getState(player)
 			StartChoiceHandled = false,
 			UntouchedPrologueActive = false,
 			UntouchedPrologueTriggered = false,
+			UntouchedPrologueContained = false,
 			TwoMinuteAwarded = {},
 			BonusAwarded = {},
 		}
@@ -390,6 +391,7 @@ function RoomProgressService:_beginUntouchedPrologue(player)
 	state.StartChoiceHandled = true
 	state.UntouchedPrologueActive = true
 	state.UntouchedPrologueTriggered = false
+	state.UntouchedPrologueContained = false
 	state.OutsideCaveAudioStopped = false
 	state.CurrentRoomId = nil
 	state.TimerStartedAt = now
@@ -405,7 +407,7 @@ function RoomProgressService:_beginUntouchedPrologue(player)
 		DarkLighting = Constants.Prologue.DarkLighting,
 		Message = "You wake up under the trees. The cave ahead should not have electric lights.",
 	})
-	self.systemMessageRemote:FireClient(player, "You wake up in the forest. You have a flashlight. The cave lights are already on.")
+	self.systemMessageRemote:FireClient(player, "You wake up in the forest. Find the flashlight before going inside.")
 end
 
 function RoomProgressService:TryTriggerUntouchedPrologue(player, sourceInstance, isSafeNavigation)
@@ -415,7 +417,7 @@ function RoomProgressService:TryTriggerUntouchedPrologue(player, sourceInstance,
 
 	local state = self:_getState(player)
 	if state.UntouchedPrologueTriggered then
-		return true
+		return false
 	end
 
 	if not state.UntouchedPrologueActive then
@@ -427,7 +429,6 @@ function RoomProgressService:TryTriggerUntouchedPrologue(player, sourceInstance,
 	end
 
 	state.UntouchedPrologueTriggered = true
-	state.UntouchedPrologueActive = false
 	state.TimerStartedAt = os.clock()
 
 	local objectName = "something"
@@ -440,53 +441,41 @@ function RoomProgressService:TryTriggerUntouchedPrologue(player, sourceInstance,
 		end
 	end
 
-	local countdownSeconds = Constants.Prologue.CountdownSeconds or 3
 	self.prologueRemote:FireClient(player, {
 		Action = "Lockdown",
 		ObjectName = objectName,
-		CountdownSeconds = countdownSeconds,
+		Mode = "StartupB",
 		SpinUpSeconds = Constants.Prologue.LightSpinUpSeconds or 30,
-		Message = "Forced teleportation of unknown personnel in",
+		Message = "Something under the floor wakes up.",
 	})
+	self.systemMessageRemote:FireClient(player, "The bunker locks down around you. Somewhere deeper, old systems begin to answer.")
 
-	task.spawn(function()
-		for remaining = countdownSeconds, 1, -1 do
-			if not player.Parent then
-				return
-			end
+	return false
+end
 
-			self.systemMessageRemote:FireClient(
-				player,
-				("Forced teleportation of unknown personnel in %d..."):format(remaining)
-			)
-			task.wait(1)
-		end
+function RoomProgressService:_completeUntouchedPrologueContainment(player)
+	if not player or not player.Parent then
+		return false
+	end
 
-		if not player.Parent then
-			return
-		end
+	local state = self:_getState(player)
+	if state.UntouchedPrologueContained or not self:IsUntouchedProloguePending(player) then
+		return false
+	end
 
-		self:_teleportPlayer(
-			player,
-			Constants.GetRoomSpawnCFrame(Constants.Prologue.ContainmentRoomId or "TVRoom"),
-			"UntouchedPrologueContainment"
-		)
+	state.UntouchedPrologueContained = true
+	state.UntouchedPrologueActive = false
+	state.UntouchedPrologueTriggered = false
+	state.TimerStartedAt = os.clock()
+	state.LastRoomTickAt = nil
 
-		local containedState = self:_getState(player)
-		containedState.CurrentRoomId = nil
-		containedState.UntouchedPrologueActive = false
-		containedState.UntouchedPrologueTriggered = false
-		containedState.TimerStartedAt = os.clock()
-		containedState.LastRoomTickAt = nil
-
-		self.prologueRemote:FireClient(player, {
-			Action = "Contained",
-			SpinUpSeconds = Constants.Prologue.LightSpinUpSeconds or 30,
-			Message = "Containment complete. Lights returning to normal.",
-		})
-		self.systemMessageRemote:FireClient(player, "Containment complete. The room slowly remembers how lights work.")
-	end)
-
+	self.prologueRemote:FireClient(player, {
+		Action = "Contained",
+		Mode = "StartupB",
+		SpinUpSeconds = Constants.Prologue.LightSpinUpSeconds or 30,
+		Message = "The TV room answers slowly.",
+	})
+	self.systemMessageRemote:FireClient(player, "The TV room boots one system at a time. The bunker sounds underfed.")
 	return true
 end
 
@@ -811,6 +800,7 @@ function RoomProgressService:_handleSessionStart(player, payload)
 	state.StartChoiceHandled = true
 	state.UntouchedPrologueActive = false
 	state.UntouchedPrologueTriggered = false
+	state.UntouchedPrologueContained = false
 	state.TimerStartedAt = os.clock()
 
 	local destinationCFrame = getContinueDestinationCFrame(roomId)
@@ -915,7 +905,9 @@ function RoomProgressService:_tickPlayer(player, now)
 			NextSparkleAt = now + Constants.Sparkle.FirstDelaySeconds,
 		}
 
-		if self:IsUntouchedProloguePending(player) then
+		if self:IsUntouchedProloguePending(player) and roomId == (Constants.Prologue.ContainmentRoomId or "TVRoom") then
+			self:_completeUntouchedPrologueContainment(player)
+		elseif self:IsUntouchedProloguePending(player) then
 			-- In the opening forest/cave walk, looking around is still a clean record.
 		elseif roomId == "CaveEntrance" then
 			self.discoveryService:Unlock(player, Constants.Discoveries.CaveEntered.Id)

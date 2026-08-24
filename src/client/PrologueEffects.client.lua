@@ -32,6 +32,7 @@ local lastInspectLookVector = nil
 local lastInspectSampleAt = 0
 local lastInspectSignature = nil
 local lastInspectCandidateIndex = 1
+local shudderToken = 0
 
 local FLASHLIGHT_LIGHT_COLOR = Color3.fromRGB(255, 226, 170)
 local FLASHLIGHT_BEAM_COLOR = Color3.fromRGB(255, 211, 128)
@@ -301,6 +302,40 @@ local function playDoorLockEchoesAfter(lockdownSound, soundId)
 	end
 end
 
+local function playBunkerShudder(duration, intensity)
+	shudderToken += 1
+	local token = shudderToken
+	duration = math.max(0.35, tonumber(duration) or 2.4)
+	intensity = math.max(0.05, tonumber(intensity) or 0.22)
+
+	task.spawn(function()
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if not humanoid then
+			return
+		end
+
+		local originalOffset = humanoid.CameraOffset
+		local startedAt = os.clock()
+		while token == shudderToken and humanoid.Parent do
+			local elapsed = os.clock() - startedAt
+			if elapsed >= duration then
+				break
+			end
+
+			local fade = 1 - math.clamp(elapsed / duration, 0, 1)
+			local waveA = math.sin(elapsed * 22)
+			local waveB = math.sin(elapsed * 31 + 0.7)
+			humanoid.CameraOffset = originalOffset + Vector3.new(waveA * intensity * fade, waveB * intensity * 0.55 * fade, 0)
+			task.wait()
+		end
+
+		if token == shudderToken and humanoid.Parent then
+			humanoid.CameraOffset = originalOffset
+		end
+	end)
+end
+
 local function stopOutsideAmbience()
 	if outsideAmbienceSound then
 		outsideAmbienceSound:Stop()
@@ -395,7 +430,7 @@ local function isCavePathLight(light)
 end
 
 local function shouldKeepLightInPrologue(light)
-	return isCavePathLight(light) or isControlPanelLight(light)
+	return false
 end
 
 local function dimWorldLights()
@@ -1002,16 +1037,43 @@ local function playLockdownCountdown(payload)
 	end
 
 	lockedDown = true
-	active = false
 	ambientToken += 1
 	stopOutsideAmbience()
 	description.Visible = false
-	local seconds = math.max(1, math.floor(payload.CountdownSeconds or Constants.Prologue.CountdownSeconds or 3))
-	local prefix = payload.Message or "Forced teleportation of unknown personnel in"
-	countdown.Visible = true
 	local prologueAudio = if Constants.AudioAssets then Constants.AudioAssets.Prologue else nil
 	local firstTouchAlarmId = prologueAudio and (prologueAudio.FirstTouchAlarmId or prologueAudio.LockdownId)
 	local doorEchoId = prologueAudio and prologueAudio.LockdownDoorEchoId
+	local mode = payload.Mode
+
+	if mode == "StartupB" then
+		countdown.Visible = true
+		countdown.Text = payload.Message or "LOCKDOWN"
+		playBunkerShudder(2.8, 0.28)
+		playLocalSound(prologueAudio and prologueAudio.LockdownId, 0.42, 0.92, 5.5)
+		playDoorLockEchoes(doorEchoId)
+		task.delay(2.6, function()
+			if countdown.Parent and lockedDown then
+				TweenService:Create(
+					countdown,
+					TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{ TextTransparency = 1, BackgroundTransparency = 1 }
+				):Play()
+				task.delay(0.5, function()
+					if countdown.Parent then
+						countdown.Visible = false
+						countdown.TextTransparency = 0
+						countdown.BackgroundTransparency = 0.16
+					end
+				end)
+			end
+		end)
+		return
+	end
+
+	active = false
+	local seconds = math.max(1, math.floor(payload.CountdownSeconds or Constants.Prologue.CountdownSeconds or 3))
+	local prefix = payload.Message or "Forced teleportation of unknown personnel in"
+	countdown.Visible = true
 	local alarmSound = startFirstTouchAlarm(firstTouchAlarmId)
 	playDoorLockEchoesAfter(nil, doorEchoId)
 

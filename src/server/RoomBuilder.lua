@@ -453,12 +453,22 @@ local function makeShell(roomFolder)
 		Color3.fromRGB(72, 102, 119),
 		Enum.Material.Wood
 	)
-	createSurfaceText(door, "DoorText", "TV ROOM", Enum.NormalId.Front, Color3.fromRGB(230, 255, 240), Color3.fromRGB(42, 66, 76))
-	createPrompt(door, "Inspect", "TV Room", 0)
+	createSurfaceText(door, "DoorText", "", Enum.NormalId.Front, Color3.fromRGB(230, 255, 240), Color3.fromRGB(42, 66, 76))
+	local prompt = createPrompt(door, "Inspect", "TV Room", 0)
+	prompt.Enabled = false
 	door:SetAttribute("DestinationCFrame", CFrame.new(Vector3.new(0, 3, depth / 2 + 9), Vector3.new(0, 3, depth / 2 + 24)))
 	door:SetAttribute("RoomId", "TVRoom")
 	door:SetAttribute("LockedDuringPrologue", true)
 	door:SetAttribute("PrologueLockedMessage", "The TV room door is quiet. It does not open before lockdown.")
+	door:SetAttribute("InvisiblePassage", true)
+	door.Transparency = 1
+	door.CanCollide = false
+	door.CanQuery = false
+	door.CanTouch = false
+	door:SetAttribute("BaseTransparency", 1)
+	door:SetAttribute("BaseCanCollide", false)
+	door:SetAttribute("BaseCanQuery", false)
+	door:SetAttribute("BaseCanTouch", false)
 	tag(door, Constants.Tags.ExitDoor)
 
 	return door
@@ -2429,15 +2439,15 @@ local function makeCaveEntranceArea(roomFolder)
 
 	local keyDoor = createPart(cave, "CaveKeyDoor", Vector3.new(13.6, 10, 0.55), CFrame.new(-124, -5.65, -121.5), Color3.fromRGB(79, 92, 116), Enum.Material.Wood)
 	keyDoor:SetAttribute("DestinationCFrame", CAVE_HALLWAY_RETURN_CFRAME)
-	keyDoor:SetAttribute("PrologueDescription", "The door has the same key shape as the desk, but the frame looks like it belongs in the hallway.")
+	keyDoor:SetAttribute("PrologueDescription", "The door is too flat for the cave. Its frame looks installed, not carved.")
 	keyDoor.CanCollide = false
 	keyDoor:SetAttribute("BaseCanCollide", false)
-	local keyDoorLabel = createSurfaceText(keyDoor, "CaveKeyDoorText", "HALLWAY", Enum.NormalId.Back, Color3.fromRGB(232, 245, 255), Color3.fromRGB(38, 48, 64))
+	local keyDoorLabel = createSurfaceText(keyDoor, "CaveKeyDoorText", "", Enum.NormalId.Back, Color3.fromRGB(232, 245, 255), Color3.fromRGB(38, 48, 64))
 	keyDoorLabel:SetAttribute("LockedText", "EXIT KEY\nREQUIRED")
 	keyDoorLabel:SetAttribute("LockedTextColor3", Color3.fromRGB(255, 221, 84))
 	keyDoorLabel:SetAttribute("LockedBackgroundColor3", Color3.fromRGB(58, 45, 36))
 	makeCaveKeyShape(cave, "CaveDoorKeyOutline", CFrame.new(-124, -5.7, -121.1) * CFrame.Angles(0, math.rad(180), 0), 1.15, Color3.fromRGB(255, 221, 84), Enum.Material.Neon)
-	local keyDoorPrompt = createPrompt(keyDoor, "Enter", "Hallway", 0.15)
+	local keyDoorPrompt = createPrompt(keyDoor, "Enter", "Door", 0.15)
 	keyDoorPrompt:SetAttribute("LockedActionText", "Unlock")
 	keyDoorPrompt:SetAttribute("LockedObjectText", "Huge Cave Door")
 	tag(keyDoor, Constants.Tags.CaveKeyDoor)

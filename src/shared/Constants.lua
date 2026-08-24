@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.250"
+Constants.BuildVersion = "0.5.251"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -526,7 +526,7 @@ Constants.Prologue = {
 	StartRoomId = "CaveEntrance",
 	ContainmentRoomId = "TVRoom",
 	CountdownSeconds = 3,
-	LightSpinUpSeconds = 30,
+	LightSpinUpSeconds = 45,
 	FlashlightRange = 58,
 	InspectRange = 34,
 	InspectIntervalSeconds = 0.18,
