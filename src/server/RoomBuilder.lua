@@ -1165,14 +1165,16 @@ local function makeObservationSuite(parent, spec)
 	mirror:SetAttribute("RoomId", spec.RoomId)
 	mirror:SetAttribute("ObservationPlaceId", spec.Id)
 	mirror:SetAttribute("ObservationLabel", spec.Label)
-	createPrompt(mirror, "Inspect", "Double-Sided Mirror", 0.08)
+	createPrompt(mirror, "Inspect", "Strange Mirror", 0.08)
 	tag(mirror, Constants.Tags.ObservationMirror)
 
 	local spark = createPart(suite, spec.Id .. "MirrorEdgeGlow", spec.MirrorSize + Vector3.new(0.04, 0.18, 0.18), spec.MirrorCFrame, Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
 	spark.Transparency = 0.84
 	spark.CanCollide = false
+	spark.CanQuery = false
 	spark:SetAttribute("BaseTransparency", spark.Transparency)
 	spark:SetAttribute("BaseCanCollide", false)
+	spark:SetAttribute("BaseCanQuery", false)
 
 	local roomCFrame = spec.RoomCFrame
 	local origin = roomCFrame.Position
