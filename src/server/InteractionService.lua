@@ -4283,6 +4283,40 @@ function InteractionService:_wireCaveExitKey(keyPart)
 end
 
 function InteractionService:_wireCaveKeyDoor(door)
+	if door:GetAttribute("WalkthroughToHallway") == true then
+		local touchDebounceByUserId = {}
+		if door:IsA("BasePart") then
+			door.Touched:Connect(function(hit)
+				local player = getPlayerFromHit(hit)
+				if not player then
+					return
+				end
+
+				local now = os.clock()
+				if touchDebounceByUserId[player.UserId] and now - touchDebounceByUserId[player.UserId] < 1.5 then
+					return
+				end
+				touchDebounceByUserId[player.UserId] = now
+
+				local destinationCFrame = door:GetAttribute("DestinationCFrame")
+				if typeof(destinationCFrame) ~= "CFrame" or not self:_canUseTeleport(player) then
+					return
+				end
+
+				self.caveHallDoorLockedByUserId[player.UserId] = true
+				self:_openCaveEntranceForNewPlayers()
+				if self:_teleportPlayer(player, destinationCFrame, "CaveWalkthroughDoor") then
+					local travelSoundId = door:GetAttribute("TravelSoundId")
+					if typeof(travelSoundId) == "string" and travelSoundId ~= "" then
+						playSound(getRootPart(player) or door, travelSoundId, 0.65, 0.42)
+					end
+					self.systemMessageRemote:FireClient(player, "The doorway locks behind you.")
+				end
+			end)
+		end
+		return
+	end
+
 	local prompt = getPrompt(door)
 
 	self:_connectPrompt(prompt, function(player)
