@@ -166,6 +166,52 @@ local function createDoubleSidedSurfaceText(parent, name, text, face, textColor,
 	return frontLabel
 end
 
+local FACE_NORMALS = {
+	{
+		Face = Enum.NormalId.Front,
+		GetNormal = function(cframe)
+			return -cframe.LookVector
+		end,
+	},
+	{
+		Face = Enum.NormalId.Back,
+		GetNormal = function(cframe)
+			return cframe.LookVector
+		end,
+	},
+	{
+		Face = Enum.NormalId.Left,
+		GetNormal = function(cframe)
+			return -cframe.RightVector
+		end,
+	},
+	{
+		Face = Enum.NormalId.Right,
+		GetNormal = function(cframe)
+			return cframe.RightVector
+		end,
+	},
+}
+
+local function getFaceTowardDirection(cframe, direction)
+	if direction.Magnitude < 0.001 then
+		return Enum.NormalId.Front
+	end
+
+	local unitDirection = direction.Unit
+	local bestFace = Enum.NormalId.Front
+	local bestDot = -math.huge
+	for _, candidate in ipairs(FACE_NORMALS) do
+		local dot = candidate.GetNormal(cframe):Dot(unitDirection)
+		if dot > bestDot then
+			bestDot = dot
+			bestFace = candidate.Face
+		end
+	end
+
+	return bestFace
+end
+
 local function createNoTouchClock(parent, name, roomId, size, cframe, face)
 	local clock = createPart(parent, name, size, cframe, Color3.fromRGB(24, 28, 34), Enum.Material.Metal)
 	clock:SetAttribute("RoomId", roomId)
@@ -1149,22 +1195,35 @@ local function makeObservationSuite(parent, spec)
 
 	local mirror = createPart(
 		suite,
-		spec.Id .. "DoubleSidedMirror",
+		spec.Id .. "ObservationMirror",
 		spec.MirrorSize,
 		spec.MirrorCFrame,
-		Color3.fromRGB(128, 176, 190),
-		Enum.Material.Glass
+		Color3.fromRGB(10, 19, 23),
+		Enum.Material.SmoothPlastic
 	)
-	mirror.Name = spec.Id .. "ObservationMirror"
-	mirror.Transparency = 0.42
-	mirror.Reflectance = 0.28
+	local mirrorFace = getFaceTowardDirection(spec.MirrorCFrame, spec.MirrorCFrame.Position - spec.RoomCFrame.Position)
+	mirror.Transparency = 1
+	mirror.Reflectance = 0
 	local mirrorCanCollide = spec.MirrorCanCollide == true
 	mirror.CanCollide = mirrorCanCollide
+	mirror.CanTouch = false
 	mirror:SetAttribute("BaseTransparency", mirror.Transparency)
 	mirror:SetAttribute("BaseCanCollide", mirrorCanCollide)
+	mirror:SetAttribute("BaseCanTouch", false)
 	mirror:SetAttribute("RoomId", spec.RoomId)
 	mirror:SetAttribute("ObservationPlaceId", spec.Id)
 	mirror:SetAttribute("ObservationLabel", spec.Label)
+	mirror:SetAttribute("OneWayMirrorFace", mirrorFace.Name)
+	local mirrorCover = createSurfaceText(
+		mirror,
+		spec.Id .. "OneWayMirrorCover",
+		"",
+		mirrorFace,
+		Color3.fromRGB(150, 226, 235),
+		Color3.fromRGB(8, 28, 34)
+	)
+	mirrorCover.BackgroundTransparency = 0
+	mirrorCover.BackgroundColor3 = Color3.fromRGB(8, 28, 34)
 	createPrompt(mirror, "Inspect", "Strange Mirror", 0.08)
 	tag(mirror, Constants.Tags.ObservationMirror)
 
@@ -1172,9 +1231,11 @@ local function makeObservationSuite(parent, spec)
 	spark.Transparency = 0.84
 	spark.CanCollide = false
 	spark.CanQuery = false
+	spark.CanTouch = false
 	spark:SetAttribute("BaseTransparency", spark.Transparency)
 	spark:SetAttribute("BaseCanCollide", false)
 	spark:SetAttribute("BaseCanQuery", false)
+	spark:SetAttribute("BaseCanTouch", false)
 
 	local roomCFrame = spec.RoomCFrame
 	local origin = roomCFrame.Position
