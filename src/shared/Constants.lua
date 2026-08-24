@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.252"
+Constants.BuildVersion = "0.5.253"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -1842,7 +1842,7 @@ Constants.Rooms = {
 		SpawnCFrame = CFrame.new(Vector3.new(-14, 3, -29), Vector3.new(-14, 3, -45)),
 		Zone = {
 			Min = Vector3.new(-34, -3, -64),
-			Max = Vector3.new(6, 30, -12),
+			Max = Vector3.new(6, 30, -28),
 		},
 	},
 	BowlingAlley = {

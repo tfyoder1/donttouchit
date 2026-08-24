@@ -684,6 +684,8 @@ local function makeLightSwitch(parent, name, baseCFrame, options)
 		Color3.fromRGB(244, 244, 238),
 		Enum.Material.Metal
 	)
+	lever.CanQuery = false
+	lever:SetAttribute("BaseCanQuery", false)
 	lever:SetAttribute("SwitchOnCFrame", leverOnCFrame)
 	lever:SetAttribute("SwitchOffCFrame", leverOffCFrame)
 
@@ -2004,6 +2006,8 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		Color3.fromRGB(24, 31, 39),
 		Enum.Material.Metal
 	)
+	panel.CanQuery = false
+	panel:SetAttribute("BaseCanQuery", false)
 	makePanelBezel(controls, "ControlPanelBezel", panelCFrame, panelWidth, panelHeight)
 	local titleStrip = createPart(
 		controls,
@@ -2013,6 +2017,8 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		Color3.fromRGB(55, 66, 80),
 		Enum.Material.SmoothPlastic
 	)
+	titleStrip.CanQuery = false
+	titleStrip:SetAttribute("BaseCanQuery", false)
 	createSurfaceText(titleStrip, "ControlPanelTitle", panelLabel, Enum.NormalId.Front, Color3.fromRGB(236, 245, 255), Color3.fromRGB(62, 69, 82))
 	local topGlow = createPart(
 		controls,
@@ -2024,8 +2030,10 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 	)
 	topGlow.CanCollide = false
 	topGlow:SetAttribute("BaseCanCollide", false)
+	topGlow.CanQuery = false
+	topGlow:SetAttribute("BaseCanQuery", false)
 
-	makePanelReadout(
+	local rewardReadout = makePanelReadout(
 		controls,
 		"ControlPanelRewardReadout",
 		panelCFrame * CFrame.new(0, panelHeight / 2 - 0.92, -0.22),
@@ -2034,6 +2042,8 @@ local function makeRoomControlPanel(parent, name, panelCFrame, roomId, title, op
 		Color3.fromRGB(255, 242, 181),
 		Color3.fromRGB(13, 21, 22)
 	)
+	rewardReadout.CanQuery = false
+	rewardReadout:SetAttribute("BaseCanQuery", false)
 
 	local logX = if includeReset then -1.16 else -1.05
 	local logY = panelHeight / 2 - 2.22
