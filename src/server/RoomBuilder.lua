@@ -2191,15 +2191,16 @@ local function makeCaveEntranceArea(roomFolder)
 		end
 	end
 
-	for starIndex = 1, 42 do
-		local side = ((starIndex - 1) % 3) + 1
+	for starIndex = 1, 78 do
+		local side = ((starIndex - 1) % 4) + 1
 		local starX = -36 - ((starIndex * 7) % 34)
 		local starY = 17 + ((starIndex * 11) % 7)
 		local starZ = 27 + ((starIndex * 13) % 36)
 		local starCFrame = if side == 1
 			then CFrame.new(-10.05, starY, starZ)
 			elseif side == 2 then CFrame.new(starX, starY, 25.05)
-			else CFrame.new(starX, starY, 64.95)
+			elseif side == 3 then CFrame.new(starX, starY, 64.95)
+			else CFrame.new(starX, 25.28, starZ)
 		local star = createPart(cave, "CaveNightStar" .. starIndex, Vector3.new(0.18 + (starIndex % 3) * 0.04, 0.18 + (starIndex % 3) * 0.04, 0.05), starCFrame, Color3.fromRGB(231, 246, 255), Enum.Material.Neon)
 		star.CanCollide = false
 		star:SetAttribute("BaseCanCollide", false)

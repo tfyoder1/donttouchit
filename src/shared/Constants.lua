@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.251"
+Constants.BuildVersion = "0.5.252"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -538,7 +538,7 @@ Constants.Prologue = {
 	DarkLighting = {
 		Ambient = Color3.fromRGB(1, 2, 5),
 		OutdoorAmbient = Color3.fromRGB(0, 0, 0),
-		Brightness = 0.05,
+		Brightness = 0.075,
 		ClockTime = 0,
 		FogStart = 16,
 		FogEnd = 120,

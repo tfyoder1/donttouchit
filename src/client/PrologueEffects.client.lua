@@ -430,7 +430,7 @@ local function isCavePathLight(light)
 end
 
 local function shouldKeepLightInPrologue(light)
-	return false
+	return isCavePathLight(light)
 end
 
 local function dimWorldLights()
@@ -443,7 +443,10 @@ local function dimWorldLights()
 				Brightness = instance.Brightness,
 			}
 
-			if not shouldKeepLightInPrologue(instance) then
+			if shouldKeepLightInPrologue(instance) then
+				instance.Enabled = true
+				instance.Brightness = math.min(instance.Brightness, 0.72)
+			else
 				instance.Enabled = false
 				instance.Brightness = 0
 			end
