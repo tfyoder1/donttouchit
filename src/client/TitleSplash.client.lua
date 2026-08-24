@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local ContentProvider = game:GetService("ContentProvider")
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -66,12 +67,90 @@ bottomShadow.Position = UDim2.fromScale(0, 1)
 bottomShadow.Size = UDim2.new(1, 0, 0, 92)
 bottomShadow.Parent = root
 
+local loadingGroup = Instance.new("Frame")
+loadingGroup.Name = "BootLoading"
+loadingGroup.AnchorPoint = Vector2.new(0.5, 0.5)
+loadingGroup.BackgroundTransparency = 1
+loadingGroup.Position = UDim2.fromScale(0.5, 0.5)
+loadingGroup.Size = UDim2.new(0.72, 0, 0, 180)
+loadingGroup.Parent = root
+
+local loadingTitle = Instance.new("TextLabel")
+loadingTitle.Name = "LoadingTitle"
+loadingTitle.AnchorPoint = Vector2.new(0.5, 0)
+loadingTitle.BackgroundTransparency = 1
+loadingTitle.Font = Enum.Font.GothamBlack
+loadingTitle.Position = UDim2.fromScale(0.5, 0)
+loadingTitle.Size = UDim2.new(1, 0, 0, 44)
+loadingTitle.Text = "DON'T TOUCH IT"
+loadingTitle.TextColor3 = Color3.fromRGB(255, 242, 181)
+loadingTitle.TextScaled = false
+loadingTitle.TextSize = 34
+loadingTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+loadingTitle.TextStrokeTransparency = 0.35
+loadingTitle.TextWrapped = true
+loadingTitle.Parent = loadingGroup
+
+local loadingStatus = Instance.new("TextLabel")
+loadingStatus.Name = "LoadingStatus"
+loadingStatus.AnchorPoint = Vector2.new(0.5, 0)
+loadingStatus.BackgroundTransparency = 1
+loadingStatus.Font = Enum.Font.GothamSemibold
+loadingStatus.Position = UDim2.fromScale(0.5, 0.38)
+loadingStatus.Size = UDim2.new(1, 0, 0, 28)
+loadingStatus.Text = "Loading bunker assets..."
+loadingStatus.TextColor3 = Color3.fromRGB(214, 226, 238)
+loadingStatus.TextScaled = false
+loadingStatus.TextSize = 20
+loadingStatus.TextWrapped = true
+loadingStatus.Parent = loadingGroup
+
+local loadingBarBack = Instance.new("Frame")
+loadingBarBack.Name = "LoadingBarBack"
+loadingBarBack.AnchorPoint = Vector2.new(0.5, 0)
+loadingBarBack.BackgroundColor3 = Color3.fromRGB(16, 21, 30)
+loadingBarBack.BackgroundTransparency = 0.18
+loadingBarBack.BorderSizePixel = 0
+loadingBarBack.Position = UDim2.fromScale(0.5, 0.62)
+loadingBarBack.Size = UDim2.new(0.74, 0, 0, 12)
+loadingBarBack.Parent = loadingGroup
+
+local loadingBarCorner = Instance.new("UICorner")
+loadingBarCorner.CornerRadius = UDim.new(1, 0)
+loadingBarCorner.Parent = loadingBarBack
+
+local loadingBarFill = Instance.new("Frame")
+loadingBarFill.Name = "LoadingBarFill"
+loadingBarFill.BackgroundColor3 = Color3.fromRGB(107, 244, 204)
+loadingBarFill.BorderSizePixel = 0
+loadingBarFill.Size = UDim2.fromScale(0.02, 1)
+loadingBarFill.Parent = loadingBarBack
+
+local loadingFillCorner = Instance.new("UICorner")
+loadingFillCorner.CornerRadius = UDim.new(1, 0)
+loadingFillCorner.Parent = loadingBarFill
+
+local loadingDetail = Instance.new("TextLabel")
+loadingDetail.Name = "LoadingDetail"
+loadingDetail.AnchorPoint = Vector2.new(0.5, 0)
+loadingDetail.BackgroundTransparency = 1
+loadingDetail.Font = Enum.Font.GothamMedium
+loadingDetail.Position = UDim2.fromScale(0.5, 0.75)
+loadingDetail.Size = UDim2.new(0.9, 0, 0, 24)
+loadingDetail.Text = "Preparing the opening sequence"
+loadingDetail.TextColor3 = Color3.fromRGB(148, 169, 190)
+loadingDetail.TextScaled = false
+loadingDetail.TextSize = 15
+loadingDetail.TextWrapped = true
+loadingDetail.Parent = loadingGroup
+
 local contentGroup = Instance.new("Frame")
 contentGroup.Name = "Content"
 contentGroup.AnchorPoint = Vector2.new(0.5, 0.5)
 contentGroup.BackgroundTransparency = 1
 contentGroup.Position = UDim2.fromScale(0.5, 0.5)
 contentGroup.Size = UDim2.new(0.92, 0, 0.78, 0)
+contentGroup.Visible = false
 contentGroup.Parent = root
 
 local glowLine = Instance.new("Frame")
@@ -189,6 +268,27 @@ local suppressChildAddedConnection = nil
 local splashFinishedNotified = false
 local titleCameraState = nil
 local titleCameraToken = 0
+local bootLoadingComplete = false
+
+local BOOT_PRELOAD_MIN_SECONDS = 1.25
+local BOOT_PRELOAD_MAX_SECONDS = 8
+local BOOT_PRELOAD_MAX_INSTANCES = 700
+
+local PRELOADABLE_CLASS_NAMES = {
+	Animation = true,
+	Beam = true,
+	Decal = true,
+	ImageButton = true,
+	ImageLabel = true,
+	MeshPart = true,
+	ParticleEmitter = true,
+	Sky = true,
+	Sound = true,
+	SpecialMesh = true,
+	Texture = true,
+	Trail = true,
+	VideoFrame = true,
+}
 
 local SUPPRESSED_PROJECT_GUIS = {
 	[UiLayerController.GuiNames.DevTools] = true,
@@ -286,6 +386,138 @@ end
 local function getIntroMusicId()
 	local music = Constants.AudioAssets and Constants.AudioAssets.Music
 	return music and normalizeSoundId(music.IntroMusicId)
+end
+
+local function isPreloadableInstance(instance)
+	if not instance or not PRELOADABLE_CLASS_NAMES[instance.ClassName] then
+		return false
+	end
+
+	if instance:IsA("Sound") then
+		return normalizeSoundId(instance.SoundId) ~= nil
+	elseif instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
+		return normalizeSoundId(instance.Image) ~= nil
+	elseif instance:IsA("Decal") or instance:IsA("Texture") then
+		return normalizeSoundId(instance.Texture) ~= nil
+	elseif instance:IsA("MeshPart") then
+		return normalizeSoundId(instance.MeshId) ~= nil or normalizeSoundId(instance.TextureID) ~= nil
+	elseif instance:IsA("SpecialMesh") then
+		return normalizeSoundId(instance.MeshId) ~= nil or normalizeSoundId(instance.TextureId) ~= nil
+	elseif instance:IsA("Animation") then
+		return normalizeSoundId(instance.AnimationId) ~= nil
+	elseif instance:IsA("VideoFrame") then
+		return normalizeSoundId(instance.Video) ~= nil
+	end
+
+	return true
+end
+
+local function collectBootPreloadInstances()
+	local instances = {}
+	local containers = {
+		ReplicatedStorage,
+		SoundService,
+		Lighting,
+		workspace,
+	}
+
+	for _, container in ipairs(containers) do
+		for _, descendant in ipairs(container:GetDescendants()) do
+			if #instances >= BOOT_PRELOAD_MAX_INSTANCES then
+				return instances
+			end
+
+			if isPreloadableInstance(descendant) then
+				table.insert(instances, descendant)
+			end
+		end
+	end
+
+	return instances
+end
+
+local function setLoadingProgress(completed, total, timedOut)
+	total = math.max(0, total or 0)
+	completed = math.clamp(completed or 0, 0, math.max(1, total))
+
+	local alpha = if total > 0 then completed / total else 1
+	loadingBarFill.Size = UDim2.fromScale(math.clamp(alpha, 0.02, 1), 1)
+
+	if total > 0 then
+		loadingStatus.Text = ("Loading assets %d / %d"):format(math.min(completed, total), total)
+	else
+		loadingStatus.Text = "Loading assets..."
+	end
+
+	if timedOut then
+		loadingDetail.Text = "Continuing while remaining assets finish in the background"
+	elseif total > 0 and completed >= total then
+		loadingDetail.Text = "Opening sequence ready"
+	else
+		loadingDetail.Text = "Preparing the opening sequence"
+	end
+end
+
+local function fadeOutLoadingGroup()
+	local tweenInfo = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	for _, descendant in ipairs(loadingGroup:GetDescendants()) do
+		if descendant:IsA("TextLabel") then
+			TweenService:Create(descendant, tweenInfo, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		elseif descendant:IsA("Frame") then
+			TweenService:Create(descendant, tweenInfo, { BackgroundTransparency = 1 }):Play()
+		end
+	end
+
+	task.delay(0.24, function()
+		if loadingGroup.Parent then
+			loadingGroup.Visible = false
+		end
+	end)
+end
+
+local function runBootPreload()
+	local preloadInstances = collectBootPreloadInstances()
+	local total = #preloadInstances
+	local completed = 0
+	local preloadFinished = false
+	local timedOut = false
+	local startedAt = os.clock()
+
+	setLoadingProgress(0, total, false)
+
+	task.spawn(function()
+		if total <= 0 then
+			preloadFinished = true
+			return
+		end
+
+		pcall(function()
+			ContentProvider:PreloadAsync(preloadInstances, function()
+				completed += 1
+			end)
+		end)
+		preloadFinished = true
+	end)
+
+	while splashGui.Parent do
+		local elapsed = os.clock() - startedAt
+		if preloadFinished and elapsed >= BOOT_PRELOAD_MIN_SECONDS then
+			break
+		end
+
+		if elapsed >= BOOT_PRELOAD_MAX_SECONDS then
+			timedOut = not preloadFinished
+			break
+		end
+
+		setLoadingProgress(if preloadFinished then total else completed, total, false)
+		task.wait(0.05)
+	end
+
+	setLoadingProgress(if preloadFinished then total else completed, total, timedOut)
+	if os.clock() - startedAt < BOOT_PRELOAD_MIN_SECONDS then
+		task.wait(BOOT_PRELOAD_MIN_SECONDS - (os.clock() - startedAt))
+	end
 end
 
 local function setTopbarEnabled(enabled)
@@ -632,6 +864,15 @@ local function applyLayout()
 	local compact = math.min(viewport.X, viewport.Y) < 520
 
 	if landscape and compact then
+		loadingGroup.Size = UDim2.new(0.8, 0, 0, 132)
+		loadingTitle.TextSize = 27
+		loadingStatus.Position = UDim2.fromScale(0.5, 0.38)
+		loadingStatus.TextSize = 17
+		loadingBarBack.Position = UDim2.fromScale(0.5, 0.62)
+		loadingBarBack.Size = UDim2.new(0.78, 0, 0, 10)
+		loadingDetail.Position = UDim2.fromScale(0.5, 0.76)
+		loadingDetail.TextSize = 13
+
 		contentGroup.Size = UDim2.new(0.82, 0, 0.82, 0)
 
 		title.Position = UDim2.fromScale(0.5, 0.31)
@@ -652,6 +893,15 @@ local function applyLayout()
 		continueButton.TextSize = 24
 		restartButton.TextSize = 24
 	else
+		loadingGroup.Size = UDim2.new(0.72, 0, 0, 180)
+		loadingTitle.TextSize = 34
+		loadingStatus.Position = UDim2.fromScale(0.5, 0.38)
+		loadingStatus.TextSize = 20
+		loadingBarBack.Position = UDim2.fromScale(0.5, 0.62)
+		loadingBarBack.Size = UDim2.new(0.74, 0, 0, 12)
+		loadingDetail.Position = UDim2.fromScale(0.5, 0.75)
+		loadingDetail.TextSize = 15
+
 		contentGroup.Size = UDim2.new(0.92, 0, 0.78, 0)
 
 		title.Position = UDim2.fromScale(0.5, 0.34)
@@ -674,31 +924,45 @@ local function applyLayout()
 	end
 end
 
+local function startPromptPulse()
+	task.spawn(function()
+		while splashGui.Parent and not advanced do
+			TweenService:Create(
+				prompt,
+				TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{ TextTransparency = 0.28 }
+			):Play()
+			task.wait(0.75)
+			TweenService:Create(
+				prompt,
+				TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{ TextTransparency = 0 }
+			):Play()
+			task.wait(0.75)
+		end
+	end)
+end
+
 task.spawn(function()
 	hideTopbarDuringSplash()
 end)
 
 applyTitleStoryPayload(nil)
 suppressProjectGuisDuringSplash()
-startTitleMusic()
-enableSplashBlur()
-startTitleCameraPan()
 
 task.spawn(function()
-	while splashGui.Parent and not advanced do
-		TweenService:Create(
-			prompt,
-			TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{ TextTransparency = 0.28 }
-		):Play()
-		task.wait(0.75)
-		TweenService:Create(
-			prompt,
-			TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{ TextTransparency = 0 }
-		):Play()
-		task.wait(0.75)
+	runBootPreload()
+	if not splashGui.Parent then
+		return
 	end
+
+	bootLoadingComplete = true
+	contentGroup.Visible = true
+	fadeOutLoadingGroup()
+	startTitleMusic()
+	enableSplashBlur()
+	startTitleCameraPan()
+	startPromptPulse()
 end)
 
 task.spawn(function()
@@ -795,6 +1059,10 @@ local function showRestartConfirmation()
 end
 
 local function requestStartMenu()
+	if not bootLoadingComplete then
+		return
+	end
+
 	if advanced then
 		return
 	end
@@ -870,7 +1138,9 @@ end)
 applyLayout()
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 	applyLayout()
-	startTitleCameraPan()
+	if bootLoadingComplete then
+		startTitleCameraPan()
+	end
 end)
 if workspace.CurrentCamera then
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(applyLayout)
