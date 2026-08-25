@@ -115,7 +115,7 @@ local function fireHiddenButton()
 	})
 end
 
-local function makeOverlay(duration, cameraLabel)
+local function makeOverlay(duration, cameraLabel, hasScreenButton)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "DontTouchItSecurityCamera"
 	gui.DisplayOrder = 85
@@ -162,31 +162,35 @@ local function makeOverlay(duration, cameraLabel)
 	stroke.Transparency = 0.18
 	stroke.Parent = label
 
-	local button = Instance.new("TextButton")
-	button.Name = "ScreenOnlyButton"
-	button.AnchorPoint = Vector2.new(0.5, 0.5)
-	button.AutoButtonColor = true
-	button.BackgroundColor3 = Color3.fromRGB(255, 72, 86)
-	button.BackgroundTransparency = 0.04
-	button.BorderSizePixel = 0
-	button.Font = Enum.Font.GothamBlack
-	button.Position = UDim2.fromScale(0.68, 0.6)
-	button.Size = UDim2.fromOffset(236, 78)
-	button.Text = "SCREEN-ONLY\nBUTTON"
-	button.TextColor3 = Color3.fromRGB(255, 246, 220)
-	button.TextScaled = true
-	button.TextWrapped = true
-	button.Parent = gui
+	if hasScreenButton then
+		local button = Instance.new("TextButton")
+		button.Name = "ScreenOnlyButton"
+		button.AnchorPoint = Vector2.new(0.5, 0.5)
+		button.AutoButtonColor = true
+		button.BackgroundColor3 = Color3.fromRGB(255, 72, 86)
+		button.BackgroundTransparency = 0.04
+		button.BorderSizePixel = 0
+		button.Font = Enum.Font.GothamBlack
+		button.Position = UDim2.fromScale(0.68, 0.6)
+		button.Size = UDim2.fromOffset(236, 78)
+		button.Text = "SCREEN-ONLY\nBUTTON"
+		button.TextColor3 = Color3.fromRGB(255, 246, 220)
+		button.TextScaled = true
+		button.TextWrapped = true
+		button.Parent = gui
 
-	local buttonCorner = Instance.new("UICorner")
-	buttonCorner.CornerRadius = UDim.new(0, 12)
-	buttonCorner.Parent = button
+		local buttonCorner = Instance.new("UICorner")
+		buttonCorner.CornerRadius = UDim.new(0, 12)
+		buttonCorner.Parent = button
 
-	local buttonStroke = Instance.new("UIStroke")
-	buttonStroke.Color = Color3.fromRGB(255, 246, 220)
-	buttonStroke.Thickness = 3
-	buttonStroke.Transparency = 0.1
-	buttonStroke.Parent = button
+		local buttonStroke = Instance.new("UIStroke")
+		buttonStroke.Color = Color3.fromRGB(255, 246, 220)
+		buttonStroke.Thickness = 3
+		buttonStroke.Transparency = 0.1
+		buttonStroke.Parent = button
+
+		button.MouseButton1Click:Connect(fireHiddenButton)
+	end
 
 	local hint = Instance.new("TextLabel")
 	hint.Name = "SecurityFeedHint"
@@ -197,13 +201,14 @@ local function makeOverlay(duration, cameraLabel)
 	hint.Font = Enum.Font.GothamBold
 	hint.Position = UDim2.new(0.5, 0, 1, -22)
 	hint.Size = UDim2.new(0.84, 0, 0, 58)
-	hint.Text = ("Press X / tap the screen button before the feed times out in %ds."):format(duration or 45)
+	hint.Text = if hasScreenButton
+		then ("Press X / tap the screen button before the feed times out in %ds."):format(duration or 45)
+		else ("Security feed active. Press B / Escape to close, or wait %ds."):format(duration or 45)
 	hint.TextColor3 = Color3.fromRGB(255, 242, 181)
 	hint.TextScaled = true
 	hint.TextWrapped = true
 	hint.Parent = gui
 
-	button.MouseButton1Click:Connect(fireHiddenButton)
 	return gui
 end
 
@@ -223,7 +228,8 @@ local function startCamera(payload)
 		FieldOfView = camera.FieldOfView,
 		PlayerCameraMode = player.CameraMode,
 		TargetCFrame = cameraCFrame,
-		Gui = makeOverlay(payload.Duration or 45, payload.CameraLabel),
+		HasScreenButton = payload.HasScreenButton == true,
+		Gui = makeOverlay(payload.Duration or 45, payload.CameraLabel, payload.HasScreenButton == true),
 	}
 
 	player.CameraMode = Enum.CameraMode.Classic
@@ -249,12 +255,14 @@ local function startCamera(payload)
 		end
 	end)
 
-	ContextActionService:BindAction(SCREEN_BUTTON_ACTION, function(_, inputState)
-		if inputState == Enum.UserInputState.Begin then
-			fireHiddenButton()
-		end
-		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.E, Enum.KeyCode.ButtonX, Enum.KeyCode.ButtonA)
+	if activeSession.HasScreenButton then
+		ContextActionService:BindAction(SCREEN_BUTTON_ACTION, function(_, inputState)
+			if inputState == Enum.UserInputState.Begin then
+				fireHiddenButton()
+			end
+			return Enum.ContextActionResult.Sink
+		end, false, Enum.KeyCode.E, Enum.KeyCode.ButtonX, Enum.KeyCode.ButtonA)
+	end
 
 	ContextActionService:BindAction(STOP_ACTION, function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then

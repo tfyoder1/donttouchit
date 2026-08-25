@@ -18,6 +18,7 @@ local SPLASH_GUI_NAME = UiLayerController.GuiNames.TitleSplash
 local TITLE_MUSIC_NAME = "DontTouchItTitleSplashMusic"
 local FINISHED_ATTRIBUTE = "DontTouchItTitleSplashFinishedNonce"
 local sessionStartRemote = nil
+local sessionStartRemoteConnected = false
 local titleStoryRandom = Random.new(os.time() + player.UserId)
 
 local splashGui = Instance.new("ScreenGui")
@@ -959,6 +960,50 @@ local function startPromptPulse()
 	end)
 end
 
+local function attachSessionStartRemote(remote)
+	if not remote or not remote:IsA("RemoteEvent") then
+		return false
+	end
+
+	sessionStartRemote = remote
+	if sessionStartRemoteConnected then
+		return true
+	end
+
+	sessionStartRemoteConnected = true
+	remote.OnClientEvent:Connect(function(payload)
+		if typeof(payload) == "table" and payload.Action == "Show" then
+			applyTitleStoryPayload(payload)
+		end
+	end)
+	remote:FireServer({
+		Action = "RequestOptions",
+	})
+	return true
+end
+
+local function resolveSessionStartRemote(timeoutSeconds)
+	if sessionStartRemote then
+		return true
+	end
+
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	if not remotes and timeoutSeconds and timeoutSeconds > 0 then
+		remotes = ReplicatedStorage:WaitForChild("Remotes", timeoutSeconds)
+	end
+	if not remotes then
+		return false
+	end
+
+	local remoteName = Constants.Remotes.SessionStart
+	local remote = remotes:FindFirstChild(remoteName)
+	if not remote and timeoutSeconds and timeoutSeconds > 0 then
+		remote = remotes:WaitForChild(remoteName, timeoutSeconds)
+	end
+
+	return attachSessionStartRemote(remote)
+end
+
 task.spawn(function()
 	hideTopbarDuringSplash()
 end)
@@ -982,20 +1027,11 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-	local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
-	if remotes then
-		local remote = remotes:WaitForChild("SessionStart", 20)
-		if remote and remote:IsA("RemoteEvent") then
-			sessionStartRemote = remote
-			remote.OnClientEvent:Connect(function(payload)
-				if typeof(payload) == "table" and payload.Action == "Show" then
-					applyTitleStoryPayload(payload)
-				end
-			end)
-			remote:FireServer({
-				Action = "RequestOptions",
-			})
+	while splashGui.Parent and not sessionStartRemote do
+		if resolveSessionStartRemote(5) then
+			return
 		end
+		task.wait(0.5)
 	end
 end)
 
@@ -1094,7 +1130,11 @@ local function sendStartChoice(action)
 
 	if not sessionStartRemote then
 		prompt.Visible = true
-		prompt.Text = "Still loading menu..."
+		prompt.Text = "Still connecting..."
+		if resolveSessionStartRemote(2) then
+			sendStartChoice(action)
+			return
+		end
 		task.delay(0.35, function()
 			if splashGui.Parent and not choiceSent then
 				sendStartChoice(action)

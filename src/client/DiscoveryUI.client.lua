@@ -908,6 +908,7 @@ local function showVictoryBrickModal(payload)
 		"Recorded accomplishment: completed the bunker."
 	)
 	UiLayerController.SetRoomMenuOpen(gui, true)
+	gui.Enabled = true
 	victoryBrickShade.Visible = true
 	victoryBrickModal.Visible = true
 end
@@ -2805,7 +2806,9 @@ local function renderReferenceBook(payload)
 	local mode = payload.Mode or "Log"
 	local storePrices = payload.StorePrices or {}
 	UiLayerController.SetRoomMenuOpen(gui, true)
+	gui.Enabled = true
 	bookPanel.Visible = true
+	bookPanel.Active = true
 	feedbackPanel.Visible = false
 	if not wasVisible then
 		closeBookButton.Modal = true
