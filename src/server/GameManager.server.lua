@@ -1,7 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local BunkerEnergyService = require(script.Parent:WaitForChild("BunkerEnergyService"))
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
+
+RemoteService.Initialize()
+
+local BunkerEnergyService = require(script.Parent:WaitForChild("BunkerEnergyService"))
 local DevToolsService = require(script.Parent:WaitForChild("DevToolsService"))
 local DiscoveryService = require(script.Parent:WaitForChild("DiscoveryService"))
 local EventManager = require(script.Parent:WaitForChild("EventManager"))
@@ -12,7 +16,6 @@ local MovementAuthorityService = require(script.Parent:WaitForChild("MovementAut
 local ModerationService = require(script.Parent:WaitForChild("ModerationService"))
 local PermissionService = require(script.Parent:WaitForChild("PermissionService"))
 local PlayerPreferencesService = require(script.Parent:WaitForChild("PlayerPreferencesService"))
-local RemoteService = require(script.Parent:WaitForChild("RemoteService"))
 local ResetService = require(script.Parent:WaitForChild("ResetService"))
 local RoomProgressService = require(script.Parent:WaitForChild("RoomProgressService"))
 local RoomBuilder = require(script.Parent:WaitForChild("RoomBuilder"))
@@ -22,7 +25,6 @@ local UiLayoutService = require(script.Parent:WaitForChild("UiLayoutService"))
 local VictoryBrickService = require(script.Parent:WaitForChild("VictoryBrickService"))
 
 workspace.Gravity = Constants.NormalGravity
-RemoteService.Initialize()
 
 local roomReferences = RoomBuilder.Build()
 local permissionService = PermissionService.new()
