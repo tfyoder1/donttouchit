@@ -7,6 +7,7 @@ local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 local TouchControls = require(script.Parent:WaitForChild("TouchControls"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local inventoryRemote = remotes:WaitForChild(Constants.Remotes.InventoryAction)
+local hintPackRemote = remotes:WaitForChild(Constants.Remotes.HintPackRequest)
 
 local CONSUMABLE_HOLD_SECONDS = 0.45
 local FLASHLIGHT_ATTRIBUTE = "DontTouchItFlashlight"
@@ -15,6 +16,12 @@ local CONSUMABLE_PROMPT_NAMES = {
 	DroppedEnergyUsePrompt = true,
 	LooseFruitEatPrompt = true,
 	LooseFruitPocketPrompt = true,
+}
+local PANEL_MENU_PROMPTS = {
+	["TV Room Log"] = "Log",
+	["Rewards & Store"] = "Store",
+	Teleport = "Teleport",
+	["Field Controls"] = "Field",
 }
 
 local actionControl = nil
@@ -143,6 +150,37 @@ local function getCurrentGenericPrompt()
 	return closestPrompt
 end
 
+local function getAncestorRoomId(instance)
+	local current = instance
+	while current and current ~= workspace do
+		local roomId = current:GetAttribute("RoomId")
+		if typeof(roomId) == "string" and roomId ~= "" then
+			return roomId
+		end
+		current = current.Parent
+	end
+
+	return nil
+end
+
+local function getPanelMenuMode(prompt)
+	if not prompt or not prompt:IsA("ProximityPrompt") then
+		return nil
+	end
+
+	local objectText = tostring(prompt.ObjectText or "")
+	local mode = PANEL_MENU_PROMPTS[objectText]
+	if mode then
+		return mode
+	end
+
+	if string.find(objectText, " Log", 1, true) then
+		return "Log"
+	end
+
+	return nil
+end
+
 local function activatePrompt(prompt)
 	if not isPromptInReach(prompt) then
 		return false
@@ -196,6 +234,17 @@ local function activateEquippedTool()
 	end
 
 	local genericPrompt = getCurrentGenericPrompt()
+	local panelMode = getPanelMenuMode(genericPrompt)
+	if panelMode then
+		hintPackRemote:FireServer({
+			Action = "OpenRoomMenu",
+			Mode = panelMode,
+			RoomId = getAncestorRoomId(genericPrompt),
+		})
+		task.defer(updateActionButton)
+		return
+	end
+
 	if genericPrompt and activatePrompt(genericPrompt) then
 		task.defer(updateActionButton)
 		return

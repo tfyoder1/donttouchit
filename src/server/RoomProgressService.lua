@@ -1103,7 +1103,18 @@ function RoomProgressService:_handleHintRequest(player, payload)
 	local action = payload.Action
 	local roomId = payload.RoomId
 
-	if action == "BuyPack" then
+	if action == "OpenRoomMenu" then
+		local mode = payload.Mode
+		if mode == "Store" then
+			self:ShowStore(player, roomId)
+		elseif mode == "Teleport" then
+			self:ShowTeleportMenu(player, roomId)
+		elseif mode == "Field" then
+			self:ShowFieldControls(player, roomId)
+		else
+			self:ShowReferenceBook(player, roomId)
+		end
+	elseif action == "BuyPack" then
 		self:_requestHintPack(player, roomId)
 	elseif action == "FreeHint" then
 		local hintText, errorText = self.discoveryService:GetFreeHint(player, roomId)
