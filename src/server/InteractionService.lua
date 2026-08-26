@@ -4848,6 +4848,12 @@ function InteractionService:_getSecretDoorWorldState(roomId)
 			state.OutlineVisible = true
 		end
 
+		if self.discoveryService:HasSecretKey(player, roomId) then
+			state.OutlineVisible = true
+			state.Active = true
+			state.HasKey = true
+		end
+
 		if self.discoveryService:IsRoomComplete(player, roomId) then
 			state.OutlineVisible = true
 			state.Active = true
@@ -4896,19 +4902,19 @@ function InteractionService:_wireSecretRoomDoor(door)
 			return
 		end
 
-		if not self.discoveryService:IsRoomComplete(player, roomId) then
-			self.systemMessageRemote:FireClient(player, "The Library outline is visible, but the room is not finished yet.")
-			return
-		end
-
 		local secretConfig = Constants.SecretDoors and Constants.SecretDoors[roomId]
 		local alreadyUnlocked = secretConfig
 			and secretConfig.EntryDiscoveryId
 			and self.discoveryService:HasDiscovery(player, secretConfig.EntryDiscoveryId)
 		local hasKey = self.discoveryService:HasSecretKey(player, roomId)
+		local roomComplete = self.discoveryService:IsRoomComplete(player, roomId)
 
 		if not alreadyUnlocked and not hasKey then
-			self.systemMessageRemote:FireClient(player, "The Library is awaiting the Library Key. A secret discovery is probably hoarding it.")
+			if roomComplete then
+				self.systemMessageRemote:FireClient(player, "The Library is awaiting the Library Key. A secret discovery is probably hoarding it.")
+			else
+				self.systemMessageRemote:FireClient(player, "The Library outline is visible, but it still wants the Library Key.")
+			end
 			return
 		end
 
@@ -8950,7 +8956,10 @@ function InteractionService:_wireVictoryBrickStand(stand)
 	local prompt = getPrompt(stand)
 
 	self:_connectPrompt(prompt, function(player)
-		local complete = self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
+		local completionDiscoveryId = Constants.VictoryWalkway and Constants.VictoryWalkway.CompletionDiscoveryId
+		local complete = if typeof(completionDiscoveryId) == "string" and completionDiscoveryId ~= ""
+			then self.discoveryService:HasDiscovery(player, completionDiscoveryId)
+			else self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
 		local eligible = complete and not self.discoveryService:IsDevOverrideActive(player)
 		playSound(stand, "rbxasset://sounds/button.wav", 0.35, eligible and 1.15 or 0.72)
 

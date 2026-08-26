@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.284"
+Constants.BuildVersion = "0.5.285"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -467,6 +467,7 @@ Constants.ModerationReasonOrder = {
 
 Constants.VictoryWalkway = {
 	CavePriorityPosition = Vector3.new(-46, 0, 55),
+	CompletionDiscoveryId = "cave_opened_door",
 	EmptyBrickText = "FUTURE\nWINNER",
 	DeluxeTextPrefix = "DELUXE",
 	FixedBricks = {

@@ -414,6 +414,23 @@ function VictoryBrickService:_isEligible(player)
 		return false
 	end
 
+	local completionDiscoveryId = Constants.VictoryWalkway and Constants.VictoryWalkway.CompletionDiscoveryId
+	if typeof(completionDiscoveryId) == "string" and completionDiscoveryId ~= "" then
+		return self.discoveryService:HasDiscovery(player, completionDiscoveryId)
+	end
+
+	return self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
+end
+
+function VictoryBrickService:_isGoldEligible(player)
+	if not player or not player.Parent or not self.discoveryService then
+		return false
+	end
+
+	if self.discoveryService:IsDevOverrideActive(player) then
+		return false
+	end
+
 	return self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
 end
 
@@ -450,8 +467,8 @@ function VictoryBrickService:SignStandard(player)
 end
 
 function VictoryBrickService:GrantDeluxe(player, preferredSlotIndex)
-	if not self:_isEligible(player) then
-		return false, "Deluxe bricks still require normal completion first."
+	if not self:_isGoldEligible(player) then
+		return false, "Gold deluxe bricks require every discovery."
 	end
 
 	local current = self:_getPlayerRecord(player)
@@ -473,8 +490,8 @@ function VictoryBrickService:GrantDeluxe(player, preferredSlotIndex)
 end
 
 function VictoryBrickService:PromptDeluxePurchase(player, preferredSlotIndex)
-	if not self:_isEligible(player) then
-		return false, "Finish the game normally first, then pick a deluxe brick spot."
+	if not self:_isGoldEligible(player) then
+		return false, "Gold deluxe brick spots unlock after every discovery."
 	end
 
 	local productId = Constants.NoTouch.VictoryBrickProductId or 0
