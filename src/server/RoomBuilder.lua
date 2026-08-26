@@ -3933,6 +3933,8 @@ local function makeHallway(roomFolder)
 		nil,
 		"SnackLab"
 	)
+	snackDoor:SetAttribute("LockedDuringPrologue", true)
+	snackDoor:SetAttribute("PrologueLockedMessage", "The Snack Lab door stays shut. The TV room is the only thing awake.")
 
 		local caveDoor = makeHallDoor(
 			hallway,
@@ -3980,6 +3982,8 @@ local function makeHallway(roomFolder)
 		SLEEPING_QUARTERS_SPAWN_CFRAME
 	)
 	sleepingDoor:SetAttribute("RoomId", "SleepingQuarters")
+	sleepingDoor:SetAttribute("LockedDuringPrologue", true)
+	sleepingDoor:SetAttribute("PrologueLockedMessage", "Sleeping Quarters does not answer yet.")
 	sleepingDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.SleepingEntered.Id)
 	sleepingDoor:SetAttribute("TravelMessage", "Sleeping Quarters unlocked. There are definitely enough beds.")
 
@@ -3998,6 +4002,8 @@ local function makeHallway(roomFolder)
 		if islandDoorPrompt and islandDoorPrompt:IsA("ProximityPrompt") then
 			islandDoorPrompt.MaxActivationDistance = 6
 		end
+		islandDoor:SetAttribute("LockedDuringPrologue", true)
+		islandDoor:SetAttribute("PrologueLockedMessage", "The island is not taking visitors yet.")
 
 	local returnPad = createPart(hallway, "HallwayLanding", Vector3.new(8, 0.25, 8), CFrame.new(HALLWAY_SPAWN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(96, 194, 134), Enum.Material.Neon)
 	returnPad.Transparency = 0.35

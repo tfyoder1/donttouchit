@@ -7486,18 +7486,26 @@ function InteractionService:_wireExitDoor(door)
 
 	local prompt = getPrompt(door)
 	self:_connectPrompt(prompt, function(player)
-		local isPrologueOpen =
-			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
-		if isPrologueOpen and door:GetAttribute("LockedDuringPrologue") == true then
+		local isProloguePending =
+			self.roomProgressService and self.roomProgressService:IsUntouchedProloguePending(player)
+		if isProloguePending and door:GetAttribute("LockedDuringPrologue") == true then
 			self.systemMessageRemote:FireClient(player, door:GetAttribute("PrologueLockedMessage") or "That door is not awake yet.")
 			return
 		end
 
-		if not self.exitUnlocked and not isPrologueOpen then
+		if door:GetAttribute("RoomId") == (Constants.Prologue.ContainmentRoomId or "TVRoom")
+			and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true
+		then
+			self.systemMessageRemote:FireClient(player, "The TV room door locks behind you. The room is not finished yet.")
+			playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
+			return
+		end
+
+		if not self.exitUnlocked and not isProloguePending then
 			self:_checkExitUnlock(player)
 		end
 
-		if not self.exitUnlocked and not isPrologueOpen then
+		if not self.exitUnlocked and not isProloguePending then
 			self.systemMessageRemote:FireClient(player, self.discoveryService:GetHallUnlockRequirementText(player))
 			return
 		end
@@ -7559,27 +7567,27 @@ function InteractionService:_wireHallDoor(door)
 	local prompt = getPrompt(door)
 
 	self:_connectPrompt(prompt, function(player)
-		local isPrologueOpen =
-			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
-		if isPrologueOpen and door:GetAttribute("LockedDuringPrologue") == true then
+		local isProloguePending =
+			self.roomProgressService and self.roomProgressService:IsUntouchedProloguePending(player)
+		if isProloguePending and door:GetAttribute("LockedDuringPrologue") == true then
 			self.systemMessageRemote:FireClient(player, door:GetAttribute("PrologueLockedMessage") or "That door is not awake yet.")
 			return
 		end
 
 		local lockedMessage = door:GetAttribute("LockedMessage")
-		if lockedMessage and not isPrologueOpen then
+		if lockedMessage and not isProloguePending then
 			self.systemMessageRemote:FireClient(player, lockedMessage)
 			return
 		end
 
 			local roomId = door:GetAttribute("RoomId")
-			if roomId and not isPrologueOpen and not self.discoveryService:IsRoomUnlocked(player, roomId) then
+			if roomId and not isProloguePending and not self.discoveryService:IsRoomUnlocked(player, roomId) then
 				self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
 				return
 			end
 
 			local endGameComplete = false
-			if door:GetAttribute("RequiresEndGameCompletion") == true and not isPrologueOpen then
+			if door:GetAttribute("RequiresEndGameCompletion") == true and not isProloguePending then
 				endGameComplete = self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
 					and not self.discoveryService:IsDevOverrideActive(player)
 				if not endGameComplete then
@@ -7590,7 +7598,7 @@ function InteractionService:_wireHallDoor(door)
 			end
 
 			if door:GetAttribute("OneWayTrapAfterHallwayEntry")
-				and not isPrologueOpen
+				and not isProloguePending
 				and not endGameComplete
 				and self.caveHallDoorLockedByUserId[player.UserId]
 			then
@@ -7600,7 +7608,7 @@ function InteractionService:_wireHallDoor(door)
 			end
 
 			if door:GetAttribute("RequiresIdBadgeAfterUse")
-				and not isPrologueOpen
+				and not isProloguePending
 				and self.caveHallDoorLockedByUserId[player.UserId]
 				and not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id)
 			then
@@ -7626,11 +7634,11 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 		local unlockDiscoveryId = door:GetAttribute("UnlockDiscoveryId")
-			if typeof(unlockDiscoveryId) == "string" and not isPrologueOpen then
+			if typeof(unlockDiscoveryId) == "string" and not isProloguePending then
 				self.discoveryService:Unlock(player, unlockDiscoveryId)
 			end
 
-			if door:GetAttribute("RequiresIdBadgeAfterUse") and not isPrologueOpen then
+			if door:GetAttribute("RequiresIdBadgeAfterUse") and not isProloguePending then
 				self.caveHallDoorLockedByUserId[player.UserId] = true
 			end
 
