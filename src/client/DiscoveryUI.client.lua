@@ -3276,7 +3276,7 @@ end)
 victoryBrickReadRemote.OnClientEvent:Connect(showVictoryBrickModal)
 
 systemMessageRemote.OnClientEvent:Connect(function(text)
-	if typeof(text) == "string" and text ~= "" then
-		showSystemMessage(text)
-	end
+	-- SystemMessageOverlay.client.lua owns user-facing system messages. Keeping
+	-- this listener quiet prevents duplicate/scattered message rendering while
+	-- DiscoveryUI continues to own room menus and other modal surfaces.
 end)

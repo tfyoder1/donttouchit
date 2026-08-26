@@ -33,6 +33,7 @@ message.TextColor3 = Color3.fromRGB(255, 255, 255)
 message.TextScaled = true
 message.TextWrapped = true
 message.TextTransparency = 1
+message.ZIndex = 1000
 message.Parent = gui
 
 local sizeConstraint = Instance.new("UISizeConstraint")

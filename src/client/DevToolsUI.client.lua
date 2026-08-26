@@ -1332,16 +1332,17 @@ local function updateInspectReadout()
 
 	local rootPart = getRootPart()
 	local playerPositionText = formatPlayerLocation(rootPart)
+	local buildVersionText = tostring(Constants.BuildVersion or "?")
 	local camera = Workspace.CurrentCamera
 	if not camera then
-		inspectLabel.Text = ("DEV INSPECT\nPlayer: %s\nNo camera"):format(playerPositionText)
+		inspectLabel.Text = ("DEV INSPECT  v%s\nPlayer: %s\nNo camera"):format(buildVersionText, playerPositionText)
 		setInspectTarget(nil)
 		return
 	end
 
 	local result = getInspectRaycastResult(camera)
 	if not result or not result.Instance then
-		inspectLabel.Text = ("DEV INSPECT\nPlayer: %s\nNo part under reticle."):format(playerPositionText)
+		inspectLabel.Text = ("DEV INSPECT  v%s\nPlayer: %s\nNo part under reticle."):format(buildVersionText, playerPositionText)
 		setInspectTarget(nil)
 		return
 	end
@@ -1355,7 +1356,8 @@ local function updateInspectReadout()
 	local collisionText = if instance:IsA("BasePart") then tostring(instance.CanCollide) else "-"
 	local transparencyText = if instance:IsA("BasePart") then string.format("%.2f", instance.Transparency) else "-"
 
-	inspectLabel.Text = ("DEV INSPECT\nPlayer: %s\nName: %s\nClass: %s\nPath: %s\nPos: %s\nSize: %s\nCollide: %s  Trans: %s\nTags: %s\nAttrs:\n%s"):format(
+	inspectLabel.Text = ("DEV INSPECT  v%s\nPlayer: %s\nName: %s\nClass: %s\nPath: %s\nPos: %s\nSize: %s\nCollide: %s  Trans: %s\nTags: %s\nAttrs:\n%s"):format(
+		buildVersionText,
 		playerPositionText,
 		instance.Name,
 		instance.ClassName,
