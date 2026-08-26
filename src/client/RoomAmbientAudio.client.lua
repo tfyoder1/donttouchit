@@ -15,6 +15,7 @@ if not roomAmbienceConfig then
 	return
 end
 
+local areaAmbienceConfig = Constants.AudioAssets and Constants.AudioAssets.RoomAmbienceAreas
 local bowlingAudioConfig = Constants.AudioAssets and Constants.AudioAssets.Bowling
 local SOUND_NAME = "DontTouchItRoomAmbience"
 local CHECK_INTERVAL_SECONDS = 0.25
@@ -130,6 +131,26 @@ local function getRoomConfig(roomId)
 	return config, soundId
 end
 
+local function getAreaConfig(roomId, position)
+	if typeof(areaAmbienceConfig) ~= "table" or not position then
+		return nil, nil
+	end
+
+	for _, config in pairs(areaAmbienceConfig) do
+		if typeof(config) == "table"
+			and (config.RoomId == nil or config.RoomId == roomId)
+			and positionInZone(position, config.Zone)
+		then
+			local soundId = normalizeSoundId(config.SoundId)
+			if soundId then
+				return config, soundId
+			end
+		end
+	end
+
+	return nil, nil
+end
+
 local function getBowlingCosmicConfig(roomId)
 	if not bowlingAudioConfig or roomId ~= BOWLING_ROOM_ID then
 		return nil, nil
@@ -186,7 +207,7 @@ local function consumeContainmentIntro()
 	containmentIntroState = nil
 end
 
-local function getActiveRoomConfig(roomId)
+local function getActiveRoomConfig(roomId, position)
 	if containmentIntroState then
 		if roomId ~= containmentIntroState.RoomId then
 			if containmentIntroState.HasReachedRoom then
@@ -212,6 +233,11 @@ local function getActiveRoomConfig(roomId)
 	local cosmicConfig, cosmicSoundId = getBowlingCosmicConfig(roomId)
 	if cosmicConfig then
 		return cosmicConfig, cosmicSoundId, false
+	end
+
+	local areaConfig, areaSoundId = getAreaConfig(roomId, position)
+	if areaConfig then
+		return areaConfig, areaSoundId, false
 	end
 
 	local config, soundId = getRoomConfig(roomId)
@@ -376,7 +402,7 @@ function updateAmbience()
 	end
 
 	local roomId = getRoomIdForPosition(rootPart.Position)
-	local config, soundId, waitingForContainmentIntro = getActiveRoomConfig(roomId)
+	local config, soundId, waitingForContainmentIntro = getActiveRoomConfig(roomId, rootPart.Position)
 	if waitingForContainmentIntro then
 		stopAmbience()
 		return

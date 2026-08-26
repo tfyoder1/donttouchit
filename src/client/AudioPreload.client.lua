@@ -83,6 +83,7 @@ local function appendCaveSoundIds(soundIds)
 		appendSoundId(soundIds, prologueAudio.InsideCaveAmbienceId)
 		appendSoundId(soundIds, prologueAudio.FirstTouchAlarmId)
 		appendSoundId(soundIds, prologueAudio.ComputerBootUpId)
+		appendSoundId(soundIds, prologueAudio.TVPowerUpId)
 		appendSoundId(soundIds, prologueAudio.LockdownId)
 		appendSoundId(soundIds, prologueAudio.LockdownDoorEchoId)
 		appendSoundIds(soundIds, prologueAudio.DripIds)
@@ -120,6 +121,7 @@ local function appendBowlingSoundIds(soundIds)
 
 	appendSoundIds(soundIds, bowlingAudio.CosmicMusicIds)
 	appendSoundIds(soundIds, bowlingAudio.StrikeSoundIds)
+	appendSoundId(soundIds, bowlingAudio.MechanicalIdleSoundId)
 end
 
 local function getRoomSoundIds(roomId)

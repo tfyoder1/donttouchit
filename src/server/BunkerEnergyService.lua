@@ -45,6 +45,22 @@ local function hasExcludedAncestor(instance)
 	return false
 end
 
+local function openContainmentExitDoors()
+	local roomId = Constants.Prologue.ContainmentRoomId or "TVRoom"
+	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.ExitDoor)) do
+		if door:IsA("BasePart") and door:GetAttribute("RoomId") == roomId and door:GetAttribute("InvisiblePassage") == true then
+			door.CanCollide = false
+			door.CanQuery = false
+			door.CanTouch = false
+			door.Transparency = 1
+			local prompt = door:FindFirstChild("InteractPrompt", true)
+			if prompt and prompt:IsA("ProximityPrompt") then
+				prompt.Enabled = false
+			end
+		end
+	end
+end
+
 local function getBaseColor(part)
 	return part:GetAttribute("BunkerEnergyBaseColor") or part:GetAttribute("BaseColor") or part.Color
 end
@@ -642,6 +658,8 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 		FadeInSeconds = fadeIn,
 		Message = recoveryMessage,
 		FirstRecovery = firstRecovery,
+		RequireContinue = firstRecovery,
+		ContinueText = "Press or tap to continue.",
 		BeepSoundId = Constants.BunkerEnergy.RecoveryBeepSoundId,
 		BeepVolume = Constants.BunkerEnergy.RecoveryBeepVolume,
 	})
@@ -663,6 +681,7 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 
 		if firstRecovery then
 			equipSignalBand(player)
+			openContainmentExitDoors()
 			self.systemMessageRemote:FireClient(
 				player,
 				"Emergency nourishment authorized. Signal Band fitted: monitor your energy and the information it decides to show you."

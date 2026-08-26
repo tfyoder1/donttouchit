@@ -5614,8 +5614,17 @@ local function makeBowlingAlley(roomFolder)
 	tag(exitDoor, Constants.Tags.SecretRoomExit)
 
 	local switch = createPart(room, "CosmicBowlingSwitch", Vector3.new(1.2, 1.8, 0.22), cframeAt(origin, -8.2, 4.3, 47.8), Color3.fromRGB(235, 235, 226), Enum.Material.SmoothPlastic)
+	switch.Material = Enum.Material.Neon
+	switch:SetAttribute("CosmicAttentionBlink", true)
 	createSurfaceText(switch, "CosmicSwitchText", "COSMIC", Enum.NormalId.Front, Color3.fromRGB(31, 28, 43), Color3.fromRGB(235, 235, 226))
 	createPrompt(switch, "Flip", "Cosmic Bowling", 0)
+	local switchLight = Instance.new("PointLight")
+	switchLight.Name = "CosmicSwitchBlinkLight"
+	switchLight.Color = Color3.fromRGB(119, 255, 203)
+	switchLight.Brightness = 1.5
+	switchLight.Range = 10
+	switchLight.Parent = switch
+	mark(switchLight)
 	tag(switch, Constants.Tags.BowlingCosmicSwitch)
 
 	local shoeRack = createPart(

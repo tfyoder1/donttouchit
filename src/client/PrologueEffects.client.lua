@@ -1143,7 +1143,7 @@ local function restoreNormalLighting(seconds)
 	countdown.Visible = false
 
 	local prologueAudio = if Constants.AudioAssets then Constants.AudioAssets.Prologue else nil
-	finishFirstTouchAudio(prologueAudio and prologueAudio.ComputerBootUpId)
+	finishFirstTouchAudio(prologueAudio and (prologueAudio.TVPowerUpId or prologueAudio.ComputerBootUpId))
 
 	if lightingBaseline then
 		TweenService:Create(

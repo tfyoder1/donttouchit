@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.292"
+Constants.BuildVersion = "0.5.293"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -577,6 +577,9 @@ Constants.AudioAssets = {
 	Bowling = {
 		CosmicActiveAttribute = "DontTouchItBowlingCosmicActive",
 		CosmicMusicAttribute = "DontTouchItBowlingCosmicMusicId",
+		MechanicalIdleSoundId = "rbxassetid://136753961563353",
+		MechanicalIdleVolume = 0.25,
+		MechanicalIdleFadeSeconds = 1.5,
 		CosmicMusicIds = {
 			"rbxassetid://9038367768",
 			"rbxassetid://87335378694883",
@@ -616,6 +619,18 @@ Constants.AudioAssets = {
 			SoundId = "rbxassetid://1840776993",
 			Volume = 0.025,
 			FadeSeconds = 1.5,
+		},
+	},
+	RoomAmbienceAreas = {
+		BowlingMaintenance = {
+			RoomId = "BowlingAlley",
+			SoundId = "rbxassetid://136753961563353",
+			Volume = 0.25,
+			FadeSeconds = 1.5,
+			Zone = {
+				Min = Vector3.new(-31, -3, -205),
+				Max = Vector3.new(-11, 16, -185),
+			},
 		},
 	},
 	Footsteps = {
@@ -675,6 +690,7 @@ Constants.AudioAssets = {
 		InsideCaveAmbienceId = "rbxassetid://9112775414",
 		FirstTouchAlarmId = "rbxassetid://9113865831",
 		ComputerBootUpId = "rbxassetid://115995638665948",
+		TVPowerUpId = "rbxassetid://130114397986399",
 		LockdownId = "rbxassetid://9116570823",
 		LockdownDoorEchoId = "rbxassetid://9116581685",
 		DripIds = {},

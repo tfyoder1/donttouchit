@@ -324,6 +324,10 @@ local function getRootPart(player)
 	return character:FindFirstChild("HumanoidRootPart")
 end
 
+local function playerHasSignalBand(player)
+	return player and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
+end
+
 local function getPlayerFromHit(hit)
 	if not hit then
 		return nil
@@ -418,6 +422,23 @@ local function playSound(parent, soundId, volume, playbackSpeed)
 	sound.Parent = parent
 	sound:Play()
 	Debris:AddItem(sound, 3)
+end
+
+local function playLockdownDoorSound(parent)
+	local prologueAudio = Constants.AudioAssets and Constants.AudioAssets.Prologue
+	playSound(parent, prologueAudio and prologueAudio.LockdownDoorEchoId or "rbxasset://sounds/snap.wav", 0.65, 0.42)
+end
+
+local function closePhysicalPassageDoor(door)
+	if not door or not door:IsA("BasePart") then
+		return
+	end
+
+	door.CanCollide = true
+	door.CanQuery = true
+	door.Transparency = door:GetAttribute("BaseTransparency") or 0
+	door.Color = door:GetAttribute("BaseColor") or Color3.fromRGB(72, 102, 119)
+	door.Material = door:GetAttribute("BaseMaterial") or Enum.Material.SmoothPlastic
 end
 
 local function isControlPanelInteraction(instance)
@@ -4902,6 +4923,12 @@ function InteractionService:_wireSecretRoomDoor(door)
 			return
 		end
 
+		if not playerHasSignalBand(player) then
+			self.systemMessageRemote:FireClient(player, "The Library door stays sealed until the infirmary fits your Signal Band.")
+			playLockdownDoorSound(door)
+			return
+		end
+
 		local secretConfig = Constants.SecretDoors and Constants.SecretDoors[roomId]
 		local alreadyUnlocked = secretConfig
 			and secretConfig.EntryDiscoveryId
@@ -7494,10 +7521,11 @@ function InteractionService:_wireExitDoor(door)
 		end
 
 		if door:GetAttribute("RoomId") == (Constants.Prologue.ContainmentRoomId or "TVRoom")
-			and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true
+			and not playerHasSignalBand(player)
 		then
+			closePhysicalPassageDoor(door)
 			self.systemMessageRemote:FireClient(player, "The TV room door locks behind you. The room is not finished yet.")
-			playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
+			playLockdownDoorSound(door)
 			return
 		end
 
@@ -7580,44 +7608,50 @@ function InteractionService:_wireHallDoor(door)
 			return
 		end
 
-			local roomId = door:GetAttribute("RoomId")
-			if roomId and not isProloguePending and not self.discoveryService:IsRoomUnlocked(player, roomId) then
-				self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
+		local roomId = door:GetAttribute("RoomId")
+		if roomId and roomId ~= (Constants.Prologue.ContainmentRoomId or "TVRoom") and not playerHasSignalBand(player) then
+			self.systemMessageRemote:FireClient(player, "The hallway doors stay sealed until the infirmary fits your Signal Band.")
+			playLockdownDoorSound(door)
+			return
+		end
+
+		if roomId and not isProloguePending and not self.discoveryService:IsRoomUnlocked(player, roomId) then
+			self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
+			return
+		end
+
+		local endGameComplete = false
+		if door:GetAttribute("RequiresEndGameCompletion") == true and not isProloguePending then
+			endGameComplete = self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
+				and not self.discoveryService:IsDevOverrideActive(player)
+			if not endGameComplete then
+				self.systemMessageRemote:FireClient(player, door:GetAttribute("EndGameLockedMessage") or "That door is waiting for the end.")
+				playLockdownDoorSound(door)
 				return
 			end
+		end
 
-			local endGameComplete = false
-			if door:GetAttribute("RequiresEndGameCompletion") == true and not isProloguePending then
-				endGameComplete = self.discoveryService:GetDiscoveryCount(player) >= (Constants.TotalDiscoveries or 1)
-					and not self.discoveryService:IsDevOverrideActive(player)
-				if not endGameComplete then
-					self.systemMessageRemote:FireClient(player, door:GetAttribute("EndGameLockedMessage") or "That door is waiting for the end.")
-					playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
-					return
-				end
-			end
+		if door:GetAttribute("OneWayTrapAfterHallwayEntry")
+			and not isProloguePending
+			and not endGameComplete
+			and self.caveHallDoorLockedByUserId[player.UserId]
+		then
+			self.systemMessageRemote:FireClient(player, door:GetAttribute("OneWayLockedMessage") or "The entryway locked behind you.")
+			playLockdownDoorSound(door)
+			return
+		end
 
-			if door:GetAttribute("OneWayTrapAfterHallwayEntry")
-				and not isProloguePending
-				and not endGameComplete
-				and self.caveHallDoorLockedByUserId[player.UserId]
-			then
-				self.systemMessageRemote:FireClient(player, door:GetAttribute("OneWayLockedMessage") or "The entryway locked behind you.")
-				playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
-				return
-			end
+		if door:GetAttribute("RequiresIdBadgeAfterUse")
+			and not isProloguePending
+			and self.caveHallDoorLockedByUserId[player.UserId]
+			and not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id)
+		then
+			self.systemMessageRemote:FireClient(player, "The cave door locked itself again. It now wants an ID Badge from Sleeping Quarters.")
+			playLockdownDoorSound(door)
+			return
+		end
 
-			if door:GetAttribute("RequiresIdBadgeAfterUse")
-				and not isProloguePending
-				and self.caveHallDoorLockedByUserId[player.UserId]
-				and not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id)
-			then
-				self.systemMessageRemote:FireClient(player, "The cave door locked itself again. It now wants an ID Badge from Sleeping Quarters.")
-				playSound(door, "rbxasset://sounds/snap.wav", 0.45, 0.42)
-				return
-			end
-
-			local destinationCFrame = door:GetAttribute("DestinationCFrame")
+		local destinationCFrame = door:GetAttribute("DestinationCFrame")
 		if typeof(destinationCFrame) ~= "CFrame" then
 			self.systemMessageRemote:FireClient(player, "This door forgot where it goes.")
 			return
@@ -7634,15 +7668,15 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 		local unlockDiscoveryId = door:GetAttribute("UnlockDiscoveryId")
-			if typeof(unlockDiscoveryId) == "string" and not isProloguePending then
-				self.discoveryService:Unlock(player, unlockDiscoveryId)
-			end
+		if typeof(unlockDiscoveryId) == "string" and not isProloguePending then
+			self.discoveryService:Unlock(player, unlockDiscoveryId)
+		end
 
-			if door:GetAttribute("RequiresIdBadgeAfterUse") and not isProloguePending then
-				self.caveHallDoorLockedByUserId[player.UserId] = true
-			end
+		if door:GetAttribute("RequiresIdBadgeAfterUse") and not isProloguePending then
+			self.caveHallDoorLockedByUserId[player.UserId] = true
+		end
 
-			local travelMessage = door:GetAttribute("TravelMessage")
+		local travelMessage = door:GetAttribute("TravelMessage")
 		if typeof(travelMessage) == "string" then
 			self.systemMessageRemote:FireClient(player, travelMessage)
 		end

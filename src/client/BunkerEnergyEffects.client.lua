@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -35,6 +36,7 @@ local lowEnergyLabel = nil
 local recoveryGui = nil
 local recoveryFadeFrame = nil
 local recoveryLabel = nil
+local recoveryContinueButton = nil
 local recoveryToken = 0
 local recoveryBeepSound = nil
 local recoveryBeepCanStopAt = 0
@@ -189,6 +191,72 @@ local function ensureRecoveryGui()
 		recoveryLabel.TextWrapped = true
 		recoveryLabel.Parent = recoveryGui
 	end
+
+	recoveryContinueButton = recoveryGui:FindFirstChild("RecoveryContinueButton")
+	if not recoveryContinueButton then
+		recoveryContinueButton = Instance.new("TextButton")
+		recoveryContinueButton.Name = "RecoveryContinueButton"
+		recoveryContinueButton.AnchorPoint = Vector2.new(0.5, 0.5)
+		recoveryContinueButton.AutoButtonColor = true
+		recoveryContinueButton.BackgroundColor3 = Color3.fromRGB(18, 24, 31)
+		recoveryContinueButton.BackgroundTransparency = 1
+		recoveryContinueButton.BorderSizePixel = 0
+		recoveryContinueButton.Font = Enum.Font.GothamBold
+		recoveryContinueButton.Position = UDim2.fromScale(0.5, 0.73)
+		recoveryContinueButton.Size = UDim2.new(0, 280, 0, 46)
+		recoveryContinueButton.Text = "Press or tap to continue"
+		recoveryContinueButton.TextColor3 = Color3.fromRGB(224, 244, 255)
+		recoveryContinueButton.TextScaled = true
+		recoveryContinueButton.TextTransparency = 1
+		recoveryContinueButton.Visible = false
+		recoveryContinueButton.Parent = recoveryGui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = recoveryContinueButton
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Color3.fromRGB(128, 231, 255)
+		stroke.Transparency = 0.35
+		stroke.Thickness = 1.5
+		stroke.Parent = recoveryContinueButton
+	end
+end
+
+local function waitForRecoveryContinue(token, text)
+	if not recoveryContinueButton then
+		return
+	end
+
+	local dismissed = false
+	recoveryContinueButton.Text = text or "Press or tap to continue"
+	recoveryContinueButton.Visible = true
+	recoveryContinueButton.BackgroundTransparency = 0.12
+	recoveryContinueButton.TextTransparency = 0
+
+	local buttonConnection = recoveryContinueButton.Activated:Connect(function()
+		dismissed = true
+	end)
+	local inputConnection = UserInputService.InputBegan:Connect(function(input)
+		local inputType = input.UserInputType
+		if inputType == Enum.UserInputType.Touch
+			or inputType == Enum.UserInputType.MouseButton1
+			or inputType == Enum.UserInputType.Keyboard
+			or string.find(inputType.Name, "Gamepad") ~= nil
+		then
+			dismissed = true
+		end
+	end)
+
+	while not dismissed and token == recoveryToken do
+		task.wait()
+	end
+
+	buttonConnection:Disconnect()
+	inputConnection:Disconnect()
+	recoveryContinueButton.Visible = false
+	recoveryContinueButton.BackgroundTransparency = 1
+	recoveryContinueButton.TextTransparency = 1
 end
 
 local function normalizeSoundId(soundId)
@@ -344,6 +412,13 @@ local function playRecoverySequence(payload)
 		return
 	end
 
+	if payload.RequireContinue == true then
+		waitForRecoveryContinue(token, payload.ContinueText)
+		if token ~= recoveryToken then
+			return
+		end
+	end
+
 	local labelOut = TweenService:Create(recoveryLabel, TweenInfo.new(0.45), { TextTransparency = 1 })
 	local inTween = TweenService:Create(
 		recoveryFadeFrame,
@@ -356,6 +431,9 @@ local function playRecoverySequence(payload)
 	if token == recoveryToken then
 		recoveryFadeFrame.Visible = false
 		recoveryLabel.Text = ""
+		if recoveryContinueButton then
+			recoveryContinueButton.Visible = false
+		end
 	end
 end
 

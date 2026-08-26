@@ -38,6 +38,45 @@ local FLASHLIGHT_OWNED_ATTRIBUTE = "DontTouchItHasFlashlight"
 local CAVE_FLASHLIGHT_REMINDER_POSITION = Vector3.new(-76, 0, 45)
 local CAVE_FLASHLIGHT_REMINDER_RADIUS = 16
 
+local function playSpatialSound(parent, soundId, volume, playbackSpeed)
+	if not parent or not parent.Parent or typeof(soundId) ~= "string" or soundId == "" then
+		return
+	end
+
+	local sound = Instance.new("Sound")
+	sound.Name = "TemporarySound"
+	sound.SoundId = soundId
+	sound.Volume = volume or 0.65
+	sound.PlaybackSpeed = playbackSpeed or 1
+	sound.RollOffMaxDistance = 45
+	sound.Parent = parent
+	sound:Play()
+	task.delay(3, function()
+		if sound.Parent then
+			sound:Destroy()
+		end
+	end)
+end
+
+local function closeContainmentExitDoors()
+	local roomId = Constants.Prologue.ContainmentRoomId or "TVRoom"
+	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.ExitDoor)) do
+		if door:IsA("BasePart") and door:GetAttribute("RoomId") == roomId then
+			door.CanCollide = true
+			door.CanQuery = true
+			door.Transparency = 0
+			door.Color = door:GetAttribute("BaseColor") or Color3.fromRGB(72, 102, 119)
+			door.Material = door:GetAttribute("BaseMaterial") or Enum.Material.SmoothPlastic
+			playSpatialSound(
+				door,
+				Constants.AudioAssets.Prologue.LockdownDoorEchoId or "rbxasset://sounds/snap.wav",
+				0.65,
+				0.42
+			)
+		end
+	end
+end
+
 local function getRootPart(player)
 	local character = player.Character
 	if not character then
@@ -496,6 +535,7 @@ function RoomProgressService:_completeUntouchedPrologueContainment(player)
 	state.UntouchedPrologueTriggered = false
 	state.TimerStartedAt = os.clock()
 	state.LastRoomTickAt = nil
+	closeContainmentExitDoors()
 
 	self.prologueRemote:FireClient(player, {
 		Action = "Contained",
