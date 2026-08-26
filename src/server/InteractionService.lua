@@ -424,6 +424,88 @@ local function playSound(parent, soundId, volume, playbackSpeed)
 	Debris:AddItem(sound, 3)
 end
 
+local function playSecretDoorRevealSound(parent)
+	if not parent or not parent.Parent then
+		return
+	end
+
+	local secretDoorAudio = Constants.AudioAssets.SecretDoors or {}
+	local sound = Instance.new("Sound")
+	sound.Name = "SecretDoorRevealSound"
+	sound.SoundId = secretDoorAudio.LibraryRevealSoundId or "rbxassetid://139444721219064"
+	sound.Volume = secretDoorAudio.LibraryRevealVolume or 0.52
+	sound.PlaybackSpeed = 1
+	sound.RollOffMaxDistance = 55
+	sound.Parent = parent
+	sound:Play()
+	Debris:AddItem(sound, 4.5)
+end
+
+local function emitSecretDoorDust(door, duration)
+	if not door or not door:IsA("BasePart") then
+		return
+	end
+
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "SecretDoorRevealDustAttachment"
+	attachment.Parent = door
+
+	local fog = Instance.new("ParticleEmitter")
+	fog.Name = "SecretDoorRevealFog"
+	fog.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	fog.Color = ColorSequence.new(Color3.fromRGB(185, 189, 184), Color3.fromRGB(126, 132, 130))
+	fog.LightEmission = 0.05
+	fog.Rate = 30
+	fog.Lifetime = NumberRange.new(1.1, 1.9)
+	fog.Speed = NumberRange.new(0.45, 1.15)
+	fog.SpreadAngle = Vector2.new(38, 18)
+	fog.Rotation = NumberRange.new(-25, 25)
+	fog.RotSpeed = NumberRange.new(-18, 18)
+	fog.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(0.55, 1.05),
+		NumberSequenceKeypoint.new(1, 1.45),
+	})
+	fog.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.48),
+		NumberSequenceKeypoint.new(0.7, 0.68),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	fog.Parent = attachment
+
+	local dust = Instance.new("ParticleEmitter")
+	dust.Name = "SecretDoorRevealDust"
+	dust.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	dust.Color = ColorSequence.new(Color3.fromRGB(222, 211, 187), Color3.fromRGB(151, 137, 112))
+	dust.Rate = 16
+	dust.Lifetime = NumberRange.new(0.75, 1.35)
+	dust.Speed = NumberRange.new(0.7, 1.65)
+	dust.SpreadAngle = Vector2.new(28, 22)
+	dust.Rotation = NumberRange.new(-45, 45)
+	dust.RotSpeed = NumberRange.new(-35, 35)
+	dust.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.18),
+		NumberSequenceKeypoint.new(0.55, 0.48),
+		NumberSequenceKeypoint.new(1, 0.75),
+	})
+	dust.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.38),
+		NumberSequenceKeypoint.new(0.65, 0.62),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	dust.Parent = attachment
+
+	task.delay(duration, function()
+		if fog.Parent then
+			fog.Enabled = false
+		end
+		if dust.Parent then
+			dust.Enabled = false
+		end
+	end)
+	Debris:AddItem(attachment, duration + 2.25)
+end
+
 local function playLockdownDoorSound(parent)
 	local prologueAudio = Constants.AudioAssets and Constants.AudioAssets.Prologue
 	playSound(parent, prologueAudio and prologueAudio.LockdownDoorEchoId or "rbxasset://sounds/snap.wav", 0.65, 0.42)
@@ -5024,17 +5106,19 @@ function InteractionService:_wireSecretRoomDoor(door)
 		end
 
 		state.Reacting = true
-		playSound(door, "rbxasset://sounds/button.wav", 0.45, 0.58)
-		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.38, 1.65)
+		local revealSeconds = (Constants.AudioAssets.SecretDoors and Constants.AudioAssets.SecretDoors.LibraryRevealSeconds) or 2.8
+		playSound(door, "rbxasset://sounds/button.wav", 0.32, 0.58)
+		playSecretDoorRevealSound(door)
+		emitSecretDoorDust(door, revealSeconds)
 
 		if door:IsA("BasePart") then
-			local openTween = tweenPart(door, 0.34, {
+			local openTween = tweenPart(door, revealSeconds, {
 				CFrame = getSecretDoorOpenCFrame(door),
 				Color = Color3.fromRGB(122, 255, 177),
-			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			}, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 			openTween.Completed:Wait()
 		else
-			task.wait(0.25)
+			task.wait(revealSeconds)
 		end
 
 		self:_teleportPlayer(player, destinationCFrame, "SecretRoomDoor")
@@ -5330,18 +5414,20 @@ function InteractionService:_wireLibraryBookcaseDoor(door)
 
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryBookcaseDoor.Id)
-		playSound(door, "rbxasset://sounds/button.wav", 0.48, 0.58)
-		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.35, 1.55)
+		local revealSeconds = (Constants.AudioAssets.SecretDoors and Constants.AudioAssets.SecretDoors.LibraryRevealSeconds) or 2.8
+		playSound(door, "rbxasset://sounds/button.wav", 0.32, 0.58)
+		playSecretDoorRevealSound(door)
+		emitSecretDoorDust(door, revealSeconds)
 
 		if door:IsA("BasePart") then
 			door.CanCollide = false
-			local openTween = tweenPart(door, 0.42, {
+			local openTween = tweenPart(door, revealSeconds, {
 				CFrame = getSecretDoorOpenCFrame(door),
 				Color = Color3.fromRGB(119, 255, 203),
-			}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			}, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 			openTween.Completed:Wait()
 		else
-			task.wait(0.25)
+			task.wait(revealSeconds)
 		end
 
 		self:_teleportPlayer(player, destinationCFrame, "LibraryBookcaseDoor")

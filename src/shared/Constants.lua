@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.294"
+Constants.BuildVersion = "0.5.295"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -597,6 +597,11 @@ Constants.AudioAssets = {
 	BunkerEnergy = {
 		ShutdownSoundId = "rbxassetid://1842440874",
 		ShutdownSoundVolume = 0.58,
+	},
+	SecretDoors = {
+		LibraryRevealSoundId = "rbxassetid://139444721219064",
+		LibraryRevealVolume = 0.52,
+		LibraryRevealSeconds = 2.8,
 	},
 	RoomAmbience = {
 		TVRoom = {

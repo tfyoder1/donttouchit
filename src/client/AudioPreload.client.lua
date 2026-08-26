@@ -104,13 +104,23 @@ end
 
 local function appendTVRoomSoundIds(soundIds)
 	local televisionAudio = audioAssets.Television
-	if not televisionAudio then
-		return
+	if televisionAudio then
+		appendSoundId(soundIds, televisionAudio.StaticId)
+		appendSoundId(soundIds, televisionAudio.TestToneId)
+		appendSoundId(soundIds, televisionAudio.PleaseStopId)
 	end
 
-	appendSoundId(soundIds, televisionAudio.StaticId)
-	appendSoundId(soundIds, televisionAudio.TestToneId)
-	appendSoundId(soundIds, televisionAudio.PleaseStopId)
+	local secretDoorAudio = audioAssets.SecretDoors
+	if secretDoorAudio then
+		appendSoundId(soundIds, secretDoorAudio.LibraryRevealSoundId)
+	end
+end
+
+local function appendLibrarySoundIds(soundIds)
+	local secretDoorAudio = audioAssets.SecretDoors
+	if secretDoorAudio then
+		appendSoundId(soundIds, secretDoorAudio.LibraryRevealSoundId)
+	end
 end
 
 local function appendBowlingSoundIds(soundIds)
@@ -149,6 +159,8 @@ local function getRoomSoundIds(roomId)
 		appendCaveSoundIds(soundIds)
 	elseif roomId == "TVRoom" then
 		appendTVRoomSoundIds(soundIds)
+	elseif roomId == "Library" then
+		appendLibrarySoundIds(soundIds)
 	elseif roomId == "BowlingAlley" then
 		appendBowlingSoundIds(soundIds)
 	end
