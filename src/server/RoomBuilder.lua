@@ -1948,6 +1948,7 @@ local function makeCompactPanelButton(parent, name, cframe, labelText, actionTex
 	lowerGlow:SetAttribute("BaseCanQuery", false)
 	local prompt = createPrompt(plate, actionText, objectText, 0.2)
 	prompt.MaxActivationDistance = 7
+	prompt.RequiresLineOfSight = false
 	if tagName then
 		tag(plate, tagName)
 	end

@@ -3184,7 +3184,12 @@ end)
 energyPanel:GetAttributeChangedSignal("Compact"):Connect(updateEnergyBar)
 bunkerEnergyPanel:GetAttributeChangedSignal("Compact"):Connect(updateBunkerEnergyBar)
 
-referenceBookRemote.OnClientEvent:Connect(renderReferenceBook)
+referenceBookRemote.OnClientEvent:Connect(function(payload)
+	local ok, err = pcall(renderReferenceBook, payload)
+	if not ok then
+		showSystemMessage("Room menu failed to open: " .. tostring(err))
+	end
+end)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)
 requestStartOptionsIfPending()
 queueStartOptionsFallback(1.25)

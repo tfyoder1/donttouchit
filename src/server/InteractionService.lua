@@ -4715,6 +4715,7 @@ function InteractionService:_wireReferenceBook(bookPart)
 	self:_connectPrompt(prompt, function(player)
 		playControlPanelSound(bookPart, 0.42, 1.02)
 		local roomId = bookPart:GetAttribute("RoomId") or "TVRoom"
+		self.systemMessageRemote:FireClient(player, ("Opening %s room log."):format(roomId))
 		if self.roomProgressService then
 			self.roomProgressService:ShowReferenceBook(player, roomId)
 		end
@@ -4727,6 +4728,7 @@ function InteractionService:_wireStoreButton(button)
 	self:_connectPrompt(prompt, function(player)
 		playControlPanelSound(button, 0.46, 1)
 		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
+		self.systemMessageRemote:FireClient(player, ("Opening %s rewards."):format(roomId))
 		if self.roomProgressService then
 			self.roomProgressService:ShowStore(player, roomId)
 		end
@@ -4739,6 +4741,7 @@ function InteractionService:_wireTeleportButton(button)
 	self:_connectPrompt(prompt, function(player)
 		playControlPanelSound(button, 0.46, 1)
 		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
+		self.systemMessageRemote:FireClient(player, ("Opening %s teleport controls."):format(roomId))
 		if not self.discoveryService:HasTeleportKey(player) then
 			self.systemMessageRemote:FireClient(player, "The Teleport control blinks: key required.")
 			playSound(button, "rbxasset://sounds/snap.wav", 0.32, 0.7)
@@ -4757,6 +4760,7 @@ function InteractionService:_wireFieldButton(button)
 	self:_connectPrompt(prompt, function(player)
 		playControlPanelSound(button, 0.48, 0.96)
 		local roomId = button:GetAttribute("RoomId") or (self.roomProgressService and self.roomProgressService:GetRoomForPlayer(player)) or "TVRoom"
+		self.systemMessageRemote:FireClient(player, ("Opening %s field controls."):format(roomId))
 		if self.roomProgressService then
 			self.roomProgressService:ShowFieldControls(player, roomId)
 		end
