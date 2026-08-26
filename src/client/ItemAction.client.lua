@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
@@ -181,6 +182,49 @@ local function getPanelMenuMode(prompt)
 	return nil
 end
 
+local function findPanelPromptNearInstance(instance)
+	local current = instance
+	local checked = 0
+	while current and current ~= Workspace and checked < 6 do
+		if current:IsA("ProximityPrompt") and getPanelMenuMode(current) then
+			return current
+		end
+
+		for _, descendant in ipairs(current:GetDescendants()) do
+			if descendant:IsA("ProximityPrompt") and getPanelMenuMode(descendant) and isPromptInReach(descendant) then
+				return descendant
+			end
+		end
+
+		current = current.Parent
+		checked += 1
+	end
+
+	return nil
+end
+
+local function getReticlePanelPrompt()
+	local camera = Workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+
+	local viewport = camera.ViewportSize
+	local unitRay = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	if player.Character then
+		params.FilterDescendantsInstances = { player.Character }
+	end
+
+	local result = Workspace:Raycast(unitRay.Origin, unitRay.Direction * 24, params)
+	if not result or not result.Instance then
+		return nil
+	end
+
+	return findPanelPromptNearInstance(result.Instance)
+end
+
 local function activatePrompt(prompt)
 	if not isPromptInReach(prompt) then
 		return false
@@ -233,7 +277,7 @@ local function activateEquippedTool()
 		return
 	end
 
-	local genericPrompt = getCurrentGenericPrompt()
+	local genericPrompt = getCurrentGenericPrompt() or getReticlePanelPrompt()
 	local panelMode = getPanelMenuMode(genericPrompt)
 	if panelMode then
 		hintPackRemote:FireServer({

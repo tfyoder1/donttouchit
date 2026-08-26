@@ -1129,6 +1129,7 @@ function RoomProgressService:_handleHintRequest(player, payload)
 
 	if action == "OpenRoomMenu" then
 		local mode = payload.Mode
+		self.systemMessageRemote:FireClient(player, ("Opening %s controls."):format(tostring(mode or "room")))
 		if mode == "Store" then
 			self:ShowStore(player, roomId)
 		elseif mode == "Teleport" then
