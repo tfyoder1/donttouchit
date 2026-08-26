@@ -37,6 +37,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = UiLayerController.GuiNames.DiscoveryUI
 gui.IgnoreGuiInset = false
 gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 UiLayerController.ApplyRole(gui, "Background")
 gui.Parent = playerGui
 pcall(function()
@@ -2805,12 +2806,15 @@ local function renderReferenceBook(payload)
 	local mode = payload.Mode or "Log"
 	local storePrices = payload.StorePrices or {}
 	UiLayerController.SetRoomMenuOpen(gui, true)
+	victoryBrickShade.Visible = false
+	victoryBrickModal.Visible = false
 	bookPanel.Visible = true
 	feedbackPanel.Visible = false
 	if not wasVisible then
 		closeBookButton.Modal = true
 		setOverlayMouse(true, closeBookButton)
 	end
+	GuiService.SelectedObject = closeBookButton
 
 	hintTray.Visible = mode ~= "Teleport" and mode ~= "Field"
 	if mode == "Teleport" or mode == "Field" then
