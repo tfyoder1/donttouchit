@@ -33,6 +33,10 @@ local TOP_DOWN_ARENA_MUSIC_NAME = "TopDownArenaMusic"
 local TOP_DOWN_ARENA_MUSIC_VOLUME = 0.5
 local TOP_DOWN_ARENA_MUSIC_FADE_SECONDS = 1.5
 local TOP_DOWN_ARENA_MUSIC_MIN_PLAYERS = 2
+local FLASHLIGHT_ATTRIBUTE = "DontTouchItFlashlight"
+local FLASHLIGHT_OWNED_ATTRIBUTE = "DontTouchItHasFlashlight"
+local CAVE_FLASHLIGHT_REMINDER_POSITION = Vector3.new(-76, 0, 45)
+local CAVE_FLASHLIGHT_REMINDER_RADIUS = 16
 
 local function getRootPart(player)
 	local character = player.Character
@@ -41,6 +45,28 @@ local function getRootPart(player)
 	end
 
 	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function playerHasFlashlight(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	if player:GetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE) == true then
+		return true
+	end
+
+	for _, container in ipairs({ player.Character, player:FindFirstChildOfClass("Backpack") }) do
+		if container then
+			for _, child in ipairs(container:GetChildren()) do
+				if child:IsA("Tool") and child:GetAttribute(FLASHLIGHT_ATTRIBUTE) == true then
+					return true
+				end
+			end
+		end
+	end
+
+	return false
 end
 
 local function teleportPlayer(player, destinationCFrame)
@@ -289,6 +315,7 @@ function RoomProgressService:_getState(player)
 			UntouchedPrologueActive = false,
 			UntouchedPrologueTriggered = false,
 			UntouchedPrologueContained = false,
+			CaveFlashlightReminderShown = false,
 			TwoMinuteAwarded = {},
 			BonusAwarded = {},
 		}
@@ -397,6 +424,7 @@ function RoomProgressService:_beginUntouchedPrologue(player)
 	state.TimerStartedAt = now
 	state.LastRoomTickAt = nil
 	state.LastSafeSpawnCFrame = startCFrame
+	state.CaveFlashlightReminderShown = false
 
 	self:_teleportPlayer(player, startCFrame, "UntouchedPrologueStart")
 	self.prologueRemote:FireClient(player, {
@@ -890,6 +918,18 @@ function RoomProgressService:_tickPlayer(player, now)
 		state.LastSafeSpawnCFrame = Constants.Hallway.SpawnCFrame
 		if state.CurrentRoomId == "CaveEntrance" or self:IsUntouchedProloguePending(player) then
 			self:StopOutsideCaveAudioForPlayer(player)
+		end
+	end
+
+	if rootPart
+		and self:IsUntouchedProloguePending(player)
+		and not state.CaveFlashlightReminderShown
+		and not playerHasFlashlight(player)
+	then
+		local flatPosition = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
+		if (flatPosition - CAVE_FLASHLIGHT_REMINDER_POSITION).Magnitude <= CAVE_FLASHLIGHT_REMINDER_RADIUS then
+			state.CaveFlashlightReminderShown = true
+			self.systemMessageRemote:FireClient(player, "I should have picked up that flashlight at the entrance.")
 		end
 	end
 
