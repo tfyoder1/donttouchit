@@ -454,7 +454,7 @@ local function makeFloor(roomFolder)
 
 			local prompt = createPrompt(floor, "Press", "The Floor", 0)
 			prompt.MaxActivationDistance = 7
-			if (column >= 3 and row >= 3) or (column == 2 and row == 3) then
+			if row == 4 or (column >= 3 and row >= 3) or (column == 2 and row == 3) then
 				floor:SetAttribute("FloorGoneProtected", true)
 			end
 			tag(floor, Constants.Tags.FloorSection)
@@ -866,11 +866,71 @@ local function makeTelevision(objectsFolder)
 	text.TextScaled = true
 	ResetService.MarkBaseline(text)
 
-	createPrompt(body, "Power", "Television", 0)
+	local prompt = createPrompt(body, "Power", "Television", 0)
+	prompt.RequiresLineOfSight = false
 	tag(tv, Constants.Tags.Television)
 
 	tv.PrimaryPart = body
 	return tv, { body, screen, stand }
+end
+
+local function makeTVSecretBookshelf(roomFolder)
+	local shelf = makeModel(roomFolder, "TVSecretBookshelf")
+	local shelfCFrame = CFrame.new(-14.2, 4.25, Constants.Room.Depth / 2 - 0.86)
+	local back = createPart(shelf, "TVSecretBookshelfBack", Vector3.new(7.8, 6.9, 0.34), shelfCFrame, Color3.fromRGB(74, 45, 31), Enum.Material.Wood)
+	back.CanQuery = false
+	back:SetAttribute("BaseCanQuery", false)
+
+	for row = 1, 3 do
+		createPart(
+			shelf,
+			"TVSecretBookshelfShelf" .. row,
+			Vector3.new(7.9, 0.24, 0.58),
+			shelfCFrame * CFrame.new(0, -2.62 + row * 1.82, -0.28),
+			Color3.fromRGB(112, 70, 42),
+			Enum.Material.Wood
+		)
+	end
+
+	local bookColors = {
+		Color3.fromRGB(124, 117, 220),
+		Color3.fromRGB(232, 72, 128),
+		Color3.fromRGB(104, 147, 230),
+		Color3.fromRGB(222, 196, 75),
+		Color3.fromRGB(176, 61, 134),
+		Color3.fromRGB(94, 190, 112),
+	}
+
+	for row = 1, 3 do
+		for index = 1, 7 do
+			local book = createPart(
+				shelf,
+				("TVSecretBook_%d_%d"):format(row, index),
+				Vector3.new(0.42 + (index % 2) * 0.12, 1.05 + ((row + index) % 3) * 0.22, 0.42),
+				shelfCFrame * CFrame.new(-3.05 + index * 0.82, -2.15 + row * 1.82, -0.52),
+				bookColors[((row + index - 2) % #bookColors) + 1],
+				Enum.Material.SmoothPlastic
+			)
+			book.CanCollide = false
+			book:SetAttribute("BaseCanCollide", false)
+			if row == 2 and index == 4 then
+				book.Name = "TVSecretStrangeBook"
+				book.Size = Vector3.new(0.5, 1.45, 0.5)
+				book.Color = Color3.fromRGB(255, 92, 166)
+				book.Material = Enum.Material.Neon
+				book:SetAttribute("RoomId", "TVRoom")
+				createSurfaceText(book, "StrangeBookText", "PULL", Enum.NormalId.Back, Color3.fromRGB(255, 245, 196), book.Color)
+				local prompt = createPrompt(book, "Pull", "Strange Book", 0.2)
+				prompt.MaxActivationDistance = 9
+				prompt.RequiresLineOfSight = false
+				tag(book, Constants.Tags.TVSecretBook)
+			end
+		end
+	end
+
+	createSurfaceText(back, "TVSecretBookshelfText", "PREFERENCE", Enum.NormalId.Front, Color3.fromRGB(255, 241, 171), Color3.fromRGB(74, 45, 31))
+	shelf.PrimaryPart = back
+	return shelf
 end
 
 local function makeUnderfloorChamber(roomFolder, recoveryFloor)
@@ -6694,6 +6754,7 @@ function RoomBuilder.Build()
 	makeTableAndAppliance(objectsFolder)
 	local squishy = makeSquishy(objectsFolder)
 	local television = makeTelevision(objectsFolder)
+	makeTVSecretBookshelf(roomFolder)
 	local snackButton = makeSnackButton(objectsFolder)
 	local snackCeilingFan = makeSnackCeilingFan(objectsFolder)
 	local fridge = makeSnackFridge(objectsFolder)

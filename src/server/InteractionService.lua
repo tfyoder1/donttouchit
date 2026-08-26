@@ -869,6 +869,10 @@ function InteractionService:Initialize()
 		self:_wireTelevision(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.TVSecretBook, function(instance)
+		self:_wireTVSecretBook(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.Appliance, function(instance)
 		self:_wireAppliance(instance)
 	end)
@@ -7263,6 +7267,41 @@ function InteractionService:_televisionSecret(tv, screen, textLabel, player, sta
 	self:_clearTelevisionSounds(tv)
 	self.resetService.RestoreInstance(tv)
 	state.Reacting = false
+end
+
+function InteractionService:_wireTVSecretBook(bookPart)
+	local prompt = getPrompt(bookPart)
+	local roomId = bookPart:GetAttribute("RoomId") or "TVRoom"
+	local pulled = false
+
+	self:_connectPrompt(prompt, function(player)
+		playControlPanelSound(bookPart, 0.44, 0.82)
+		playSound(bookPart, "rbxasset://sounds/electronicpingshort.wav", 0.38, 1.4)
+		task.delay(0.16, function()
+			if bookPart and bookPart.Parent then
+				playSound(bookPart, "rbxasset://sounds/impact_water.mp3", 0.24, 0.55)
+			end
+		end)
+
+		if not pulled and bookPart:IsA("BasePart") then
+			pulled = true
+			local baseCFrame = bookPart:GetAttribute("BaseCFrame") or bookPart.CFrame
+			tweenPart(bookPart, 0.2, {
+				CFrame = baseCFrame * CFrame.new(0, 0, -0.42),
+			}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		end
+
+		if self.discoveryService.RevealSecretDoor then
+			self.discoveryService:RevealSecretDoor(player, roomId, "A shelf clicks. The Library outline stops pretending.")
+		end
+
+		local granted = self.discoveryService:GrantSecretKey(player, roomId, "Library Key added to inventory.")
+		if not granted then
+			self.systemMessageRemote:FireClient(player, "The strange book has already given up its Library Key.")
+		end
+
+		self:_refreshSecretDoorsForPlayer(player)
+	end)
 end
 
 function InteractionService:_clearTelevisionSounds(tv)
