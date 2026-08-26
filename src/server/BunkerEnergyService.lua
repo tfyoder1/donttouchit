@@ -79,6 +79,76 @@ local function getBaseTransparency(part)
 	return part.Transparency
 end
 
+local function encodeColor(color)
+	if typeof(color) ~= "Color3" then
+		return nil
+	end
+
+	return {
+		R = color.R,
+		G = color.G,
+		B = color.B,
+	}
+end
+
+local function decodeColor(data, fallback)
+	if typeof(data) ~= "table" then
+		return fallback
+	end
+
+	local r = tonumber(data.R)
+	local g = tonumber(data.G)
+	local b = tonumber(data.B)
+	if not r or not g or not b then
+		return fallback
+	end
+
+	return Color3.new(math.clamp(r, 0, 1), math.clamp(g, 0, 1), math.clamp(b, 0, 1))
+end
+
+local function encodeVector(vector)
+	if typeof(vector) ~= "Vector3" then
+		return nil
+	end
+
+	return {
+		X = vector.X,
+		Y = vector.Y,
+		Z = vector.Z,
+	}
+end
+
+local function decodeVector(data, fallback)
+	if typeof(data) ~= "table" then
+		return fallback
+	end
+
+	local x = tonumber(data.X)
+	local y = tonumber(data.Y)
+	local z = tonumber(data.Z)
+	if not x or not y or not z then
+		return fallback
+	end
+
+	return Vector3.new(x, y, z)
+end
+
+local function encodeEnumItem(item)
+	return if typeof(item) == "EnumItem" then item.Name else nil
+end
+
+local function decodeEnumItem(enumType, name, fallback)
+	if typeof(name) ~= "string" then
+		return fallback
+	end
+
+	local ok, value = pcall(function()
+		return enumType[name]
+	end)
+
+	return if ok and value then value else fallback
+end
+
 local function isLight(instance)
 	return instance:IsA("PointLight") or instance:IsA("SpotLight") or instance:IsA("SurfaceLight")
 end
@@ -1182,6 +1252,12 @@ function BunkerEnergyService:_getEnergyReserveStackLimit()
 	return math.max(1, Constants.BunkerEnergy.EnergyReserveStackLimit or 10)
 end
 
+function BunkerEnergyService:_queueInventorySave(player)
+	if self.discoveryService and self.discoveryService.QueueSave then
+		self.discoveryService:QueueSave(player)
+	end
+end
+
 function BunkerEnergyService:_getStackableTool(player, attributeName, kindAttributeName, kind, stackLimit)
 	local function findInContainer(container)
 		if not container then
@@ -1400,6 +1476,7 @@ function BunkerEnergyService:DropOneEquippedInventoryItem(player)
 		}
 
 		self:_consumeOneFromStackedTool(tool, "PocketStackCount", "PocketItem")
+		self:_queueInventorySave(player)
 		return true, itemData
 	end
 
@@ -1419,6 +1496,7 @@ function BunkerEnergyService:DropOneEquippedInventoryItem(player)
 		}
 
 		self:_consumeOneFromStackedTool(tool, "EnergyReserveStackCount", "EnergyReserve")
+		self:_queueInventorySave(player)
 		return true, itemData
 	end
 
@@ -1439,13 +1517,15 @@ function BunkerEnergyService:GrantPocketItemTool(player, options)
 	local kind = options.Kind or "Item"
 	local baseName = options.Name or if kind == "IslandRock" then "Beach Rock" elseif kind == "IslandWood" then "Driftwood" else "Pocketed Item"
 	local stackLimit = math.max(1, options.StackLimit or Constants.BunkerEnergy.EnergyReserveStackLimit or 10)
+	local grantCount = math.clamp(math.floor(tonumber(options.Count) or 1), 1, stackLimit)
 	local existingTool, currentStack = self:_getStackableTool(player, "DontTouchItPocketItem", "PocketItemKind", kind, stackLimit)
 	if existingTool then
-		local nextStack = math.clamp((currentStack or 1) + 1, 1, stackLimit)
+		local nextStack = math.clamp((currentStack or 1) + grantCount, 1, stackLimit)
 		existingTool:SetAttribute("PocketStackCount", nextStack)
 		existingTool:SetAttribute("PocketStackLimit", stackLimit)
 		existingTool:SetAttribute("PocketItemBaseName", existingTool:GetAttribute("PocketItemBaseName") or baseName)
 		self:_updatePocketItemToolName(existingTool)
+		self:_queueInventorySave(player)
 		return true, options.GrantMessage or ("%s stacked to x%d."):format(baseName, nextStack)
 	end
 
@@ -1462,11 +1542,12 @@ function BunkerEnergyService:GrantPocketItemTool(player, options)
 	tool:SetAttribute("DontTouchItPocketItem", true)
 	tool:SetAttribute("PocketItemKind", kind)
 	tool:SetAttribute("PocketItemBaseName", baseName)
-	tool:SetAttribute("PocketStackCount", 1)
+	tool:SetAttribute("PocketStackCount", grantCount)
 	tool:SetAttribute("PocketStackLimit", stackLimit)
 	self:_buildPocketItemToolVisual(tool, options)
 	self:_updatePocketItemToolName(tool)
 	tool.Parent = backpack
+	self:_queueInventorySave(player)
 	return true, options.GrantMessage or ("%s pocketed."):format(baseName)
 end
 
@@ -1534,7 +1615,11 @@ function BunkerEnergyService:ConsumePocketItem(player, kind, amount)
 
 	consumeContainer(player.Character)
 	consumeContainer(player:FindFirstChildOfClass("Backpack"))
-	return remaining <= 0
+	local consumed = remaining <= 0
+	if consumed then
+		self:_queueInventorySave(player)
+	end
+	return consumed
 end
 
 function BunkerEnergyService:GrantEnergyReserveTool(player, options)
@@ -1551,14 +1636,16 @@ function BunkerEnergyService:GrantEnergyReserveTool(player, options)
 	local kind = options.Kind or "Fruit"
 	local baseName = self:_getEnergyReserveBaseName(options, kind)
 	local stackLimit = self:_getEnergyReserveStackLimit()
+	local grantCount = math.clamp(math.floor(tonumber(options.Count) or 1), 1, stackLimit)
 	local existingTool, currentStack = self:_findStackableEnergyReserveTool(player, kind)
 	if existingTool then
-		local nextStack = math.clamp((currentStack or 1) + 1, 1, stackLimit)
+		local nextStack = math.clamp((currentStack or 1) + grantCount, 1, stackLimit)
 		existingTool:SetAttribute("EnergyReserveStackCount", nextStack)
 		existingTool:SetAttribute("EnergyReserveStackLimit", stackLimit)
 		existingTool:SetAttribute("EnergyRestoreAmount", options.RestoreAmount or existingTool:GetAttribute("EnergyRestoreAmount") or Constants.BunkerEnergy.FruitEnergyRestore or 0.32)
 		existingTool:SetAttribute("EnergyReserveBaseName", existingTool:GetAttribute("EnergyReserveBaseName") or baseName)
 		self:_updateEnergyReserveToolName(existingTool)
+		self:_queueInventorySave(player)
 		return true, options.GrantMessage or ("%s stacked to x%d."):format(baseName, nextStack)
 	end
 
@@ -1575,7 +1662,7 @@ function BunkerEnergyService:GrantEnergyReserveTool(player, options)
 	tool:SetAttribute("DontTouchItEnergyReserve", true)
 	tool:SetAttribute("EnergyReserveKind", kind)
 	tool:SetAttribute("EnergyReserveBaseName", baseName)
-	tool:SetAttribute("EnergyReserveStackCount", 1)
+	tool:SetAttribute("EnergyReserveStackCount", grantCount)
 	tool:SetAttribute("EnergyReserveStackLimit", stackLimit)
 	tool:SetAttribute("EnergyRestoreAmount", options.RestoreAmount or Constants.BunkerEnergy.FruitEnergyRestore or 0.32)
 	self:_buildEnergyReserveToolVisual(tool, options)
@@ -1595,15 +1682,131 @@ function BunkerEnergyService:GrantEnergyReserveTool(player, options)
 			tool:SetAttribute("EnergyReserveUsed", true)
 			tool.Enabled = false
 			Debris:AddItem(tool, 0.1)
+			self:_queueInventorySave(player)
 			return
 		end
 
 		tool:SetAttribute("EnergyReserveStackCount", stackCount)
 		self:_updateEnergyReserveToolName(tool)
 		tool.Enabled = true
+		self:_queueInventorySave(player)
 	end)
 	tool.Parent = backpack
+	self:_queueInventorySave(player)
 	return true, options.GrantMessage or "Pocketed for later. Try not to think about why it is still warm."
+end
+
+function BunkerEnergyService:_serializeManagedInventoryTool(tool, inventoryType)
+	local visual = self:_getToolHandleSnapshot(tool)
+	local item = {
+		InventoryType = inventoryType,
+		Color = encodeColor(visual.Color),
+		Material = encodeEnumItem(visual.Material),
+		Size = encodeVector(visual.Size),
+		Shape = encodeEnumItem(visual.Shape),
+		ToolTip = tool.ToolTip,
+	}
+
+	if inventoryType == "EnergyReserve" then
+		item.Kind = tool:GetAttribute("EnergyReserveKind") or "Fruit"
+		item.Name = tool:GetAttribute("EnergyReserveBaseName") or self:_getEnergyReserveBaseName({}, item.Kind)
+		item.Count = math.max(1, math.floor(tonumber(tool:GetAttribute("EnergyReserveStackCount")) or 1))
+		item.StackLimit = math.max(1, math.floor(tonumber(tool:GetAttribute("EnergyReserveStackLimit")) or self:_getEnergyReserveStackLimit()))
+		item.RestoreAmount = tonumber(tool:GetAttribute("EnergyRestoreAmount")) or Constants.BunkerEnergy.FruitEnergyRestore or 0.32
+	else
+		item.Kind = tool:GetAttribute("PocketItemKind") or "Item"
+		item.Name = tool:GetAttribute("PocketItemBaseName") or tool.Name
+		item.Count = math.max(1, math.floor(tonumber(tool:GetAttribute("PocketStackCount")) or 1))
+		item.StackLimit = math.max(1, math.floor(tonumber(tool:GetAttribute("PocketStackLimit")) or Constants.BunkerEnergy.EnergyReserveStackLimit or 10))
+	end
+
+	return item
+end
+
+function BunkerEnergyService:SerializeInventory(player)
+	local snapshot = {
+		Version = 1,
+		Items = {},
+	}
+
+	if not player or not player.Parent then
+		return snapshot
+	end
+
+	local function collect(container)
+		if not container then
+			return
+		end
+
+		for _, item in ipairs(container:GetChildren()) do
+			if item:IsA("Tool") and item:GetAttribute("EnergyReserveUsed") ~= true then
+				if item:GetAttribute("DontTouchItEnergyReserve") == true then
+					table.insert(snapshot.Items, self:_serializeManagedInventoryTool(item, "EnergyReserve"))
+				elseif item:GetAttribute("DontTouchItPocketItem") == true then
+					table.insert(snapshot.Items, self:_serializeManagedInventoryTool(item, "PocketItem"))
+				end
+			end
+		end
+	end
+
+	collect(player.Character)
+	collect(player:FindFirstChildOfClass("Backpack"))
+	return snapshot
+end
+
+function BunkerEnergyService:RestoreInventory(player, snapshot)
+	if not player or not player.Parent or typeof(snapshot) ~= "table" or typeof(snapshot.Items) ~= "table" then
+		return false
+	end
+
+	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 2)
+	if not backpack then
+		return false
+	end
+
+	local function clearManagedTools(container)
+		if not container then
+			return
+		end
+
+		for _, item in ipairs(container:GetChildren()) do
+			if item:IsA("Tool")
+				and (item:GetAttribute("DontTouchItEnergyReserve") == true or item:GetAttribute("DontTouchItPocketItem") == true)
+			then
+				item:Destroy()
+			end
+		end
+	end
+
+	clearManagedTools(player.Character)
+	clearManagedTools(backpack)
+
+	for _, item in ipairs(snapshot.Items) do
+		if typeof(item) == "table" then
+			local stackLimit = math.max(1, math.floor(tonumber(item.StackLimit) or self:_getEnergyReserveStackLimit()))
+			local count = math.clamp(math.floor(tonumber(item.Count) or 1), 1, stackLimit)
+			local options = {
+				Kind = if typeof(item.Kind) == "string" then item.Kind else "Item",
+				Name = if typeof(item.Name) == "string" then item.Name else nil,
+				ToolTip = if typeof(item.ToolTip) == "string" then item.ToolTip else nil,
+				Count = count,
+				StackLimit = stackLimit,
+				Color = decodeColor(item.Color, nil),
+				Material = decodeEnumItem(Enum.Material, item.Material, nil),
+				Size = decodeVector(item.Size, nil),
+				Shape = decodeEnumItem(Enum.PartType, item.Shape, nil),
+			}
+
+			if item.InventoryType == "EnergyReserve" then
+				options.RestoreAmount = tonumber(item.RestoreAmount) or Constants.BunkerEnergy.FruitEnergyRestore or 0.32
+				self:GrantEnergyReserveTool(player, options)
+			elseif item.InventoryType == "PocketItem" then
+				self:GrantPocketItemTool(player, options)
+			end
+		end
+	end
+
+	return true
 end
 
 function BunkerEnergyService:RecordMatterReclaimed(partCount)

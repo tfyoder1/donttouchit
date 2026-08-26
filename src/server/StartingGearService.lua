@@ -162,7 +162,13 @@ local function createFlashlightTool()
 end
 
 function StartingGearService.new()
-	return setmetatable({}, StartingGearService)
+	return setmetatable({
+		discoveryService = nil,
+	}, StartingGearService)
+end
+
+function StartingGearService:SetDiscoveryService(discoveryService)
+	self.discoveryService = discoveryService
 end
 
 function StartingGearService:_grantFlashlight(player)
@@ -185,6 +191,9 @@ function StartingGearService:GrantFlashlight(player)
 
 	player:SetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE, true)
 	self:_grantFlashlight(player)
+	if self.discoveryService and self.discoveryService.SetFlashlightOwned then
+		self.discoveryService:SetFlashlightOwned(player, true, true)
+	end
 end
 
 function StartingGearService:_toggleEquippedFlashlight(player)

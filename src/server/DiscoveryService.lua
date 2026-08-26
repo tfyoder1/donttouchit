@@ -50,6 +50,43 @@ local function cloneDictionary(source)
 	return copy
 end
 
+local function cloneInventorySnapshot(snapshot)
+	local copy = {
+		Version = 1,
+		Items = {},
+	}
+
+	if typeof(snapshot) ~= "table" then
+		return copy
+	end
+
+	if typeof(snapshot.Version) == "number" then
+		copy.Version = snapshot.Version
+	end
+
+	if typeof(snapshot.Items) == "table" then
+		for _, item in ipairs(snapshot.Items) do
+			if typeof(item) == "table" then
+				local itemCopy = {}
+				for key, value in pairs(item) do
+					if typeof(value) == "table" then
+						local nestedCopy = {}
+						for nestedKey, nestedValue in pairs(value) do
+							nestedCopy[nestedKey] = nestedValue
+						end
+						itemCopy[key] = nestedCopy
+					else
+						itemCopy[key] = value
+					end
+				end
+				table.insert(copy.Items, itemCopy)
+			end
+		end
+	end
+
+	return copy
+end
+
 local function dictionaryFromList(items)
 	local dictionary = {}
 
@@ -92,14 +129,19 @@ function DiscoveryService.new()
 	self.secretKeysByUserId = {}
 	self.teleportKeyByUserId = {}
 	self.secretDoorRevealsByUserId = {}
+	self.flashlightByUserId = {}
 	self.lastUnlockedRoomByUserId = {}
 	self.continueRoomByUserId = {}
+	self.savedToolInventoryByUserId = {}
+	self.toolInventoryRestoredByUserId = {}
 	self.devOverrideByUserId = {}
 	self.freshRunByUserId = {}
 	self.hasSavedDataByUserId = {}
 	self.loadedByUserId = {}
 	self.saveQueuedByUserId = {}
 	self.saveWarningShownByUserId = {}
+	self.inventoryPersistenceService = nil
+	self.startingGearService = nil
 	self.dataStore = nil
 	self.remote = RemoteService.GetRemote(Constants.Remotes.DiscoveryUpdate)
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
@@ -125,12 +167,14 @@ function DiscoveryService:Initialize()
 		self:_loadPlayer(player)
 		self:_grantRoomCompletionSecretKeys(player)
 		self:_syncSecretKeyTools(player)
+		self:_restoreSavedToolInventory(player)
 		self:_sendSnapshot(player)
 
 		player.CharacterAdded:Connect(function()
 			task.delay(0.25, function()
 				if player.Parent then
 					self:_syncSecretKeyTools(player)
+					self:_restoreSavedToolInventory(player)
 				end
 			end)
 		end)
@@ -146,8 +190,11 @@ function DiscoveryService:Initialize()
 		self.secretKeysByUserId[player.UserId] = nil
 		self.teleportKeyByUserId[player.UserId] = nil
 		self.secretDoorRevealsByUserId[player.UserId] = nil
+		self.flashlightByUserId[player.UserId] = nil
 		self.lastUnlockedRoomByUserId[player.UserId] = nil
 		self.continueRoomByUserId[player.UserId] = nil
+		self.savedToolInventoryByUserId[player.UserId] = nil
+		self.toolInventoryRestoredByUserId[player.UserId] = nil
 		self.devOverrideByUserId[player.UserId] = nil
 		self.freshRunByUserId[player.UserId] = nil
 		self.hasSavedDataByUserId[player.UserId] = nil
@@ -160,6 +207,7 @@ function DiscoveryService:Initialize()
 		self:_loadPlayer(player)
 		self:_grantRoomCompletionSecretKeys(player)
 		self:_syncSecretKeyTools(player)
+		self:_restoreSavedToolInventory(player)
 		self:_sendSnapshot(player)
 	end
 
@@ -212,6 +260,10 @@ function DiscoveryService:_ensurePlayer(player)
 		self.secretDoorRevealsByUserId[player.UserId] = {}
 	end
 
+	if self.flashlightByUserId[player.UserId] == nil then
+		self.flashlightByUserId[player.UserId] = false
+	end
+
 	if not self.lastUnlockedRoomByUserId[player.UserId] then
 		self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	end
@@ -227,10 +279,22 @@ function DiscoveryService:_ensurePlayer(player)
 	if self.loadedByUserId[player.UserId] == nil then
 		self.loadedByUserId[player.UserId] = false
 	end
+
+	if not self.savedToolInventoryByUserId[player.UserId] then
+		self.savedToolInventoryByUserId[player.UserId] = cloneInventorySnapshot(nil)
+	end
+
+	if self.toolInventoryRestoredByUserId[player.UserId] == nil then
+		self.toolInventoryRestoredByUserId[player.UserId] = false
+	end
 end
 
 function DiscoveryService:_captureRuntimeState(player)
 	self:_ensurePlayer(player)
+	local toolInventory = self.savedToolInventoryByUserId[player.UserId]
+	if self.inventoryPersistenceService and self.inventoryPersistenceService.SerializeInventory then
+		toolInventory = self.inventoryPersistenceService:SerializeInventory(player)
+	end
 
 	return {
 		DiscoveryById = cloneDictionary(self.discoveryByUserId[player.UserId]),
@@ -241,8 +305,10 @@ function DiscoveryService:_captureRuntimeState(player)
 		SecretKeysByRoomId = cloneDictionary(self.secretKeysByUserId[player.UserId]),
 		HasTeleportKey = self.teleportKeyByUserId[player.UserId] == true,
 		SecretDoorRevealsByRoomId = cloneDictionary(self.secretDoorRevealsByUserId[player.UserId]),
+		HasFlashlight = self.flashlightByUserId[player.UserId] == true,
 		LastUnlockedRoomId = self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID,
 		ContinueRoomId = self.continueRoomByUserId[player.UserId] or self.lastUnlockedRoomByUserId[player.UserId] or DEFAULT_ROOM_ID,
+		ToolInventory = cloneInventorySnapshot(toolInventory),
 	}
 end
 
@@ -255,8 +321,15 @@ function DiscoveryService:_applyRuntimeState(player, state)
 	self.secretKeysByUserId[player.UserId] = cloneDictionary(state.SecretKeysByRoomId)
 	self.teleportKeyByUserId[player.UserId] = state.HasTeleportKey == true
 	self.secretDoorRevealsByUserId[player.UserId] = cloneDictionary(state.SecretDoorRevealsByRoomId)
+	self.flashlightByUserId[player.UserId] = state.HasFlashlight == true
+	if self.flashlightByUserId[player.UserId] and self.startingGearService and self.startingGearService.GrantFlashlight then
+		self.startingGearService:GrantFlashlight(player)
+	end
 	self.lastUnlockedRoomByUserId[player.UserId] = state.LastUnlockedRoomId or DEFAULT_ROOM_ID
 	self.continueRoomByUserId[player.UserId] = state.ContinueRoomId or state.LastUnlockedRoomId or DEFAULT_ROOM_ID
+	self.savedToolInventoryByUserId[player.UserId] = cloneInventorySnapshot(state.ToolInventory)
+	self.toolInventoryRestoredByUserId[player.UserId] = false
+	self:_restoreSavedToolInventory(player)
 end
 
 function DiscoveryService:IsDevOverrideActive(player)
@@ -554,8 +627,11 @@ function DiscoveryService:_loadPlayer(player)
 	self.secretKeysByUserId[player.UserId] = {}
 	self.teleportKeyByUserId[player.UserId] = false
 	self.secretDoorRevealsByUserId[player.UserId] = {}
+	self.flashlightByUserId[player.UserId] = false
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	self.continueRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
+	self.savedToolInventoryByUserId[player.UserId] = cloneInventorySnapshot(nil)
+	self.toolInventoryRestoredByUserId[player.UserId] = false
 	self.hasSavedDataByUserId[player.UserId] = false
 	self.loadedByUserId[player.UserId] = false
 
@@ -632,12 +708,20 @@ function DiscoveryService:_loadPlayer(player)
 			self.teleportKeyByUserId[player.UserId] = true
 		end
 
+		if data.Inventory.Flashlight == true or data.Inventory.HasFlashlight == true then
+			self.flashlightByUserId[player.UserId] = true
+		end
+
 		if typeof(data.Inventory.SecretDoorReveals) == "table" then
 			for _, roomId in ipairs(data.Inventory.SecretDoorReveals) do
 				if Constants.SecretDoors and Constants.SecretDoors[roomId] then
 					self.secretDoorRevealsByUserId[player.UserId][roomId] = true
 				end
 			end
+		end
+
+		if typeof(data.Inventory.ToolStacks) == "table" then
+			self.savedToolInventoryByUserId[player.UserId] = cloneInventorySnapshot(data.Inventory.ToolStacks)
 		end
 	end
 
@@ -671,6 +755,11 @@ end
 
 function DiscoveryService:_buildSaveData(player)
 	self:_ensurePlayer(player)
+	local toolInventory = self.savedToolInventoryByUserId[player.UserId]
+	if self.inventoryPersistenceService and self.inventoryPersistenceService.SerializeInventory then
+		toolInventory = self.inventoryPersistenceService:SerializeInventory(player)
+		self.savedToolInventoryByUserId[player.UserId] = cloneInventorySnapshot(toolInventory)
+	end
 
 	return {
 		Version = 1,
@@ -683,7 +772,9 @@ function DiscoveryService:_buildSaveData(player)
 			RevealedDiscoveries = buildDiscoveryStateList(self.revealedDiscoveriesByUserId[player.UserId]),
 			SecretKeys = buildSecretRoomList(self.secretKeysByUserId[player.UserId]),
 			TeleportKey = self.teleportKeyByUserId[player.UserId] == true,
+			HasFlashlight = self.flashlightByUserId[player.UserId] == true,
 			SecretDoorReveals = buildSecretRoomList(self.secretDoorRevealsByUserId[player.UserId]),
+			ToolStacks = cloneInventorySnapshot(toolInventory),
 		},
 		LastUnlockedRoomId = self:GetLastUnlockedRoomId(player),
 		ContinueRoomId = self:GetContinueRoomId(player),
@@ -745,6 +836,67 @@ function DiscoveryService:_queueSave(player)
 			self:_savePlayer(player)
 		end
 	end)
+end
+
+function DiscoveryService:QueueSave(player)
+	self:_queueSave(player)
+end
+
+function DiscoveryService:SetInventoryPersistenceService(service)
+	self.inventoryPersistenceService = service
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if self.loadedByUserId[player.UserId] == true then
+			self:_restoreSavedToolInventory(player)
+		end
+	end
+end
+
+function DiscoveryService:SetStartingGearService(service)
+	self.startingGearService = service
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if self.loadedByUserId[player.UserId] == true and self.flashlightByUserId[player.UserId] == true then
+			service:GrantFlashlight(player)
+		end
+	end
+end
+
+function DiscoveryService:SetFlashlightOwned(player, owned, shouldSave)
+	if not player or not player.Parent then
+		return false
+	end
+
+	self:_ensurePlayer(player)
+	local nextOwned = owned == true
+	if self.flashlightByUserId[player.UserId] == nextOwned then
+		return false
+	end
+
+	self.flashlightByUserId[player.UserId] = nextOwned
+	if shouldSave then
+		self:_queueSave(player)
+	end
+
+	return true
+end
+
+function DiscoveryService:_restoreSavedToolInventory(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	if self.toolInventoryRestoredByUserId[player.UserId] == true then
+		return
+	end
+
+	if not self.inventoryPersistenceService or not self.inventoryPersistenceService.RestoreInventory then
+		return
+	end
+
+	self:_ensurePlayer(player)
+	self.inventoryPersistenceService:RestoreInventory(player, self.savedToolInventoryByUserId[player.UserId])
+	self.toolInventoryRestoredByUserId[player.UserId] = true
 end
 
 function DiscoveryService:_countForPlayer(player, discoveryOrder)

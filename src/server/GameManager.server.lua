@@ -57,9 +57,12 @@ uiLayoutService:Initialize(playerPreferencesService)
 
 local startingGearService = StartingGearService.new()
 startingGearService:Initialize()
+startingGearService:SetDiscoveryService(discoveryService)
+discoveryService:SetStartingGearService(startingGearService)
 
 local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService)
 bunkerEnergyService:Initialize()
+discoveryService:SetInventoryPersistenceService(bunkerEnergyService)
 
 local victoryBrickService = VictoryBrickService.new(discoveryService, roomProgressService)
 victoryBrickService:Initialize()
