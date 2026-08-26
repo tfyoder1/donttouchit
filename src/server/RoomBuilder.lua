@@ -3445,13 +3445,17 @@ local function makeInfirmaryRoom(roomFolder)
 	local title = createPart(room, "InfirmaryTitleSign", Vector3.new(16, 2.3, 0.3), cframeAt(origin, 0, 12.8, depth / 2 - 0.72), trimColor, Enum.Material.Neon)
 	createDoubleSidedSurfaceText(title, "InfirmaryTitleText", "INFIRMARY\nREMAIN FUNCTIONAL", Enum.NormalId.Front, Color3.fromRGB(20, 36, 39), trimColor)
 
+	local infirmaryClockCFrame = cframeAt(origin, width / 2 - 0.62, 9.2, -6.5) * CFrame.Angles(0, math.rad(-90), 0)
 	createNoTouchClock(
 		room,
 		"InfirmaryWallClock",
 		"Infirmary",
 		Vector3.new(6.2, 1.9, 0.24),
-		cframeAt(origin, width / 2 - 0.62, 9.2, -6.5) * CFrame.Angles(0, math.rad(-90), 0),
-		Enum.NormalId.Left
+		infirmaryClockCFrame,
+		getFaceTowardDirection(
+			infirmaryClockCFrame,
+			Vector3.new(origin.X, infirmaryClockCFrame.Position.Y, origin.Z) - infirmaryClockCFrame.Position
+		)
 	)
 
 	local recovery = makeModel(room, "PrimaryRecoveryBed")
@@ -3472,7 +3476,9 @@ local function makeInfirmaryRoom(roomFolder)
 	light.Parent = ceilingLight
 	mark(light)
 
-	local monitor = createPart(room, "InfirmaryMonitor", Vector3.new(5.4, 3.2, 0.34), cframeAt(origin, 18.6, 4.8, -4.6) * CFrame.Angles(0, math.rad(-28), 0), Color3.fromRGB(18, 30, 33), Enum.Material.Metal)
+	local monitorPosition = origin + Vector3.new(18.6, 4.8, -4.6)
+	local monitorLookAway = (monitorPosition - Vector3.new(origin.X, monitorPosition.Y, origin.Z)).Unit
+	local monitor = createPart(room, "InfirmaryMonitor", Vector3.new(5.4, 3.2, 0.34), CFrame.lookAt(monitorPosition, monitorPosition + monitorLookAway), Color3.fromRGB(18, 30, 33), Enum.Material.Metal)
 	createSurfaceText(monitor, "InfirmaryMonitorText", "STATUS\nSTABILIZED\n?", Enum.NormalId.Front, Color3.fromRGB(119, 255, 203), Color3.fromRGB(18, 30, 33))
 	createPrompt(monitor, "Read", "Patient Monitor", 0)
 	tag(monitor, Constants.Tags.InfirmaryMonitor)
@@ -3490,7 +3496,7 @@ local function makeInfirmaryRoom(roomFolder)
 		{ X = 19.8, Z = 13.2, Label = "STERILE\nENOUGH" },
 		{ X = 20.2, Z = -14.0, Label = "CABINET\n03" },
 	}) do
-		local cabinet = createPart(room, "InfirmaryCabinet" .. cabinetIndex, Vector3.new(3.4, 5.8, 1.2), cframeAt(origin, data.X, 3.2, data.Z), Color3.fromRGB(194, 203, 206), Enum.Material.Metal)
+		local cabinet = createPart(room, "InfirmaryCabinet" .. cabinetIndex, Vector3.new(3.4, 5.8, 1.2), cframeAt(origin, data.X, 3.2, data.Z) * CFrame.Angles(0, math.rad(-90), 0), Color3.fromRGB(194, 203, 206), Enum.Material.Metal)
 		createSurfaceText(cabinet, "InfirmaryCabinetText", data.Label, Enum.NormalId.Front, Color3.fromRGB(64, 86, 92), Color3.fromRGB(194, 203, 206))
 		createPrompt(cabinet, "Open", "Medical Cabinet", 0)
 		tag(cabinet, Constants.Tags.InfirmaryCabinet)
