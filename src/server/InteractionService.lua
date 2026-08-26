@@ -1133,7 +1133,7 @@ function InteractionService:Initialize()
 	end)
 
 	self:_connectTagged(Constants.Tags.LibraryShelf, function(instance)
-		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryShushedShelf.Id, "The shelf shushes you before you even make noise.")
+		self:_wireDiscoveryPrompt(instance, Constants.Discoveries.LibraryShushedShelf.Id, "A low hum vibrates behind the shelf and wall. The Library pretends that is normal.")
 	end)
 
 	self:_connectTagged(Constants.Tags.LibraryBookStorm, function(instance)
@@ -2378,7 +2378,7 @@ function InteractionService:_wireLibraryBookStorm(book)
 				looseBook.Color = Color3.fromRGB(70 + (index * 29) % 160, 42 + (index * 17) % 130, 70 + (index * 41) % 140)
 				looseBook.Size = Vector3.new(0.55 + (index % 3) * 0.08, 0.16, 1.15 + (index % 4) * 0.12)
 				looseBook.CFrame = origin
-					* CFrame.new(((index % 9) - 4) * 0.35, 0.35 + (index % 5) * 0.16, -0.8 - (index % 4) * 0.18)
+					* CFrame.new(((index % 9) - 4) * 0.35, 0.35 + (index % 5) * 0.16, 0.85 + (index % 4) * 0.18)
 					* CFrame.Angles(math.rad(index * 17), math.rad(index * 23), math.rad(index * 31))
 				looseBook.CustomPhysicalProperties = PhysicalProperties.new(0.45, 0.55, 0.35, 1, 1)
 				looseBook.Parent = workspace
@@ -5371,9 +5371,9 @@ function InteractionService:_wireLibraryBowlingKey(key)
 
 		local unlocked = self.discoveryService:Unlock(player, Constants.Discoveries.LibraryBowlingKey.Id)
 		if unlocked then
-			self.systemMessageRemote:FireClient(player, "Bowling Key found. The bookcase suddenly looks guilty.")
+			self.systemMessageRemote:FireClient(player, "Bowling Key clearance logged. The bookcase suddenly looks guilty.")
 		else
-			self.systemMessageRemote:FireClient(player, "You already found the Bowling Key.")
+			self.systemMessageRemote:FireClient(player, "Bowling Key clearance is already logged.")
 		end
 
 		playSound(key, "rbxasset://sounds/electronicpingshort.wav", 0.5, 1.85)

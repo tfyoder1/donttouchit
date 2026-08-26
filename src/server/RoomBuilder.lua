@@ -4929,7 +4929,8 @@ local function makeLibraryFurnishings(room)
 		local base = CFrame.new(origin + Vector3.new(shelf.X, 3.7, shelf.Z)) * CFrame.Angles(0, math.rad(shelf.Yaw), 0)
 		local back = createPart(shelfModel, "ShelfBack", Vector3.new(shelf.Width, 7.4, 0.34), base, Color3.fromRGB(72, 48, 36), Enum.Material.Wood)
 		if shelfIndex == 1 then
-			createPrompt(back, "Inspect", "Whispering Shelf", 0)
+			local shelfPrompt = createPrompt(back, "Listen", "Hum Behind Shelf and Wall", 0)
+			shelfPrompt.RequiresLineOfSight = false
 			tag(back, Constants.Tags.LibraryShelf)
 		end
 
@@ -4954,7 +4955,8 @@ local function makeLibraryFurnishings(room)
 						shelfBook.Color = Color3.fromRGB(255, 91, 141)
 						shelfBook.Material = Enum.Material.Neon
 						createSurfaceText(shelfBook, "LooseBookText", "PULL", Enum.NormalId.Back, Color3.fromRGB(255, 245, 196), shelfBook.Color)
-						createPrompt(shelfBook, "Pull", "Loose Book", 0)
+						local looseBookPrompt = createPrompt(shelfBook, "Pull", "Loose Book", 0)
+						looseBookPrompt.RequiresLineOfSight = false
 						tag(shelfBook, Constants.Tags.LibraryBookStorm)
 					end
 				end
@@ -5052,14 +5054,16 @@ local function makeLibraryFurnishings(room)
 	key.Shape = Enum.PartType.Cylinder
 	local keyHead = createPart(room, "BowlingKeyHead", Vector3.new(0.82, 0.18, 0.82), cframeAt(origin, -15.55, 9.42, -15.4), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)
 	keyHead.Shape = Enum.PartType.Cylinder
-	createPrompt(key, "Take", "Bowling Key", 0)
+	local keyPrompt = createPrompt(key, "Claim", "Bowling Key Clearance", 0)
+	keyPrompt.RequiresLineOfSight = false
 	tag(key, Constants.Tags.LibraryTopShelfKey)
 
 	local bookcaseDoor = createPart(room, "LibraryBookcaseDoor", Vector3.new(5.6, 7.6, 0.42), cframeAt(origin, 7.2, 4.0, -16.55), Color3.fromRGB(76, 48, 34), Enum.Material.Wood)
 	bookcaseDoor:SetAttribute("DestinationCFrame", BOWLING_ALLEY_SPAWN_CFRAME)
 	bookcaseDoor:SetAttribute("SecretClosedCFrame", bookcaseDoor.CFrame)
 	createReferenceBookcaseFace(bookcaseDoor)
-	createPrompt(bookcaseDoor, "Inspect", "Reference Bookcase", 0)
+	local bookcasePrompt = createPrompt(bookcaseDoor, "Open", "Reference Bookcase", 0)
+	bookcasePrompt.RequiresLineOfSight = false
 	tag(bookcaseDoor, Constants.Tags.LibraryBookcaseDoor)
 
 	makeAtomicBoomerang(room, "LibraryBackWallAtomicBoomerang", cframeAt(origin, -10.8, 11.2, -LIBRARY_DEPTH / 2 + 0.62), 0.78, ATOMIC_COLORS.Orange)
