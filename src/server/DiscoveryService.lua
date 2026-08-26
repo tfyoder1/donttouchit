@@ -538,9 +538,13 @@ function DiscoveryService:_applyFreshRuntimeProgress(player, options)
 	self.secretDoorRevealsByUserId[player.UserId] = if preserveKnowledge and realState
 		then cloneDictionary(realState.SecretDoorRevealsByRoomId)
 		else {}
+	self.flashlightByUserId[player.UserId] = false
 	self.lastUnlockedRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 	self.continueRoomByUserId[player.UserId] = DEFAULT_ROOM_ID
 
+	if self.startingGearService and self.startingGearService.ResetFlashlightForFreshRun then
+		self.startingGearService:ResetFlashlightForFreshRun(player)
+	end
 	self:_syncSecretKeyTools(player)
 	self:_sendSnapshot(player)
 	self._secretDoorChangedEvent:Fire(player)

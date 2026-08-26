@@ -524,6 +524,16 @@ local function closePhysicalPassageDoor(door)
 	door.Material = door:GetAttribute("BaseMaterial") or Enum.Material.SmoothPlastic
 end
 
+local function closeContainmentExitDoors()
+	local roomId = Constants.Prologue.ContainmentRoomId or "TVRoom"
+	for _, door in ipairs(CollectionService:GetTagged(Constants.Tags.ExitDoor)) do
+		if door:IsA("BasePart") and door:GetAttribute("RoomId") == roomId then
+			closePhysicalPassageDoor(door)
+			playLockdownDoorSound(door)
+		end
+	end
+end
+
 local function isControlPanelInteraction(instance)
 	local current = instance
 	while current do
@@ -1475,15 +1485,8 @@ function InteractionService:_connectPrompt(prompt, callback, options)
 
 		callback(player)
 
-		if roomId == "CaveEntrance" and not prologueSafeNavigation and self:_setCaveEntranceSealed() then
-			local soundParent = prompt.Parent or workspace
-			playSound(soundParent, "rbxasset://sounds/snap.wav", 0.75, 0.38)
-			task.delay(0.08, function()
-				if soundParent.Parent then
-					playSound(soundParent, "rbxasset://sounds/button.wav", 0.55, 0.42)
-				end
-			end)
-			self.systemMessageRemote:FireClient(player, "The cave entrance rumbles shut behind you. Someone absolutely noticed.")
+		if roomId == "CaveEntrance" and not prologueSafeNavigation then
+			self.systemMessageRemote:FireClient(player, "The cave answers from somewhere deeper. The way forward is no longer optional.")
 		end
 	end)
 end

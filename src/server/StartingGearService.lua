@@ -71,6 +71,23 @@ local function findFlashlightTool(player)
 	return nil, nil
 end
 
+local function removeFlashlightTools(player)
+	local function clearContainer(container)
+		if not container then
+			return
+		end
+
+		for _, child in ipairs(container:GetChildren()) do
+			if child:IsA("Tool") and child:GetAttribute(FLASHLIGHT_ATTRIBUTE) == true then
+				child:Destroy()
+			end
+		end
+	end
+
+	clearContainer(player.Character)
+	clearContainer(player:FindFirstChildOfClass("Backpack"))
+end
+
 local function setFlashlightEnabled(tool, enabled)
 	tool:SetAttribute("FlashlightOn", enabled)
 
@@ -193,6 +210,18 @@ function StartingGearService:GrantFlashlight(player)
 	self:_grantFlashlight(player)
 	if self.discoveryService and self.discoveryService.SetFlashlightOwned then
 		self.discoveryService:SetFlashlightOwned(player, true, true)
+	end
+end
+
+function StartingGearService:ResetFlashlightForFreshRun(player)
+	if not player or not player.Parent then
+		return
+	end
+
+	player:SetAttribute(FLASHLIGHT_OWNED_ATTRIBUTE, false)
+	removeFlashlightTools(player)
+	if self.discoveryService and self.discoveryService.SetFlashlightOwned then
+		self.discoveryService:SetFlashlightOwned(player, false, false)
 	end
 end
 

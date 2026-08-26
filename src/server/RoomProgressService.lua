@@ -35,6 +35,8 @@ local TOP_DOWN_ARENA_MUSIC_FADE_SECONDS = 1.5
 local TOP_DOWN_ARENA_MUSIC_MIN_PLAYERS = 2
 local FLASHLIGHT_ATTRIBUTE = "DontTouchItFlashlight"
 local FLASHLIGHT_OWNED_ATTRIBUTE = "DontTouchItHasFlashlight"
+local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
+local SIGNAL_BAND_NAME = "DontTouchItSignalBand"
 local CAVE_FLASHLIGHT_REMINDER_POSITION = Vector3.new(-76, 0, 45)
 local CAVE_FLASHLIGHT_REMINDER_RADIUS = 16
 
@@ -106,6 +108,26 @@ local function playerHasFlashlight(player)
 	end
 
 	return false
+end
+
+local function clearSignalBandForFreshRun(player)
+	player:SetAttribute(SIGNAL_BAND_ATTRIBUTE, false)
+
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if playerGui then
+		playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, false)
+	end
+
+	local character = player.Character
+	if not character then
+		return
+	end
+
+	for _, descendant in ipairs(character:GetDescendants()) do
+		if descendant.Name == SIGNAL_BAND_NAME then
+			descendant:Destroy()
+		end
+	end
 end
 
 local function teleportPlayer(player, destinationCFrame)
@@ -355,6 +377,7 @@ function RoomProgressService:_getState(player)
 			UntouchedPrologueTriggered = false,
 			UntouchedPrologueContained = false,
 			CaveFlashlightReminderShown = false,
+			LastContainmentReturnAt = 0,
 			TwoMinuteAwarded = {},
 			BonusAwarded = {},
 		}
@@ -465,6 +488,7 @@ function RoomProgressService:_beginUntouchedPrologue(player)
 	state.LastSafeSpawnCFrame = startCFrame
 	state.CaveFlashlightReminderShown = false
 
+	clearSignalBandForFreshRun(player)
 	self:_teleportPlayer(player, startCFrame, "UntouchedPrologueStart")
 	self.prologueRemote:FireClient(player, {
 		Action = "Begin",
@@ -958,6 +982,14 @@ function RoomProgressService:_tickPlayer(player, now)
 		state.LastSafeSpawnCFrame = Constants.Hallway.SpawnCFrame
 		if state.CurrentRoomId == "CaveEntrance" or self:IsUntouchedProloguePending(player) then
 			self:StopOutsideCaveAudioForPlayer(player)
+		end
+		if state.UntouchedPrologueContained == true and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true then
+			if now - (state.LastContainmentReturnAt or 0) >= 1.5 then
+				state.LastContainmentReturnAt = now
+				self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(Constants.Prologue.ContainmentRoomId or "TVRoom"), "ContainmentReturn")
+				self.systemMessageRemote:FireClient(player, "The TV room door locks behind you. The room is not finished yet.")
+			end
+			return
 		end
 	end
 

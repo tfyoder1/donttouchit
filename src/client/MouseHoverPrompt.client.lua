@@ -80,6 +80,32 @@ local function getPromptPosition(prompt)
 	return nil
 end
 
+local function hasPromptLineOfSight(prompt)
+	if not prompt or prompt.RequiresLineOfSight == false then
+		return true
+	end
+
+	local camera = workspace.CurrentCamera
+	local promptPosition = getPromptPosition(prompt)
+	if not camera or not promptPosition then
+		return false
+	end
+
+	local promptRoot = prompt.Parent
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	if player.Character then
+		params.FilterDescendantsInstances = { player.Character }
+	end
+
+	local offset = promptPosition - camera.CFrame.Position
+	local result = workspace:Raycast(camera.CFrame.Position, offset, params)
+	return not result
+		or not result.Instance
+		or (promptRoot and result.Instance:IsDescendantOf(promptRoot))
+		or result.Instance == promptRoot
+end
+
 local function isPromptInReach(prompt)
 	if not prompt or not prompt.Enabled then
 		return false
@@ -92,6 +118,7 @@ local function isPromptInReach(prompt)
 	end
 
 	return (rootPart.Position - promptPosition).Magnitude <= prompt.MaxActivationDistance + PROMPT_EXTRA_REACH
+		and hasPromptLineOfSight(prompt)
 end
 
 local function getDirectPrompt(instance)
