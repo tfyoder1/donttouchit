@@ -118,6 +118,7 @@ local BOWLING_STRIKE_SOUND_IDS = (bowlingAudio and bowlingAudio.StrikeSoundIds) 
 	"rbxassetid://128237818020429",
 }
 local BOWLING_STRIKE_SOUND_VOLUME = (bowlingAudio and bowlingAudio.StrikeVolume) or 0.72
+local BOWLING_KNOCKDOWN_SOUND_VOLUME = (bowlingAudio and bowlingAudio.KnockdownVolume) or 0.48
 local bunkerEnergyAudio = Constants.AudioAssets and Constants.AudioAssets.BunkerEnergy
 local BUNKER_SHUTDOWN_SOUND_ID = (bunkerEnergyAudio and bunkerEnergyAudio.ShutdownSoundId) or "rbxassetid://1842440874"
 local BUNKER_SHUTDOWN_SOUND_VOLUME = (bunkerEnergyAudio and bunkerEnergyAudio.ShutdownSoundVolume) or 0.58
@@ -5689,14 +5690,14 @@ function InteractionService:_getBowlingLaneSoundSource(laneIndex, fallback)
 	return fallback
 end
 
-function InteractionService:_playBowlingStrikeSound(laneIndex, fallback)
+function InteractionService:_playBowlingStrikeSound(laneIndex, fallback, volume)
 	local soundId = chooseRandomAudioId(BOWLING_STRIKE_SOUND_IDS, self.bowlingAudioRandom, self.lastBowlingStrikeSoundId)
 	if not soundId then
 		return
 	end
 
 	self.lastBowlingStrikeSoundId = soundId
-	playSound(self:_getBowlingLaneSoundSource(laneIndex, fallback), soundId, BOWLING_STRIKE_SOUND_VOLUME, 1)
+	playSound(self:_getBowlingLaneSoundSource(laneIndex, fallback), soundId, volume or BOWLING_STRIKE_SOUND_VOLUME, 1)
 end
 
 function InteractionService:_countKnockedBowlingPins(laneIndex)
@@ -5774,6 +5775,7 @@ function InteractionService:_wireBowlingLaneButton(button)
 				self:_playBowlingStrikeSound(laneIndex, button)
 				self.systemMessageRemote:FireClient(player, ("Lane %d calls that close enough to a strike: %d pins."):format(laneIndex, knocked))
 			elseif knocked > 0 then
+				self:_playBowlingStrikeSound(laneIndex, button, BOWLING_KNOCKDOWN_SOUND_VOLUME)
 				self.systemMessageRemote:FireClient(player, ("Lane %d reports %d pins down. The rest are being stubborn."):format(laneIndex, knocked))
 			end
 		end)
