@@ -2181,7 +2181,16 @@ function InteractionService:_placeDroppedRockOnSecurityPlate(player, itemData, p
 end
 
 function InteractionService:_handleInventoryActionRemote(player, payload)
-	if typeof(payload) ~= "table" or payload.Action ~= "DropEquipped" then
+	if typeof(payload) ~= "table" then
+		return
+	end
+
+	if payload.Action == "ConsumePromptItem" then
+		self:_handlePromptItemConsume(player, payload)
+		return
+	end
+
+	if payload.Action ~= "DropEquipped" then
 		return
 	end
 
@@ -2221,6 +2230,34 @@ function InteractionService:_handleInventoryActionRemote(player, payload)
 	end
 
 	self:_spawnDroppedInventoryItem(player, itemData, dropCFrame)
+end
+
+function InteractionService:_handlePromptItemConsume(player, payload)
+	local prompt = payload.Prompt
+	if typeof(prompt) ~= "Instance" or not prompt:IsA("ProximityPrompt") or not prompt.Parent then
+		return
+	end
+
+	if prompt:GetAttribute("PromptConsumeKind") ~= "InfirmaryNourishment" then
+		return
+	end
+
+	local tray = prompt:FindFirstAncestor("InfirmaryNourishmentTray") or prompt.Parent
+	if not tray or not CollectionService:HasTag(tray, Constants.Tags.InfirmaryNourishment) then
+		return
+	end
+
+	local rootPart = getRootPart(player)
+	local promptPart = prompt.Parent
+	if not rootPart or not promptPart or not promptPart:IsA("BasePart") then
+		return
+	end
+
+	if (rootPart.Position - promptPart.Position).Magnitude > prompt.MaxActivationDistance + 1.5 then
+		return
+	end
+
+	self:_consumeInfirmaryNourishment(player, tray)
 end
 
 function InteractionService:_wireLibraryBookStorm(book)
@@ -2996,16 +3033,51 @@ function InteractionService:_wireInfirmaryCabinet(cabinet)
 	end)
 end
 
+function InteractionService:_consumeInfirmaryNourishment(player, tray)
+	self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryNourishment.Id)
+	if self.bunkerEnergyService and self.bunkerEnergyService.RecordEnergyItemUsed then
+		self.bunkerEnergyService:RecordEnergyItemUsed(player, "StabilizationRation", 0.26)
+	end
+	playSound(tray, "rbxasset://sounds/snap.wav", 0.32, 1.08)
+	self.systemMessageRemote:FireClient(player, "The stabilization ration steadies you. The nearby readout brightens like it expected that.")
+end
+
+function InteractionService:_pocketInfirmaryNourishment(player, tray)
+	self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryNourishment.Id)
+	if not self.bunkerEnergyService or not self.bunkerEnergyService.GrantEnergyReserveTool then
+		self.systemMessageRemote:FireClient(player, "The ration refuses to fit in a pocket yet.")
+		return
+	end
+
+	local ok, message = self.bunkerEnergyService:GrantEnergyReserveTool(player, {
+		Kind = "StabilizationRation",
+		Name = "Stabilization Ration",
+		ToolTip = "A bland ration packet from the infirmary.",
+		RestoreAmount = 0.26,
+		Color = Color3.fromRGB(255, 202, 103),
+		GrantMessage = "Stabilization ration pocketed for later.",
+		UseMessage = "The stabilization ration steadies you. The nearby readout brightens like it expected that.",
+	})
+	if not ok then
+		self.systemMessageRemote:FireClient(player, message or "Your pockets are out of room.")
+		return
+	end
+
+	playSound(tray, "rbxasset://sounds/button.wav", 0.28, 0.92)
+	self.systemMessageRemote:FireClient(player, message or "Stabilization ration pocketed for later.")
+end
+
 function InteractionService:_wireInfirmaryNourishment(tray)
 	local prompt = getPrompt(tray)
+	if prompt then
+		prompt.ActionText = "Pick Up"
+		prompt.ObjectText = "Stabilization Ration"
+		prompt.HoldDuration = 0
+		prompt:SetAttribute("PromptConsumeKind", "InfirmaryNourishment")
+	end
 
 	self:_connectPrompt(prompt, function(player)
-		self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryNourishment.Id)
-		if self.bunkerEnergyService and self.bunkerEnergyService.RecordEnergyItemUsed then
-			self.bunkerEnergyService:RecordEnergyItemUsed(player, "Matter", 0.26)
-		end
-		playSound(tray, "rbxasset://sounds/snap.wav", 0.32, 1.08)
-		self.systemMessageRemote:FireClient(player, "The tray steadies you. The nearby readout brightens like it expected that.")
+		self:_pocketInfirmaryNourishment(player, tray)
 	end)
 end
 

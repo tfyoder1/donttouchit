@@ -364,8 +364,9 @@ local function beginTouchAction()
 		return
 	end
 
+	local genericPrompt = getCurrentGenericPrompt() or getReticlePanelPrompt()
 	local _, usePrompt = getCurrentConsumablePrompts()
-	if not usePrompt then
+	if not usePrompt and not (genericPrompt and genericPrompt:GetAttribute("PromptConsumeKind")) then
 		return
 	end
 
@@ -381,6 +382,18 @@ local function beginTouchAction()
 
 		local _, currentUsePrompt = getCurrentConsumablePrompts()
 		if currentUsePrompt and activatePrompt(currentUsePrompt) then
+			touchHoldConsumed = true
+			lastHoldConsumedAt = os.clock()
+			task.defer(updateActionButton)
+			return
+		end
+
+		local currentGenericPrompt = getCurrentGenericPrompt() or getReticlePanelPrompt()
+		if currentGenericPrompt and currentGenericPrompt:GetAttribute("PromptConsumeKind") then
+			inventoryRemote:FireServer({
+				Action = "ConsumePromptItem",
+				Prompt = currentGenericPrompt,
+			})
 			touchHoldConsumed = true
 			lastHoldConsumedAt = os.clock()
 			task.defer(updateActionButton)

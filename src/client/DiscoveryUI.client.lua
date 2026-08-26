@@ -1821,6 +1821,9 @@ local activeBookRoomId = nil
 local activeSecretDoorAction = "RevealSecretDoor"
 local currentStatusType = nil
 local currentStatusRoomId = nil
+local displayedRoomCountsById = {}
+local displayedTotalDiscoveryCount = nil
+local counterAnimationToken = 0
 local pendingStartOptions = nil
 local lastStartOptionsPayload = nil
 local startChoiceSent = false
@@ -1935,6 +1938,137 @@ local function tween(instance, duration, properties)
 	)
 	tweenObject:Play()
 	return tweenObject
+end
+
+local function findDiscoveryRoomId(discoveryId)
+	for roomId, discoveryOrder in pairs(Constants.RoomDiscoveryOrder or {}) do
+		for _, roomDiscoveryId in ipairs(discoveryOrder) do
+			if roomDiscoveryId == discoveryId then
+				return roomId
+			end
+		end
+	end
+
+	return nil
+end
+
+local function formatRoomCounterText(roomName, count, total)
+	if counter:GetAttribute("Compact") == true then
+		return ("%s: %d/%d"):format(roomName, count or 0, total or 0)
+	end
+
+	return ("%s: %d / %d"):format(roomName, count or 0, total or 0)
+end
+
+local function animateRoomCounterText(roomName, fromCount, toCount, total)
+	fromCount = math.max(0, math.floor(tonumber(fromCount) or 0))
+	toCount = math.max(0, math.floor(tonumber(toCount) or fromCount))
+	total = math.max(0, math.floor(tonumber(total) or 0))
+	if toCount <= fromCount then
+		counter.Text = formatRoomCounterText(roomName, toCount, total)
+		return
+	end
+
+	counterAnimationToken += 1
+	local token = counterAnimationToken
+	local steps = math.clamp(toCount - fromCount, 1, 8)
+	for step = 1, steps do
+		task.delay(0.08 * step, function()
+			if token ~= counterAnimationToken then
+				return
+			end
+
+			local alpha = step / steps
+			local value = math.floor(fromCount + (toCount - fromCount) * alpha + 0.5)
+			counter.Text = formatRoomCounterText(roomName, value, total)
+		end)
+	end
+
+	task.delay(0.08 * steps + 0.05, function()
+		if token == counterAnimationToken then
+			counter.Text = formatRoomCounterText(roomName, toCount, total)
+		end
+	end)
+end
+
+local function pulseCounterArrival()
+	local originalTextColor = counter.TextColor3
+	local originalBackground = counter.BackgroundColor3
+	tween(counter, 0.16, {
+		TextColor3 = Color3.fromRGB(255, 244, 150),
+		BackgroundColor3 = Color3.fromRGB(37, 42, 34),
+	})
+	task.delay(0.18, function()
+		if counter.Parent then
+			tween(counter, 0.28, {
+				TextColor3 = originalTextColor,
+				BackgroundColor3 = originalBackground,
+			})
+		end
+	end)
+end
+
+local function playRoomCompletionSparkle()
+	if not counter.Parent or not gui.Enabled then
+		return
+	end
+
+	local targetCenter = counter.AbsolutePosition + counter.AbsoluteSize * 0.5
+	if targetCenter.X <= 0 or targetCenter.Y <= 0 then
+		return
+	end
+
+	local startCenter = Vector2.new(
+		math.clamp(targetCenter.X - 160, 28, math.max(28, gui.AbsoluteSize.X - 28)),
+		math.clamp(gui.AbsoluteSize.Y * 0.68, 72, math.max(72, gui.AbsoluteSize.Y - 72))
+	)
+
+	local sparkleCount = 9
+	for index = 1, sparkleCount do
+		local sparkle = Instance.new("TextLabel")
+		sparkle.Name = "RoomCompletionSparkle"
+		sparkle.AnchorPoint = Vector2.new(0.5, 0.5)
+		sparkle.BackgroundTransparency = 1
+		sparkle.Font = Enum.Font.GothamBlack
+		sparkle.Position = UDim2.fromOffset(startCenter.X + math.random(-18, 18), startCenter.Y + math.random(-12, 12))
+		sparkle.Size = UDim2.fromOffset(18, 18)
+		sparkle.Text = "*"
+		sparkle.TextColor3 = Color3.fromRGB(255, 239, 122)
+		sparkle.TextScaled = true
+		sparkle.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+		sparkle.TextStrokeTransparency = 0.35
+		sparkle.ZIndex = counter.ZIndex + 12
+		sparkle.Parent = gui
+
+		local drift = Vector2.new(math.random(-26, 26), math.random(-10, 18))
+		local travelTime = 0.72 + index * 0.035
+		task.delay((index - 1) * 0.025, function()
+			if not sparkle.Parent then
+				return
+			end
+
+			local travelTween = tween(sparkle, travelTime, {
+				Position = UDim2.fromOffset(targetCenter.X + drift.X, targetCenter.Y + drift.Y),
+				TextTransparency = 0.05,
+				TextStrokeTransparency = 0.2,
+				Rotation = math.random(-35, 35),
+			})
+			travelTween.Completed:Connect(function()
+				if not sparkle.Parent then
+					return
+				end
+
+				pulseCounterArrival()
+				tween(sparkle, 0.22, {
+					Position = UDim2.fromOffset(targetCenter.X, targetCenter.Y),
+					TextTransparency = 1,
+					TextStrokeTransparency = 1,
+					Size = UDim2.fromOffset(4, 4),
+				})
+				Debris:AddItem(sparkle, 0.28)
+			end)
+		end)
+	end
 end
 
 local function showDiscoveryToast(discoveryName)
@@ -2170,20 +2304,28 @@ local function updateCounter(payload)
 		for _, room in ipairs(payload.Rooms) do
 			if room.RoomId == currentStatusRoomId then
 				local roomName = formatHudRoomName(room.Name or "Room")
-				if counter:GetAttribute("Compact") == true then
-					counter.Text = ("%s: %d/%d"):format(roomName, room.Count or 0, room.Total or 0)
+				local count = math.max(0, math.floor(tonumber(room.Count) or 0))
+				local total = math.max(0, math.floor(tonumber(room.Total) or 0))
+				local previousCount = displayedRoomCountsById[currentStatusRoomId]
+				displayedRoomCountsById[currentStatusRoomId] = count
+				if payload.Type == "Unlocked" and previousCount and count > previousCount then
+					animateRoomCounterText(roomName, previousCount, count, total)
 				else
-					counter.Text = ("%s: %d / %d"):format(roomName, room.Count or 0, room.Total or 0)
+					counter.Text = formatRoomCounterText(roomName, count, total)
 				end
 				return
 			end
 		end
 	end
 
+	local count = math.max(0, math.floor(tonumber(payload.Count) or 0))
+	local total = math.max(1, math.floor(tonumber(payload.Total) or Constants.TotalDiscoveries) or Constants.TotalDiscoveries)
+	local previousCount = displayedTotalDiscoveryCount
+	displayedTotalDiscoveryCount = count
 	if counter:GetAttribute("Compact") == true then
-		counter.Text = ("%d/%d found"):format(payload.Count or 0, payload.Total or Constants.TotalDiscoveries)
+		counter.Text = ("%d/%d found"):format(count, total)
 	else
-		counter.Text = ("Discoveries: %d / %d"):format(payload.Count or 0, payload.Total or Constants.TotalDiscoveries)
+		counter.Text = ("Discoveries: %d / %d"):format(count, total)
 	end
 end
 
@@ -2207,6 +2349,7 @@ local function updateRoomStatus(payload)
 		end
 	elseif payload.Type == "Room" then
 		local roomName = formatHudRoomName(payload.RoomName or "Room")
+		displayedRoomCountsById[payload.RoomId] = math.max(0, math.floor(tonumber(payload.Count) or 0))
 		if counter:GetAttribute("Compact") == true then
 			counter.Text = ("%s: %d/%d"):format(roomName, payload.Count or 0, payload.Total or 0)
 		else
@@ -3206,11 +3349,15 @@ discoveryRemote.OnClientEvent:Connect(function(payload)
 		return
 	end
 
+	local unlockedRoomId = if payload.Type == "Unlocked" then findDiscoveryRoomId(payload.Id) else nil
 	updateCounter(payload)
 	updateTotalProgress(payload)
 
 	if payload.Type == "Unlocked" and payload.Name then
 		showDiscoveryToast(payload.Name)
+		if currentStatusType == "Room" and unlockedRoomId == currentStatusRoomId then
+			playRoomCompletionSparkle()
+		end
 	end
 	if payload.Type == "Unlocked"
 		and Constants.Discoveries.SecurityBunkerEnergy
