@@ -36,7 +36,7 @@ local root = Instance.new("Frame")
 root.Name = "SplashRoot"
 root.Active = true
 root.BackgroundColor3 = Color3.fromRGB(7, 9, 13)
-root.BackgroundTransparency = 0.25
+root.BackgroundTransparency = 0
 root.BorderSizePixel = 0
 root.Size = UDim2.fromScale(1, 1)
 root.Parent = splashGui
@@ -1018,11 +1018,16 @@ task.spawn(function()
 	end
 
 	bootLoadingComplete = true
+	startTitleCameraPan()
 	contentGroup.Visible = true
 	fadeOutLoadingGroup()
+	TweenService:Create(
+		root,
+		TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ BackgroundTransparency = 0.25 }
+	):Play()
 	startTitleMusic()
 	enableSplashBlur()
-	startTitleCameraPan()
 	startPromptPulse()
 end)
 
