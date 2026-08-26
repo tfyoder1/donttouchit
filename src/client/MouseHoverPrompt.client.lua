@@ -142,7 +142,7 @@ local function findHoverPrompt(target)
 	while current and current ~= workspace do
 		if current:IsA("Model") then
 			if current:GetAttribute("StrictPromptTargets") then
-				return nil
+				return getClosestPromptInModel(current, targetPosition)
 			end
 
 			if targetPosition then

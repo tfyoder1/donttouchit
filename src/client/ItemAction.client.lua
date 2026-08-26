@@ -47,6 +47,7 @@ local touchPressToken = 0
 local touchPressActive = false
 local touchHoldConsumed = false
 local lastHoldConsumedAt = 0
+local updateActionButton = nil
 
 local function isConsumablePrompt(prompt)
 	return prompt
@@ -271,6 +272,21 @@ local function activatePrompt(prompt)
 	return true
 end
 
+local function requestPanelMenu(prompt)
+	local panelMode = getPanelMenuMode(prompt)
+	if not panelMode then
+		return false
+	end
+
+	hintPackRemote:FireServer({
+		Action = "OpenRoomMenu",
+		Mode = panelMode,
+		RoomId = getAncestorRoomId(prompt),
+	})
+	task.defer(updateActionButton)
+	return true
+end
+
 local function isUsableTool(tool)
 	return tool
 		and tool:IsA("Tool")
@@ -297,7 +313,7 @@ local function getEquippedUsableTool()
 	return nil
 end
 
-local function updateActionButton()
+function updateActionButton()
 	if actionControl and actionControl.SetEnabled then
 		local pocketPrompt, usePrompt = getCurrentConsumablePrompts()
 		actionControl:SetEnabled(getCurrentGenericPrompt() ~= nil or getEquippedUsableTool() ~= nil or (pocketPrompt ~= nil and usePrompt ~= nil))
@@ -310,14 +326,7 @@ local function activateEquippedTool()
 	end
 
 	local genericPrompt = getCurrentGenericPrompt() or getReticlePanelPrompt()
-	local panelMode = getPanelMenuMode(genericPrompt)
-	if panelMode then
-		hintPackRemote:FireServer({
-			Action = "OpenRoomMenu",
-			Mode = panelMode,
-			RoomId = getAncestorRoomId(genericPrompt),
-		})
-		task.defer(updateActionButton)
+	if requestPanelMenu(genericPrompt) then
 		return
 	end
 
@@ -462,4 +471,12 @@ ProximityPromptService.PromptHidden:Connect(function(prompt)
 		shownConsumablePrompts[prompt] = nil
 	end
 	updateActionButton()
+end)
+
+ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeringPlayer)
+	if triggeringPlayer ~= player then
+		return
+	end
+
+	requestPanelMenu(prompt)
 end)
