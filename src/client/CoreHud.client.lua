@@ -385,6 +385,71 @@ local function isTouchLandscape()
 	return UserInputService.TouchEnabled and viewport.X > viewport.Y
 end
 
+local function setPanelTop(panel, top)
+	local delta = top - panel.AbsolutePosition.Y
+	panel.Position = clampPanelPosition(
+		panel,
+		UDim2.new(panel.Position.X.Scale, panel.Position.X.Offset, panel.Position.Y.Scale, panel.Position.Y.Offset + delta)
+	)
+end
+
+local function nudgePanelRight(panel, amount)
+	panel.Position = clampPanelPosition(
+		panel,
+		UDim2.new(panel.Position.X.Scale, panel.Position.X.Offset + amount, panel.Position.Y.Scale, panel.Position.Y.Offset)
+	)
+end
+
+local function separatePanelPair(leftPanel, rightPanel, gap)
+	if isEditMode() or activeDrag then
+		return
+	end
+	if not leftPanel.Visible or not rightPanel.Visible then
+		return
+	end
+
+	local leftRight = leftPanel.AbsolutePosition.X + leftPanel.AbsoluteSize.X
+	local rightLeft = rightPanel.AbsolutePosition.X
+	local top = math.max(leftPanel.AbsolutePosition.Y, rightPanel.AbsolutePosition.Y)
+	local bottom = math.min(
+		leftPanel.AbsolutePosition.Y + leftPanel.AbsoluteSize.Y,
+		rightPanel.AbsolutePosition.Y + rightPanel.AbsoluteSize.Y
+	)
+	if bottom <= top or rightLeft - leftRight >= gap then
+		return
+	end
+
+	nudgePanelRight(rightPanel, gap - (rightLeft - leftRight))
+
+	leftRight = leftPanel.AbsolutePosition.X + leftPanel.AbsoluteSize.X
+	rightLeft = rightPanel.AbsolutePosition.X
+	if rightLeft - leftRight < 0 then
+		setPanelTop(rightPanel, leftPanel.AbsolutePosition.Y + leftPanel.AbsoluteSize.Y + gap)
+	end
+end
+
+local function separateVerticalPair(topPanel, bottomPanel, gap)
+	if isEditMode() or activeDrag then
+		return
+	end
+	if not topPanel.Visible or not bottomPanel.Visible then
+		return
+	end
+
+	local topBottom = topPanel.AbsolutePosition.Y + topPanel.AbsoluteSize.Y
+	local bottomTop = bottomPanel.AbsolutePosition.Y
+	if bottomTop - topBottom >= gap then
+		return
+	end
+
+	setPanelTop(bottomPanel, topBottom + gap)
+end
+
+local function separateVisibleHudPanels()
+	separatePanelPair(roomCounter, progressPanel, 10)
+	separateVerticalPair(energyPanel, bunkerEnergyPanel, UserInputService.TouchEnabled and 4 or 8)
+end
+
 local function applyLayout()
 	local touchLandscape = isTouchLandscape()
 	local sideInset = UserInputService.TouchEnabled and 32 or 18
@@ -432,6 +497,7 @@ local function applyLayout()
 			sessionPositions[id] = panel.Position
 		end
 	end
+	separateVisibleHudPanels()
 	applyHudEditState()
 end
 
@@ -448,6 +514,7 @@ local function applyVisibility()
 		player:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 		or playerGui:GetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE) == true
 	)
+	separateVisibleHudPanels()
 	applyHudEditState()
 end
 
