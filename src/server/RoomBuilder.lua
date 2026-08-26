@@ -4981,7 +4981,8 @@ local function makeLibraryFurnishings(room)
 	local loftDoor = createPart(room, "LibraryLoftDoor", Vector3.new(3.2, 4.1, 0.28), cframeAt(origin, -8.8, 10.2, -16.55), Color3.fromRGB(68, 88, 118), Enum.Material.Wood)
 	loftDoor:SetAttribute("DestinationCFrame", LIBRARY_LOFT_SPAWN_CFRAME)
 	createSurfaceText(loftDoor, "LoftDoorText", "LOFT", Enum.NormalId.Front, Color3.fromRGB(235, 245, 255), Color3.fromRGB(68, 88, 118))
-	createPrompt(loftDoor, "Open", "Loft Door", 0)
+	local loftPrompt = createPrompt(loftDoor, "Open", "Loft Door", 0)
+	loftPrompt.RequiresLineOfSight = false
 	tag(loftDoor, Constants.Tags.LibraryLoftDoor)
 
 	local key = createPart(room, "BowlingKeyTopShelf", Vector3.new(0.34, 0.34, 1.45), cframeAt(origin, -14.7, 9.42, -15.4) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(255, 219, 92), Enum.Material.Metal)

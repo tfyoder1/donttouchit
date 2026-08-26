@@ -5135,12 +5135,6 @@ function InteractionService:_wireLibraryLoftDoor(door)
 			return
 		end
 
-		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id) then
-			self.systemMessageRemote:FireClient(player, "The loft door is visible, but the Library expects ladder etiquette first.")
-			playSound(door, "rbxasset://sounds/snap.wav", 0.35, 0.6)
-			return
-		end
-
 		state.Reacting = true
 		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLoft.Id)
 		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.42, 1.35)
