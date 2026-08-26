@@ -2570,6 +2570,38 @@ local function makeCaveEntranceArea(roomFolder)
 	createPart(cave, "CaveLongTunnelLeftWall", Vector3.new(1, 13.8, 118), CFrame.new(-130, -3.85, -62), Color3.fromRGB(30, 31, 31), Enum.Material.Slate)
 	createPart(cave, "CaveLongTunnelRightWall", Vector3.new(1, 13.8, 118), CFrame.new(-118, -3.85, -62), Color3.fromRGB(30, 31, 31), Enum.Material.Slate)
 	createPart(cave, "CaveLongTunnelCeiling", Vector3.new(12, 1, 118), CFrame.new(-124, 2.55, -62), Color3.fromRGB(24, 24, 25), Enum.Material.Slate)
+	createPart(cave, "CaveExitThresholdFloor", Vector3.new(13.8, 1, 17), CFrame.new(-124, -10.7, -116.5), Color3.fromRGB(214, 217, 204), Enum.Material.SmoothPlastic)
+	createPart(cave, "CaveExitThresholdLeftWall", Vector3.new(1, 13.8, 17), CFrame.new(-131.4, -3.85, -116.5), Color3.fromRGB(206, 211, 204), Enum.Material.SmoothPlastic)
+	createPart(cave, "CaveExitThresholdRightWall", Vector3.new(1, 13.8, 17), CFrame.new(-116.6, -3.85, -116.5), Color3.fromRGB(206, 211, 204), Enum.Material.SmoothPlastic)
+	createPart(cave, "CaveExitThresholdCeiling", Vector3.new(14.8, 1, 17), CFrame.new(-124, 2.55, -116.5), Color3.fromRGB(235, 237, 224), Enum.Material.SmoothPlastic)
+	createPart(cave, "CaveExitThresholdTopSeal", Vector3.new(14.8, 2.4, 0.8), CFrame.new(-124, 1.35, -124.7), Color3.fromRGB(239, 242, 230), Enum.Material.SmoothPlastic)
+	local exitWash = createPart(cave, "CaveExitThresholdWhiteout", Vector3.new(13.2, 10.4, 0.22), CFrame.new(-124, -5.65, -124.95), Color3.fromRGB(255, 249, 214), Enum.Material.Neon)
+	exitWash.Transparency = 0.18
+	exitWash.CanCollide = false
+	exitWash.CanTouch = false
+	exitWash.CanQuery = false
+	exitWash:SetAttribute("BaseTransparency", exitWash.Transparency)
+	exitWash:SetAttribute("BaseCanCollide", false)
+	exitWash:SetAttribute("BaseCanTouch", false)
+	exitWash:SetAttribute("BaseCanQuery", false)
+	local exitWashLight = Instance.new("PointLight")
+	exitWashLight.Name = "CaveExitThresholdGlare"
+	exitWashLight.Brightness = 6.5
+	exitWashLight.Color = Color3.fromRGB(255, 244, 194)
+	exitWashLight.Range = 34
+	exitWashLight.Parent = exitWash
+	mark(exitWashLight)
+	for glowIndex, xOffset in ipairs({ -5.8, 5.8 }) do
+		local glareStrip = createPart(cave, "CaveExitThresholdGlareStrip" .. glowIndex, Vector3.new(0.22, 9.6, 0.18), CFrame.new(-124 + xOffset, -5.65, -121.2), Color3.fromRGB(255, 250, 216), Enum.Material.Neon)
+		glareStrip.Transparency = 0.08
+		glareStrip.CanCollide = false
+		glareStrip.CanTouch = false
+		glareStrip.CanQuery = false
+		glareStrip:SetAttribute("BaseTransparency", glareStrip.Transparency)
+		glareStrip:SetAttribute("BaseCanCollide", false)
+		glareStrip:SetAttribute("BaseCanTouch", false)
+		glareStrip:SetAttribute("BaseCanQuery", false)
+	end
 
 	for tickIndex = 1, 9 do
 		local tick = createPart(cave, "CaveLongTunnelDistanceMarker" .. tickIndex, Vector3.new(0.1, 0.16, 2.4), CFrame.new(-117.4, -2.4, 0 - tickIndex * 12), Color3.fromRGB(92, 82, 68), Enum.Material.Neon)
