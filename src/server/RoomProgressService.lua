@@ -549,8 +549,13 @@ function RoomProgressService:ResetStorePrices()
 end
 
 function RoomProgressService:ShowReferenceBook(player, roomId, extra)
+	if not Constants.GetRoom(roomId) then
+		roomId = self:GetRoomForPlayer(player) or "TVRoom"
+	end
+
 	local snapshot = self.discoveryService:GetRoomSnapshot(player, roomId)
 	if not snapshot then
+		self.systemMessageRemote:FireClient(player, "Room menu could not find a valid room record.")
 		return
 	end
 
