@@ -49,6 +49,28 @@ local function getEquippedFlashlight(player)
 	return nil
 end
 
+local function findFlashlightTool(player)
+	local character = player and player.Character
+	if character then
+		for _, child in ipairs(character:GetChildren()) do
+			if child:IsA("Tool") and child:GetAttribute(FLASHLIGHT_ATTRIBUTE) == true then
+				return child, character
+			end
+		end
+	end
+
+	local backpack = player and player:FindFirstChildOfClass("Backpack")
+	if backpack then
+		for _, child in ipairs(backpack:GetChildren()) do
+			if child:IsA("Tool") and child:GetAttribute(FLASHLIGHT_ATTRIBUTE) == true then
+				return child, backpack
+			end
+		end
+	end
+
+	return nil, nil
+end
+
 local function setFlashlightEnabled(tool, enabled)
 	tool:SetAttribute("FlashlightOn", enabled)
 
@@ -167,6 +189,17 @@ end
 
 function StartingGearService:_toggleEquippedFlashlight(player)
 	local tool = getEquippedFlashlight(player)
+	if not tool then
+		local container
+		tool, container = findFlashlightTool(player)
+		local character = player and player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if tool and container and container:IsA("Backpack") and humanoid then
+			humanoid:EquipTool(tool)
+			tool = getEquippedFlashlight(player) or tool
+		end
+	end
+
 	if not tool or tool.Enabled == false then
 		return
 	end
