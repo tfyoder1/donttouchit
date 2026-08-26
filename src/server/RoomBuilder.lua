@@ -20,7 +20,7 @@ local SNACK_DONUT_MESH_ID = "rbxassetid://13582448483"
 local SNACK_DONUT_TEXTURE_ID = "rbxassetid://13582452879"
 local SLEEPING_REPLACEMENT_TENT_ASSET_ID = 140322654375696
 local LIBRARY_ROLLING_LADDER_ASSET_ID = 88745654506698
-local MAIN_HALLWAY_WALL_TEXTURE_ID = "rbxassetid://12813020091"
+local LIGHT_BRICK_WALL_TEXTURE_ID = "rbxassetid://12813020091"
 local ATOMIC_COLORS = {
 	Pink = Color3.fromRGB(255, 102, 176),
 	Orange = Color3.fromRGB(255, 134, 58),
@@ -484,12 +484,18 @@ local function makeShell(roomFolder)
 	local doorHeight = 10
 	local sideWallWidth = (width - doorWidth) / 2
 
-	createPart(roomFolder, "BackWall", Vector3.new(width, height, 1), CFrame.new(0, height / 2, -depth / 2), wallColor, Enum.Material.SmoothPlastic)
-	createPart(roomFolder, "LeftWall", Vector3.new(1, height, depth), CFrame.new(-width / 2, height / 2, 0), wallColor, Enum.Material.SmoothPlastic)
-	createPart(roomFolder, "RightWall", Vector3.new(1, height, depth), CFrame.new(width / 2, height / 2, 0), wallColor, Enum.Material.SmoothPlastic)
-	createPart(roomFolder, "FrontWallLeft", Vector3.new(sideWallWidth, height, 1), CFrame.new(-(doorWidth / 2 + sideWallWidth / 2), height / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
-	createPart(roomFolder, "FrontWallRight", Vector3.new(sideWallWidth, height, 1), CFrame.new(doorWidth / 2 + sideWallWidth / 2, height / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
-	createPart(roomFolder, "FrontWallHeader", Vector3.new(doorWidth, height - doorHeight, 1), CFrame.new(0, doorHeight + (height - doorHeight) / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
+	local backWall = createPart(roomFolder, "BackWall", Vector3.new(width, height, 1), CFrame.new(0, height / 2, -depth / 2), wallColor, Enum.Material.SmoothPlastic)
+	local leftWall = createPart(roomFolder, "LeftWall", Vector3.new(1, height, depth), CFrame.new(-width / 2, height / 2, 0), wallColor, Enum.Material.SmoothPlastic)
+	local rightWall = createPart(roomFolder, "RightWall", Vector3.new(1, height, depth), CFrame.new(width / 2, height / 2, 0), wallColor, Enum.Material.SmoothPlastic)
+	local frontWallLeft = createPart(roomFolder, "FrontWallLeft", Vector3.new(sideWallWidth, height, 1), CFrame.new(-(doorWidth / 2 + sideWallWidth / 2), height / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
+	local frontWallRight = createPart(roomFolder, "FrontWallRight", Vector3.new(sideWallWidth, height, 1), CFrame.new(doorWidth / 2 + sideWallWidth / 2, height / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
+	local frontWallHeader = createPart(roomFolder, "FrontWallHeader", Vector3.new(doorWidth, height - doorHeight, 1), CFrame.new(0, doorHeight + (height - doorHeight) / 2, depth / 2), wallColor, Enum.Material.SmoothPlastic)
+	applyTextureToFace(backWall, "TVBackWallLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Back, 8)
+	applyTextureToFace(leftWall, "TVLeftWallLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Right, 8)
+	applyTextureToFace(rightWall, "TVRightWallLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Left, 8)
+	applyTextureToFace(frontWallLeft, "TVFrontWallLeftLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Front, 8)
+	applyTextureToFace(frontWallRight, "TVFrontWallRightLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Front, 8)
+	applyTextureToFace(frontWallHeader, "TVFrontWallHeaderLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Front, 8)
 	createPart(roomFolder, "Ceiling", Vector3.new(width, 1, depth), CFrame.new(0, height, 0), Color3.fromRGB(138, 144, 142), Enum.Material.Concrete)
 
 	local door = createPart(
@@ -3823,17 +3829,22 @@ local function makeHallway(roomFolder)
 	createPart(hallway, "HallwayFloor", Vector3.new(13, 1, 56), CFrame.new(0, 0, 45), Color3.fromRGB(92, 101, 112), Enum.Material.Concrete)
 	local hallwayLeftWall = createPart(hallway, "HallwayLeftWall", Vector3.new(1, 10, 56), CFrame.new(-6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
 	local hallwayRightWall = createPart(hallway, "HallwayRightWall", Vector3.new(1, 10, 56), CFrame.new(6.5, 5, 45), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
-	applyTextureToFace(hallwayLeftWall, "HallwayLeftWallTexture", MAIN_HALLWAY_WALL_TEXTURE_ID, Enum.NormalId.Right, 8)
-	applyTextureToFace(hallwayRightWall, "HallwayRightWallTexture", MAIN_HALLWAY_WALL_TEXTURE_ID, Enum.NormalId.Left, 8)
+	applyTextureToFace(hallwayLeftWall, "HallwayLeftWallTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Right, 8)
+	applyTextureToFace(hallwayRightWall, "HallwayRightWallTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Left, 8)
 	createPart(hallway, "HallwayCeiling", Vector3.new(13, 1, 56), CFrame.new(0, 10, 45), Color3.fromRGB(116, 119, 128), Enum.Material.Concrete)
 	createPart(hallway, "IslandApproachFloor", Vector3.new(9, 1, 48), CFrame.new(0, 0, 97), Color3.fromRGB(65, 84, 104), Enum.Material.Concrete)
-	createPart(hallway, "IslandApproachLeftWallBeforeStair", Vector3.new(1, 9, 5.8), CFrame.new(-4.5, 4.5, 75.9), Color3.fromRGB(76, 103, 130), Enum.Material.SmoothPlastic)
-	createPart(hallway, "IslandApproachLeftWallAfterStair", Vector3.new(1, 9, 35.8), CFrame.new(-4.5, 4.5, 103.1), Color3.fromRGB(76, 103, 130), Enum.Material.SmoothPlastic)
-	createPart(hallway, "IslandApproachRightWall", Vector3.new(1, 9, 48), CFrame.new(4.5, 4.5, 97), Color3.fromRGB(76, 103, 130), Enum.Material.SmoothPlastic)
+	local islandLeftWallBeforeStair = createPart(hallway, "IslandApproachLeftWallBeforeStair", Vector3.new(1, 9, 5.8), CFrame.new(-4.5, 4.5, 75.9), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	local islandLeftWallAfterStair = createPart(hallway, "IslandApproachLeftWallAfterStair", Vector3.new(1, 9, 35.8), CFrame.new(-4.5, 4.5, 103.1), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	local islandRightWall = createPart(hallway, "IslandApproachRightWall", Vector3.new(1, 9, 48), CFrame.new(4.5, 4.5, 97), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	applyTextureToFace(islandLeftWallBeforeStair, "IslandApproachLeftWallBeforeStairLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Right, 8)
+	applyTextureToFace(islandLeftWallAfterStair, "IslandApproachLeftWallAfterStairLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Right, 8)
+	applyTextureToFace(islandRightWall, "IslandApproachRightWallLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Left, 8)
 	createPart(hallway, "IslandApproachCeiling", Vector3.new(9, 1, 48), CFrame.new(0, 9.5, 97), Color3.fromRGB(41, 65, 91), Enum.Material.Concrete)
 	createPart(hallway, "IslandApproachArchTop", Vector3.new(13, 2, 1), CFrame.new(0, 9, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
-	createPart(hallway, "IslandApproachArchLeft", Vector3.new(2, 9, 1), CFrame.new(-5.5, 4.5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
-	createPart(hallway, "IslandApproachArchRight", Vector3.new(2, 9, 1), CFrame.new(5.5, 4.5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	local islandArchLeft = createPart(hallway, "IslandApproachArchLeft", Vector3.new(2, 9, 1), CFrame.new(-5.5, 4.5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	local islandArchRight = createPart(hallway, "IslandApproachArchRight", Vector3.new(2, 9, 1), CFrame.new(5.5, 4.5, 73), Color3.fromRGB(150, 156, 168), Enum.Material.SmoothPlastic)
+	applyTextureToFace(islandArchLeft, "IslandApproachArchLeftLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Front, 8)
+	applyTextureToFace(islandArchRight, "IslandApproachArchRightLightBrickTexture", LIGHT_BRICK_WALL_TEXTURE_ID, Enum.NormalId.Front, 8)
 	local ziplineSightBlocker = createPart(hallway, "IslandApproachZiplineSightBlocker", Vector3.new(1.4, 54, 58), CFrame.new(5.75, 35, 101), Color3.fromRGB(41, 65, 91), Enum.Material.SmoothPlastic)
 	ziplineSightBlocker.CanCollide = false
 	ziplineSightBlocker:SetAttribute("BaseCanCollide", false)

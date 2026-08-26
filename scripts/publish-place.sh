@@ -86,7 +86,9 @@ if [[ "$DRY_RUN" == "1" ]]; then
 	exit 0
 fi
 
-response_file="$(mktemp)"
+response_dir="${PUBLISH_TMPDIR:-${TMPDIR:-/tmp}}"
+mkdir -p "$response_dir"
+response_file="$(mktemp "${response_dir%/}/publish-response.XXXXXX")"
 trap 'rm -f "$response_file"' EXIT
 
 echo "Uploading to Roblox Open Cloud..."
