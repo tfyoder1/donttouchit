@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -23,6 +24,19 @@ local PANEL_MENU_PROMPTS = {
 	["Rewards & Store"] = "Store",
 	Teleport = "Teleport",
 	["Field Controls"] = "Field",
+}
+local PANEL_MENU_TAGS = {
+	[Constants.Tags.ReferenceBook] = "Log",
+	[Constants.Tags.StoreButton] = "Store",
+	[Constants.Tags.TeleportButton] = "Teleport",
+	[Constants.Tags.FieldButton] = "Field",
+}
+local PANEL_MENU_NAME_PATTERNS = {
+	{ Pattern = "StoreButton", Mode = "Store" },
+	{ Pattern = "TeleportButton", Mode = "Teleport" },
+	{ Pattern = "FieldButton", Mode = "Field" },
+	{ Pattern = "ReferenceBook", Mode = "Log" },
+	{ Pattern = "LogScreen", Mode = "Log" },
 }
 
 local actionControl = nil
@@ -167,6 +181,24 @@ end
 local function getPanelMenuMode(prompt)
 	if not prompt or not prompt:IsA("ProximityPrompt") then
 		return nil
+	end
+
+	local current = prompt.Parent
+	while current and current ~= Workspace do
+		for tagName, mode in pairs(PANEL_MENU_TAGS) do
+			if CollectionService:HasTag(current, tagName) then
+				return mode
+			end
+		end
+
+		local currentName = current.Name
+		for _, entry in ipairs(PANEL_MENU_NAME_PATTERNS) do
+			if string.find(currentName, entry.Pattern, 1, true) then
+				return entry.Mode
+			end
+		end
+
+		current = current.Parent
 	end
 
 	local objectText = tostring(prompt.ObjectText or "")

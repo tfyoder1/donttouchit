@@ -1967,6 +1967,8 @@ local function showDiscoveryToast(discoveryName)
 end
 
 local function showSystemMessage(text)
+	gui.Enabled = true
+	UiLayerController.ApplyRole(gui, gui:GetAttribute("DontTouchItRoomMenuOpen") == true and "RoomMenu" or "Background")
 	messageSequence += 1
 	local currentSequence = messageSequence
 
@@ -2860,6 +2862,7 @@ local function renderReferenceBook(payload)
 		return
 	end
 
+	gui.Enabled = true
 	local wasVisible = bookPanel.Visible
 	activeBookRoomId = payload.RoomId
 	local mode = payload.Mode or "Log"
