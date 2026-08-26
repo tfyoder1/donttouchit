@@ -3247,10 +3247,9 @@ energyPanel:GetAttributeChangedSignal("Compact"):Connect(updateEnergyBar)
 bunkerEnergyPanel:GetAttributeChangedSignal("Compact"):Connect(updateBunkerEnergyBar)
 
 referenceBookRemote.OnClientEvent:Connect(function(payload)
-	local ok, err = pcall(renderReferenceBook, payload)
-	if not ok then
-		showSystemMessage("Room menu failed to open: " .. tostring(err))
-	end
+	-- RoomMenuOverlay.client.lua owns room log/reward/teleport/field menus.
+	-- DiscoveryUI keeps the legacy renderer available, but does not render
+	-- this remote directly so the modal stack has one owner.
 end)
 sessionStartRemote.OnClientEvent:Connect(renderStartOptions)
 requestStartOptionsIfPending()
