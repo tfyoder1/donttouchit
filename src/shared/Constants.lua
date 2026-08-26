@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.302"
+Constants.BuildVersion = "0.5.303"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -580,6 +580,12 @@ Constants.AudioAssets = {
 		MechanicalIdleSoundId = "rbxassetid://136753961563353",
 		MechanicalIdleVolume = 0.25,
 		MechanicalIdleFadeSeconds = 1.5,
+		LaneRollSoundId = "rbxassetid://9116570823",
+		LaneRollSoundVolume = 0.38,
+		ResetSoundId = "rbxassetid://9125869797",
+		ResetSoundVolume = 0.42,
+		CosmicSwitchSoundId = "rbxassetid://130114397986399",
+		CosmicSwitchSoundVolume = 0.34,
 		CosmicMusicIds = {
 			"rbxassetid://9038367768",
 			"rbxassetid://87335378694883",

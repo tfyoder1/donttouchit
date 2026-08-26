@@ -119,6 +119,13 @@ local BOWLING_STRIKE_SOUND_IDS = (bowlingAudio and bowlingAudio.StrikeSoundIds) 
 }
 local BOWLING_STRIKE_SOUND_VOLUME = (bowlingAudio and bowlingAudio.StrikeVolume) or 0.72
 local BOWLING_KNOCKDOWN_SOUND_VOLUME = (bowlingAudio and bowlingAudio.KnockdownVolume) or 0.48
+local BOWLING_LANE_ROLL_SOUND_ID = (bowlingAudio and bowlingAudio.LaneRollSoundId) or "rbxassetid://9116570823"
+local BOWLING_LANE_ROLL_SOUND_VOLUME = (bowlingAudio and bowlingAudio.LaneRollSoundVolume) or 0.38
+local BOWLING_RESET_SOUND_ID = (bowlingAudio and bowlingAudio.ResetSoundId) or "rbxassetid://9125869797"
+local BOWLING_RESET_SOUND_VOLUME = (bowlingAudio and bowlingAudio.ResetSoundVolume) or 0.42
+local BOWLING_COSMIC_SWITCH_SOUND_ID = (bowlingAudio and bowlingAudio.CosmicSwitchSoundId)
+	or "rbxassetid://130114397986399"
+local BOWLING_COSMIC_SWITCH_SOUND_VOLUME = (bowlingAudio and bowlingAudio.CosmicSwitchSoundVolume) or 0.34
 local bunkerEnergyAudio = Constants.AudioAssets and Constants.AudioAssets.BunkerEnergy
 local BUNKER_SHUTDOWN_SOUND_ID = (bunkerEnergyAudio and bunkerEnergyAudio.ShutdownSoundId) or "rbxassetid://1842440874"
 local BUNKER_SHUTDOWN_SOUND_VOLUME = (bunkerEnergyAudio and bunkerEnergyAudio.ShutdownSoundVolume) or 0.58
@@ -1537,6 +1544,16 @@ function InteractionService:_bunkerSputter(part, message)
 
 	if message then
 		self.systemMessageRemote:FireAllClients(message)
+	end
+end
+
+function InteractionService:_bunkerSputterForPlayer(player, part, message)
+	if part then
+		playSound(part, BUNKER_SHUTDOWN_SOUND_ID, BUNKER_SHUTDOWN_SOUND_VOLUME, 1)
+	end
+
+	if player and message then
+		self.systemMessageRemote:FireClient(player, message)
 	end
 end
 
@@ -5741,14 +5758,18 @@ function InteractionService:_wireBowlingLaneButton(button)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingFirstBall.Id)
 		local powerState, power = self:_getBunkerPowerState()
 		if powerState == "Offline" then
-			self:_bunkerSputter(button, "The lane button clicks, but the room grid does not have enough charge to roll anything yet.")
+			self:_bunkerSputterForPlayer(
+				player,
+				button,
+				"Bowling is disabled: bunker power is too low for the lane machinery to roll a ball."
+			)
 			task.delay(0.9, function()
 				state.Reacting = false
 			end)
 			return
 		end
 
-		playSound(button, "rbxasset://sounds/button.wav", 0.55, 0.75)
+		playSound(button, BOWLING_LANE_ROLL_SOUND_ID, BOWLING_LANE_ROLL_SOUND_VOLUME, 0.82)
 
 		if button:IsA("BasePart") then
 			local baseCFrame = button:GetAttribute("BaseCFrame") or button.CFrame
@@ -5932,7 +5953,7 @@ function InteractionService:_setBowlingCosmic(active, source)
 	end)
 
 	if source then
-		playSound(source, "rbxasset://sounds/electronicpingshort.wav", 0.5, 1.9)
+		playSound(source, BOWLING_COSMIC_SWITCH_SOUND_ID, BOWLING_COSMIC_SWITCH_SOUND_VOLUME, active and 1 or 0.82)
 	end
 end
 
@@ -5975,7 +5996,11 @@ function InteractionService:_wireBowlingCosmicSwitch(switch)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingCosmic.Id)
 		local powerState, power = self:_getBunkerPowerState()
 		if not self.bowlingCosmicActive and power < (Constants.BunkerEnergy.CosmicMinimumPower or 0.2) then
-			self:_bunkerSputter(switch, "The disco ball tries once, then remembers the room grid is undercharged.")
+			self:_bunkerSputterForPlayer(
+				player,
+				switch,
+				"Cosmic Bowling is disabled: bunker power is too low to run party lighting."
+			)
 			if prompt then
 				prompt.ActionText = "Cosmic"
 			end
@@ -6100,12 +6125,16 @@ function InteractionService:_wireBowlingResetLever(lever)
 		local laneIndex = lever:GetAttribute("LaneIndex")
 		local powerState = self:_getBunkerPowerState()
 		if powerState == "Offline" then
-			self:_bunkerSputter(lever, "The pinsetter clicks twice and gives up. The room grid needs activity before it can tidy the lane.")
+			self:_bunkerSputterForPlayer(
+				player,
+				lever,
+				"Lane reset is disabled: bunker power is too low for the pinsetter."
+			)
 			return
 		end
 
 		self:_resetBowlingPins(laneIndex)
-		playSound(lever, "rbxasset://sounds/button.wav", 0.5, 0.58)
+		playSound(lever, BOWLING_RESET_SOUND_ID, BOWLING_RESET_SOUND_VOLUME, 0.78)
 
 		if lever:IsA("BasePart") then
 			local baseCFrame = lever:GetAttribute("BaseCFrame") or lever.CFrame
@@ -6138,13 +6167,17 @@ function InteractionService:_wireBowlingBallReturn(ballReturn)
 		self.discoveryService:Unlock(player, Constants.Discoveries.BowlingBallReturn.Id)
 		local powerState = self:_getBunkerPowerState()
 		if powerState == "Offline" then
-			self:_bunkerSputter(ballReturn, "The lane reset button glows weakly. It needs a few more terrible decisions to wake up.")
+			self:_bunkerSputterForPlayer(
+				player,
+				ballReturn,
+				"Ball return is disabled: bunker power is too low for the reset motor."
+			)
 			return
 		end
 
 		self:_resetBowlingPins(laneIndex)
 		self:_incrementBowlingLaneCount(laneIndex)
-		playSound(ballReturn, "rbxasset://sounds/button.wav", 0.45, 0.72)
+		playSound(ballReturn, BOWLING_RESET_SOUND_ID, BOWLING_RESET_SOUND_VOLUME * 0.9, 1.04)
 		task.delay(0.1, function()
 			playSound(ballReturn, "rbxasset://sounds/electronicpingshort.wav", 0.35, 1.45)
 		end)
