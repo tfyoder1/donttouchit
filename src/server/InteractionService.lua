@@ -185,15 +185,6 @@ local INVENTORY_DROP_DECAY_DURATION = 18
 local INVENTORY_DROP_ABSORB_DELAY = 34
 local INVENTORY_DROP_ABSORB_DURATION = 3.2
 local SECURITY_WEIGHT_DROP_MARGIN = 2.2
-local LIBRARY_LOFT_DOOR_PROMPT_DISTANCE = 16
-local LIBRARY_LOFT_DOOR_TOUCH_COOLDOWN = 1.25
-local LIBRARY_LOFT_PHYSICAL_ACCESS_DISTANCE = 18
-local LIBRARY_TELEPORT_KEY_PROMPT_DISTANCE = 16
-local LIBRARY_TELEPORT_KEY_TOUCH_COOLDOWN = 1.25
-local LIBRARY_BOWLING_KEY_PROMPT_DISTANCE = 16
-local LIBRARY_BOWLING_KEY_TOUCH_COOLDOWN = 1.25
-local LIBRARY_BOOKCASE_DOOR_PROMPT_DISTANCE = 16
-local LIBRARY_BOOKCASE_DOOR_TOUCH_COOLDOWN = 1.25
 
 local BOWLING_COSMIC_COLORS = {
 	Color3.fromRGB(119, 255, 203),
@@ -344,15 +335,6 @@ local function getPlayerFromHit(hit)
 	end
 
 	return Players:GetPlayerFromCharacter(character)
-end
-
-local function tunePrompt(prompt, maxActivationDistance, requiresLineOfSight)
-	if not prompt or not prompt:IsA("ProximityPrompt") then
-		return
-	end
-
-	prompt.MaxActivationDistance = math.max(4, tonumber(maxActivationDistance) or prompt.MaxActivationDistance)
-	prompt.RequiresLineOfSight = requiresLineOfSight == true
 end
 
 local function teleportPlayer(player, destinationCFrame)
@@ -913,10 +895,6 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.FieldButton, function(instance)
 		self:_wireFieldButton(instance)
-	end)
-
-	self:_connectTagged(Constants.Tags.TVSecretBook, function(instance)
-		self:_wireTVSecretBook(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.SecretRoomDoor, function(instance)
@@ -2242,8 +2220,6 @@ function InteractionService:_wireLibraryBookStorm(book)
 		end)
 
 		local origin = book.CFrame
-		local outward = -origin.LookVector
-		local lateral = origin.RightVector
 		for index = 1, 46 do
 			task.delay((index - 1) * 0.015, function()
 				if not book.Parent then
@@ -2258,15 +2234,17 @@ function InteractionService:_wireLibraryBookStorm(book)
 				looseBook.Color = Color3.fromRGB(70 + (index * 29) % 160, 42 + (index * 17) % 130, 70 + (index * 41) % 140)
 				looseBook.Size = Vector3.new(0.55 + (index % 3) * 0.08, 0.16, 1.15 + (index % 4) * 0.12)
 				looseBook.CFrame = origin
-					* CFrame.new(((index % 9) - 4) * 0.35, 0.35 + (index % 5) * 0.16, 0.95 + (index % 4) * 0.22)
+					* CFrame.new(((index % 9) - 4) * 0.35, 0.35 + (index % 5) * 0.16, -0.8 - (index % 4) * 0.18)
 					* CFrame.Angles(math.rad(index * 17), math.rad(index * 23), math.rad(index * 31))
 				looseBook.CustomPhysicalProperties = PhysicalProperties.new(0.45, 0.55, 0.35, 1, 1)
 				looseBook.Parent = workspace
 				CollectionService:AddTag(looseBook, Constants.Tags.TemporaryObject)
 
-				looseBook.AssemblyLinearVelocity = (outward * (14 + (index % 8) * 2.4))
-					+ (lateral * (((index % 7) - 3) * 4.5))
-					+ Vector3.new(0, 18 + (index % 6) * 2.2, 0)
+				looseBook.AssemblyLinearVelocity = Vector3.new(
+					((index % 7) - 3) * 4.5,
+					18 + (index % 6) * 2.2,
+					10 + (index % 8) * 2.4
+				)
 					looseBook.AssemblyAngularVelocity = Vector3.new(index % 5, 7 + index % 4, index % 6) * 2.5
 					self:_scheduleBunkerReclaim(looseBook, {
 						Delay = 118 + (index % 12) * 2,
@@ -2318,9 +2296,6 @@ function InteractionService:_handleSecurityCameraRemote(player, payload)
 		self.securityCameraSessionByUserId[player.UserId] = nil
 		return
 	end
-	if session.HasScreenButton ~= true then
-		return
-	end
 
 	self.discoveryService:Unlock(player, Constants.Discoveries.SecurityScreenButton.Id)
 	self.systemMessageRemote:FireClient(player, "The screen-only button admits it was watching you too.")
@@ -2339,10 +2314,8 @@ function InteractionService:_wireSecurityMonitor(monitor)
 
 		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityMonitorWall.Id)
 		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityCameraView.Id)
-		local hasScreenButton = monitor:GetAttribute("SecurityScreenButton") == true
 		self.securityCameraSessionByUserId[player.UserId] = {
 			ExpiresAt = os.clock() + SECURITY_CAMERA_DURATION,
-			HasScreenButton = hasScreenButton,
 		}
 
 		if monitor:IsA("BasePart") then
@@ -2355,7 +2328,6 @@ function InteractionService:_wireSecurityMonitor(monitor)
 			Action = "Start",
 			CameraCFrame = cameraCFrame,
 			CameraLabel = monitor:GetAttribute("CameraLabel") or "CAM 23 - SECURITY ROOM",
-			HasScreenButton = hasScreenButton,
 			Duration = SECURITY_CAMERA_DURATION,
 		})
 		self.systemMessageRemote:FireClient(player, "The monitor changes viewpoint. You appear on the screen with excellent timing.")
@@ -4791,35 +4763,6 @@ function InteractionService:_wireFieldButton(button)
 	end)
 end
 
-function InteractionService:_wireTVSecretBook(book)
-	local prompt = getPrompt(book)
-
-	self:_connectPrompt(prompt, function(player)
-		local roomId = book:GetAttribute("RoomId") or "TVRoom"
-		local alreadyReady = self.discoveryService:HasSecretDoorReveal(player, roomId)
-			and self.discoveryService:HasSecretKey(player, roomId)
-
-		playSound(book, "rbxasset://sounds/button.wav", 0.44, 0.52)
-		playSound(book, Constants.AudioAssets.Prologue.LockdownDoorEchoId, 0.44, 0.5)
-
-		local closedCFrame = book:GetAttribute("SecretClosedCFrame") or book.CFrame
-		tweenPart(book, 0.22, {
-			CFrame = closedCFrame * CFrame.new(0, 0, -0.24),
-			Color = Color3.fromRGB(168, 67, 124),
-		}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-		self.discoveryService:RevealSecretDoor(player, roomId)
-		self.discoveryService:GrantSecretKey(player, roomId)
-		self:_refreshSecretDoorsForPlayer(player)
-
-		if alreadyReady then
-			self.systemMessageRemote:FireClient(player, "The strange book is already pulled slightly forward.")
-		else
-			self.systemMessageRemote:FireClient(player, "A book clicks. A panel slides somewhere behind you.")
-		end
-	end)
-end
-
 function InteractionService:_getSecretDoorRoot(door)
 	if not door then
 		return nil
@@ -4893,14 +4836,8 @@ function InteractionService:_getSecretDoorWorldState(roomId)
 			state.Unlocked = true
 		end
 
-		local hasReveal = self.discoveryService:HasSecretDoorReveal(player, roomId)
-		local hasKey = self.discoveryService:HasSecretKey(player, roomId)
-		if hasReveal then
+		if self.discoveryService:HasSecretDoorReveal(player, roomId) then
 			state.OutlineVisible = true
-			if hasKey then
-				state.Active = true
-				state.HasKey = true
-			end
 		end
 
 		if self.discoveryService:IsRoomComplete(player, roomId) then
@@ -4951,18 +4888,16 @@ function InteractionService:_wireSecretRoomDoor(door)
 			return
 		end
 
-		local secretConfig = Constants.SecretDoors and Constants.SecretDoors[roomId]
-		local hasReveal = self.discoveryService:HasSecretDoorReveal(player, roomId)
-		local hasKey = self.discoveryService:HasSecretKey(player, roomId)
-		local canOpenFromReveal = hasReveal and hasKey
-		if not canOpenFromReveal and not self.discoveryService:IsRoomComplete(player, roomId) then
+		if not self.discoveryService:IsRoomComplete(player, roomId) then
 			self.systemMessageRemote:FireClient(player, "The Library outline is visible, but the room is not finished yet.")
 			return
 		end
 
+		local secretConfig = Constants.SecretDoors and Constants.SecretDoors[roomId]
 		local alreadyUnlocked = secretConfig
 			and secretConfig.EntryDiscoveryId
 			and self.discoveryService:HasDiscovery(player, secretConfig.EntryDiscoveryId)
+		local hasKey = self.discoveryService:HasSecretKey(player, roomId)
 
 		if not alreadyUnlocked and not hasKey then
 			self.systemMessageRemote:FireClient(player, "The Library is awaiting the Library Key. A secret discovery is probably hoarding it.")
@@ -5175,41 +5110,24 @@ end
 
 function InteractionService:_wireLibraryLoftDoor(door)
 	local prompt = getPrompt(door)
-	tunePrompt(prompt, LIBRARY_LOFT_DOOR_PROMPT_DISTANCE, false)
 
 	self.libraryLoftDoorState[door] = self.libraryLoftDoorState[door] or {
 		Reacting = false,
-		LastTouchAtByUserId = {},
 	}
 
-	local function hasPhysicalLoftAccess(player)
-		local rootPart = getRootPart(player)
-		if not rootPart or not door:IsA("BasePart") then
-			return false
-		end
-
-		local offset = rootPart.Position - door.Position
-		return offset.Magnitude <= LIBRARY_LOFT_PHYSICAL_ACCESS_DISTANCE
-			and rootPart.Position.Y >= door.Position.Y - 5
-	end
-
-	local function enterLoft(player)
+	self:_connectPrompt(prompt, function(player)
 		local state = self.libraryLoftDoorState[door]
 		if not state or state.Reacting then
 			return
 		end
 
-		local hasLadderDiscovery = self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id)
-		if not hasLadderDiscovery and not hasPhysicalLoftAccess(player) then
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id) then
 			self.systemMessageRemote:FireClient(player, "The loft door is visible, but the Library expects ladder etiquette first.")
 			playSound(door, "rbxasset://sounds/snap.wav", 0.35, 0.6)
 			return
 		end
 
 		state.Reacting = true
-		if not hasLadderDiscovery then
-			self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLadder.Id)
-		end
 		self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLoft.Id)
 		playSound(door, "rbxasset://sounds/electronicpingshort.wav", 0.42, 1.35)
 		self.systemMessageRemote:FireClient(player, "The loft door opens onto a very selective reading nook above the Library.")
@@ -5218,58 +5136,17 @@ function InteractionService:_wireLibraryLoftDoor(door)
 		self:_teleportPlayer(player, destination, "LibraryLoftDoor")
 		task.wait(0.25)
 		state.Reacting = false
-	end
-
-	self:_connectPrompt(prompt, enterLoft)
-
-	if door:IsA("BasePart") and door:GetAttribute("LibraryLoftTouchFallbackConnected") ~= true then
-		door:SetAttribute("LibraryLoftTouchFallbackConnected", true)
-		door.CanTouch = true
-		door.Touched:Connect(function(hit)
-			local player = getPlayerFromHit(hit)
-			if not player then
-				return
-			end
-
-			local state = self.libraryLoftDoorState[door]
-			if not state then
-				return
-			end
-			local now = os.clock()
-			if now - (state.LastTouchAtByUserId[player.UserId] or 0) < LIBRARY_LOFT_DOOR_TOUCH_COOLDOWN then
-				return
-			end
-			state.LastTouchAtByUserId[player.UserId] = now
-			enterLoft(player)
-		end)
-	end
+	end)
 end
 
 function InteractionService:_wireLibraryTeleportKey(key)
 	local prompt = getPrompt(key)
-	tunePrompt(prompt, LIBRARY_TELEPORT_KEY_PROMPT_DISTANCE, false)
 
-	local lastKeyTouchAtByUserId = {}
-
-	local function hasPhysicalKeyAccess(player)
-		local rootPart = getRootPart(player)
-		if not rootPart or not key:IsA("BasePart") then
-			return false
-		end
-
-		return (rootPart.Position - key.Position).Magnitude <= LIBRARY_TELEPORT_KEY_PROMPT_DISTANCE + 3
-			and rootPart.Position.Y >= key.Position.Y - 5
-	end
-
-	local function grantKey(player)
-		local hasLoftDiscovery = self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLoft.Id)
-		if not hasLoftDiscovery and not hasPhysicalKeyAccess(player) then
+	self:_connectPrompt(prompt, function(player)
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLoft.Id) then
 			self.systemMessageRemote:FireClient(player, "The Teleport Key hums from the loft. The Library wants you to reach the room properly first.")
 			playSound(key, "rbxasset://sounds/snap.wav", 0.35, 0.55)
 			return
-		end
-		if not hasLoftDiscovery then
-			self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLoft.Id)
 		end
 
 		local unlocked = self.discoveryService:Unlock(player, Constants.Discoveries.LibraryTeleportKey.Id)
@@ -5288,54 +5165,17 @@ function InteractionService:_wireLibraryTeleportKey(key)
 				end
 			end
 		end
-	end
-
-	self:_connectPrompt(prompt, grantKey)
-
-	if key:IsA("BasePart") and key:GetAttribute("LibraryTeleportKeyTouchFallbackConnected") ~= true then
-		key:SetAttribute("LibraryTeleportKeyTouchFallbackConnected", true)
-		key.CanTouch = true
-		key.Touched:Connect(function(hit)
-			local player = getPlayerFromHit(hit)
-			if not player then
-				return
-			end
-
-			local now = os.clock()
-			if now - (lastKeyTouchAtByUserId[player.UserId] or 0) < LIBRARY_TELEPORT_KEY_TOUCH_COOLDOWN then
-				return
-			end
-			lastKeyTouchAtByUserId[player.UserId] = now
-			grantKey(player)
-		end)
-	end
+	end)
 end
 
 function InteractionService:_wireLibraryBowlingKey(key)
 	local prompt = getPrompt(key)
-	tunePrompt(prompt, LIBRARY_BOWLING_KEY_PROMPT_DISTANCE, false)
 
-	local lastKeyTouchAtByUserId = {}
-
-	local function hasPhysicalKeyAccess(player)
-		local rootPart = getRootPart(player)
-		if not rootPart or not key:IsA("BasePart") then
-			return false
-		end
-
-		return (rootPart.Position - key.Position).Magnitude <= LIBRARY_BOWLING_KEY_PROMPT_DISTANCE + 3
-			and rootPart.Position.Y >= key.Position.Y - 5
-	end
-
-	local function grantKey(player)
-		local hasLadderDiscovery = self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id)
-		if not hasLadderDiscovery and not hasPhysicalKeyAccess(player) then
+	self:_connectPrompt(prompt, function(player)
+		if not self.discoveryService:HasDiscovery(player, Constants.Discoveries.LibraryLadder.Id) then
 			self.systemMessageRemote:FireClient(player, "The Bowling Key is too high. The rolling ladder is the Library-approved shortcut.")
 			playSound(key, "rbxasset://sounds/snap.wav", 0.35, 0.5)
 			return
-		end
-		if not hasLadderDiscovery then
-			self.discoveryService:Unlock(player, Constants.Discoveries.LibraryLadder.Id)
 		end
 
 		local unlocked = self.discoveryService:Unlock(player, Constants.Discoveries.LibraryBowlingKey.Id)
@@ -5353,43 +5193,17 @@ function InteractionService:_wireLibraryBowlingKey(key)
 				part.CanCollide = false
 			end
 		end
-	end
-
-	self:_connectPrompt(prompt, grantKey)
-
-	if key:IsA("BasePart") and key:GetAttribute("LibraryBowlingKeyTouchFallbackConnected") ~= true then
-		key:SetAttribute("LibraryBowlingKeyTouchFallbackConnected", true)
-		key.CanTouch = true
-		key.Touched:Connect(function(hit)
-			local player = getPlayerFromHit(hit)
-			if not player then
-				return
-			end
-
-			local now = os.clock()
-			if now - (lastKeyTouchAtByUserId[player.UserId] or 0) < LIBRARY_BOWLING_KEY_TOUCH_COOLDOWN then
-				return
-			end
-			lastKeyTouchAtByUserId[player.UserId] = now
-			grantKey(player)
-		end)
-	end
+	end)
 end
 
 function InteractionService:_wireLibraryBookcaseDoor(door)
 	local prompt = getPrompt(door)
-	tunePrompt(prompt, LIBRARY_BOOKCASE_DOOR_PROMPT_DISTANCE, false)
-	if prompt then
-		prompt.ActionText = "Open"
-		prompt.ObjectText = "Bowling Alley"
-	end
 
 	self.libraryBookcaseState[door] = self.libraryBookcaseState[door] or {
 		Reacting = false,
-		LastTouchAtByUserId = {},
 	}
 
-	local function openBookcase(player)
+	self:_connectPrompt(prompt, function(player)
 		local state = self.libraryBookcaseState[door]
 		if not state or state.Reacting then
 			return
@@ -5437,31 +5251,7 @@ function InteractionService:_wireLibraryBookcaseDoor(door)
 			end
 			state.Reacting = false
 		end)
-	end
-
-	self:_connectPrompt(prompt, openBookcase)
-
-	if door:IsA("BasePart") and door:GetAttribute("LibraryBookcaseTouchFallbackConnected") ~= true then
-		door:SetAttribute("LibraryBookcaseTouchFallbackConnected", true)
-		door.CanTouch = true
-		door.Touched:Connect(function(hit)
-			local player = getPlayerFromHit(hit)
-			if not player then
-				return
-			end
-
-			local state = self.libraryBookcaseState[door]
-			if not state then
-				return
-			end
-			local now = os.clock()
-			if now - (state.LastTouchAtByUserId[player.UserId] or 0) < LIBRARY_BOOKCASE_DOOR_TOUCH_COOLDOWN then
-				return
-			end
-			state.LastTouchAtByUserId[player.UserId] = now
-			openBookcase(player)
-		end)
-	end
+	end)
 end
 
 function InteractionService:_spawnBowlingBall(button, laneIndex, laneX, player)
@@ -7740,15 +7530,6 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 			local roomId = door:GetAttribute("RoomId")
-			if door:GetAttribute("RequiresClearanceBadge") == true
-				and not isPrologueOpen
-				and not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SleepingIdBadge.Id)
-			then
-				self.systemMessageRemote:FireClient(player, door:GetAttribute("BadgeRequiredMessage") or "Place clearance badge on reader to open door.")
-				playSound(door, "rbxasset://sounds/snap.wav", 0.34, 0.62)
-				return
-			end
-
 			if roomId and not isPrologueOpen and not self.discoveryService:IsRoomUnlocked(player, roomId) then
 				self.systemMessageRemote:FireClient(player, self:_getRoomDoorRequirementText(player, roomId))
 				return
@@ -7793,17 +7574,6 @@ function InteractionService:_wireHallDoor(door)
 
 		if not self:_canUseTeleport(player) then
 			return
-		end
-
-		local badgeAcceptedSoundId = door:GetAttribute("BadgeAcceptedSoundId")
-		local shouldPlayBadgeAccepted = door:GetAttribute("RequiresClearanceBadge") == true
-			and not isPrologueOpen
-			and typeof(badgeAcceptedSoundId) == "string"
-			and badgeAcceptedSoundId ~= ""
-			and not self.discoveryService:HasDiscovery(player, Constants.Discoveries.SecurityEntered.Id)
-
-		if shouldPlayBadgeAccepted then
-			playSound(door, badgeAcceptedSoundId, 0.32, 1.42)
 		end
 
 		self:_teleportPlayer(player, destinationCFrame, "HallDoor")

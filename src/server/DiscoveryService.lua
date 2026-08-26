@@ -9,7 +9,6 @@ local DiscoveryService = {}
 DiscoveryService.__index = DiscoveryService
 
 local DEFAULT_ROOM_ID = Constants.RoomOrder[1]
-local BUNKER_ENERGY_MONITOR_ATTRIBUTE = "DontTouchItBunkerEnergyMonitorUnlocked"
 
 local function getDataKey(player)
 	return ("player_%d"):format(player.UserId)
@@ -59,13 +58,6 @@ local function dictionaryFromList(items)
 	end
 
 	return dictionary
-end
-
-local function setPlayerGuiAttribute(player, attributeName, value)
-	local playerGui = player:FindFirstChildOfClass("PlayerGui")
-	if playerGui then
-		playerGui:SetAttribute(attributeName, value)
-	end
 end
 
 local function buildDiscoveryStateList(foundById)
@@ -364,21 +356,6 @@ function DiscoveryService:_finalizeDevStateChange(player, roomId)
 	self:_sendSnapshot(player)
 	self._secretDoorChangedEvent:Fire(player, roomId)
 	self._unlockedEvent:Fire(player)
-end
-
-function DiscoveryService:_syncBunkerEnergyMonitorAttribute(player)
-	if not player or not player.Parent then
-		return
-	end
-
-	local discoveredById = self.discoveryByUserId[player.UserId]
-	local securityDiscovery = Constants.Discoveries.SecurityBunkerEnergy
-	local unlocked = securityDiscovery ~= nil
-		and discoveredById ~= nil
-		and discoveredById[securityDiscovery.Id] == true
-
-	player:SetAttribute(BUNKER_ENERGY_MONITOR_ATTRIBUTE, unlocked)
-	setPlayerGuiAttribute(player, BUNKER_ENERGY_MONITOR_ATTRIBUTE, unlocked)
 end
 
 function DiscoveryService:SetDevRoomDiscoveries(player, roomId, discoveryIds)
@@ -1267,8 +1244,6 @@ function DiscoveryService:_sendSnapshot(player)
 	local lastUnlockedRoom = Constants.GetRoom(lastUnlockedRoomId)
 	local savedProgress = self:GetSavedProgressSummary(player)
 
-	self:_syncBunkerEnergyMonitorAttribute(player)
-
 	self.remote:FireClient(player, {
 		Type = "Snapshot",
 		Count = self:_countForPlayer(player),
@@ -1305,7 +1280,6 @@ function DiscoveryService:Unlock(player, discoveryId)
 
 	self.discoveryByUserId[player.UserId][discoveryId] = true
 	self:_refreshLastUnlockedRoom(player, false)
-	self:_syncBunkerEnergyMonitorAttribute(player)
 
 	local secretConfig = Constants.SecretDiscoveries and Constants.SecretDiscoveries[discoveryId]
 	if secretConfig then

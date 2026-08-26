@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.269"
+Constants.BuildVersion = "0.5.270"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -131,7 +131,6 @@ Constants.Tags = {
 	StoreButton = "DontTouchIt_StoreButton",
 	TeleportButton = "DontTouchIt_TeleportButton",
 	FieldButton = "DontTouchIt_FieldButton",
-	TVSecretBook = "DontTouchIt_TVSecretBook",
 	SecretRoomDoor = "DontTouchIt_SecretRoomDoor",
 	SecretRoomExit = "DontTouchIt_SecretRoomExit",
 	ResetRoomButton = "DontTouchIt_ResetRoomButton",

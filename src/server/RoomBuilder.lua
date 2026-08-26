@@ -2602,29 +2602,20 @@ local function makeSecurityRoom(roomFolder)
 	local monitorCameraCFrame =
 		CFrame.new(origin + Vector3.new(-18, 9.8, depth / 2 - 3.8), origin + Vector3.new(4, 3.2, -depth / 2 + 2.5))
 	local specialIndex = 23
-	local function cameraFeed(label, cameraCFrame)
-		return {
-			Label = label,
-			CameraCFrame = cameraCFrame,
-		}
-	end
-
 	local cameraFeeds = {
-		[1] = cameraFeed("TV ROOM", CFrame.new(Vector3.new(-20, 12, 20), Vector3.new(0, 4, 0))),
-		[2] = cameraFeed("SNACK LAB", CFrame.new(Vector3.new(18, 11, 74), Vector3.new(48, 4, 44))),
-		[3] = cameraFeed("ISLAND", CFrame.new(Vector3.new(-36, 18, 184), Vector3.new(0, 4, 154))),
-		[4] = cameraFeed("LIBRARY", CFrame.new(Vector3.new(4, 18, -60), Vector3.new(-16, 5, -44))),
-		[5] = cameraFeed("BOWLING", CFrame.new(Vector3.new(-31, 19, -236), Vector3.new(-14, 4, -140))),
-		[6] = cameraFeed("SPACE", CFrame.new(Vector3.new(112, 99, 172), Vector3.new(92, 84, 150))),
-		[7] = cameraFeed("SLEEPING", CFrame.new(Vector3.new(108, 18, -116), Vector3.new(82, 5, -188))),
-		[8] = cameraFeed("HALLWAY", CFrame.new(Vector3.new(0, 11, 114), Vector3.new(0, 4, 45))),
-		[9] = cameraFeed("CAVE", CFrame.new(Vector3.new(-72, 12, 60), Vector3.new(-92, 4, 22))),
-		[10] = cameraFeed("ZIPLINE", CFrame.new(Vector3.new(-38, 55, -245), Vector3.new(-14, 31, -220))),
-		[11] = cameraFeed("VOID", CFrame.new(Vector3.new(-116, 68, -54), Vector3.new(-92, 47, -28))),
-		[12] = cameraFeed("INFIRMARY", CFrame.new(Vector3.new(196, 11, -146), Vector3.new(160, 4, -154))),
-		[13] = cameraFeed("GYM", CFrame.new(Vector3.new(198, 20, -224), Vector3.new(160, 10, -224))),
-		[14] = cameraFeed("TRAINING", CFrame.new(Vector3.new(82, 38, -438), Vector3.new(82, 5, -382))),
-		[23] = cameraFeed("SECURITY\nYOU?", monitorCameraCFrame),
+		[1] = "TV ROOM",
+		[2] = "SNACK LAB",
+		[3] = "ISLAND",
+		[4] = "LIBRARY",
+		[5] = "BOWLING",
+		[6] = "SPACE",
+		[7] = "SLEEPING",
+		[8] = "HALLWAY",
+		[9] = "CAVE",
+		[10] = "ZIPLINE",
+		[11] = "VOID",
+		[12] = "MAINT.",
+		[23] = "SECURITY\nYOU?",
 	}
 
 	local function makeSecurityMonitorSurface(screen, monitorIndex, feedName, mode, isSpecial)
@@ -2698,18 +2689,15 @@ local function makeSecurityRoom(roomFolder)
 			local frame = createPart(monitorWall, ("SecurityMonitor%02dFrame"):format(monitorIndex), Vector3.new(5.05, 2.7, 0.22), screenCFrame, Color3.fromRGB(11, 13, 18), Enum.Material.Metal)
 			local screen = createPart(monitorWall, ("SecurityMonitor%02dScreen"):format(monitorIndex), Vector3.new(4.48, 2.16, 0.12), screenCFrame * CFrame.new(0, 0, 0.18), Color3.fromRGB(18, 32, 42), Enum.Material.Neon)
 			local isSpecial = monitorIndex == specialIndex
-			local feed = cameraFeeds[monitorIndex]
-			local feedName = feed and feed.Label
+			local feedName = cameraFeeds[monitorIndex]
 			local mode = if feedName then "Room" elseif monitorIndex % 2 == 0 then "Test" else "Static"
 			makeSecurityMonitorSurface(screen, monitorIndex, feedName or mode:upper(), mode, isSpecial)
 
-			if feed and feed.CameraCFrame then
-				screen.Name = if isSpecial then "SecuritySpecialMonitorScreen" else ("SecurityRoomCameraMonitor%02dScreen"):format(monitorIndex)
-				screen:SetAttribute("CameraCFrame", feed.CameraCFrame)
-				screen:SetAttribute("CameraLabel", ("CAM %02d - %s"):format(monitorIndex, (feedName or "SECURITY"):gsub("\n", " ")))
-				screen:SetAttribute("SecurityScreenButton", isSpecial)
-				local promptObjectText = if isSpecial then "Suspicious Monitor" else ((feedName or "Room") .. " Camera")
-				local prompt = createPrompt(screen, "Watch", promptObjectText, 0.1)
+			if isSpecial then
+				screen.Name = "SecuritySpecialMonitorScreen"
+				screen:SetAttribute("CameraCFrame", monitorCameraCFrame)
+				screen:SetAttribute("CameraLabel", "CAM 23 - SECURITY ROOM")
+				local prompt = createPrompt(screen, "Watch", "Suspicious Monitor", 0.1)
 				prompt.MaxActivationDistance = 16
 				tag(screen, Constants.Tags.SecurityMonitor)
 			end
@@ -3918,9 +3906,6 @@ local function makeHallway(roomFolder)
 	)
 	securityDoor:SetAttribute("LockedDuringPrologue", true)
 	securityDoor:SetAttribute("PrologueLockedMessage", "Security is dark. The door ignores you for now.")
-	securityDoor:SetAttribute("RequiresClearanceBadge", true)
-	securityDoor:SetAttribute("BadgeRequiredMessage", "Place clearance badge on reader to open door.")
-	securityDoor:SetAttribute("BadgeAcceptedSoundId", "rbxasset://sounds/electronicpingshort.wav")
 	securityDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.SecurityEntered.Id)
 	securityDoor:SetAttribute("TravelMessage", "Security unlocked. Try to look less monitored.")
 
@@ -4818,55 +4803,36 @@ local function makeLibraryFurnishings(room)
 	}) do
 		local shelfModel = makeModel(room, shelf.Name)
 		local base = CFrame.new(origin + Vector3.new(shelf.X, 3.7, shelf.Z)) * CFrame.Angles(0, math.rad(shelf.Yaw), 0)
-		local woodDark = Color3.fromRGB(70, 45, 32)
-		local woodMid = Color3.fromRGB(112, 72, 45)
-		local woodTrim = Color3.fromRGB(88, 55, 37)
-		local back = createPart(shelfModel, "ShelfBack", Vector3.new(shelf.Width, 7.4, 0.34), base, woodDark, Enum.Material.Wood)
+		local back = createPart(shelfModel, "ShelfBack", Vector3.new(shelf.Width, 7.4, 0.34), base, Color3.fromRGB(72, 48, 36), Enum.Material.Wood)
 		if shelfIndex == 1 then
 			createPrompt(back, "Inspect", "Whispering Shelf", 0)
 			tag(back, Constants.Tags.LibraryShelf)
 		end
 
-		createPart(shelfModel, "ShelfTopTrim", Vector3.new(shelf.Width + 0.42, 0.32, 0.62), base * CFrame.new(0, 3.86, 0.08), woodTrim, Enum.Material.Wood)
-		createPart(shelfModel, "ShelfBottomTrim", Vector3.new(shelf.Width + 0.42, 0.32, 0.62), base * CFrame.new(0, -3.86, 0.08), woodTrim, Enum.Material.Wood)
-		createPart(shelfModel, "ShelfLeftTrim", Vector3.new(0.34, 7.75, 0.58), base * CFrame.new(-shelf.Width / 2 - 0.17, 0, 0.08), woodTrim, Enum.Material.Wood)
-		createPart(shelfModel, "ShelfRightTrim", Vector3.new(0.34, 7.75, 0.58), base * CFrame.new(shelf.Width / 2 + 0.17, 0, 0.08), woodTrim, Enum.Material.Wood)
-
-		local bookCount = math.max(14, math.floor(shelf.Width / 0.95))
-		local looseBookIndex = math.floor(bookCount * 0.58)
-
-		for row = 1, 4 do
-			local shelfY = -3.1 + row * 1.55
-			createPart(shelfModel, "ShelfBoard" .. row, Vector3.new(shelf.Width + 0.2, 0.28, 0.72), base * CFrame.new(0, shelfY, 0.22), woodMid, Enum.Material.Wood)
-			for bookIndex = 1, bookCount do
-				local t = if bookCount > 1 then (bookIndex - 1) / (bookCount - 1) else 0
-				local bookX = -shelf.Width / 2 + 0.62 + t * (shelf.Width - 1.24)
-				local width = 0.42 + ((bookIndex + row + shelfIndex) % 3) * 0.08
-				local height = 0.82 + ((row + bookIndex * 2 + shelfIndex) % 4) * 0.11
-				local lean = math.rad(((bookIndex + row + shelfIndex) % 5) - 2)
-				local color = Color3.fromRGB(
-					72 + (bookIndex * 31 + row * 17 + shelfIndex * 11) % 135,
-					42 + (bookIndex * 19 + row * 13 + shelfIndex * 23) % 110,
-					66 + (bookIndex * 23 + row * 29 + shelfIndex * 17) % 135
-				)
-				local shelfBook = createPart(
-					shelfModel,
-					("Book_%d_%d"):format(row, bookIndex),
-					Vector3.new(width, height, 0.38),
-					base * CFrame.new(bookX, shelfY + 0.2 + height / 2, 0.58) * CFrame.Angles(0, 0, lean),
-					color,
-					Enum.Material.SmoothPlastic
-				)
-				shelfBook.CanCollide = false
-				shelfBook:SetAttribute("BaseCanCollide", false)
-				if shelfIndex == 3 and row == 3 and bookIndex == looseBookIndex then
-					shelfBook.Name = "LibraryLooseStormBook"
-					shelfBook.Size = Vector3.new(0.56, 1.18, 0.46)
-					shelfBook.Color = Color3.fromRGB(255, 91, 141)
-					shelfBook.Material = Enum.Material.Neon
-					createSurfaceText(shelfBook, "LooseBookText", "PULL", Enum.NormalId.Back, Color3.fromRGB(255, 245, 196), shelfBook.Color)
-					createPrompt(shelfBook, "Pull", "Loose Book", 0)
-					tag(shelfBook, Constants.Tags.LibraryBookStorm)
+			for row = 1, 4 do
+				createPart(shelfModel, "ShelfBoard" .. row, Vector3.new(shelf.Width + 0.2, 0.28, 0.72), base * CFrame.new(0, -3.1 + row * 1.55, 0.22), Color3.fromRGB(92, 61, 43), Enum.Material.Wood)
+				for bookIndex = 1, 8 do
+					local bookX = -shelf.Width / 2 + 0.7 + (bookIndex - 1) * (shelf.Width - 1.4) / 7
+					local color = Color3.fromRGB(90 + (bookIndex * 17) % 120, 52 + (row * 31) % 130, 70 + (shelfIndex * 43) % 120)
+					local shelfBook = createPart(
+						shelfModel,
+						("Book_%d_%d"):format(row, bookIndex),
+						Vector3.new(0.42, 1.05 + (bookIndex % 3) * 0.14, 0.38),
+						base * CFrame.new(bookX, -3.05 + row * 1.55, 0.58),
+						color,
+						Enum.Material.SmoothPlastic
+					)
+					shelfBook.CanCollide = false
+					shelfBook:SetAttribute("BaseCanCollide", false)
+					if shelfIndex == 3 and row == 3 and bookIndex == 5 then
+						shelfBook.Name = "LibraryLooseStormBook"
+						shelfBook.Size = Vector3.new(0.52, 1.42, 0.46)
+						shelfBook.Color = Color3.fromRGB(255, 91, 141)
+						shelfBook.Material = Enum.Material.Neon
+						createSurfaceText(shelfBook, "LooseBookText", "PULL", Enum.NormalId.Back, Color3.fromRGB(255, 245, 196), shelfBook.Color)
+						createPrompt(shelfBook, "Pull", "Loose Book", 0)
+						tag(shelfBook, Constants.Tags.LibraryBookStorm)
+					end
 				end
 			end
 		end
@@ -5765,56 +5731,6 @@ local function makeBowlingAlley(roomFolder)
 		ResetRoomButton = bowlingControls.ResetRoomButton,
 		ReferenceBook = bowlingControls.ReferenceBook,
 	}
-end
-
-local function makeTVRoomSecretBookshelf(parent)
-	local shelf = makeModel(parent, "TVRoomSecretBookshelf")
-	local baseCFrame = CFrame.new(-14.2, 4.35, Constants.Room.Depth / 2 - 0.66)
-	local woodDark = Color3.fromRGB(74, 48, 34)
-	local woodMid = Color3.fromRGB(112, 72, 45)
-
-	local back = createPart(shelf, "TVSecretBookshelfBack", Vector3.new(8.2, 6.2, 0.28), baseCFrame, woodDark, Enum.Material.Wood)
-	createSurfaceText(back, "TVSecretBookshelfTitle", "ODD REFERENCE", Enum.NormalId.Front, Color3.fromRGB(255, 232, 159), woodDark)
-
-	for row = 1, 3 do
-		local shelfY = 2.2 - (row - 1) * 1.68
-		createPart(shelf, "TVSecretBookshelfShelf" .. row, Vector3.new(7.55, 0.22, 0.36), baseCFrame * CFrame.new(0, shelfY - 0.62, -0.22), woodMid, Enum.Material.Wood)
-		for bookIndex = 1, 9 do
-			local x = -3.35 + (bookIndex - 1) * 0.82
-			local height = 0.86 + ((row + bookIndex) % 3) * 0.16
-			local color = Color3.fromRGB(
-				72 + (bookIndex * 31 + row * 17) % 120,
-				42 + (bookIndex * 19 + row * 13) % 100,
-				66 + (bookIndex * 23 + row * 29) % 130
-			)
-			local book = createPart(
-				shelf,
-				("TVSecretShelfBook%d_%d"):format(row, bookIndex),
-				Vector3.new(0.48, height, 0.34),
-				baseCFrame * CFrame.new(x, shelfY - 0.08 + height / 2 - 0.52, -0.42),
-				color,
-				Enum.Material.SmoothPlastic
-			)
-			book.CanCollide = false
-			book:SetAttribute("BaseCanCollide", false)
-		end
-	end
-
-	local secretBook = createPart(
-		shelf,
-		"TVStrangeBook",
-		Vector3.new(0.56, 1.26, 0.42),
-		baseCFrame * CFrame.new(-0.62, 0.58, -0.58) * CFrame.Angles(0, 0, math.rad(-3)),
-		Color3.fromRGB(124, 36, 86),
-		Enum.Material.SmoothPlastic
-	)
-	secretBook:SetAttribute("RoomId", "TVRoom")
-	secretBook:SetAttribute("SecretClosedCFrame", secretBook.CFrame)
-	createPrompt(secretBook, "Pull", "Strange Book", 0)
-	tag(secretBook, Constants.Tags.TVSecretBook)
-
-	shelf.PrimaryPart = back
-	return shelf
 end
 
 local function makeTVSecretRoom(roomFolder)
@@ -6741,7 +6657,6 @@ function RoomBuilder.Build()
 	local resetRoomButton = tvControls.ResetRoomButton
 	local tvInsideLog = tvControls.ReferenceBook
 	makeTVRoomClocks(roomFolder)
-	makeTVRoomSecretBookshelf(roomFolder)
 	local underfloorChamber, safetyFloor = makeUnderfloorChamber(roomFolder, recoveryFloor)
 	makeSpawn(roomFolder)
 	makeAtomicStarburst(roomFolder, "TVRoomAtomicStarburst", CFrame.new(13.2, 13.6, -Constants.Room.Depth / 2 + 0.62), 0.92, ATOMIC_COLORS.Pink, ATOMIC_COLORS.Orange)
