@@ -1233,6 +1233,15 @@ function RoomProgressService:_requestFieldEffect(player, roomId, effectId)
 
 	if effectId == "LowGravity" then
 		self:_runLowGravityFromField(player)
+	elseif effectId == "FloorGone" then
+		if self.eventManager then
+			local triggered = self.eventManager:TriggerById(player, "floor_gone")
+			if not triggered then
+				self.systemMessageRemote:FireClient(player, "The floor control tries to comply, but the room is busy.")
+			end
+		else
+			self.systemMessageRemote:FireClient(player, "The floor control is not connected to anything sensible yet.")
+		end
 	elseif effectId == "TinyPlayer" then
 		self:_applyPlayerScaleField(
 			player,

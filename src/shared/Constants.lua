@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.283"
+Constants.BuildVersion = "0.5.284"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -777,6 +777,12 @@ Constants.FieldControls = {
 		Id = "LowGravity",
 		Name = "Low Gravity",
 		Description = "Gravity becomes negotiable until RESET.",
+		RequiresDiscoveryId = "low_gravity",
+	},
+	{
+		Id = "FloorGone",
+		Name = "Remove Some Floor",
+		Description = "Ask the room to remove a few floor sections until RESET.",
 		RequiresDiscoveryId = "low_gravity",
 	},
 	{

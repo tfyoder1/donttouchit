@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -359,6 +360,8 @@ local lastDiscoveryPayload = {
 	Total = Constants.TotalDiscoveries or 0,
 }
 local lastRoomPayload = nil
+local roomCountByRoomId = {}
+local lastRoomSparkleAt = 0
 
 local function getReplicatedAttribute(name, fallback)
 	local value = player:GetAttribute(name)
@@ -497,6 +500,126 @@ local function updateProgress(payload)
 	progressFill.Size = UDim2.fromScale(math.clamp(count / total, 0, 1), 1)
 end
 
+local function getGuiLocalPoint(screenPoint)
+	local guiPosition = gui.AbsolutePosition
+	return Vector2.new(screenPoint.X - guiPosition.X, screenPoint.Y - guiPosition.Y)
+end
+
+local function playRoomDiscoverySparkle(amount)
+	if not gui.Parent or not roomCounter.Visible then
+		return
+	end
+
+	local now = os.clock()
+	if now - lastRoomSparkleAt < 0.2 then
+		return
+	end
+	lastRoomSparkleAt = now
+
+	local target = getGuiLocalPoint(roomCounter.AbsolutePosition + roomCounter.AbsoluteSize * Vector2.new(0.5, 0.5))
+	local source = getGuiLocalPoint(Vector2.new(gui.AbsoluteSize.X * 0.5, gui.AbsoluteSize.Y * 0.72))
+	local count = math.clamp(math.floor(amount or 1) + 3, 4, 8)
+
+	for index = 1, count do
+		local sparkle = Instance.new("Frame")
+		sparkle.Name = "RoomDiscoverySparkle"
+		sparkle.AnchorPoint = Vector2.new(0.5, 0.5)
+		sparkle.BackgroundColor3 = if index % 2 == 0
+			then Color3.fromRGB(255, 242, 125)
+			else Color3.fromRGB(119, 255, 203)
+		sparkle.BorderSizePixel = 0
+		sparkle.Position = UDim2.fromOffset(source.X + (index - count / 2) * 9, source.Y + (index % 3) * 8)
+		sparkle.Rotation = 45
+		sparkle.Size = UDim2.fromOffset(7, 7)
+		sparkle.ZIndex = 80
+		sparkle.Parent = gui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = sparkle
+
+		local midway = source:Lerp(target, 0.48) + Vector2.new((index - count / 2) * 18, -34 - (index % 2) * 18)
+		local firstTween = TweenService:Create(
+			sparkle,
+			TweenInfo.new(0.28 + index * 0.018, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{
+				Position = UDim2.fromOffset(midway.X, midway.Y),
+				Size = UDim2.fromOffset(10, 10),
+			}
+		)
+		local secondTween = TweenService:Create(
+			sparkle,
+			TweenInfo.new(0.34, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(target.X, target.Y),
+				Size = UDim2.fromOffset(3, 3),
+			}
+		)
+
+		firstTween.Completed:Connect(function()
+			if sparkle.Parent then
+				secondTween:Play()
+			end
+		end)
+		secondTween.Completed:Connect(function()
+			if sparkle.Parent then
+				sparkle:Destroy()
+			end
+		end)
+		firstTween:Play()
+	end
+
+	local originalSize = roomCounter.Size
+	local expandedSize = UDim2.new(
+		originalSize.X.Scale,
+		originalSize.X.Offset + 8,
+		originalSize.Y.Scale,
+		originalSize.Y.Offset + 4
+	)
+	local pulseOut = TweenService:Create(roomCounter, TweenInfo.new(0.11, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = expandedSize,
+	})
+	local pulseIn = TweenService:Create(roomCounter, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		Size = originalSize,
+	})
+	pulseOut.Completed:Connect(function()
+		if roomCounter.Parent then
+			pulseIn:Play()
+		end
+	end)
+	pulseOut:Play()
+end
+
+local function trackRoomCount(roomId, count)
+	if typeof(roomId) ~= "string" or typeof(count) ~= "number" then
+		return
+	end
+
+	local previous = roomCountByRoomId[roomId]
+	roomCountByRoomId[roomId] = count
+	if previous and count > previous then
+		playRoomDiscoverySparkle(count - previous)
+	end
+end
+
+local function updateRoomCountsFromDiscoveryPayload(payload)
+	if typeof(payload) ~= "table" or typeof(payload.Rooms) ~= "table" then
+		return
+	end
+	local currentRoomId = if typeof(lastRoomPayload) == "table" then lastRoomPayload.RoomId else nil
+	if typeof(currentRoomId) ~= "string" then
+		return
+	end
+
+	for _, room in ipairs(payload.Rooms) do
+		if typeof(room) == "table" and room.RoomId == currentRoomId then
+			trackRoomCount(currentRoomId, tonumber(room.Count))
+			return
+		end
+	end
+end
+
 local function updateRoomStatus(payload)
 	if typeof(payload) == "table" then
 		lastRoomPayload = payload
@@ -511,6 +634,7 @@ local function updateRoomStatus(payload)
 	if status.Type == "Hallway" then
 		roomCounterLabel.Text = ("Hall: %d/%d rooms"):format(status.UnlockedRooms or 0, status.TotalRooms or 0)
 	elseif status.Type == "Room" then
+		trackRoomCount(status.RoomId, tonumber(status.Count))
 		roomCounterLabel.Text = ("%s: %d/%d"):format(status.RoomName or "Room", status.Count or 0, status.Total or 0)
 	else
 		roomCounterLabel.Text = ("Discoveries: %d/%d"):format(
@@ -527,6 +651,7 @@ discoveryRemote.OnClientEvent:Connect(function(payload)
 			playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
 		end
 		updateProgress(payload)
+		updateRoomCountsFromDiscoveryPayload(payload)
 		if not lastRoomPayload then
 			updateRoomStatus(nil)
 		end
