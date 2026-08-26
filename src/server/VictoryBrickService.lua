@@ -46,9 +46,23 @@ local function getSlotDistance(slot)
 	return (Vector3.new(position.X, 0, position.Z) - Vector3.new(cavePosition.X, 0, cavePosition.Z)).Magnitude
 end
 
-function VictoryBrickService.new(discoveryService)
+local function sanitizeStats(stats)
+	if typeof(stats) ~= "table" then
+		return nil
+	end
+
+	return {
+		DiscoveryCount = if typeof(stats.DiscoveryCount) == "number" then math.max(0, math.floor(stats.DiscoveryCount)) else nil,
+		TotalDiscoveries = if typeof(stats.TotalDiscoveries) == "number" then math.max(0, math.floor(stats.TotalDiscoveries)) else nil,
+		TimePlayedSeconds = if typeof(stats.TimePlayedSeconds) == "number" then math.max(0, math.floor(stats.TimePlayedSeconds)) else nil,
+		BuildVersion = if typeof(stats.BuildVersion) == "string" then string.sub(stats.BuildVersion, 1, 24) else nil,
+	}
+end
+
+function VictoryBrickService.new(discoveryService, roomProgressService)
 	local self = setmetatable({}, VictoryBrickService)
 	self.discoveryService = discoveryService
+	self.roomProgressService = roomProgressService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.records = {}
 	self.loaded = false
@@ -128,7 +142,27 @@ function VictoryBrickService:_sanitizeRecord(record)
 		PreferredSlotIndex = if typeof(record.PreferredSlotIndex) == "number" then math.floor(record.PreferredSlotIndex) else nil,
 		CreatedAt = if typeof(record.CreatedAt) == "number" then record.CreatedAt else now(),
 		UpdatedAt = if typeof(record.UpdatedAt) == "number" then record.UpdatedAt else now(),
+		Stats = sanitizeStats(record.Stats),
 	}
+end
+
+function VictoryBrickService:_buildClaimStats(player)
+	local discoveryCount = 0
+	if self.discoveryService and player then
+		discoveryCount = self.discoveryService:GetDiscoveryCount(player)
+	end
+
+	local timePlayedSeconds = 0
+	if self.roomProgressService and self.roomProgressService.GetTrackedPlaySeconds then
+		timePlayedSeconds = self.roomProgressService:GetTrackedPlaySeconds(player)
+	end
+
+	return sanitizeStats({
+		DiscoveryCount = discoveryCount,
+		TotalDiscoveries = Constants.TotalDiscoveries,
+		TimePlayedSeconds = timePlayedSeconds,
+		BuildVersion = Constants.BuildVersion,
+	})
 end
 
 function VictoryBrickService:_load()
@@ -242,6 +276,12 @@ function VictoryBrickService:_resetBrick(slot)
 	part:SetAttribute("VictoryBrickUserId", nil)
 	part:SetAttribute("VictoryBrickTier", nil)
 	part:SetAttribute("VictoryBrickDisplayName", nil)
+	part:SetAttribute("VictoryBrickClaimedAt", nil)
+	part:SetAttribute("VictoryBrickUpdatedAt", nil)
+	part:SetAttribute("VictoryBrickDiscoveryCount", nil)
+	part:SetAttribute("VictoryBrickTotalDiscoveries", nil)
+	part:SetAttribute("VictoryBrickTimePlayedSeconds", nil)
+	part:SetAttribute("VictoryBrickBuildVersion", nil)
 end
 
 function VictoryBrickService:_applyRecordToSlot(slot, record)
@@ -276,6 +316,14 @@ function VictoryBrickService:_applyRecordToSlot(slot, record)
 	part:SetAttribute("VictoryBrickUserId", record.UserId)
 	part:SetAttribute("VictoryBrickTier", record.Tier)
 	part:SetAttribute("VictoryBrickDisplayName", cleanName(record.DisplayName or record.Username))
+	part:SetAttribute("VictoryBrickClaimedAt", record.CreatedAt)
+	part:SetAttribute("VictoryBrickUpdatedAt", record.UpdatedAt)
+
+	local stats = sanitizeStats(record.Stats)
+	part:SetAttribute("VictoryBrickDiscoveryCount", stats and stats.DiscoveryCount or nil)
+	part:SetAttribute("VictoryBrickTotalDiscoveries", stats and stats.TotalDiscoveries or nil)
+	part:SetAttribute("VictoryBrickTimePlayedSeconds", stats and stats.TimePlayedSeconds or nil)
+	part:SetAttribute("VictoryBrickBuildVersion", stats and stats.BuildVersion or nil)
 end
 
 function VictoryBrickService:_takeSlotByIndex(availableSlots, requestedSlotIndex)
@@ -306,6 +354,9 @@ function VictoryBrickService:_applyFixedBricks(availableSlots)
 					Username = fixedBrick.Username,
 					DisplayName = fixedBrick.DisplayName or fixedBrick.Username,
 					Tier = fixedBrick.Tier == DELUXE_TIER and DELUXE_TIER or STANDARD_TIER,
+					CreatedAt = fixedBrick.CreatedAt,
+					UpdatedAt = fixedBrick.UpdatedAt,
+					Stats = fixedBrick.Stats,
 				})
 			end
 		end
@@ -376,6 +427,7 @@ function VictoryBrickService:SignStandard(player)
 		current.DisplayName = cleanName(player.DisplayName or player.Name)
 		current.Username = cleanName(player.Name)
 		current.UpdatedAt = now()
+		current.Stats = current.Stats or self:_buildClaimStats(player)
 		self:_applyLayout()
 		self:_queueSave()
 		return true, "Your deluxe victory brick is already on the walkway."
@@ -389,6 +441,7 @@ function VictoryBrickService:SignStandard(player)
 		Tier = STANDARD_TIER,
 		CreatedAt = createdAt,
 		UpdatedAt = now(),
+		Stats = current and current.Stats or self:_buildClaimStats(player),
 	}
 
 	self:_applyLayout()
@@ -411,6 +464,7 @@ function VictoryBrickService:GrantDeluxe(player, preferredSlotIndex)
 		PreferredSlotIndex = if typeof(preferredSlotIndex) == "number" then math.floor(preferredSlotIndex) else nil,
 		CreatedAt = createdAt,
 		UpdatedAt = now(),
+		Stats = current and current.Stats or self:_buildClaimStats(player),
 	}
 
 	self:_applyLayout()

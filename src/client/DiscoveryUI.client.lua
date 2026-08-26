@@ -897,16 +897,75 @@ local function showVictoryBrickModal(payload)
 		return
 	end
 
+	local function formatSeconds(seconds)
+		seconds = tonumber(seconds)
+		if not seconds or seconds < 0 then
+			return nil
+		end
+
+		seconds = math.floor(seconds)
+		local hours = math.floor(seconds / 3600)
+		local minutes = math.floor((seconds % 3600) / 60)
+		if hours > 0 then
+			return ("%dh %dm"):format(hours, minutes)
+		end
+		if minutes > 0 then
+			return ("%dm"):format(minutes)
+		end
+		return ("%ds"):format(seconds)
+	end
+
+	local function formatDate(timestamp)
+		timestamp = tonumber(timestamp)
+		if not timestamp or timestamp <= 0 then
+			return nil
+		end
+
+		local ok, text = pcall(function()
+			return os.date("%b %d, %Y", timestamp)
+		end)
+		return if ok then text else nil
+	end
+
 	local displayName = tostring(payload.DisplayName or "Unknown Player")
 	local tier = tostring(payload.Tier or "Victory")
 	local slotIndex = tonumber(payload.SlotIndex)
 	local messageText = tostring(payload.Message or "This brick remembers a completed run.")
+	local detailLines = {}
+	if slotIndex then
+		table.insert(detailLines, ("Walkway slot: %d"):format(slotIndex))
+	end
+
+	local discoveryCount = tonumber(payload.DiscoveryCount)
+	local totalDiscoveries = tonumber(payload.TotalDiscoveries)
+	if discoveryCount and totalDiscoveries then
+		table.insert(detailLines, ("Discoveries at claim: %d / %d"):format(discoveryCount, totalDiscoveries))
+	end
+
+	local timePlayed = formatSeconds(payload.TimePlayedSeconds)
+	if timePlayed then
+		table.insert(detailLines, ("Tracked time played: %s"):format(timePlayed))
+	end
+
+	local claimedDate = formatDate(payload.ClaimedAt)
+	if claimedDate then
+		table.insert(detailLines, ("Recorded: %s"):format(claimedDate))
+	end
+
+	local buildVersion = tostring(payload.BuildVersion or "")
+	if buildVersion ~= "" and buildVersion ~= "nil" then
+		table.insert(detailLines, ("Build: %s"):format(buildVersion))
+	end
+
+	if #detailLines == 0 then
+		table.insert(detailLines, "Recorded accomplishment: completed the bunker.")
+	end
+
 	victoryBrickTitle.Text = if tier == "Deluxe" then "Deluxe Victory Brick" else "Victory Brick"
 	victoryBrickName.Text = displayName
-	victoryBrickBody.Text = ("%s\n\n%s%s"):format(
+	victoryBrickBody.Text = ("%s\n\n%s"):format(
 		messageText,
-		if slotIndex then ("Walkway slot: %d\n"):format(slotIndex) else "",
-		"Recorded accomplishment: completed the bunker."
+		table.concat(detailLines, "\n")
 	)
 	UiLayerController.SetRoomMenuOpen(gui, true)
 	victoryBrickShade.Visible = true

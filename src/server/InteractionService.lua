@@ -8873,6 +8873,12 @@ function InteractionService:_wireVictoryBrick(brick)
 				DisplayName = displayName,
 				Tier = if isDeluxe then "Deluxe" else "Standard",
 				SlotIndex = slotIndex,
+				ClaimedAt = brick:GetAttribute("VictoryBrickClaimedAt"),
+				UpdatedAt = brick:GetAttribute("VictoryBrickUpdatedAt"),
+				DiscoveryCount = brick:GetAttribute("VictoryBrickDiscoveryCount"),
+				TotalDiscoveries = brick:GetAttribute("VictoryBrickTotalDiscoveries"),
+				TimePlayedSeconds = brick:GetAttribute("VictoryBrickTimePlayedSeconds"),
+				BuildVersion = brick:GetAttribute("VictoryBrickBuildVersion"),
 				Message = if isDeluxe
 					then "This deluxe victory brick was claimed after the bunker was completed."
 					else "This victory brick was signed after the bunker was completed.",

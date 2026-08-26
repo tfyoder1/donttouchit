@@ -1013,6 +1013,30 @@ function RoomProgressService:_sendRoomStatus(player, now)
 	})
 end
 
+function RoomProgressService:GetTrackedPlaySeconds(player)
+	if not player or not player.Parent then
+		return 0
+	end
+
+	local state = self:_getState(player)
+	local total = 0
+
+	for _, seconds in pairs(state.RoomPlaySecondsByRoomId or {}) do
+		if typeof(seconds) == "number" then
+			total += math.max(0, seconds)
+		end
+	end
+
+	if state.CurrentRoomId and not self:IsUntouchedProloguePending(player) then
+		local lastTickAt = state.LastRoomTickAt or state.TimerStartedAt
+		if typeof(lastTickAt) == "number" then
+			total += math.max(0, os.clock() - lastTickAt)
+		end
+	end
+
+	return math.floor(total)
+end
+
 function RoomProgressService:_tickRoomPlayRewards(player, roomId, totalPlay, state)
 	local earnedCount = math.floor(totalPlay / Constants.RoomPlay.HintIntervalSeconds)
 	local awardedCount = state.RoomPlayRewardsByRoomId[roomId] or 0

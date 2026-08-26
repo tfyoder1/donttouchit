@@ -61,7 +61,7 @@ startingGearService:Initialize()
 local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService)
 bunkerEnergyService:Initialize()
 
-local victoryBrickService = VictoryBrickService.new(discoveryService)
+local victoryBrickService = VictoryBrickService.new(discoveryService, roomProgressService)
 victoryBrickService:Initialize()
 
 local feedbackOk, feedbackServiceOrError = pcall(function()
