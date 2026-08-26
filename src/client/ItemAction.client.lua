@@ -20,6 +20,7 @@ local CONSUMABLE_PROMPT_NAMES = {
 local actionControl = nil
 local characterConnections = {}
 local shownConsumablePrompts = {}
+local shownGenericPrompts = {}
 local touchPressToken = 0
 local touchPressActive = false
 local touchHoldConsumed = false
@@ -39,6 +40,46 @@ local function getPromptRoot(prompt)
 	end
 
 	return parent
+end
+
+local function getRootPart()
+	local character = player.Character
+	if not character then
+		return nil
+	end
+
+	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getPromptPosition(prompt)
+	local parent = prompt and prompt.Parent
+	if not parent then
+		return nil
+	end
+
+	if parent:IsA("Attachment") then
+		return parent.WorldPosition
+	elseif parent:IsA("BasePart") then
+		return parent.Position
+	elseif parent:IsA("Model") then
+		return parent:GetPivot().Position
+	end
+
+	return nil
+end
+
+local function isPromptInReach(prompt)
+	if not prompt or not prompt:IsA("ProximityPrompt") or prompt.Enabled == false then
+		return false
+	end
+
+	local rootPart = getRootPart()
+	local promptPosition = getPromptPosition(prompt)
+	if not rootPart or not promptPosition then
+		return false
+	end
+
+	return (rootPart.Position - promptPosition).Magnitude <= prompt.MaxActivationDistance + 1.5
 end
 
 local function findSiblingPrompt(prompt, preferredNames)
@@ -81,8 +122,29 @@ local function getCurrentConsumablePrompts()
 	return nil, nil
 end
 
+local function getCurrentGenericPrompt()
+	local rootPart = getRootPart()
+	local closestPrompt = nil
+	local closestDistance = math.huge
+
+	for prompt in pairs(shownGenericPrompts) do
+		if not isPromptInReach(prompt) or isConsumablePrompt(prompt) then
+			shownGenericPrompts[prompt] = nil
+		elseif rootPart then
+			local promptPosition = getPromptPosition(prompt)
+			local distance = promptPosition and (rootPart.Position - promptPosition).Magnitude or math.huge
+			if distance < closestDistance then
+				closestDistance = distance
+				closestPrompt = prompt
+			end
+		end
+	end
+
+	return closestPrompt
+end
+
 local function activatePrompt(prompt)
-	if not isConsumablePrompt(prompt) then
+	if not isPromptInReach(prompt) then
 		return false
 	end
 
@@ -124,12 +186,18 @@ end
 local function updateActionButton()
 	if actionControl and actionControl.SetEnabled then
 		local pocketPrompt, usePrompt = getCurrentConsumablePrompts()
-		actionControl:SetEnabled(getEquippedUsableTool() ~= nil or (pocketPrompt ~= nil and usePrompt ~= nil))
+		actionControl:SetEnabled(getCurrentGenericPrompt() ~= nil or getEquippedUsableTool() ~= nil or (pocketPrompt ~= nil and usePrompt ~= nil))
 	end
 end
 
 local function activateEquippedTool()
 	if os.clock() - lastHoldConsumedAt < 0.25 then
+		return
+	end
+
+	local genericPrompt = getCurrentGenericPrompt()
+	if genericPrompt and activatePrompt(genericPrompt) then
+		task.defer(updateActionButton)
 		return
 	end
 
@@ -252,15 +320,21 @@ player.ChildAdded:Connect(function(child)
 end)
 
 ProximityPromptService.PromptShown:Connect(function(prompt)
+	if prompt and prompt:IsA("ProximityPrompt") and prompt.Enabled ~= false then
+		shownGenericPrompts[prompt] = true
+	end
 	if isConsumablePrompt(prompt) then
 		shownConsumablePrompts[prompt] = true
-		updateActionButton()
 	end
+	updateActionButton()
 end)
 
 ProximityPromptService.PromptHidden:Connect(function(prompt)
+	if shownGenericPrompts[prompt] then
+		shownGenericPrompts[prompt] = nil
+	end
 	if shownConsumablePrompts[prompt] then
 		shownConsumablePrompts[prompt] = nil
-		updateActionButton()
 	end
+	updateActionButton()
 end)
