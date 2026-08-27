@@ -756,8 +756,10 @@ local function makeLightSwitch(parent, name, baseCFrame, options)
 	prompt.RequiresLineOfSight = false
 	prompt.MaxActivationDistance = options.MaxActivationDistance or 7
 	tag(switch, Constants.Tags.LightSwitch)
+	tag(plate, Constants.Tags.LightSwitch)
 	if options.HighlightTag then
 		tag(switch, options.HighlightTag)
+		tag(plate, options.HighlightTag)
 	end
 
 	switch.PrimaryPart = plate

@@ -4780,11 +4780,16 @@ end
 
 function InteractionService:_wireLightSwitch(lightSwitch)
 	local prompt = getPrompt(lightSwitch)
-	local plate = lightSwitch:FindFirstChild("SwitchPlate", true)
-	local lever = lightSwitch:FindFirstChild("SwitchLever", true)
+	local switchModel = if lightSwitch:IsA("Model") then lightSwitch else lightSwitch:FindFirstAncestorOfClass("Model")
+	local plate = if lightSwitch:IsA("BasePart") and lightSwitch.Name == "SwitchPlate"
+		then lightSwitch
+		elseif switchModel
+			then switchModel:FindFirstChild("SwitchPlate", true)
+			else lightSwitch:FindFirstChild("SwitchPlate", true)
+	local lever = if switchModel then switchModel:FindFirstChild("SwitchLever", true) else lightSwitch:FindFirstChild("SwitchLever", true)
 
 	local state = self.lightSwitchState
-	state.Switches[lightSwitch] = true
+	state.Switches[switchModel or lightSwitch] = true
 	self:_syncLightSwitches(state.IsOn)
 
 	self:_connectPrompt(prompt, function(player)
@@ -4820,7 +4825,7 @@ function InteractionService:_wireLightSwitch(lightSwitch)
 				self.systemMessageRemote:FireClient(player, "The room lights return to normal. Normal is a strong word.")
 			end
 
-			if lightSwitch:GetAttribute("UnlocksGiantDiscovery")
+			if (switchModel or lightSwitch):GetAttribute("UnlocksGiantDiscovery")
 				and not state.GiantAwardedByUserId[player.UserId]
 				and state.OnCycle >= 3
 			then
@@ -7628,50 +7633,54 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	model.Parent = tv
 	CollectionService:AddTag(model, Constants.Tags.TemporaryObject)
 
-	local outline = Instance.new("Part")
-	outline.Name = "EyeOutline"
-	outline.Anchored = true
-	outline.CanCollide = false
-	outline.CanQuery = false
-	outline.CanTouch = false
-	outline.CastShadow = false
-	outline.Shape = Enum.PartType.Ball
-	outline.Size = Vector3.new(6.95, 4.9, 0.24)
-	outline.Color = Color3.fromRGB(2, 3, 5)
-	outline.Material = Enum.Material.SmoothPlastic
-	outline.Parent = model
-	CollectionService:AddTag(outline, Constants.Tags.TemporaryObject)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "WatchingEyeSurfaceGui"
+	gui.Adornee = screen
+	gui.AlwaysOnTop = true
+	gui.Face = Enum.NormalId.Back
+	gui.LightInfluence = 0
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 80
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent = model
+	CollectionService:AddTag(gui, Constants.Tags.TemporaryObject)
 
-	local eye = Instance.new("Part")
-	eye.Name = "EyeWhite"
-	eye.Anchored = true
-	eye.CanCollide = false
-	eye.CanQuery = false
-	eye.CanTouch = false
-	eye.CastShadow = false
-	eye.Shape = Enum.PartType.Ball
-	eye.Size = Vector3.new(6.35, 4.15, 0.22)
-	eye.Color = Color3.fromRGB(255, 255, 245)
-	eye.Material = Enum.Material.Neon
-	eye.Parent = model
-	CollectionService:AddTag(eye, Constants.Tags.TemporaryObject)
+	local eyeFrame = Instance.new("Frame")
+	eyeFrame.Name = "EyeWhite"
+	eyeFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	eyeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 245)
+	eyeFrame.BorderSizePixel = 0
+	eyeFrame.Position = UDim2.fromScale(0.5, 0.5)
+	eyeFrame.Size = UDim2.fromScale(0.78, 0.72)
+	eyeFrame.ZIndex = 2
+	eyeFrame.Parent = gui
 
-	local pupil = Instance.new("Part")
+	local eyeCorner = Instance.new("UICorner")
+	eyeCorner.CornerRadius = UDim.new(1, 0)
+	eyeCorner.Parent = eyeFrame
+
+	local eyeStroke = Instance.new("UIStroke")
+	eyeStroke.Name = "EyeOutline"
+	eyeStroke.Color = Color3.fromRGB(2, 3, 5)
+	eyeStroke.Thickness = 18
+	eyeStroke.Transparency = 0
+	eyeStroke.Parent = eyeFrame
+
+	local pupil = Instance.new("Frame")
 	pupil.Name = "EyePupil"
-	pupil.Anchored = true
-	pupil.CanCollide = false
-	pupil.CanQuery = false
-	pupil.CanTouch = false
-	pupil.CastShadow = false
-	pupil.Shape = Enum.PartType.Ball
-	pupil.Size = Vector3.new(1.75, 1.75, 0.28)
-	pupil.Color = Color3.fromRGB(0, 0, 0)
-	pupil.Material = Enum.Material.SmoothPlastic
-	pupil.Parent = model
-	CollectionService:AddTag(pupil, Constants.Tags.TemporaryObject)
+	pupil.AnchorPoint = Vector2.new(0.5, 0.5)
+	pupil.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	pupil.BorderSizePixel = 0
+	pupil.Position = UDim2.fromScale(0.5, 0.5)
+	pupil.Size = UDim2.fromScale(0.19, 0.34)
+	pupil.ZIndex = 3
+	pupil.Parent = eyeFrame
 
-	local eyeCFrame = screen.CFrame * CFrame.new(0, 0, screen.Size.Z / 2 + 0.36)
-	local maxPupilOffset = 1.85
+	local pupilCorner = Instance.new("UICorner")
+	pupilCorner.CornerRadius = UDim.new(1, 0)
+	pupilCorner.Parent = pupil
+
+	local maxPupilOffset = 0.27
 	local startedAt = os.clock()
 
 	task.spawn(function()
@@ -7686,8 +7695,8 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 			local targetLocal = screen.CFrame:PointToObjectSpace(targetPosition)
 			local targetDistance = math.max(math.abs(targetLocal.Z), 6)
 			local pupilOffset = Vector2.new(
-				math.clamp((targetLocal.X / targetDistance) * 1.9, -maxPupilOffset, maxPupilOffset),
-				math.clamp((targetLocal.Y / targetDistance) * 1.9, -maxPupilOffset, maxPupilOffset)
+				math.clamp((targetLocal.X / targetDistance) * 0.35, -maxPupilOffset, maxPupilOffset),
+				math.clamp((-targetLocal.Y / targetDistance) * 0.35, -maxPupilOffset, maxPupilOffset)
 			)
 			if pupilOffset.Magnitude > maxPupilOffset then
 				pupilOffset = pupilOffset.Unit * maxPupilOffset
@@ -7695,12 +7704,10 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 
 			local fadeStart = duration - fadeDuration
 			local fadeAlpha = if elapsed > fadeStart then math.clamp((elapsed - fadeStart) / fadeDuration, 0, 1) else 0
-			outline.Transparency = fadeAlpha
-			eye.Transparency = fadeAlpha
+			eyeFrame.BackgroundTransparency = fadeAlpha
+			eyeStroke.Transparency = fadeAlpha
 			pupil.Transparency = fadeAlpha
-			outline.CFrame = eyeCFrame * CFrame.new(0, 0, -0.04)
-			eye.CFrame = eyeCFrame
-			pupil.CFrame = eyeCFrame * CFrame.new(pupilOffset.X, pupilOffset.Y, 0.16)
+			pupil.Position = UDim2.fromScale(0.5 + pupilOffset.X, 0.5 + pupilOffset.Y)
 			task.wait(0.08)
 		end
 
