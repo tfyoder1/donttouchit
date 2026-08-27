@@ -2574,10 +2574,10 @@ local function makeCaveEntranceArea(roomFolder)
 
 	createPart(cave, "CaveTunnelMouthFloor", Vector3.new(13, 1, 9), CFrame.new(-124, -10.7, -8.5), Color3.fromRGB(44, 44, 42), Enum.Material.Slate)
 	createPart(cave, "CaveTunnelMouthCeiling", Vector3.new(13, 1, 9), CFrame.new(-124, 2.55, -8.5), Color3.fromRGB(25, 25, 26), Enum.Material.Slate)
-	createPart(cave, "CaveLongTunnelFloor", Vector3.new(11, 1, 116), CFrame.new(-124, -10.7, -62), Color3.fromRGB(42, 42, 41), Enum.Material.Slate)
+	createPart(cave, "CaveLongTunnelFloor", Vector3.new(11, 1, 104), CFrame.new(-124, -10.7, -56), Color3.fromRGB(42, 42, 41), Enum.Material.Slate)
 	createPart(cave, "CaveLongTunnelLeftWall", Vector3.new(1, 13.8, 118), CFrame.new(-130, -3.85, -62), Color3.fromRGB(30, 31, 31), Enum.Material.Slate)
 	createPart(cave, "CaveLongTunnelRightWall", Vector3.new(1, 13.8, 118), CFrame.new(-118, -3.85, -62), Color3.fromRGB(30, 31, 31), Enum.Material.Slate)
-	createPart(cave, "CaveLongTunnelCeiling", Vector3.new(12, 1, 118), CFrame.new(-124, 2.55, -62), Color3.fromRGB(24, 24, 25), Enum.Material.Slate)
+	createPart(cave, "CaveLongTunnelCeiling", Vector3.new(12, 1, 104), CFrame.new(-124, 2.55, -56), Color3.fromRGB(24, 24, 25), Enum.Material.Slate)
 	createPart(cave, "CaveExitThresholdFloor", Vector3.new(13.8, 1, 17), CFrame.new(-124, -10.7, -116.5), Color3.fromRGB(214, 217, 204), Enum.Material.SmoothPlastic)
 	createPart(cave, "CaveExitThresholdLeftWall", Vector3.new(1, 13.8, 17), CFrame.new(-131.4, -3.85, -116.5), Color3.fromRGB(206, 211, 204), Enum.Material.SmoothPlastic)
 	createPart(cave, "CaveExitThresholdRightWall", Vector3.new(1, 13.8, 17), CFrame.new(-116.6, -3.85, -116.5), Color3.fromRGB(206, 211, 204), Enum.Material.SmoothPlastic)
@@ -2599,18 +2599,6 @@ local function makeCaveEntranceArea(roomFolder)
 	exitWashLight.Range = 22
 	exitWashLight.Parent = exitWash
 	mark(exitWashLight)
-	for glowIndex, xOffset in ipairs({ -5.8, 5.8 }) do
-		local glareStrip = createPart(cave, "CaveExitThresholdGlareStrip" .. glowIndex, Vector3.new(0.18, 8.8, 0.16), CFrame.new(-124 + xOffset, -5.65, -124.58), Color3.fromRGB(255, 250, 216), Enum.Material.Neon)
-		glareStrip.Transparency = 0.32
-		glareStrip.CanCollide = false
-		glareStrip.CanTouch = false
-		glareStrip.CanQuery = false
-		glareStrip:SetAttribute("BaseTransparency", glareStrip.Transparency)
-		glareStrip:SetAttribute("BaseCanCollide", false)
-		glareStrip:SetAttribute("BaseCanTouch", false)
-		glareStrip:SetAttribute("BaseCanQuery", false)
-	end
-
 	for tickIndex = 1, 9 do
 		local tick = createPart(cave, "CaveLongTunnelDistanceMarker" .. tickIndex, Vector3.new(0.1, 0.16, 2.4), CFrame.new(-117.4, -2.4, 0 - tickIndex * 12), Color3.fromRGB(92, 82, 68), Enum.Material.Neon)
 		tick.Transparency = 0.28
