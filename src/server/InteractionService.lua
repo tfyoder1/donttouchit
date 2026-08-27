@@ -5106,7 +5106,7 @@ function InteractionService:_wireSecretRoomDoor(door)
 		end
 
 		if not playerHasSignalBand(player) then
-			self.systemMessageRemote:FireClient(player, "The Library door stays sealed until the infirmary fits your Signal Band.")
+			self.systemMessageRemote:FireClient(player, "The key fits, but the door still acts locked.")
 			playLockdownDoorSound(door)
 			return
 		end
