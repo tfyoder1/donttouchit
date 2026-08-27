@@ -311,7 +311,7 @@ local function getPrompt(root)
 		return root:FindFirstChildOfClass("ProximityPrompt")
 	end
 
-	return root:FindFirstChild("InteractPrompt", true)
+	return root:FindFirstChild("InteractPrompt", true) or root:FindFirstChildWhichIsA("ProximityPrompt", true)
 end
 
 local function getHumanoid(player)
