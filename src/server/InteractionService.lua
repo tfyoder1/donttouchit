@@ -915,11 +915,9 @@ function InteractionService:Initialize()
 				end
 				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.SecurityBunkerEnergy.Id) then
 					player:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
-					player:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
 					local playerGui = player:FindFirstChildOfClass("PlayerGui")
 					if playerGui then
 						playerGui:SetAttribute(SIGNAL_BAND_ATTRIBUTE, true)
-						playerGui:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", true)
 					end
 				end
 			end

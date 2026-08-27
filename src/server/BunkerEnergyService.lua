@@ -234,10 +234,11 @@ local function equipSignalBand(player)
 	readoutWeld.Parent = readout
 end
 
-function BunkerEnergyService.new(discoveryService, movementAuthorityService)
+function BunkerEnergyService.new(discoveryService, movementAuthorityService, resetService)
 	local self = setmetatable({}, BunkerEnergyService)
 	self.discoveryService = discoveryService
 	self.movementAuthorityService = movementAuthorityService
+	self.resetService = resetService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.recoveryRemote = RemoteService.GetRemote(Constants.Remotes.NourishmentRecovery)
 	self.neonParts = {}
@@ -719,7 +720,9 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 		fadeIn *= 0.75
 	end
 	black = math.max(2, black)
-	local recoveryMessage = if firstRecovery then "Emergency nourishment authorized." else "Condition stabilized."
+	local recoveryMessage = if firstRecovery
+		then "Emergency nourishment authorized. A Signal Band has been fitted to your wrist. It will show your room, discoveries, and energy."
+		else "Condition stabilized."
 	self.recoveryRemote:FireClient(player, {
 		Action = "PassOut",
 		Reason = tostring(reason or "CriticalEnergy"),
@@ -740,6 +743,10 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 			return
 		end
 
+		if firstRecovery and self.resetService and self.resetService.RestoreAll then
+			self.resetService.RestoreAll()
+		end
+
 		self:_teleportToInfirmary(player)
 		state.Energy = Constants.BunkerEnergy.RecoveryEnergyBaseline or 0.46
 		state.UpdatedAt = os.clock()
@@ -750,11 +757,16 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 		self:_applyPlayerEnergy(player, self:_calculateWorldPower())
 
 		if firstRecovery then
+			player:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", false)
+			local playerGui = player:FindFirstChildOfClass("PlayerGui")
+			if playerGui then
+				playerGui:SetAttribute("DontTouchItBunkerEnergyMonitorUnlocked", false)
+			end
 			equipSignalBand(player)
 			openContainmentExitDoors()
 			self.systemMessageRemote:FireClient(
 				player,
-				"Emergency nourishment authorized. Signal Band fitted: monitor your energy and the information it decides to show you."
+				"Signal Band fitted. It shows room status, discoveries, and your energy. Bunker status remains unavailable."
 			)
 		else
 			self.systemMessageRemote:FireClient(player, "Condition stabilized.")
