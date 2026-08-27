@@ -7613,7 +7613,7 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	eye.CanTouch = false
 	eye.CastShadow = false
 	eye.Shape = Enum.PartType.Ball
-	eye.Size = Vector3.new(3.45, 3.45, 0.12)
+	eye.Size = Vector3.new(5.35, 5.35, 0.14)
 	eye.Color = Color3.fromRGB(255, 255, 245)
 	eye.Material = Enum.Material.Neon
 	eye.Parent = model
@@ -7627,14 +7627,14 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	pupil.CanTouch = false
 	pupil.CastShadow = false
 	pupil.Shape = Enum.PartType.Ball
-	pupil.Size = Vector3.new(0.86, 0.86, 0.08)
+	pupil.Size = Vector3.new(1.12, 1.12, 0.1)
 	pupil.Color = Color3.fromRGB(12, 14, 18)
 	pupil.Material = Enum.Material.SmoothPlastic
 	pupil.Parent = model
 	CollectionService:AddTag(pupil, Constants.Tags.TemporaryObject)
 
 	local eyeCFrame = screen.CFrame * CFrame.new(0, 0, screen.Size.Z / 2 + 0.08)
-	local maxPupilOffset = 1.08
+	local maxPupilOffset = 1.7
 	local startedAt = os.clock()
 
 	task.spawn(function()
