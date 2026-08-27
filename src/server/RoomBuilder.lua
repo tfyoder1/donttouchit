@@ -954,6 +954,9 @@ local function makeUnderfloorChamber(roomFolder, recoveryFloor)
 	local width = Constants.Room.Width + 14
 	local depth = Constants.Room.Depth + 14
 	local wallColor = Color3.fromRGB(61, 70, 82)
+	local lowerFloorY = y + 0.72
+	local upperFloorY = y + 8.2
+	local upperWallCenterY = upperFloorY + 4
 
 	recoveryFloor.Name = "UnderfloorFloor"
 	recoveryFloor.Color = Color3.fromRGB(55, 88, 123)
@@ -965,8 +968,17 @@ local function makeUnderfloorChamber(roomFolder, recoveryFloor)
 	createPart(chamber, "UnderfloorFrontWall", Vector3.new(width, 8, 1), CFrame.new(0, y + 4, depth / 2), wallColor, Enum.Material.Concrete)
 	createPart(chamber, "UnderfloorLeftWall", Vector3.new(1, 8, depth), CFrame.new(-width / 2, y + 4, 0), wallColor, Enum.Material.Concrete)
 	createPart(chamber, "UnderfloorRightWall", Vector3.new(1, 8, depth), CFrame.new(width / 2, y + 4, 0), wallColor, Enum.Material.Concrete)
-	local subLevelOneFloor = createPart(chamber, "SubLevel1Floor", Vector3.new(width, 0.45, depth), CFrame.new(0, y + 8.2, 0), Color3.fromRGB(40, 47, 58), Enum.Material.Concrete)
-	createSurfaceText(subLevelOneFloor, "SubLevel1FloorText", "SUB LEVEL 1", Enum.NormalId.Top, Color3.fromRGB(106, 255, 196), Color3.fromRGB(40, 47, 58))
+	createPart(chamber, "SubLevel1BackWall", Vector3.new(width, 8, 1), CFrame.new(0, upperWallCenterY, -depth / 2), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1FrontWall", Vector3.new(width, 8, 1), CFrame.new(0, upperWallCenterY, depth / 2), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1LeftWall", Vector3.new(1, 8, depth), CFrame.new(-width / 2, upperWallCenterY, 0), wallColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1RightWall", Vector3.new(1, 8, depth), CFrame.new(width / 2, upperWallCenterY, 0), wallColor, Enum.Material.Concrete)
+
+	local subLevelFloorColor = Color3.fromRGB(40, 47, 58)
+	local subLevelOneMainFloor = createPart(chamber, "SubLevel1FloorMain", Vector3.new(37.5, 0.45, depth), CFrame.new(-9.25, upperFloorY, 0), subLevelFloorColor, Enum.Material.Concrete)
+	createSurfaceText(subLevelOneMainFloor, "SubLevel1FloorText", "SUB LEVEL 1", Enum.NormalId.Top, Color3.fromRGB(106, 255, 196), subLevelFloorColor)
+	createPart(chamber, "SubLevel1FloorRightLip", Vector3.new(5.5, 0.45, depth), CFrame.new(25.25, upperFloorY, 0), subLevelFloorColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1FloorStairFront", Vector3.new(13, 0.45, 23), CFrame.new(16, upperFloorY, 12.5), subLevelFloorColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1FloorStairBack", Vector3.new(13, 0.45, 9), CFrame.new(16, upperFloorY, -19.5), subLevelFloorColor, Enum.Material.Concrete)
 
 	local subLevelOneSign = createPart(chamber, "SubLevel1Sign", Vector3.new(13.5, 2.1, 0.3), CFrame.new(0, y + 12, depth / 2 - 2.2), Color3.fromRGB(106, 255, 196), Enum.Material.Neon)
 	createDoubleSidedSurfaceText(subLevelOneSign, "SubLevel1SignText", "SUB LEVEL 1\nRAIN SORTING DECK", Enum.NormalId.Front, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
@@ -979,9 +991,54 @@ local function makeUnderfloorChamber(roomFolder, recoveryFloor)
 	createPrompt(subLevelOnePad, "Return", "Sub Level 1 Elevator Pad", 0)
 	tag(subLevelOnePad, Constants.Tags.UnderfloorReturn)
 
+	local stairWallColor = Color3.fromRGB(47, 54, 66)
+	createPart(chamber, "SubLevel1StairwellLeftWall", Vector3.new(0.55, 8.4, 17), CFrame.new(9.25, y + 4.05, -7), stairWallColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1StairwellRightWall", Vector3.new(0.55, 8.4, 17), CFrame.new(22.75, y + 4.05, -7), stairWallColor, Enum.Material.Concrete)
+	createPart(chamber, "SubLevel1StairwellBackRail", Vector3.new(13.5, 2.8, 0.45), CFrame.new(16, upperFloorY + 1.3, -15.2), Color3.fromRGB(81, 95, 112), Enum.Material.Metal)
+	createPart(chamber, "SubLevel2StairLanding", Vector3.new(8, 0.5, 5.2), CFrame.new(16, lowerFloorY + 0.02, -18.2), Color3.fromRGB(49, 58, 70), Enum.Material.Metal)
+	for stepIndex = 1, 12 do
+		local alpha = (stepIndex - 1) / 11
+		local stepY = (upperFloorY - 0.35) + (lowerFloorY + 0.35 - (upperFloorY - 0.35)) * alpha
+		local stepZ = -1.8 + (-16.2 + 1.8) * alpha
+		local step = createPart(chamber, "SubLevelStairStep" .. stepIndex, Vector3.new(7.2, 0.42, 1.25), CFrame.new(16, stepY, stepZ), Color3.fromRGB(72, 83, 98), Enum.Material.Metal)
+		step:SetAttribute("SubLevelStairStep", true)
+	end
+
 	local sign = createPart(chamber, "UnderfloorSign", Vector3.new(12, 2.2, 0.3), CFrame.new(0, y + 4.7, -depth / 2 + 0.55), Color3.fromRGB(106, 255, 196), Enum.Material.Neon)
 	createSurfaceText(sign, "UnderfloorSignText", "SUB LEVEL 2\nFLOOR LOST & FOUND", Enum.NormalId.Front, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
 	createSurfaceText(sign, "UnderfloorSignBackText", "SUB LEVEL 2\nFLOOR LOST & FOUND", Enum.NormalId.Back, Color3.fromRGB(12, 26, 24), Color3.fromRGB(106, 255, 196))
+
+	local machineBases = {
+		{ Name = "North", X = -18, Z = -13, Length = 10, Hue = Color3.fromRGB(96, 113, 132) },
+		{ Name = "West", X = -18, Z = 12, Length = 8, Hue = Color3.fromRGB(89, 105, 122) },
+		{ Name = "Center", X = 8, Z = -8, Length = 9, Hue = Color3.fromRGB(82, 99, 118) },
+		{ Name = "South", X = 16, Z = 13, Length = 7, Hue = Color3.fromRGB(92, 101, 116) },
+	}
+	for _, data in ipairs(machineBases) do
+		local machine = makeModel(chamber, "SubLevel2MotorAssembly" .. data.Name)
+		local baseCFrame = CFrame.new(data.X, lowerFloorY + 0.55, data.Z)
+		createPart(machine, "MotorBase", Vector3.new(data.Length, 0.9, 3.2), baseCFrame, Color3.fromRGB(33, 38, 46), Enum.Material.Metal)
+		local housing = createPart(machine, "MotorHousing", Vector3.new(data.Length * 0.58, 2.3, 2.55), baseCFrame * CFrame.new(-data.Length * 0.08, 1.45, 0), data.Hue, Enum.Material.Metal)
+		local axle = createPart(machine, "MotorAxle", Vector3.new(0.55, data.Length * 0.72, 0.55), housing.CFrame * CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(172, 180, 185), Enum.Material.Metal)
+		axle.Shape = Enum.PartType.Cylinder
+		for sideIndex, xOffset in ipairs({ -data.Length * 0.38, data.Length * 0.38 }) do
+			local wheel = createPart(machine, "Flywheel" .. sideIndex, Vector3.new(2.5, 0.34, 2.5), baseCFrame * CFrame.new(xOffset, 1.55, -1.56) * CFrame.Angles(math.rad(90), 0, 0), Color3.fromRGB(42, 50, 61), Enum.Material.Metal)
+			wheel.Shape = Enum.PartType.Cylinder
+			local hub = createPart(machine, "FlywheelHub" .. sideIndex, Vector3.new(0.65, 0.38, 0.65), wheel.CFrame, Color3.fromRGB(119, 255, 203), Enum.Material.Neon)
+			hub.Shape = Enum.PartType.Cylinder
+			local belt = createPart(machine, "DriveBelt" .. sideIndex, Vector3.new(0.32, 2.65, 0.18), baseCFrame * CFrame.new(xOffset, 1.55, -0.12), Color3.fromRGB(15, 17, 19), Enum.Material.Rubber)
+			belt.CFrame *= CFrame.Angles(0, 0, math.rad(12))
+		end
+		for lightIndex = 1, 3 do
+			local indicator = createPart(machine, "IndicatorLight" .. lightIndex, Vector3.new(0.36, 0.18, 0.36), housing.CFrame * CFrame.new(-data.Length * 0.25 + lightIndex * 0.72, 1.2, -1.31), Color3.fromRGB(106, 255, 196), Enum.Material.Neon)
+			indicator.Shape = Enum.PartType.Ball
+		end
+		machine.PrimaryPart = housing
+	end
+	for pipeIndex, zOffset in ipairs({ -18, -10, 0, 10, 18 }) do
+		local pipe = createPart(chamber, "SubLevel2OverheadPipe" .. pipeIndex, Vector3.new(0.42, 0.42, width - 8), CFrame.new(0, y + 6.9, zOffset) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(80, 91, 104), Enum.Material.Metal)
+		pipe.Shape = Enum.PartType.Cylinder
+	end
 
 	local pad = createPart(chamber, "UnderfloorReturnPad", Vector3.new(6.5, 0.35, 6.5), CFrame.new(0, y + 0.72, 5.5), Color3.fromRGB(61, 217, 132), Enum.Material.Neon)
 	pad.Transparency = 0.12
