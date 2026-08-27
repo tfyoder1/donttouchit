@@ -4397,14 +4397,20 @@ function InteractionService:_wireCaveLight(light)
 
 	self:_connectPrompt(prompt, function(player)
 		self:_cycleCaveLight(light)
+		local isProloguePending =
+			self.roomProgressService
+			and self.roomProgressService:IsUntouchedProloguePending(player)
+			and not playerHasSignalBand(player)
+		if isProloguePending then
+			self:_setCaveEntranceSealed()
+			self:_triggerCaveAlarm(light)
+		end
 
 		local lightIndex = light:GetAttribute("CaveLightIndex") or 0
 		if lightIndex == 1 then
 			local alreadyFound = self.discoveryService:HasDiscovery(player, Constants.Discoveries.CaveFirstLight.Id)
 			self.discoveryService:Unlock(player, Constants.Discoveries.CaveFirstLight.Id)
-			local isPrologueOpen =
-				self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
-			if not isPrologueOpen then
+			if not isProloguePending then
 				self:_setCaveEntranceSealed()
 			end
 			playSound(light, "rbxasset://sounds/snap.wav", 0.75, 0.38)

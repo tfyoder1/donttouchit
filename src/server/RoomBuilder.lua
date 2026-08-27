@@ -2594,14 +2594,14 @@ local function makeCaveEntranceArea(roomFolder)
 	exitWash:SetAttribute("BaseCanQuery", false)
 	local exitWashLight = Instance.new("PointLight")
 	exitWashLight.Name = "CaveExitThresholdGlare"
-	exitWashLight.Brightness = 6.5
+	exitWashLight.Brightness = 4.4
 	exitWashLight.Color = Color3.fromRGB(255, 244, 194)
-	exitWashLight.Range = 34
+	exitWashLight.Range = 22
 	exitWashLight.Parent = exitWash
 	mark(exitWashLight)
 	for glowIndex, xOffset in ipairs({ -5.8, 5.8 }) do
-		local glareStrip = createPart(cave, "CaveExitThresholdGlareStrip" .. glowIndex, Vector3.new(0.22, 9.6, 0.18), CFrame.new(-124 + xOffset, -5.65, -121.2), Color3.fromRGB(255, 250, 216), Enum.Material.Neon)
-		glareStrip.Transparency = 0.08
+		local glareStrip = createPart(cave, "CaveExitThresholdGlareStrip" .. glowIndex, Vector3.new(0.18, 8.8, 0.16), CFrame.new(-124 + xOffset, -5.65, -124.58), Color3.fromRGB(255, 250, 216), Enum.Material.Neon)
+		glareStrip.Transparency = 0.32
 		glareStrip.CanCollide = false
 		glareStrip.CanTouch = false
 		glareStrip.CanQuery = false
