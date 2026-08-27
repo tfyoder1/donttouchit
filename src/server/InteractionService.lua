@@ -2646,7 +2646,6 @@ function InteractionService:_wireObservationMirror(mirror)
 	local prompt = getPrompt(mirror)
 
 	self:_connectPrompt(prompt, function(player)
-		local label = mirror:GetAttribute("ObservationLabel") or "OBS-??-01"
 		local placeId = mirror:GetAttribute("ObservationPlaceId")
 		self.discoveryService:Unlock(player, Constants.Discoveries.SecurityObservationMirror.Id)
 		playSound(mirror, "rbxasset://sounds/electronicpingshort.wav", 0.42, 0.62)
@@ -2666,11 +2665,12 @@ function InteractionService:_wireObservationMirror(mirror)
 		end
 		self.systemMessageRemote:FireClient(
 			player,
-			("The glass reflects a coordinate: %s. The Teleport Key may know what to do with observation rooms now."):format(label)
+			"The strange mirror hums behind the wall. Something shifts elsewhere in the room."
 		)
 		if placeId then
 			player:SetAttribute("DontTouchItLastObservationCoordinate", placeId)
 		end
+		self.eventManager:TriggerById(player, "floor_gone")
 	end)
 end
 

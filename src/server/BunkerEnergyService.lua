@@ -721,7 +721,7 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 	end
 	black = math.max(2, black)
 	local recoveryMessage = if firstRecovery
-		then "Emergency nourishment authorized. A Signal Band has been fitted to your wrist. It will show your room, discoveries, and energy."
+		then "You wake in the infirmary with a Signal Band locked around your wrist. It now shows your room, discoveries, and energy."
 		else "Condition stabilized."
 	self.recoveryRemote:FireClient(player, {
 		Action = "PassOut",
@@ -732,7 +732,7 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 		Message = recoveryMessage,
 		FirstRecovery = firstRecovery,
 		RequireContinue = firstRecovery,
-		ContinueText = "Press or tap to continue.",
+		ContinueText = "Press or tap to acknowledge.",
 		BeepSoundId = Constants.BunkerEnergy.RecoveryBeepSoundId,
 		BeepVolume = Constants.BunkerEnergy.RecoveryBeepVolume,
 	})
@@ -745,6 +745,7 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 
 		if firstRecovery and self.resetService and self.resetService.RestoreAll then
 			self.resetService.RestoreAll()
+			workspace.Gravity = Constants.NormalGravity
 		end
 
 		self:_teleportToInfirmary(player)
@@ -766,7 +767,7 @@ function BunkerEnergyService:_beginPassOut(player, state, reason)
 			openContainmentExitDoors()
 			self.systemMessageRemote:FireClient(
 				player,
-				"Signal Band fitted. It shows room status, discoveries, and your energy. Bunker status remains unavailable."
+				"The Signal Band display settles: room status, discoveries, and your energy. Bunker status remains unavailable."
 			)
 		else
 			self.systemMessageRemote:FireClient(player, "Condition stabilized.")
