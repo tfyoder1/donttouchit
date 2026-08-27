@@ -39,6 +39,8 @@ local SIGNAL_BAND_ATTRIBUTE = "DontTouchItSignalBandEquipped"
 local SIGNAL_BAND_NAME = "DontTouchItSignalBand"
 local CAVE_FLASHLIGHT_REMINDER_POSITION = Vector3.new(-76, 0, 45)
 local CAVE_FLASHLIGHT_REMINDER_RADIUS = 16
+local CAVE_ENTRANCE_LOCK_RETURN_X = -74
+local CAVE_ENTRANCE_LOCK_RETURN_CFRAME = CFrame.new(Vector3.new(-86, 3, 45), Vector3.new(-102, 3, 45))
 
 local function playSpatialSound(parent, soundId, volume, playbackSpeed)
 	if not parent or not parent.Parent or typeof(soundId) ~= "string" or soundId == "" then
@@ -983,14 +985,34 @@ function RoomProgressService:_tickPlayer(player, now)
 		if state.CurrentRoomId == "CaveEntrance" or self:IsUntouchedProloguePending(player) then
 			self:StopOutsideCaveAudioForPlayer(player)
 		end
-		if state.UntouchedPrologueContained == true and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true then
+	end
+
+	if rootPart
+		and self:IsUntouchedProloguePending(player)
+		and state.UntouchedPrologueTriggered == true
+		and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true
+		and rootPart.Position.X > CAVE_ENTRANCE_LOCK_RETURN_X
+	then
+		if now - (state.LastCaveLockReturnAt or 0) >= 1.5 then
+			state.LastCaveLockReturnAt = now
+			self:_teleportPlayer(player, CAVE_ENTRANCE_LOCK_RETURN_CFRAME, "CaveEntranceLockedReturn")
+			self.systemMessageRemote:FireClient(player, "The cave entrance has locked behind you. The only way forward is deeper.")
+		end
+		return
+	end
+
+	if state.UntouchedPrologueContained == true and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true then
+		local containmentRoomId = Constants.Prologue.ContainmentRoomId or "TVRoom"
+		if roomId ~= containmentRoomId then
 			if now - (state.LastContainmentReturnAt or 0) >= 1.5 then
 				state.LastContainmentReturnAt = now
-				self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(Constants.Prologue.ContainmentRoomId or "TVRoom"), "ContainmentReturn")
+				closeContainmentExitDoors()
+				self:_teleportPlayer(player, Constants.GetRoomSpawnCFrame(containmentRoomId), "ContainmentReturn")
 				self.systemMessageRemote:FireClient(player, "The TV room door locks behind you. The room is not finished yet.")
 			end
 			return
 		end
+		closeContainmentExitDoors()
 	end
 
 	if rootPart

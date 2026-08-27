@@ -7828,7 +7828,6 @@ function InteractionService:_wireHallDoor(door)
 		end
 
 		if door:GetAttribute("OneWayTrapAfterHallwayEntry")
-			and not isProloguePending
 			and not endGameComplete
 			and self.caveHallDoorLockedByUserId[player.UserId]
 		then

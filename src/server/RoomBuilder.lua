@@ -4009,8 +4009,8 @@ local function makeHallway(roomFolder)
 		caveDoor:SetAttribute("OneWayTrapAfterHallwayEntry", true)
 		caveDoor:SetAttribute("OneWayLockedMessage", "The cave entryway already locked behind you. The hallway is your way forward now.")
 		caveDoor:SetAttribute("TravelSoundId", Constants.AudioAssets.Prologue.LockdownDoorEchoId)
-		caveDoor.CanCollide = false
-		caveDoor:SetAttribute("BaseCanCollide", false)
+		caveDoor.CanCollide = true
+		caveDoor:SetAttribute("BaseCanCollide", true)
 		tag(caveDoor, Constants.Tags.CaveHallwayDoor)
 
 	local securityDoor = makeHallDoor(
