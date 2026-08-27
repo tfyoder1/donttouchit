@@ -1713,6 +1713,9 @@ function InteractionService:_openObjectRainSortingSlots()
 
 	for _, floor in ipairs(CollectionService:GetTagged(Constants.Tags.FloorSection)) do
 		if floor:IsA("BasePart") then
+			if floor:GetAttribute("FloorGoneProtected") == true then
+				continue
+			end
 			if floor.CanCollide then
 				openedCount += 1
 			end
