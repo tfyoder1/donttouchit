@@ -418,6 +418,23 @@ function RoomProgressService:IsUntouchedProloguePending(player)
 	return state.UntouchedPrologueActive == true or state.UntouchedPrologueTriggered == true
 end
 
+function RoomProgressService:IsStartupOrPrologueRestricted(player)
+	if not player or not player.Parent then
+		return true
+	end
+
+	local state = self:_getState(player)
+	if state.StartChoiceHandled ~= true then
+		return true
+	end
+
+	if self:IsUntouchedProloguePending(player) then
+		return true
+	end
+
+	return state.UntouchedPrologueContained == true and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true
+end
+
 function RoomProgressService:StopOutsideCaveAudioForPlayer(player)
 	if not player or not player.Parent then
 		return false

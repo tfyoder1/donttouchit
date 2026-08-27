@@ -904,11 +904,13 @@ function InteractionService:Initialize()
 	end
 
 	Players.PlayerAdded:Connect(function(player)
-		task.delay(1.5, function()
+		local function grantPersistentPrizesIfAllowed()
 			if player.Parent then
 				self:_snapshotRoomUnlockNotices(player)
 				self:_refreshSecretDoorsForPlayer(player)
-				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id) then
+				if self:_canAutoGrantPersistentPrize(player)
+					and self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id)
+				then
 					self:_grantFreezeRay(player)
 				end
 				if self.discoveryService:HasDiscovery(player, Constants.Discoveries.SecurityBunkerEnergy.Id) then
@@ -921,7 +923,10 @@ function InteractionService:Initialize()
 					end
 				end
 			end
-		end)
+		end
+
+		task.delay(1.5, grantPersistentPrizesIfAllowed)
+		task.delay(8, grantPersistentPrizesIfAllowed)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
@@ -1446,7 +1451,9 @@ function InteractionService:Initialize()
 	for _, player in ipairs(Players:GetPlayers()) do
 		self:_checkExitUnlock(player)
 		self:_refreshSecretDoorsForPlayer(player)
-		if self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id) then
+		if self:_canAutoGrantPersistentPrize(player)
+			and self.discoveryService:HasDiscovery(player, Constants.Discoveries.VoidFreezeRay.Id)
+		then
 			self:_grantFreezeRay(player)
 		end
 	end
@@ -6593,6 +6600,18 @@ function InteractionService:_hasFreezeRay(player)
 	end
 
 	return containerHasTool(player:FindFirstChildOfClass("Backpack")) or containerHasTool(player.Character)
+end
+
+function InteractionService:_canAutoGrantPersistentPrize(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	if self.roomProgressService and self.roomProgressService.IsStartupOrPrologueRestricted then
+		return not self.roomProgressService:IsStartupOrPrologueRestricted(player)
+	end
+
+	return true
 end
 
 function InteractionService:_spawnFreezeBeam(origin, targetPosition)
