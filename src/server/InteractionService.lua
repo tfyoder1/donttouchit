@@ -7630,6 +7630,20 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	model.Parent = tv
 	CollectionService:AddTag(model, Constants.Tags.TemporaryObject)
 
+	local outline = Instance.new("Part")
+	outline.Name = "EyeOutline"
+	outline.Anchored = true
+	outline.CanCollide = false
+	outline.CanQuery = false
+	outline.CanTouch = false
+	outline.CastShadow = false
+	outline.Shape = Enum.PartType.Ball
+	outline.Size = Vector3.new(6.95, 4.9, 0.24)
+	outline.Color = Color3.fromRGB(2, 3, 5)
+	outline.Material = Enum.Material.SmoothPlastic
+	outline.Parent = model
+	CollectionService:AddTag(outline, Constants.Tags.TemporaryObject)
+
 	local eye = Instance.new("Part")
 	eye.Name = "EyeWhite"
 	eye.Anchored = true
@@ -7638,7 +7652,7 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	eye.CanTouch = false
 	eye.CastShadow = false
 	eye.Shape = Enum.PartType.Ball
-	eye.Size = Vector3.new(5.35, 5.35, 0.14)
+	eye.Size = Vector3.new(6.35, 4.15, 0.22)
 	eye.Color = Color3.fromRGB(255, 255, 245)
 	eye.Material = Enum.Material.Neon
 	eye.Parent = model
@@ -7652,14 +7666,14 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	pupil.CanTouch = false
 	pupil.CastShadow = false
 	pupil.Shape = Enum.PartType.Ball
-	pupil.Size = Vector3.new(1.12, 1.12, 0.1)
-	pupil.Color = Color3.fromRGB(12, 14, 18)
+	pupil.Size = Vector3.new(1.75, 1.75, 0.28)
+	pupil.Color = Color3.fromRGB(0, 0, 0)
 	pupil.Material = Enum.Material.SmoothPlastic
 	pupil.Parent = model
 	CollectionService:AddTag(pupil, Constants.Tags.TemporaryObject)
 
-	local eyeCFrame = screen.CFrame * CFrame.new(0, 0, screen.Size.Z / 2 + 0.08)
-	local maxPupilOffset = 1.7
+	local eyeCFrame = screen.CFrame * CFrame.new(0, 0, screen.Size.Z / 2 + 0.36)
+	local maxPupilOffset = 1.85
 	local startedAt = os.clock()
 
 	task.spawn(function()
@@ -7683,10 +7697,12 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 
 			local fadeStart = duration - fadeDuration
 			local fadeAlpha = if elapsed > fadeStart then math.clamp((elapsed - fadeStart) / fadeDuration, 0, 1) else 0
+			outline.Transparency = fadeAlpha
 			eye.Transparency = fadeAlpha
 			pupil.Transparency = fadeAlpha
+			outline.CFrame = eyeCFrame * CFrame.new(0, 0, -0.04)
 			eye.CFrame = eyeCFrame
-			pupil.CFrame = eyeCFrame * CFrame.new(pupilOffset.X, pupilOffset.Y, 0.08)
+			pupil.CFrame = eyeCFrame * CFrame.new(pupilOffset.X, pupilOffset.Y, 0.16)
 			task.wait(0.08)
 		end
 
