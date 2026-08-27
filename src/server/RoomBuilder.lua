@@ -753,6 +753,7 @@ local function makeLightSwitch(parent, name, baseCFrame, options)
 	plate:SetAttribute("IsOn", true)
 	createSurfaceText(plate, "SwitchText", options.Label or "LIGHT", Enum.NormalId.Front, Color3.fromRGB(34, 34, 32), Color3.fromRGB(238, 238, 226))
 	local prompt = createPrompt(plate, "Flip", options.PromptObjectText or "Light Switch", 0)
+	prompt.RequiresLineOfSight = false
 	prompt.MaxActivationDistance = options.MaxActivationDistance or 7
 	tag(switch, Constants.Tags.LightSwitch)
 	if options.HighlightTag then
