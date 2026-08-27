@@ -710,6 +710,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 		Switches = {},
 	}
 	self.floorPressStateByUserId = {}
+	self.observationMirrorStateByUserId = {}
 	self.squishyState = {}
 	self.tvState = {}
 	self.applianceState = {}
@@ -945,6 +946,7 @@ function InteractionService:Initialize()
 		self.topDownLoadedBalloonsByUserId[player.UserId] = nil
 		self.topDownBucketTouchAtByUserId[player.UserId] = nil
 		self.topDownTeamByUserId[player.UserId] = nil
+		self.observationMirrorStateByUserId[player.UserId] = nil
 		self.inventoryDropAtByUserId[player.UserId] = nil
 		self.roomUnlockNoticeByUserId[player.UserId] = nil
 		task.defer(function()
@@ -2673,7 +2675,23 @@ function InteractionService:_wireObservationMirror(mirror)
 		if placeId then
 			player:SetAttribute("DontTouchItLastObservationCoordinate", placeId)
 		end
-		self.eventManager:TriggerById(player, "floor_gone")
+
+		if placeId == "ObservationTVRoom" then
+			local userId = player.UserId
+			local state = self.observationMirrorStateByUserId[userId]
+			if not state then
+				state = {}
+				self.observationMirrorStateByUserId[userId] = state
+			end
+
+			local count = (state[placeId] or 0) + 1
+			if count >= 2 then
+				state[placeId] = 0
+				self.eventManager:TriggerById(player, "floor_gone")
+			else
+				state[placeId] = count
+			end
+		end
 	end)
 end
 
