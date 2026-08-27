@@ -1008,6 +1008,7 @@ function RoomProgressService:_tickPlayer(player, now)
 		and self:IsUntouchedProloguePending(player)
 		and state.UntouchedPrologueTriggered == true
 		and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true
+		and not inHallway
 		and rootPart.Position.X > CAVE_ENTRANCE_LOCK_RETURN_X
 	then
 		if now - (state.LastCaveLockReturnAt or 0) >= 1.5 then
