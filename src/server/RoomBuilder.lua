@@ -1752,8 +1752,9 @@ local function makeVictoryWalkway(parent)
 			brick:SetAttribute("VictoryBrickColumn", column)
 			brick.CanCollide = false
 			createSurfaceText(brick, "VictoryBrickText", Constants.VictoryWalkway.EmptyBrickText or "FUTURE\nWINNER", Enum.NormalId.Top, Color3.fromRGB(255, 226, 174), brick.Color)
-			local prompt = createPrompt(brick, "Choose", "Deluxe Brick Spot", 0.12)
+			local prompt = createPrompt(brick, "Choose", "Victory Brick Spot", 0.12)
 			prompt.MaxActivationDistance = 5
+			prompt.UIOffset = Vector2.new(0, 92)
 			prompt:SetAttribute("PrologueInspectIgnore", true)
 			tag(brick, Constants.Tags.VictoryBrick)
 			makeVictoryBrickBorder(walkway, slotIndex, brickCFrame)

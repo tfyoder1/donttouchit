@@ -264,7 +264,8 @@ function VictoryBrickService:_resetBrick(slot)
 	local prompt = part:FindFirstChild("InteractPrompt")
 	if prompt and prompt:IsA("ProximityPrompt") then
 		prompt.ActionText = "Choose"
-		prompt.ObjectText = "Deluxe Brick Spot"
+		prompt.ObjectText = "Victory Brick Spot"
+		prompt.UIOffset = Vector2.new(0, 92)
 	end
 
 	for _, border in ipairs(slot.Borders) do
@@ -305,6 +306,7 @@ function VictoryBrickService:_applyRecordToSlot(slot, record)
 	if prompt and prompt:IsA("ProximityPrompt") then
 		prompt.ActionText = "Read"
 		prompt.ObjectText = if isDeluxe then "Deluxe Victory Brick" else "Victory Brick"
+		prompt.UIOffset = Vector2.new(0, 92)
 	end
 
 	for _, border in ipairs(slot.Borders) do

@@ -7654,52 +7654,66 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 	model.Parent = tv
 	CollectionService:AddTag(model, Constants.Tags.TemporaryObject)
 
-	local gui = Instance.new("SurfaceGui")
-	gui.Name = "WatchingEyeSurfaceGui"
-	gui.Adornee = screen
-	gui.AlwaysOnTop = true
-	gui.Face = Enum.NormalId.Back
-	gui.LightInfluence = 0
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 80
-	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.Parent = model
-	CollectionService:AddTag(gui, Constants.Tags.TemporaryObject)
+	local eyeSurfaces = {}
+	local function createEyeSurface(face)
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "WatchingEyeSurfaceGui_" .. face.Name
+		gui.Adornee = screen
+		gui.AlwaysOnTop = true
+		gui.Face = face
+		gui.LightInfluence = 0
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 90
+		gui.CanvasSize = Vector2.new(1024, 560)
+		gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+		gui.Parent = model
+		CollectionService:AddTag(gui, Constants.Tags.TemporaryObject)
 
-	local eyeFrame = Instance.new("Frame")
-	eyeFrame.Name = "EyeWhite"
-	eyeFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-	eyeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 245)
-	eyeFrame.BorderSizePixel = 0
-	eyeFrame.Position = UDim2.fromScale(0.5, 0.5)
-	eyeFrame.Size = UDim2.fromScale(0.78, 0.72)
-	eyeFrame.ZIndex = 2
-	eyeFrame.Parent = gui
+		local eyeFrame = Instance.new("Frame")
+		eyeFrame.Name = "EyeWhite"
+		eyeFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		eyeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 245)
+		eyeFrame.BorderSizePixel = 0
+		eyeFrame.Position = UDim2.fromScale(0.5, 0.5)
+		eyeFrame.Size = UDim2.fromScale(0.88, 0.78)
+		eyeFrame.ZIndex = 2
+		eyeFrame.Parent = gui
 
-	local eyeCorner = Instance.new("UICorner")
-	eyeCorner.CornerRadius = UDim.new(1, 0)
-	eyeCorner.Parent = eyeFrame
+		local eyeCorner = Instance.new("UICorner")
+		eyeCorner.CornerRadius = UDim.new(1, 0)
+		eyeCorner.Parent = eyeFrame
 
-	local eyeStroke = Instance.new("UIStroke")
-	eyeStroke.Name = "EyeOutline"
-	eyeStroke.Color = Color3.fromRGB(2, 3, 5)
-	eyeStroke.Thickness = 18
-	eyeStroke.Transparency = 0
-	eyeStroke.Parent = eyeFrame
+		local eyeStroke = Instance.new("UIStroke")
+		eyeStroke.Name = "EyeOutline"
+		eyeStroke.Color = Color3.fromRGB(2, 3, 5)
+		eyeStroke.Thickness = 14
+		eyeStroke.Transparency = 0
+		eyeStroke.Parent = eyeFrame
 
-	local pupil = Instance.new("Frame")
-	pupil.Name = "EyePupil"
-	pupil.AnchorPoint = Vector2.new(0.5, 0.5)
-	pupil.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	pupil.BorderSizePixel = 0
-	pupil.Position = UDim2.fromScale(0.5, 0.5)
-	pupil.Size = UDim2.fromScale(0.19, 0.34)
-	pupil.ZIndex = 3
-	pupil.Parent = eyeFrame
+		local pupil = Instance.new("Frame")
+		pupil.Name = "EyePupil"
+		pupil.AnchorPoint = Vector2.new(0.5, 0.5)
+		pupil.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		pupil.BorderSizePixel = 0
+		pupil.Position = UDim2.fromScale(0.5, 0.5)
+		pupil.Size = UDim2.fromScale(0.27, 0.45)
+		pupil.ZIndex = 3
+		pupil.Parent = eyeFrame
 
-	local pupilCorner = Instance.new("UICorner")
-	pupilCorner.CornerRadius = UDim.new(1, 0)
-	pupilCorner.Parent = pupil
+		local pupilCorner = Instance.new("UICorner")
+		pupilCorner.CornerRadius = UDim.new(1, 0)
+		pupilCorner.Parent = pupil
+
+		table.insert(eyeSurfaces, {
+			EyeFrame = eyeFrame,
+			EyeStroke = eyeStroke,
+			Pupil = pupil,
+			HorizontalSign = if face == Enum.NormalId.Back then 1 else -1,
+		})
+	end
+
+	createEyeSurface(Enum.NormalId.Back)
+	createEyeSurface(Enum.NormalId.Front)
 
 	local maxPupilOffset = 0.27
 	local startedAt = os.clock()
@@ -7725,10 +7739,12 @@ function InteractionService:_spawnTelevisionEye(tv, screen, player, duration)
 
 			local fadeStart = duration - fadeDuration
 			local fadeAlpha = if elapsed > fadeStart then math.clamp((elapsed - fadeStart) / fadeDuration, 0, 1) else 0
-			eyeFrame.BackgroundTransparency = fadeAlpha
-			eyeStroke.Transparency = fadeAlpha
-			pupil.Transparency = fadeAlpha
-			pupil.Position = UDim2.fromScale(0.5 + pupilOffset.X, 0.5 + pupilOffset.Y)
+			for _, surface in ipairs(eyeSurfaces) do
+				surface.EyeFrame.BackgroundTransparency = fadeAlpha
+				surface.EyeStroke.Transparency = fadeAlpha
+				surface.Pupil.Transparency = fadeAlpha
+				surface.Pupil.Position = UDim2.fromScale(0.5 + pupilOffset.X * surface.HorizontalSign, 0.5 + pupilOffset.Y)
+			end
 			task.wait(0.08)
 		end
 
