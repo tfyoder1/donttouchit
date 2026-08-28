@@ -379,7 +379,9 @@ function RoomProgressService:_getState(player)
 			UntouchedPrologueTriggered = false,
 			UntouchedPrologueContained = false,
 			CaveFlashlightReminderShown = false,
+			LastInteractionAt = now,
 			LastContainmentReturnAt = 0,
+			LastContainmentRumbleAt = 0,
 			TwoMinuteAwarded = {},
 			BonusAwarded = {},
 		}
@@ -435,6 +437,19 @@ function RoomProgressService:IsStartupOrPrologueRestricted(player)
 	return state.UntouchedPrologueContained == true and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) ~= true
 end
 
+function RoomProgressService:IsFirstContainmentDrainActive(player)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local state = self:_getState(player)
+	if state.UntouchedPrologueContained ~= true or player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true then
+		return false
+	end
+
+	return self:GetRoomForPlayer(player) == (Constants.Prologue.ContainmentRoomId or "TVRoom")
+end
+
 function RoomProgressService:StopOutsideCaveAudioForPlayer(player)
 	if not player or not player.Parent then
 		return false
@@ -487,7 +502,9 @@ function RoomProgressService:RecordInteraction(player)
 	end
 
 	local state = self:_getState(player)
-	state.TimerStartedAt = os.clock()
+	local now = os.clock()
+	state.TimerStartedAt = now
+	state.LastInteractionAt = now
 end
 
 function RoomProgressService:_beginUntouchedPrologue(player)
@@ -503,6 +520,8 @@ function RoomProgressService:_beginUntouchedPrologue(player)
 	state.OutsideCaveAudioStopped = false
 	state.CurrentRoomId = nil
 	state.TimerStartedAt = now
+	state.LastInteractionAt = now
+	state.LastContainmentRumbleAt = 0
 	state.LastRoomTickAt = nil
 	state.LastSafeSpawnCFrame = startCFrame
 	state.CaveFlashlightReminderShown = false
@@ -577,6 +596,8 @@ function RoomProgressService:_completeUntouchedPrologueContainment(player)
 	state.UntouchedPrologueActive = false
 	state.UntouchedPrologueTriggered = false
 	state.TimerStartedAt = os.clock()
+	state.LastInteractionAt = state.TimerStartedAt
+	state.LastContainmentRumbleAt = state.TimerStartedAt
 	state.LastRoomTickAt = nil
 	closeContainmentExitDoors()
 
@@ -588,6 +609,30 @@ function RoomProgressService:_completeUntouchedPrologueContainment(player)
 	})
 	self.systemMessageRemote:FireClient(player, "The TV room boots one system at a time. The bunker sounds underfed.")
 	return true
+end
+
+function RoomProgressService:_maybePlayContainmentIdleRumble(player, state, now)
+	local lastInteractionAt = state.LastInteractionAt or state.TimerStartedAt or now
+	local minGapAfterInteraction = Constants.Prologue.ContainmentIdleRumbleMinGapAfterInteractionSeconds or 7
+	if now - lastInteractionAt < minGapAfterInteraction then
+		return
+	end
+
+	local lastRumbleAt = state.LastContainmentRumbleAt or 0
+	local waitSeconds = if lastRumbleAt > 0
+		then Constants.Prologue.ContainmentIdleRumbleIntervalSeconds or 14
+		else Constants.Prologue.ContainmentIdleRumbleDelaySeconds or 10
+	local anchor = if lastRumbleAt > 0 then lastRumbleAt else state.TimerStartedAt or now
+	if now - anchor < waitSeconds then
+		return
+	end
+
+	state.LastContainmentRumbleAt = now
+	self.prologueRemote:FireClient(player, {
+		Action = "HungryRumble",
+		Duration = Constants.Prologue.ContainmentIdleRumbleDuration or 1.35,
+		Intensity = Constants.Prologue.ContainmentIdleRumbleIntensity or 0.16,
+	})
 end
 
 function RoomProgressService:StartFreshDevSession(player)
@@ -1032,6 +1077,7 @@ function RoomProgressService:_tickPlayer(player, now)
 			return
 		end
 		closeContainmentExitDoors()
+		self:_maybePlayContainmentIdleRumble(player, state, now)
 	end
 
 	if rootPart

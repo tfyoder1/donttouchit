@@ -1131,6 +1131,12 @@ local function playLockdownCountdown(payload)
 	end)
 end
 
+local function playHungryRumble(payload)
+	local prologueAudio = if Constants.AudioAssets then Constants.AudioAssets.Prologue else nil
+	playBunkerShudder(payload.Duration or Constants.Prologue.ContainmentIdleRumbleDuration or 1.35, payload.Intensity or Constants.Prologue.ContainmentIdleRumbleIntensity or 0.16)
+	playLocalSound(prologueAudio and prologueAudio.LockdownId, 0.18, 0.68, 2.4)
+end
+
 local function restoreNormalLighting(seconds)
 	seconds = math.max(1, tonumber(seconds) or Constants.Prologue.LightSpinUpSeconds or 30)
 	destroyFlashlight()
@@ -1195,6 +1201,8 @@ prologueRemote.OnClientEvent:Connect(function(payload)
 		playLockdownCountdown(payload)
 	elseif payload.Action == "Contained" then
 		restoreNormalLighting(payload.SpinUpSeconds)
+	elseif payload.Action == "HungryRumble" then
+		playHungryRumble(payload)
 	elseif payload.Action == "StopOutsideCaveAudio" then
 		stopOutsideCaveAudio()
 	end

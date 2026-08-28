@@ -814,9 +814,22 @@ function BunkerEnergyService:_changePlayerEnergy(player, delta, options)
 end
 
 function BunkerEnergyService:_isEnergyDrainSuspended(player)
+	if self.roomProgressService
+		and self.roomProgressService.IsFirstContainmentDrainActive
+		and self.roomProgressService:IsFirstContainmentDrainActive(player)
+	then
+		return false
+	end
+
 	return self.roomProgressService
 		and self.roomProgressService.IsStartupOrPrologueRestricted
 		and self.roomProgressService:IsStartupOrPrologueRestricted(player)
+end
+
+function BunkerEnergyService:_isFirstContainmentDrainActive(player)
+	return self.roomProgressService
+		and self.roomProgressService.IsFirstContainmentDrainActive
+		and self.roomProgressService:IsFirstContainmentDrainActive(player)
 end
 
 function BunkerEnergyService:_updatePlayerEnergyDrain(player, worldPower, now)
@@ -856,11 +869,24 @@ function BunkerEnergyService:_updatePlayerEnergyDrain(player, worldPower, now)
 	local hunger = self:_calculateBunkerHunger(worldPower, player)
 	local drainThreshold = Constants.BunkerEnergy.BunkerPlayerDrainHungerThreshold or 0.34
 	local drainPressure = math.clamp((hunger - drainThreshold) / math.max(0.05, 1 - drainThreshold), 0, 1)
+	local firstContainmentDrainActive = self:_isFirstContainmentDrainActive(player)
+	local passiveMultiplier = if firstContainmentDrainActive
+		then Constants.BunkerEnergy.FirstContainmentPassiveDrainMultiplier or 5
+		else 1
+	local bunkerMultiplier = if firstContainmentDrainActive
+		then Constants.BunkerEnergy.FirstContainmentBunkerDrainMultiplier or 4
+		else 1
+	local walkingMultiplier = if firstContainmentDrainActive
+		then Constants.BunkerEnergy.FirstContainmentWalkingDrainMultiplier or 1.4
+		else 1
 	local passiveDrain = (Constants.BunkerEnergy.PassiveDrainPerSecond or 0.00018) * elapsed
 	local bunkerDrain = (Constants.BunkerEnergy.BunkerDrainPerSecond or 0.00072) * drainPressure * elapsed
 	local walkingDrain = distance
 		* (Constants.BunkerEnergy.WalkingDrainPerStud or 0.000018)
 		* (1 + drainPressure * (Constants.BunkerEnergy.WalkingDrainHungerMultiplier or 0.7))
+	passiveDrain *= passiveMultiplier
+	bunkerDrain *= bunkerMultiplier
+	walkingDrain *= walkingMultiplier
 	local totalDrain = passiveDrain + bunkerDrain + walkingDrain
 
 	if totalDrain > 0 then
@@ -1192,7 +1218,11 @@ function BunkerEnergyService:RecordInteraction(player)
 
 	self:_addFeedValue(player, Constants.BunkerEnergy.BaseActionFeed or 0.25, "Action", "Interaction")
 	self:_addPlayerActivity(player, Constants.BunkerEnergy.PlayerActivityPerInteraction or 0.095)
-	self:_changePlayerEnergy(player, -(Constants.BunkerEnergy.PlayerActionEnergyCost or 0.005))
+	local energyCost = Constants.BunkerEnergy.PlayerActionEnergyCost or 0.005
+	if self:_isFirstContainmentDrainActive(player) then
+		energyCost *= Constants.BunkerEnergy.FirstContainmentInteractionEnergyCostMultiplier or 3
+	end
+	self:_changePlayerEnergy(player, -energyCost)
 	self:_queueApplyAll()
 	self:_applyPlayerEnergy(player, self:_calculateWorldPower())
 end
