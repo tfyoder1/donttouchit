@@ -1,10 +1,16 @@
 # DON'T TOUCH IT Backlog
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 This file is the source-of-truth parking lot for requested work that is not currently assigned to an active lane. When an item is assigned to a lane, move it out of backlog tracking and into that lane's handoff notes.
 
 ## Active / High Priority
+
+- Automated regression coverage:
+  - Phase 1 source-level audit is implemented in `scripts/phase1_regression_audit.py`.
+  - Phase 2 high priority: generated-place inspection after Rojo build, including generated tags, prompt targets, room zones, collision/query flags, and expected named objects.
+  - Phase 3 high priority: owner-only in-game Dev Test Runner that can run server-authoritative smoke tests for prompt wiring, room locks, progression gates, inventory, HUD unlock flags, and modal remotes.
+  - Phase 4 high priority: Studio automation/multiplayer simulation for fresh start, continue, two-player cave lock behavior, arena teams, Xbox-style input paths, and mobile/iOS prompt workflows.
 
 - Finish-game final doors:
   - Add a meaningful final-door sequence when players reach the last doors.

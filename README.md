@@ -34,6 +34,12 @@ Fallback path:
 
 ## Build And Publish
 
+Run the Phase 1 source regression audit before building:
+
+```sh
+python3 scripts/phase1_regression_audit.py
+```
+
 Build the current place file:
 
 ```sh
