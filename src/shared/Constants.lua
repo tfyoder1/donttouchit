@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.324"
+Constants.BuildVersion = "0.5.325"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -1840,8 +1840,8 @@ Constants.Rooms = {
 		NoTouchDiscoveryId = Constants.Discoveries.TVRoomNoTouch.Id,
 		SpawnCFrame = CFrame.new(Vector3.new(0, 3, 11), Vector3.new(0, 3, 0)),
 		Zone = {
-			Min = Vector3.new(-Constants.Room.Width / 2, Constants.Room.RecoveryY - 3, -Constants.Room.Depth / 2),
-			Max = Vector3.new(Constants.Room.Width / 2, Constants.Room.TVHeight + 2, Constants.Room.Depth / 2),
+			Min = Vector3.new(-(Constants.Room.Width + 14) / 2, Constants.Room.RecoveryY - 3, -(Constants.Room.Depth + 14) / 2),
+			Max = Vector3.new((Constants.Room.Width + 14) / 2, Constants.Room.TVHeight + 2, (Constants.Room.Depth + 14) / 2),
 		},
 	},
 	SnackLab = {
