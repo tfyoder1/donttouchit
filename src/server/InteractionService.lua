@@ -2630,6 +2630,7 @@ function InteractionService:_wireBunkerPowerMeter(meter)
 	self:_connectPrompt(prompt, function(player)
 		if self.discoveryService then
 			self.discoveryService:Unlock(player, Constants.Discoveries.SecurityBunkerEnergy.Id)
+			self.discoveryService:Unlock(player, Constants.Discoveries.SecurityEnhancedAccess.Id)
 		end
 
 		setBunkerEnergyMonitorUnlocked(player)
@@ -2639,7 +2640,7 @@ function InteractionService:_wireBunkerPowerMeter(meter)
 		local hunger = math.clamp(tonumber(player:GetAttribute("DontTouchItBunkerHunger")) or 0, 0, 1)
 		self.systemMessageRemote:FireClient(
 			player,
-			("Signal Band bunker status unlocked. Power %d%%, draw %s. Security notes this knowledge does not contribute energy."):format(
+			("Signal Band bunker status unlocked. Enhanced Security Access added to your badge. Power %d%%, draw %s. Security notes this knowledge does not contribute energy."):format(
 				math.floor(power * 100 + 0.5),
 				formatBunkerDrawText(hunger)
 			)
@@ -5198,12 +5199,35 @@ function InteractionService:_wireSecretRoomDoor(door)
 	end)
 end
 
+function InteractionService:_checkRequiredAccess(player, instance)
+	local requiredDiscoveryId = instance:GetAttribute("RequiredAccessDiscoveryId")
+	if typeof(requiredDiscoveryId) ~= "string" or requiredDiscoveryId == "" then
+		return true
+	end
+
+	if self.discoveryService and self.discoveryService:HasDiscovery(player, requiredDiscoveryId) then
+		return true
+	end
+
+	local message = instance:GetAttribute("RequiredAccessMessage")
+	self.systemMessageRemote:FireClient(
+		player,
+		typeof(message) == "string" and message or "Enhanced Security Access is required."
+	)
+	playLockdownDoorSound(instance)
+	return false
+end
+
 function InteractionService:_wireSecretRoomExit(exitDoor)
 	local prompt = getPrompt(exitDoor)
 
 	self:_connectPrompt(prompt, function(player)
 		local isPrologueOpen =
 			self.roomProgressService and self.roomProgressService:IsUntouchedPrologueActive(player)
+		if not isPrologueOpen and not self:_checkRequiredAccess(player, exitDoor) then
+			return
+		end
+
 		local destinationCFrame = exitDoor:GetAttribute("DestinationCFrame")
 		if typeof(destinationCFrame) ~= "CFrame" then
 			self.systemMessageRemote:FireClient(player, "The secret exit is having stage fright.")
@@ -7891,6 +7915,10 @@ function InteractionService:_wireHallDoor(door)
 		if roomId and roomId ~= (Constants.Prologue.ContainmentRoomId or "TVRoom") and not playerHasSignalBand(player) then
 			self.systemMessageRemote:FireClient(player, "The hallway doors stay sealed until the infirmary fits your Signal Band.")
 			playLockdownDoorSound(door)
+			return
+		end
+
+		if not isProloguePending and not self:_checkRequiredAccess(player, door) then
 			return
 		end
 

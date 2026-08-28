@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.322"
+Constants.BuildVersion = "0.5.323"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -1326,6 +1326,11 @@ Constants.Discoveries = {
 		Name = "Checked Bunker Energy",
 		Hint = "Inspect the bunker power meter in Security.",
 	},
+	SecurityEnhancedAccess = {
+		Id = "security_enhanced_access",
+		Name = "Added Enhanced Security Access",
+		Hint = "Inspect bunker power in Security so the badge can accept higher-clearance doors.",
+	},
 	SecurityScreenButton = {
 		Id = "security_screen_button",
 		Name = "Pressed the Screen-Only Button",
@@ -1512,6 +1517,7 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.SecurityMonitorWall.Id,
 		Constants.Discoveries.SecurityCameraView.Id,
 		Constants.Discoveries.SecurityBunkerEnergy.Id,
+		Constants.Discoveries.SecurityEnhancedAccess.Id,
 		Constants.Discoveries.SecurityScreenButton.Id,
 		Constants.Discoveries.SecurityRedPhone.Id,
 		Constants.Discoveries.SecurityTapeDeck.Id,

@@ -91,6 +91,11 @@ This file is the source-of-truth parking lot for requested work that is not curr
   - Continue should place the player in the last room or named destination they deliberately teleported to.
   - Continue should restore current inventory where appropriate.
 
+- Enhanced access badge puzzle:
+  - First-pass gate is implemented through Security bunker-power inspection granting Enhanced Security Access.
+  - Later full design still needs terminal key fob, weight pad, badge update terminal, and two-player-or-weighted-object security desk flow.
+  - Enhanced access should gate the expansion hallway/island route and the upper rail/zipline route.
+
 ## Pending Tests
 
 - Test 1: Intro title screen.

@@ -4100,7 +4100,7 @@ local function makeHallway(roomFolder)
 			Vector3.new(7, 8.5, 0.45),
 			CFrame.new(0, 4.75, 121),
 		Enum.NormalId.Back,
-		"ISLAND",
+		"ENHANCED\nACCESS",
 		ISLAND_SPAWN_CFRAME,
 			nil,
 			"Island"
@@ -4111,6 +4111,8 @@ local function makeHallway(roomFolder)
 		end
 		islandDoor:SetAttribute("LockedDuringPrologue", true)
 		islandDoor:SetAttribute("PrologueLockedMessage", "The island is not taking visitors yet.")
+		islandDoor:SetAttribute("RequiredAccessDiscoveryId", Constants.Discoveries.SecurityEnhancedAccess.Id)
+		islandDoor:SetAttribute("RequiredAccessMessage", "Enhanced Security Access is required. Security can update your badge.")
 
 	local returnPad = createPart(hallway, "HallwayLanding", Vector3.new(8, 0.25, 8), CFrame.new(HALLWAY_SPAWN_CFRAME.Position - Vector3.new(0, 2.9, 0)), Color3.fromRGB(96, 194, 134), Enum.Material.Neon)
 	returnPad.Transparency = 0.35
@@ -5379,11 +5381,13 @@ local function makeTreetopZiplineArea(room, bowlingOrigin)
 		Enum.Material.Wood
 	)
 	accessDoor:SetAttribute("DestinationCFrame", TREETOP_ENTRY_CFRAME)
-	accessDoor:SetAttribute("DestinationName", "the treetop platform")
+	accessDoor:SetAttribute("DestinationName", "the upper rail platform")
+	accessDoor:SetAttribute("RequiredAccessDiscoveryId", Constants.Discoveries.SecurityEnhancedAccess.Id)
+	accessDoor:SetAttribute("RequiredAccessMessage", "Enhanced Security Access is required. Security can update your badge.")
 	accessDoor:SetAttribute("UnlockDiscoveryId", Constants.Discoveries.TreetopZiplineEntered.Id)
-	accessDoor:SetAttribute("TravelMessage", "Treetop Zipline unlocked. Please ignore how high up this is.")
-	createSurfaceText(accessDoor, "TreetopAccessText", "TREE LINE\nZIPLINE", Enum.NormalId.Front, Color3.fromRGB(225, 255, 206), Color3.fromRGB(68, 105, 80))
-	createPrompt(accessDoor, "Enter", "Treetop Zipline", 0)
+	accessDoor:SetAttribute("TravelMessage", "Enhanced access accepted. The rail wakes up.")
+	createSurfaceText(accessDoor, "TreetopAccessText", "ENHANCED\nACCESS", Enum.NormalId.Front, Color3.fromRGB(225, 255, 206), Color3.fromRGB(68, 105, 80))
+	createPrompt(accessDoor, "Enter", "Enhanced Access Door", 0)
 	tag(accessDoor, Constants.Tags.SecretRoomExit)
 
 	local platform = createPart(treetop, "TreetopPlatform", Vector3.new(24, 0.7, 18), CFrame.new(platformCenter), Color3.fromRGB(115, 78, 45), Enum.Material.WoodPlanks)
