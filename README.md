@@ -40,6 +40,14 @@ Run the Phase 1 source regression audit before building:
 python3 scripts/phase1_regression_audit.py
 ```
 
+Run the Phase 2 built-place/generator-contract audit after source-level checks:
+
+```sh
+python3 scripts/phase2_generated_place_audit.py
+```
+
+Phase 2 builds a temporary `.rbxlx` package and verifies the scripts plus key room-generator contracts. It does not replace Studio/device testing because the Workspace rooms are generated at server runtime.
+
 Build the current place file:
 
 ```sh
