@@ -60,7 +60,7 @@ startingGearService:Initialize()
 startingGearService:SetDiscoveryService(discoveryService)
 discoveryService:SetStartingGearService(startingGearService)
 
-local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService, ResetService)
+local bunkerEnergyService = BunkerEnergyService.new(discoveryService, movementAuthorityService, ResetService, roomProgressService)
 bunkerEnergyService:Initialize()
 discoveryService:SetInventoryPersistenceService(bunkerEnergyService)
 

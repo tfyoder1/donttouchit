@@ -234,11 +234,12 @@ local function equipSignalBand(player)
 	readoutWeld.Parent = readout
 end
 
-function BunkerEnergyService.new(discoveryService, movementAuthorityService, resetService)
+function BunkerEnergyService.new(discoveryService, movementAuthorityService, resetService, roomProgressService)
 	local self = setmetatable({}, BunkerEnergyService)
 	self.discoveryService = discoveryService
 	self.movementAuthorityService = movementAuthorityService
 	self.resetService = resetService
+	self.roomProgressService = roomProgressService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
 	self.recoveryRemote = RemoteService.GetRemote(Constants.Remotes.NourishmentRecovery)
 	self.neonParts = {}
@@ -812,10 +813,29 @@ function BunkerEnergyService:_changePlayerEnergy(player, delta, options)
 	return state.Energy
 end
 
+function BunkerEnergyService:_isEnergyDrainSuspended(player)
+	return self.roomProgressService
+		and self.roomProgressService.IsStartupOrPrologueRestricted
+		and self.roomProgressService:IsStartupOrPrologueRestricted(player)
+end
+
 function BunkerEnergyService:_updatePlayerEnergyDrain(player, worldPower, now)
 	local state = self:_getPlayerEnergyState(player, now)
 	if not state then
 		return 1
+	end
+
+	if self:_isEnergyDrainSuspended(player) then
+		local rootPart = getRootPart(player)
+		if rootPart then
+			state.LastPosition = rootPart.Position
+		end
+		state.UpdatedAt = now
+		state.CriticalSince = nil
+
+		local hunger = self:_calculateBunkerHunger(worldPower, player)
+		self:_setPlayerEnergyAttributes(player, state.Energy or 1, hunger, 0)
+		return state.Energy or 1
 	end
 
 	local elapsed = math.clamp(now - (state.UpdatedAt or now), 0, (Constants.BunkerEnergy.UpdateIntervalSeconds or 4) * 2.5)
