@@ -171,6 +171,7 @@ def audit_shared_contracts(audit: Audit) -> None:
     for remote in (
         "ReferenceBook",
         "SystemMessage",
+        "AcknowledgedMessage",
         "RoomStatus",
         "SparkleHint",
         "InventoryAction",
@@ -192,6 +193,7 @@ def audit_shared_contracts(audit: Audit) -> None:
         "TVSecretBook",
         "StartingFlashlight",
         "CaveScrapBox",
+        "CaveFlashlightReminder",
         "UnderfloorReturn",
         "BunkerPowerMeter",
         "VictoryBrick",
@@ -208,6 +210,7 @@ def audit_generator_contracts(audit: Audit) -> None:
     audit.require_regex(group, "RoomBuilder", r"StartingFlashlightPickup.*flashlightPrompt\.RequiresLineOfSight\s*=\s*false", "starting flashlight overrides line of sight")
     audit.require_text(group, "RoomBuilder", "CaveBoxOfScraps", "cave box of scraps is generated")
     audit.require_text(group, "RoomBuilder", "Box of Scraps", "cave scrap box prompt exists")
+    audit.require_text(group, "RoomBuilder", "CaveFlashlightReminderZone", "cave flashlight reminder trigger is generated")
     audit.require_text(group, "RoomBuilder", 'controls:SetAttribute("StrictPromptTargets", true)', "control panels use strict prompt targets")
     audit.require_text(group, "RoomBuilder", 'panel.CanQuery = false', "control panel back is non-queryable")
     audit.require_text(group, "RoomBuilder", 'back.CanQuery = false', "room log backing is non-queryable")
@@ -261,6 +264,7 @@ def audit_interaction_contracts(audit: Audit) -> None:
         "Television",
         "TVSecretBook",
         "CaveScrapBox",
+        "CaveFlashlightReminder",
         "VictoryBrick",
     ):
         audit.add(group, f"tag is wired: {tag_name}", f"Constants.Tags.{tag_name}" in interaction)
@@ -270,6 +274,7 @@ def audit_interaction_contracts(audit: Audit) -> None:
 
     audit.require_text(group, "InteractionService", "isControlPanelInteraction", "control panel interaction sound path exists")
     audit.require_text(group, "InteractionService", "_wireCaveScrapBox", "cave scrap box prompt handler exists")
+    audit.require_text(group, "InteractionService", "_wireCaveFlashlightReminder", "cave flashlight reminder handler exists")
     audit.require_text(group, "InteractionService", "RememberContinueDestination", "interaction teleports persist continue destination")
     audit.require_text(group, "InteractionService", "VictoryBrickRead", "victory brick read remote path exists")
 
@@ -284,6 +289,7 @@ def audit_client_ui_contracts(audit: Audit) -> None:
     audit.require_text(group, "UiLayerController", "Tutorial", "Tutorial layer is below modal menus")
     audit.require_text(group, "TutorialHints", "TutorialPreferences", "tutorial preference remote is consumed")
     audit.require_text(group, "TutorialHints", "Don't show this again", "tutorial replay suppression UI exists")
+    audit.require_text(group, "SystemMessageOverlay", "AcknowledgedMessage", "acknowledged message modal exists")
     audit.require_text(group, "CoreHud", "SIGNAL_BAND_ATTRIBUTE", "core HUD waits for Signal Band")
     audit.require_text(group, "CoreHud", "BUNKER_ENERGY_MONITOR_ATTRIBUTE", "bunker power HUD has separate Security unlock")
 

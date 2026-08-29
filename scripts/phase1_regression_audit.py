@@ -95,6 +95,7 @@ def audit_shared_contracts(audit: Audit) -> None:
     for remote in (
         "ReferenceBook",
         "SystemMessage",
+        "AcknowledgedMessage",
         "RoomStatus",
         "SparkleHint",
         "InventoryAction",
@@ -115,6 +116,7 @@ def audit_shared_contracts(audit: Audit) -> None:
         "BunkerPowerMeter",
         "StartingFlashlight",
         "CaveScrapBox",
+        "CaveFlashlightReminder",
         "UnderfloorReturn",
     ):
         audit.add(group, f"tag exists: {tag}", re.search(rf'\b{tag}\s*=\s*"', constants) is not None)
@@ -189,6 +191,7 @@ def audit_flashlight_and_tutorials(audit: Audit) -> None:
     audit.add(group, "starting flashlight has stable tutorial id", 'TutorialId", "StartingFlashlightPickup"' in builder)
     audit.add(group, "starting flashlight ignores line of sight", "flashlightPrompt.RequiresLineOfSight = false" in builder)
     audit.add(group, "cave box of scraps is generated", "CaveBoxOfScraps" in builder and "Box of Scraps" in builder)
+    audit.add(group, "cave flashlight reminder trigger is generated", "CaveFlashlightReminderZone" in builder)
     audit.add(group, "tutorial preference service file exists", audit.exists("src/server/TutorialPreferencesService.lua"))
     audit.add(group, "tutorial preference service initialized", "TutorialPreferencesService" in game_manager)
 

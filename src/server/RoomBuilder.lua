@@ -2528,6 +2528,18 @@ local function makeCaveEntranceArea(roomFolder)
 	createPart(cave, "CavernRightWall", Vector3.new(1, 16, 38), CFrame.new(cavernCenter + Vector3.new(24, 8, 0)), Color3.fromRGB(36, 36, 35), Enum.Material.Slate)
 	createPart(cave, "CavernCeiling", Vector3.new(48, 1, 38), CFrame.new(cavernCenter + Vector3.new(0, 16, 0)), Color3.fromRGB(27, 28, 28), Enum.Material.Slate)
 
+	local flashlightReminder = createPart(cave, "CaveFlashlightReminderZone", Vector3.new(8, 8, 14), CFrame.new(cavernCenter + Vector3.new(17.5, 1, 11.5)), Color3.fromRGB(50, 220, 255), Enum.Material.SmoothPlastic)
+	flashlightReminder.Transparency = 1
+	flashlightReminder.CanCollide = false
+	flashlightReminder.CanQuery = false
+	flashlightReminder.CanTouch = true
+	flashlightReminder:SetAttribute("BaseTransparency", 1)
+	flashlightReminder:SetAttribute("BaseCanCollide", false)
+	flashlightReminder:SetAttribute("BaseCanQuery", false)
+	flashlightReminder:SetAttribute("BaseCanTouch", true)
+	flashlightReminder:SetAttribute("PrologueInspectIgnore", true)
+	tag(flashlightReminder, Constants.Tags.CaveFlashlightReminder)
+
 	local scrapBox = makeModel(cave, "CaveBoxOfScraps")
 	local scrapBoxCFrame = CFrame.new(cavernCenter + Vector3.new(20.8, 1.05, 12.5)) * CFrame.Angles(0, math.rad(-90), 0)
 	local scrapBase = createPart(scrapBox, "ScrapBoxBase", Vector3.new(3.8, 0.28, 2.6), scrapBoxCFrame * CFrame.new(0, -0.62, 0), Color3.fromRGB(86, 55, 34), Enum.Material.Wood)

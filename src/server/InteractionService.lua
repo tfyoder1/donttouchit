@@ -336,6 +336,21 @@ local function playerHasSignalBand(player)
 	return player and player:GetAttribute(SIGNAL_BAND_ATTRIBUTE) == true
 end
 
+local function playerHasEquippedFlashlight(player)
+	local character = player and player.Character
+	if not character then
+		return false
+	end
+
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Tool") and child:GetAttribute("DontTouchItFlashlight") == true then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function getPlayerFromHit(hit)
 	if not hit then
 		return nil
@@ -690,6 +705,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.bunkerEnergyService = bunkerEnergyService
 	self.victoryBrickService = victoryBrickService
 	self.systemMessageRemote = RemoteService.GetRemote(Constants.Remotes.SystemMessage)
+	self.acknowledgedMessageRemote = RemoteService.GetRemote(Constants.Remotes.AcknowledgedMessage)
 	self.snackEffectRemote = RemoteService.GetRemote(Constants.Remotes.SnackEffect)
 	self.voidEffectRemote = RemoteService.GetRemote(Constants.Remotes.VoidEffect)
 	self.securityCameraRemote = RemoteService.GetRemote(Constants.Remotes.SecurityCamera)
@@ -778,6 +794,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.caveLightState = {}
 	self.caveEntranceSealed = false
 	self.caveAlarmActive = false
+	self.caveFlashlightReminderByUserId = {}
 	self.caveHallDoorLockedByUserId = {}
 	self.securityCameraSessionByUserId = {}
 	self.securityPressurePlateState = {
@@ -1297,6 +1314,10 @@ function InteractionService:Initialize()
 
 	self:_connectTagged(Constants.Tags.CaveScrapBox, function(instance)
 		self:_wireCaveScrapBox(instance)
+	end)
+
+	self:_connectTagged(Constants.Tags.CaveFlashlightReminder, function(instance)
+		self:_wireCaveFlashlightReminder(instance)
 	end)
 
 	self:_connectTagged(Constants.Tags.CaveExitKey, function(instance)
@@ -4475,6 +4496,30 @@ function InteractionService:_wireCaveScrapBox(scrapBox)
 			player,
 			"A box of scraps, in a cave. Someone was either desperate, brilliant, or very fond of dramatic constraints."
 		)
+	end)
+end
+
+function InteractionService:_wireCaveFlashlightReminder(zone)
+	if not zone or not zone:IsA("BasePart") or zone:GetAttribute("CaveFlashlightReminderWired") == true then
+		return
+	end
+
+	zone:SetAttribute("CaveFlashlightReminderWired", true)
+	zone.Touched:Connect(function(hit)
+		local player = getPlayerFromHit(hit)
+		if not player or self.caveFlashlightReminderByUserId[player.UserId] then
+			return
+		end
+		if playerHasEquippedFlashlight(player) then
+			return
+		end
+
+		self.caveFlashlightReminderByUserId[player.UserId] = true
+		self.acknowledgedMessageRemote:FireClient(player, {
+			Title = "It Gets Dark Ahead",
+			Text = "I should go back and get the flashlight from the entrance before going any deeper.",
+			ButtonText = "OK",
+		})
 	end)
 end
 
