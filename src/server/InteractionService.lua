@@ -3227,7 +3227,11 @@ function InteractionService:_pocketInfirmaryNourishment(player, tray)
 	end
 
 	playSound(tray, "rbxasset://sounds/button.wav", 0.28, 0.92)
-	self.systemMessageRemote:FireClient(player, message or "Infirmary ration pocketed for later.")
+	self.acknowledgedMessageRemote:FireClient(player, {
+		Title = "Infirmary Ration Pocketed",
+		Text = "The ration is in your inventory. Select it, then use Action to eat it. PC: equip and click or press Action. Xbox: select it and press X. iOS: tap the inventory slot, then tap Action. Holding the pickup prompt eats it immediately.",
+		ButtonText = "OK",
+	})
 end
 
 function InteractionService:_wireInfirmaryNourishment(tray)
