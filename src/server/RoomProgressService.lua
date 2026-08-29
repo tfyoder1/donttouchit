@@ -1100,6 +1100,13 @@ function RoomProgressService:_tickPlayer(player, now)
 		return
 	end
 
+	if state.StartChoiceHandled ~= true then
+		state.TimerStartedAt = now
+		state.LastRoomTickAt = now
+		self:_sendRoomStatus(player, now)
+		return
+	end
+
 	if state.CurrentRoomId ~= roomId then
 		state.CurrentRoomId = roomId
 		state.TimerStartedAt = now

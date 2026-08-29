@@ -148,6 +148,7 @@ def audit_startup_and_hud(audit: Audit) -> None:
     audit.add(group, "prologue starts in cave entrance", 'StartRoomId = "CaveEntrance"' in constants)
     audit.add(group, "prologue containment target is TV Room", 'ContainmentRoomId = "TVRoom"' in constants)
     audit.add(group, "startup/prologue restriction helper exists", "IsStartupOrPrologueRestricted" in room_progress)
+    audit.require_regex(group, "src/server/RoomProgressService.lua", r"state\.StartChoiceHandled\s*~=\s*true[\s\S]*?_sendRoomStatus\(player,\s*now\)[\s\S]*?return", "title start choice gates no-touch ticking")
     audit.add(group, "energy drain suspension exists", "_isEnergyDrainSuspended" in energy)
     audit.add(group, "HUD gates on Signal Band", "SIGNAL_BAND_ATTRIBUTE" in hud and "hudVisible" in hud)
     audit.add(group, "bunker power HUD has separate Security gate", "BUNKER_ENERGY_MONITOR_ATTRIBUTE" in hud and "bunkerEnergyPanel.Visible" in hud)

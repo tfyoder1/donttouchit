@@ -286,6 +286,7 @@ def audit_client_ui_contracts(audit: Audit) -> None:
 def audit_startup_energy_inventory(audit: Audit) -> None:
     group = "startup, energy, inventory"
     audit.require_text(group, "RoomProgressService", "IsStartupOrPrologueRestricted", "startup/prologue restriction helper exists")
+    audit.require_regex("startup, energy, inventory", "RoomProgressService", r"state\.StartChoiceHandled\s*~=\s*true[\s\S]*?_sendRoomStatus\(player,\s*now\)[\s\S]*?return", "title start choice gates no-touch ticking")
     audit.require_text(group, "RoomProgressService", "RememberContinueDestination", "continue destination helper exists")
     audit.require_text(group, "DiscoveryService", "ContinueRoomId", "continue destination persists in player data")
     audit.require_text(group, "BunkerEnergyService", "IsFirstContainmentDrainActive", "first containment drain flag exists")
