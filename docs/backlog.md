@@ -49,6 +49,12 @@ This file is the source-of-truth parking lot for requested work that is not curr
   - Include capacity limits so lockers help with full inventory without becoming unlimited storage.
   - Later: support item aging, expiration, or retrieval rules for foot-locker style storage.
 
+- Gym second-floor expansion and equipment pass:
+  - Replace or improve the current treadmill and stationary bike visuals so they read more like real gym equipment.
+  - Add stairs up to a second floor in the Gym at the north-wall location shown in the August 28 screenshot, near `GymWestWallNorth` / the existing treadmill side of the room.
+  - Ensure the stair placement preserves the existing Gym entry path, control panel access, treadmill/bike interactions, and no-touch discovery behavior.
+  - Second floor content/design remains TBD; first pass should establish safe stairs, landing, rails/walls, and collision.
+
 ## Existing High Priority / Open
 
 - Control panel reliability:
@@ -178,3 +184,8 @@ This file is the source-of-truth parking lot for requested work that is not curr
   - TV Strange Mirror first interaction shows normal strange-mirror messaging.
   - TV Strange Mirror second interaction triggers floor-open event.
   - Object rain/floor-open does not remove protected floor under the doorway and control panel.
+
+- Test 16: Future Gym second-floor/equipment pass.
+  - Improved treadmills and stationary bikes are readable as gym equipment.
+  - New stairs at the pictured north-wall location are climbable and do not block existing Gym interactions.
+  - Second-floor landing/rails/walls prevent falling out of bounds.
