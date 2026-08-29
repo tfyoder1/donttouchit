@@ -522,6 +522,7 @@ local function makeShell(roomFolder)
 	door:SetAttribute("LockedDuringPrologue", true)
 	door:SetAttribute("PrologueLockedMessage", "The TV room door is quiet. It does not open before lockdown.")
 	door:SetAttribute("InvisiblePassage", true)
+	door:SetAttribute("RemoveAfterSignalBand", true)
 	door.Transparency = 1
 	door.CanCollide = false
 	door.CanQuery = false
