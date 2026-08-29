@@ -250,6 +250,7 @@ function BunkerEnergyService.new(discoveryService, movementAuthorityService, res
 	self.playerActivityByUserId = {}
 	self.playerEnergyByUserId = {}
 	self.recoveryPoseByUserId = {}
+	self.infirmaryRationRandom = Random.new()
 	self.worldPowerCharge = (Constants.BunkerEnergy.WorldPowerChargeCapacity or 28)
 		* (Constants.BunkerEnergy.InitialWorldPowerCharge or 0.9)
 	self.lastPowerChargeUpdatedAt = os.clock()
@@ -1260,6 +1261,16 @@ function BunkerEnergyService:RecordFruitEaten(player, restoreAmount)
 	self:_applyPlayerEnergy(player, self:_calculateWorldPower())
 end
 
+function BunkerEnergyService:_getEnergyReserveUseMessage(kind, fallbackMessage)
+	if kind == "StabilizationRation" then
+		if self.infirmaryRationRandom and self.infirmaryRationRandom:NextInteger(1, 5) == 1 then
+			return "The infirmary ration tastes gross, but better than nothing."
+		end
+		return fallbackMessage or "The infirmary ration steadies you. The nearby readout brightens like it expected that."
+	end
+	return fallbackMessage or "Energy returns for a moment. Nearby lights react to the transaction."
+end
+
 function BunkerEnergyService:RecordEnergyItemUsed(player, kind, restoreAmount)
 	if not player or not player.Parent then
 		return
@@ -1737,8 +1748,9 @@ function BunkerEnergyService:GrantEnergyReserveTool(player, options)
 
 		local stackCount = math.max(1, math.floor(tonumber(tool:GetAttribute("EnergyReserveStackCount")) or 1))
 		local restore = tonumber(tool:GetAttribute("EnergyRestoreAmount")) or Constants.BunkerEnergy.FruitEnergyRestore or 0.32
-		self:RecordEnergyItemUsed(player, tool:GetAttribute("EnergyReserveKind") or kind, restore)
-		self.systemMessageRemote:FireClient(player, options.UseMessage or "Energy returns for a moment. Nearby lights react to the transaction.")
+		local reserveKind = tool:GetAttribute("EnergyReserveKind") or kind
+		self:RecordEnergyItemUsed(player, reserveKind, restore)
+		self.systemMessageRemote:FireClient(player, self:_getEnergyReserveUseMessage(reserveKind, options.UseMessage))
 
 		stackCount -= 1
 		if stackCount <= 0 then

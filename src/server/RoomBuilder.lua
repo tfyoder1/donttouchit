@@ -3598,7 +3598,7 @@ local function makeInfirmaryRoom(roomFolder)
 	cup.Shape = Enum.PartType.Cylinder
 	local ration = createPart(tray, "InfirmaryRationBar", Vector3.new(1.35, 0.28, 0.62), trayBase.CFrame * CFrame.new(0.75, 0.35, 0), Color3.fromRGB(255, 202, 103), Enum.Material.SmoothPlastic)
 	createSurfaceText(ration, "RationText", "STABLE", Enum.NormalId.Top, Color3.fromRGB(64, 42, 26), Color3.fromRGB(255, 202, 103))
-	createPrompt(trayBase, "Accept", "Stabilization Snack", 0)
+	createPrompt(trayBase, "Accept", "Infirmary Ration", 0)
 	tag(trayBase, Constants.Tags.InfirmaryNourishment)
 	tray.PrimaryPart = trayBase
 

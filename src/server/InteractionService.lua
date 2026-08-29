@@ -785,6 +785,7 @@ function InteractionService.new(eventManager, discoveryService, resetService, ro
 	self.lastBowlingCosmicMusicId = nil
 	self.lastBowlingStrikeSoundId = nil
 	self.inventoryAudioRandom = Random.new()
+	self.infirmaryRationRandom = Random.new()
 	self.lastRockDropSoundId = nil
 	self.bowlingAdToken = nil
 	self.bowlingMaintenanceMotionConnection = nil
@@ -3188,13 +3189,20 @@ function InteractionService:_wireInfirmaryCabinet(cabinet)
 	end)
 end
 
+function InteractionService:_getInfirmaryRationUseMessage()
+	if self.infirmaryRationRandom and self.infirmaryRationRandom:NextInteger(1, 5) == 1 then
+		return "The infirmary ration tastes gross, but better than nothing."
+	end
+	return "The infirmary ration steadies you. The nearby readout brightens like it expected that."
+end
+
 function InteractionService:_consumeInfirmaryNourishment(player, tray)
 	self.discoveryService:Unlock(player, Constants.Discoveries.InfirmaryNourishment.Id)
 	if self.bunkerEnergyService and self.bunkerEnergyService.RecordEnergyItemUsed then
 		self.bunkerEnergyService:RecordEnergyItemUsed(player, "StabilizationRation", 0.26)
 	end
 	playSound(tray, "rbxasset://sounds/snap.wav", 0.32, 1.08)
-	self.systemMessageRemote:FireClient(player, "The stabilization ration steadies you. The nearby readout brightens like it expected that.")
+	self.systemMessageRemote:FireClient(player, self:_getInfirmaryRationUseMessage())
 end
 
 function InteractionService:_pocketInfirmaryNourishment(player, tray)
@@ -3206,12 +3214,12 @@ function InteractionService:_pocketInfirmaryNourishment(player, tray)
 
 	local ok, message = self.bunkerEnergyService:GrantEnergyReserveTool(player, {
 		Kind = "StabilizationRation",
-		Name = "Stabilization Ration",
+		Name = "Infirmary Ration",
 		ToolTip = "A bland ration packet from the infirmary.",
 		RestoreAmount = 0.26,
 		Color = Color3.fromRGB(255, 202, 103),
-		GrantMessage = "Stabilization ration pocketed for later.",
-		UseMessage = "The stabilization ration steadies you. The nearby readout brightens like it expected that.",
+		GrantMessage = "Infirmary ration pocketed for later.",
+		UseMessage = "The infirmary ration steadies you. The nearby readout brightens like it expected that.",
 	})
 	if not ok then
 		self.systemMessageRemote:FireClient(player, message or "Your pockets are out of room.")
@@ -3219,14 +3227,14 @@ function InteractionService:_pocketInfirmaryNourishment(player, tray)
 	end
 
 	playSound(tray, "rbxasset://sounds/button.wav", 0.28, 0.92)
-	self.systemMessageRemote:FireClient(player, message or "Stabilization ration pocketed for later.")
+	self.systemMessageRemote:FireClient(player, message or "Infirmary ration pocketed for later.")
 end
 
 function InteractionService:_wireInfirmaryNourishment(tray)
 	local prompt = getPrompt(tray)
 	if prompt then
 		prompt.ActionText = "Pick Up"
-		prompt.ObjectText = "Stabilization Ration"
+		prompt.ObjectText = "Infirmary Ration"
 		prompt.HoldDuration = 0
 		prompt:SetAttribute("PromptConsumeKind", "InfirmaryNourishment")
 	end

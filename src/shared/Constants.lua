@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.330"
+Constants.BuildVersion = "0.5.331"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -1435,7 +1435,7 @@ Constants.Discoveries = {
 	},
 	InfirmaryNourishment = {
 		Id = "infirmary_nourishment",
-		Name = "Accepted Stabilization Snack",
+		Name = "Accepted Infirmary Ration",
 		Hint = "There is food and water near the recovery bed, left where a waking person would see it.",
 	},
 	InfirmaryNoTouch = {
