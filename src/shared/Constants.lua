@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.328"
+Constants.BuildVersion = "0.5.329"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -206,6 +206,7 @@ Constants.Tags = {
 	SpaceStationMeteorButton = "DontTouchIt_SpaceStationMeteorButton",
 	SpaceStationEscapePod = "DontTouchIt_SpaceStationEscapePod",
 	CaveLight = "DontTouchIt_CaveLight",
+	CaveScrapBox = "DontTouchIt_CaveScrapBox",
 	StartingFlashlight = "DontTouchIt_StartingFlashlight",
 	CaveEntranceSeal = "DontTouchIt_CaveEntranceSeal",
 	CaveLockdownReveal = "DontTouchIt_CaveLockdownReveal",

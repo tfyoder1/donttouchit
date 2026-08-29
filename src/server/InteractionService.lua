@@ -1295,6 +1295,10 @@ function InteractionService:Initialize()
 		self:_wireCaveLight(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.CaveScrapBox, function(instance)
+		self:_wireCaveScrapBox(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.CaveExitKey, function(instance)
 		self:_wireCaveExitKey(instance)
 	end)
@@ -4451,6 +4455,26 @@ function InteractionService:_wireCaveLight(light)
 		playSound(light, "rbxasset://sounds/electronicpingshort.wav", 0.45, 1.25)
 		self.discoveryService:Unlock(player, Constants.Discoveries.CaveChangedLights.Id)
 		self.systemMessageRemote:FireClient(player, "The cave light changes color. This feels like exactly the sort of thing the sign mentioned.")
+	end)
+end
+
+function InteractionService:_wireCaveScrapBox(scrapBox)
+	local prompt = getPrompt(scrapBox)
+
+	self:_connectPrompt(prompt, function(player)
+		local isProloguePending =
+			self.roomProgressService
+			and self.roomProgressService:IsUntouchedProloguePending(player)
+			and not playerHasSignalBand(player)
+		if isProloguePending then
+			self:_setCaveEntranceSealed()
+			self:_triggerCaveAlarm(scrapBox)
+		end
+
+		self.systemMessageRemote:FireClient(
+			player,
+			"A box of scraps, in a cave. Someone was either desperate, brilliant, or very fond of dramatic constraints."
+		)
 	end)
 end
 

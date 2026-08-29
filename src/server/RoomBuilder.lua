@@ -2528,6 +2528,30 @@ local function makeCaveEntranceArea(roomFolder)
 	createPart(cave, "CavernRightWall", Vector3.new(1, 16, 38), CFrame.new(cavernCenter + Vector3.new(24, 8, 0)), Color3.fromRGB(36, 36, 35), Enum.Material.Slate)
 	createPart(cave, "CavernCeiling", Vector3.new(48, 1, 38), CFrame.new(cavernCenter + Vector3.new(0, 16, 0)), Color3.fromRGB(27, 28, 28), Enum.Material.Slate)
 
+	local scrapBox = makeModel(cave, "CaveBoxOfScraps")
+	local scrapBoxCFrame = CFrame.new(cavernCenter + Vector3.new(20.8, 1.05, 12.5)) * CFrame.Angles(0, math.rad(-90), 0)
+	local scrapBase = createPart(scrapBox, "ScrapBoxBase", Vector3.new(3.8, 0.28, 2.6), scrapBoxCFrame * CFrame.new(0, -0.62, 0), Color3.fromRGB(86, 55, 34), Enum.Material.Wood)
+	scrapBase:SetAttribute("PrologueDescription", "A battered box of scraps sits in the cave, as if someone expected engineering to happen under pressure.")
+	local scrapBack = createPart(scrapBox, "ScrapBoxBack", Vector3.new(3.8, 1.05, 0.22), scrapBoxCFrame * CFrame.new(0, -0.05, 1.19), Color3.fromRGB(74, 47, 30), Enum.Material.Wood)
+	local scrapFront = createPart(scrapBox, "ScrapBoxFront", Vector3.new(3.8, 1.05, 0.22), scrapBoxCFrame * CFrame.new(0, -0.05, -1.19), Color3.fromRGB(74, 47, 30), Enum.Material.Wood)
+	local scrapLeft = createPart(scrapBox, "ScrapBoxLeft", Vector3.new(0.22, 1.05, 2.6), scrapBoxCFrame * CFrame.new(-1.79, -0.05, 0), Color3.fromRGB(74, 47, 30), Enum.Material.Wood)
+	local scrapRight = createPart(scrapBox, "ScrapBoxRight", Vector3.new(0.22, 1.05, 2.6), scrapBoxCFrame * CFrame.new(1.79, -0.05, 0), Color3.fromRGB(74, 47, 30), Enum.Material.Wood)
+	for scrapIndex, scrapData in ipairs({
+		{ Offset = Vector3.new(-1.05, 0.28, -0.45), Size = Vector3.new(1.35, 0.16, 0.3), Color = Color3.fromRGB(140, 143, 135), Rot = Vector3.new(8, 18, -10) },
+		{ Offset = Vector3.new(0.05, 0.36, 0.12), Size = Vector3.new(1.7, 0.18, 0.24), Color = Color3.fromRGB(99, 112, 116), Rot = Vector3.new(-5, -22, 7) },
+		{ Offset = Vector3.new(0.88, 0.42, -0.25), Size = Vector3.new(0.26, 0.24, 1.2), Color = Color3.fromRGB(120, 91, 52), Rot = Vector3.new(15, 38, 5) },
+		{ Offset = Vector3.new(-0.28, 0.5, 0.58), Size = Vector3.new(0.35, 0.22, 0.9), Color = Color3.fromRGB(171, 135, 66), Rot = Vector3.new(-12, 4, 24) },
+	}) do
+		local rotation = CFrame.Angles(math.rad(scrapData.Rot.X), math.rad(scrapData.Rot.Y), math.rad(scrapData.Rot.Z))
+		local scrap = createPart(scrapBox, "LooseScrap" .. scrapIndex, scrapData.Size, scrapBoxCFrame * CFrame.new(scrapData.Offset) * rotation, scrapData.Color, Enum.Material.Metal)
+		scrap.CanCollide = false
+		scrap:SetAttribute("BaseCanCollide", false)
+	end
+	local scrapPrompt = createPrompt(scrapBase, "Inspect", "Box of Scraps", 0)
+	scrapPrompt.MaxActivationDistance = 10
+	scrapBox.PrimaryPart = scrapBase
+	tag(scrapBox, Constants.Tags.CaveScrapBox)
+
 	for spikeIndex, spikeData in ipairs({
 		{ X = -139, Z = 1, H = 5.4, D = 1.1, Down = false },
 		{ X = -132, Z = 27, H = 4.4, D = 0.9, Down = false },

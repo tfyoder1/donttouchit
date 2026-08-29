@@ -114,6 +114,7 @@ def audit_shared_contracts(audit: Audit) -> None:
         "LightSwitch",
         "BunkerPowerMeter",
         "StartingFlashlight",
+        "CaveScrapBox",
         "UnderfloorReturn",
     ):
         audit.add(group, f"tag exists: {tag}", re.search(rf'\b{tag}\s*=\s*"', constants) is not None)
@@ -187,6 +188,7 @@ def audit_flashlight_and_tutorials(audit: Audit) -> None:
     audit.add(group, "client sends ToggleFlashlight action", 'Action = "ToggleFlashlight"' in action)
     audit.add(group, "starting flashlight has stable tutorial id", 'TutorialId", "StartingFlashlightPickup"' in builder)
     audit.add(group, "starting flashlight ignores line of sight", "flashlightPrompt.RequiresLineOfSight = false" in builder)
+    audit.add(group, "cave box of scraps is generated", "CaveBoxOfScraps" in builder and "Box of Scraps" in builder)
     audit.add(group, "tutorial preference service file exists", audit.exists("src/server/TutorialPreferencesService.lua"))
     audit.add(group, "tutorial preference service initialized", "TutorialPreferencesService" in game_manager)
 
