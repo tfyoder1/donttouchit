@@ -3591,6 +3591,8 @@ local function makeInfirmaryRoom(roomFolder)
 	local sink = createPart(room, "InfirmarySink", Vector3.new(4.6, 1.4, 2.2), cframeAt(origin, -18.8, 2.2, -15.8), Color3.fromRGB(203, 210, 211), Enum.Material.Metal)
 	createPart(room, "InfirmaryFaucet", Vector3.new(0.34, 1.25, 0.34), cframeAt(origin, -18.8, 3.28, -16.7), Color3.fromRGB(148, 162, 170), Enum.Material.Metal)
 	sink:SetAttribute("BunkerEnergyIgnored", true)
+	createPrompt(sink, "Wash Hands", "Infirmary Sink", 0)
+	tag(sink, Constants.Tags.InfirmarySink)
 
 	local tray = makeModel(room, "InfirmaryNourishmentTray")
 	local trayBase = createPart(tray, "InfirmarySnackTray", Vector3.new(3.6, 0.22, 1.8), cframeAt(origin, 4.6, 2.35, 3.6), Color3.fromRGB(196, 202, 203), Enum.Material.Metal)

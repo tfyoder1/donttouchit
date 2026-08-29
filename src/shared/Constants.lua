@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.BuildVersion = "0.5.332"
+Constants.BuildVersion = "0.5.333"
 Constants.GameIntro = "You wake up in the forest with no memory of arriving. There is a cave ahead, and the lights inside are already on."
 Constants.TitleStoryLines = {
 	Default = {
@@ -240,6 +240,7 @@ Constants.Tags = {
 	InfirmaryMonitor = "DontTouchIt_InfirmaryMonitor",
 	InfirmaryCabinet = "DontTouchIt_InfirmaryCabinet",
 	InfirmaryNourishment = "DontTouchIt_InfirmaryNourishment",
+	InfirmarySink = "DontTouchIt_InfirmarySink",
 	GymTreadmill = "DontTouchIt_GymTreadmill",
 	GymBike = "DontTouchIt_GymBike",
 	GymWeights = "DontTouchIt_GymWeights",
@@ -1438,6 +1439,11 @@ Constants.Discoveries = {
 		Name = "Accepted Infirmary Ration",
 		Hint = "There is food and water near the recovery bed, left where a waking person would see it.",
 	},
+	InfirmarySink = {
+		Id = "infirmary_sink",
+		Name = "Washed Your Hands",
+		Hint = "The Infirmary sink still remembers water pressure.",
+	},
 	InfirmaryNoTouch = {
 		Id = "infirmary_no_touch",
 		Name = "Left the Infirmary Alone",
@@ -1553,6 +1559,7 @@ Constants.RoomDiscoveryOrder = {
 		Constants.Discoveries.InfirmaryMonitor.Id,
 		Constants.Discoveries.InfirmaryCabinet.Id,
 		Constants.Discoveries.InfirmaryNourishment.Id,
+		Constants.Discoveries.InfirmarySink.Id,
 		Constants.Discoveries.InfirmaryNoTouch.Id,
 	},
 	Gym = {
@@ -2078,6 +2085,7 @@ Constants.DiscoveryHighlightTargets = {
 	[Constants.Discoveries.InfirmaryMonitor.Id] = Constants.Tags.InfirmaryMonitor,
 	[Constants.Discoveries.InfirmaryCabinet.Id] = Constants.Tags.InfirmaryCabinet,
 	[Constants.Discoveries.InfirmaryNourishment.Id] = Constants.Tags.InfirmaryNourishment,
+	[Constants.Discoveries.InfirmarySink.Id] = Constants.Tags.InfirmarySink,
 	[Constants.Discoveries.GymEntered.Id] = Constants.Tags.GymTreadmill,
 	[Constants.Discoveries.GymTreadmill.Id] = Constants.Tags.GymTreadmill,
 	[Constants.Discoveries.GymBike.Id] = Constants.Tags.GymBike,

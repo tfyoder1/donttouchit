@@ -1420,6 +1420,10 @@ function InteractionService:Initialize()
 		self:_wireInfirmaryNourishment(instance)
 	end)
 
+	self:_connectTagged(Constants.Tags.InfirmarySink, function(instance)
+		self:_wireInfirmarySink(instance)
+	end)
+
 	self:_connectTagged(Constants.Tags.GymTreadmill, function(instance)
 		self:_wireGymTreadmill(instance)
 	end)
@@ -3245,6 +3249,21 @@ function InteractionService:_wireInfirmaryNourishment(tray)
 
 	self:_connectPrompt(prompt, function(player)
 		self:_pocketInfirmaryNourishment(player, tray)
+	end)
+end
+
+function InteractionService:_wireInfirmarySink(sink)
+	local prompt = getPrompt(sink)
+
+	self:_connectPrompt(prompt, function(player)
+		self.discoveryService:Unlock(player, Constants.Discoveries.InfirmarySink.Id)
+		playSound(sink, "rbxasset://sounds/impact_water.mp3", 0.22, 1.15)
+		task.delay(0.12, function()
+			if sink.Parent then
+				playSound(sink, "rbxasset://sounds/electronicpingshort.wav", 0.18, 1.75)
+			end
+		end)
+		self.systemMessageRemote:FireClient(player, "The water runs cold and clean for exactly long enough to be unsettling.")
 	end)
 end
 
